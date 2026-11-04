@@ -108,7 +108,7 @@ tests/         Vitest; fixtures/responses/ holds the recorded payloads
   `forbids_population` grows a kind for them. A suite
   mean therefore says nothing about whether a prompt extracts the
   uncovered types, however green it runs. The policy is
-  `docs/adr/0002-constraint-coverage-policy.md`; the living inventory
+  `docs/adr/constraint-coverage-policy.md`; the living inventory
   and closing workstreams are
   `docs/specs/constraint-extraction-coverage.spec.md` -- update that
   spec in the same commit that adds a type's first or second tested
@@ -138,12 +138,10 @@ tests/         Vitest; fixtures/responses/ holds the recorded payloads
   constraints and never reads populations -- so the stale field changed
   no score and produced no symptom.
 
-  `withDeterministicIds` is what makes the guard exact rather than
-  approximate: ids are minted fresh on every parse, so without a fixed
-  generator only structure could be compared. It restores the previous
-  generator in a `finally`, because `setIdGenerator` is process-wide and
-  a leak would leave every later test in the worker minting fixture ids
-  while still passing.
+  The guard is exact, comparing bytes, because every id is one the model
+  gives from a name or a sentence (iri-identity 6b-4b): one payload
+  renders one file. `withDeterministicIds`, which fixed a random
+  generator for the same purpose, retired with the generator.
 
   A drift failure means one of two things and they call for opposite
   responses: the parse path changed and the references should be

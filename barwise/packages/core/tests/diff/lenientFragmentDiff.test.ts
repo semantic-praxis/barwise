@@ -42,7 +42,7 @@
 
 import { describe, expect, it } from "vitest";
 import { diffModels } from "../../src/diff/ModelDiff.js";
-import { mergeAndValidate, mergeModels } from "../../src/diff/ModelMerge.js";
+import { MERGE_DIFF_OPTIONS, mergeAndValidate, mergeModels } from "../../src/diff/ModelMerge.js";
 import { OrmModel } from "../../src/model/OrmModel.js";
 
 const lenient = { skipPlayerValidation: true };
@@ -116,7 +116,7 @@ describe("a subtype fact in a lenient fragment", () => {
     const incoming = fragment();
     incoming.addSubtypeFact({ id: "sf-2", subtypeId: "ot-mgr", supertypeId: "ot-emp" }, lenient);
 
-    const { deltas } = diffModels(existing, incoming);
+    const { deltas } = diffModels(existing, incoming, MERGE_DIFF_OPTIONS);
     // The default review policy for a fragment: take what it adds, keep
     // what it does not mention. Accepting the removals instead would
     // empty the model, which is the fragment's own doing and not this
@@ -124,7 +124,11 @@ describe("a subtype fact in a lenient fragment", () => {
     const accepted = new Set(
       deltas.map((d, i) => (d.kind === "added" ? i : -1)).filter((i) => i >= 0),
     );
-    const merged = mergeModels(existing, incoming, deltas, accepted);
+    const merged = mergeModels(existing, incoming, {
+      deltas,
+      matching: "id-first",
+      recognizeRenames: false,
+    }, accepted);
     expect(merged.subtypeFacts).toHaveLength(1);
     expect(merged.getObjectType(merged.subtypeFacts[0]!.subtypeId)?.name).toBe("Manager");
   });
@@ -219,13 +223,18 @@ describe("a subtype fact in a lenient fragment", () => {
       const incoming = fragment();
       incoming.addSubtypeFact({ id: "sf-3", subtypeId, supertypeId }, lenient);
 
-      const { deltas } = diffModels(existing, incoming);
+      const { deltas } = diffModels(existing, incoming, MERGE_DIFF_OPTIONS);
       // Accept only what the fragment adds: accepting the removals would
       // empty the base model and confuse what is being asked.
       const accepted = new Set(
         deltas.map((d, i) => (d.kind === "added" ? i : -1)).filter((i) => i >= 0),
       );
-      const result = mergeAndValidate(existing, incoming, deltas, accepted);
+      const result = mergeAndValidate(
+        existing,
+        incoming,
+        { deltas, matching: "id-first", recognizeRenames: false },
+        accepted,
+      );
 
       expect(result.model?.subtypeFacts).toHaveLength(1);
       expect(result.isValid).toBe(false);
@@ -373,8 +382,13 @@ describe("a lenient fragment element the merge used to drop", () => {
       lenient,
     );
 
-    const { deltas } = diffModels(existing, incoming);
-    const result = mergeAndValidate(existing, incoming, deltas, acceptAdded(deltas));
+    const { deltas } = diffModels(existing, incoming, MERGE_DIFF_OPTIONS);
+    const result = mergeAndValidate(
+      existing,
+      incoming,
+      { deltas, matching: "id-first", recognizeRenames: false },
+      acceptAdded(deltas),
+    );
 
     expect(result.model?.populations).toHaveLength(1);
     expect(result.isValid).toBe(false);
@@ -394,8 +408,13 @@ describe("a lenient fragment element the merge used to drop", () => {
       const incoming = fragment();
       incoming.addObjectifiedFactType({ id: "oft-typo", objectTypeId, factTypeId }, lenient);
 
-      const { deltas } = diffModels(existing, incoming);
-      const result = mergeAndValidate(existing, incoming, deltas, acceptAdded(deltas));
+      const { deltas } = diffModels(existing, incoming, MERGE_DIFF_OPTIONS);
+      const result = mergeAndValidate(
+        existing,
+        incoming,
+        { deltas, matching: "id-first", recognizeRenames: false },
+        acceptAdded(deltas),
+      );
 
       expect(result.model?.objectifiedFactTypes).toHaveLength(1);
       expect(result.isValid).toBe(false);
@@ -420,7 +439,7 @@ describe("a lenient fragment element the merge used to drop", () => {
     // An incoming model that simply lacks the fact type, so the diff
     // offers its removal.
     const incoming = objectTypes();
-    const { deltas } = diffModels(existing, incoming);
+    const { deltas } = diffModels(existing, incoming, MERGE_DIFF_OPTIONS);
 
     // Accept the FACT TYPE's removal but REJECT the population's, so the
     // population is still chosen when the guard runs. Accepting both --
@@ -432,7 +451,11 @@ describe("a lenient fragment element the merge used to drop", () => {
         .map((d, i) => (d.kind === "removed" && d.elementType !== "population" ? i : -1))
         .filter((i) => i >= 0),
     );
-    const result = mergeAndValidate(existing, incoming, deltas, accepted);
+    const result = mergeAndValidate(existing, incoming, {
+      deltas,
+      matching: "id-first",
+      recognizeRenames: false,
+    }, accepted);
 
     expect(result.model?.factTypes).toHaveLength(0);
     expect(result.model?.populations).toHaveLength(0);
@@ -460,7 +483,9 @@ describe("a renamed fact type in a lenient fragment", () => {
     const existing = existingIsFragment ? works(fragment()) : works(objectTypes());
     const incoming = existingIsFragment ? assigned(objectTypes()) : assigned(fragment());
 
-    const { synonymCandidates } = diffModels(existing, incoming);
+    // With rename recognition off, the fragment's players must still
+    // resolve by name for the synonym detector to see the pair.
+    const { synonymCandidates } = diffModels(existing, incoming, { recognizeRenames: false });
     expect(synonymCandidates).toContainEqual(
       expect.objectContaining({
         elementType: "fact_type",
@@ -468,6 +493,17 @@ describe("a renamed fact type in a lenient fragment", () => {
         addedName: "EmployeeIsAssignedTo",
       }),
     );
+
+    // With it on (the default), the same resolution lets the content pass
+    // pair the two as one renamed fact type (iri-identity 6a).
+    const ft = diffModels(existing, incoming).deltas.filter((d) => d.elementType === "fact_type");
+    expect(ft).toEqual([
+      expect.objectContaining({
+        kind: "modified",
+        name: "EmployeeWorksInDepartment",
+        pairedBy: "recognized",
+      }),
+    ]);
   });
 });
 

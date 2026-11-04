@@ -12,7 +12,7 @@ import * as path from "node:path";
 import * as YAML from "yaml";
 import type { OrmModel } from "../model/OrmModel.js";
 import { OrmYamlSerializer } from "../serialization/OrmYamlSerializer.js";
-import type { LineageManifest, ManifestExport } from "./types.js";
+import { LINEAGE_MANIFEST_VERSION, type LineageManifest, type ManifestExport } from "./types.js";
 
 const MANIFEST_DIR = ".barwise";
 const MANIFEST_FILE = "lineage.yaml";
@@ -31,9 +31,35 @@ export function serializeManifest(manifest: LineageManifest): string {
   return YAML.stringify(manifest, { lineWidth: 0 });
 }
 
-/** Parse lineage manifest YAML text into a manifest object. */
+/**
+ * Parse lineage manifest YAML text into a manifest object, upgraded to the
+ * current version (`upgradeManifest`), so every reader sees the marker on
+ * an export written under 3.x ids.
+ */
 export function parseManifest(yamlContent: string): LineageManifest {
-  return YAML.parse(yamlContent) as LineageManifest;
+  return upgradeManifest(YAML.parse(yamlContent) as LineageManifest);
+}
+
+/**
+ * A manifest as version 2 (iri-identity 6e): a version 1 manifest was
+ * written by a build before format 4.0, so each of its exports names
+ * elements by 3.x ids, and is marked `idsBefore40`. The marker is per
+ * export because `updateManifest` keeps every export it does not replace,
+ * so one manifest holds both. Any other manifest is returned as it is.
+ */
+export function upgradeManifest(manifest: LineageManifest): LineageManifest {
+  // An empty file parses to null, which every reader takes as no manifest;
+  // a version this build does not know is left as written, never relabelled.
+  if (manifest === null || typeof manifest !== "object" || manifest.version !== 1) {
+    return manifest;
+  }
+  return {
+    ...manifest,
+    version: LINEAGE_MANIFEST_VERSION,
+    exports: (manifest.exports ?? []).map((exp) =>
+      exp.idsBefore40 ? exp : { ...exp, idsBefore40: true }
+    ),
+  };
 }
 
 /**
@@ -47,36 +73,40 @@ export function parseManifest(yamlContent: string): LineageManifest {
  *
  * `sourceModel` names the model file relative to the manifest's
  * directory, which is how `resolveArtifact` finds it. It was never
- * passed, so every manifest recorded "" (barwise-ofb).
+ * passed, so every manifest recorded "" (barwise-ofb). The entry records
+ * it too, because a manifest serves every model in its directory and the
+ * top-level field names only the last to export (iri-identity 6a).
  */
 export function updateManifest(
-  entry: ManifestExport,
+  given: ManifestExport,
   existingManifest?: LineageManifest,
   sourceModel?: string,
 ): LineageManifest {
+  const entry = sourceModel !== undefined ? { ...given, sourceModel } : given;
   if (!existingManifest) {
     return {
-      version: 1,
+      version: LINEAGE_MANIFEST_VERSION,
       sourceModel: sourceModel ?? "",
       sourceModelHash: entry.modelHash,
       exports: [entry],
     };
   }
 
-  const existingIndex = existingManifest.exports.findIndex(
+  const existing = upgradeManifest(existingManifest);
+  const existingIndex = existing.exports.findIndex(
     (exp) => exp.artifact === entry.artifact,
   );
 
   const newExports: readonly ManifestExport[] = existingIndex >= 0
     ? [
-      ...existingManifest.exports.slice(0, existingIndex),
+      ...existing.exports.slice(0, existingIndex),
       entry,
-      ...existingManifest.exports.slice(existingIndex + 1),
+      ...existing.exports.slice(existingIndex + 1),
     ]
-    : [...existingManifest.exports, entry];
+    : [...existing.exports, entry];
 
   return {
-    ...existingManifest,
+    ...existing,
     ...(sourceModel !== undefined ? { sourceModel } : {}),
     sourceModelHash: entry.modelHash,
     exports: newExports,
@@ -84,61 +114,50 @@ export function updateManifest(
 }
 
 /**
- * Hash an ORM model to detect staleness.
+ * Hash an ORM model to detect staleness: the serialized model, SHA-256,
+ * hex digest. The model's own `namespace` and `imports` are in it; the
+ * project file's `iri_base` and contexts are not (iri-identity 6e).
  *
- * The model is serialized to YAML, its ids are canonicalized, and the
- * result is hashed with SHA-256. Returns the hex digest.
- *
- * Ids are canonicalized because they are not all authored: every
- * constraint without an `id` in the source is minted a fresh UUID on
- * load (`FactType`), so two loads of one file serialize differently on
- * every such line and hashed differently -- and `barwise lineage
- * status` reported every export stale on every run for any model with
- * an id-less constraint (barwise-923). Each id string is replaced by
- * its order of first appearance, and every reference to it follows
- * because a reference is the same string. The cost is that renaming an
- * explicit id, with nothing else changed, does not change the hash;
- * lineage guards content, and ids are identity plumbing.
+ * Ids used to be canonicalized first, because a constraint without an id
+ * took a fresh UUID on every load (barwise-923), and the canonicalization
+ * stayed so every recorded hash still matched. Under format 4.0 an id is
+ * the element's name or sentence, the same on every load, and a manifest
+ * written before 4.0 reads stale anyway (`idsBefore40`), so the hash is
+ * of the model as written. A rename now changes the hash, which is right:
+ * the names an artifact was generated from have changed.
  */
 export function hashModel(model: OrmModel): string {
-  const serializer = new OrmYamlSerializer();
-  const doc: unknown = YAML.parse(serializer.serialize(model));
-
   const hash = createHash("sha256");
-  hash.update(JSON.stringify(canonicalizeIds(doc)));
+  hash.update(new OrmYamlSerializer().serialize(model));
   return hash.digest("hex");
 }
 
 /**
- * Replace every id value, and every string equal to one, with `#n`
- * where n is the id's order of first appearance in document order.
- * Pure over plain YAML data; key order is the serializer's, which is
- * already deterministic.
+ * The manifest with each source id in `ids` read as its new id, in the
+ * exports `sourceModel` made (iri-identity 6e): what a rename does to the
+ * lineage it can see. The hash is never restamped, because the artifacts
+ * really are stale. Undefined when no source changes, so the caller writes
+ * nothing. An export that names another model, or none, is left: whose it
+ * is is `attribution.ts`'s question, and a rename does not answer it. So is
+ * one marked `idsBefore40`: its 3.x ids can collide with a 4.0 map.
  */
-function canonicalizeIds(doc: unknown): unknown {
-  const ids = new Map<string, string>();
-  const collect = (node: unknown): void => {
-    if (Array.isArray(node)) {
-      node.forEach(collect);
-    } else if (node !== null && typeof node === "object") {
-      for (const [key, value] of Object.entries(node)) {
-        if (key === "id" && typeof value === "string" && !ids.has(value)) {
-          ids.set(value, `#${ids.size + 1}`);
-        }
-        collect(value);
-      }
-    }
-  };
-  const rewrite = (node: unknown): unknown => {
-    if (typeof node === "string") return ids.get(node) ?? node;
-    if (Array.isArray(node)) return node.map(rewrite);
-    if (node !== null && typeof node === "object") {
-      return Object.fromEntries(
-        Object.entries(node).map(([key, value]) => [key, rewrite(value)]),
-      );
-    }
-    return node;
-  };
-  collect(doc);
-  return rewrite(doc);
+export function renameInManifest(
+  manifest: LineageManifest,
+  ids: ReadonlyMap<string, string>,
+  sourceModel: string,
+): LineageManifest | undefined {
+  let changed = false;
+  const exports = manifest.exports.map((exp) => {
+    // A marked export names 3.x ids, which a 4.0 rename map can collide
+    // with; it reads stale until re-exported anyway, so it is left.
+    if (exp.sourceModel !== sourceModel || exp.idsBefore40) return exp;
+    const sources = exp.sources.map((src) => {
+      const now = ids.get(src.elementId);
+      if (now === undefined || now === src.elementId) return src;
+      changed = true;
+      return { ...src, elementId: now };
+    });
+    return sources.some((src, i) => src !== exp.sources[i]) ? { ...exp, sources } : exp;
+  });
+  return changed ? { ...manifest, exports } : undefined;
 }

@@ -2,9 +2,14 @@
  * export_model tool: exports an ORM model to a specified format.
  */
 
-import { getExporter, listExporters } from "@barwise/core";
+import {
+  getExporter,
+  listExporters,
+  surrogateKeyFormats,
+  surrogateKeysRefusal,
+} from "@barwise/core";
 import { registerDbtFormats } from "@barwise/dbt";
-import { registerStandardFormats } from "@barwise/formats";
+import { formatConstraintReport, registerStandardFormats } from "@barwise/formats";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { resolveModels, type SourceInput, sourcePath } from "../workspace/resolve.js";
@@ -68,6 +73,14 @@ export function registerExportModelTool(server: McpServer): void {
               .describe(
                 "Refuse to export if model has validation errors (default: false)",
               ),
+            surrogateKeys: z
+              .boolean()
+              .optional()
+              .describe(
+                "Give every table keyed on several columns a generated key, the hash of "
+                  + "its natural key, and make every reference to one a single column "
+                  + `(${surrogateKeyFormats().join(", ")})`,
+              ),
           })
           .catchall(z.unknown())
           .optional()
@@ -108,6 +121,9 @@ export function executeExportModel(
     );
   }
 
+  const refusal = options?.["surrogateKeys"] === true ? surrogateKeysRefusal(format) : undefined;
+  if (refusal) return jsonError(refusal);
+
   // Resolve the model to export. A single call yields one artifact, so a
   // multi-domain project must name the `domain` to export.
   let model;
@@ -135,12 +151,27 @@ export function executeExportModel(
 
     // Return the primary text output, spilling to a file when large.
     // For multi-file formats, the text field contains a combined view.
-    return boundedTextResult(result.text, {
+    const artifact = boundedTextResult(result.text, {
       kind: `export-${format}`,
       source: sourcePath(source),
       outputPath,
       extension: extensionForFormat(format),
     });
+    // In full: an agent acting on the export needs the predicate and the
+    // example, not only the sentence.
+    const reportText = formatConstraintReport(result.constraintSpecs, format, {
+      detail: true,
+      ...(domain ? { domain } : {}),
+    });
+    if (!reportText) return artifact;
+    // A second block, so `content[0]` stays the artifact. Bounded on its
+    // own, and never to `outputPath`: that path names the artifact, and
+    // a spilled report written there would overwrite it.
+    const report = boundedTextResult(reportText, {
+      kind: `export-${format}-constraints`,
+      source: sourcePath(source),
+    });
+    return { content: [...artifact.content, ...report.content] };
   } catch (error) {
     return jsonError(error instanceof Error ? error.message : String(error));
   }

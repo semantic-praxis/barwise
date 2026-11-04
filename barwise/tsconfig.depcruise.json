@@ -10,6 +10,7 @@
       "@barwise/core/lineage": ["packages/core/src/lineage/index.ts"],
       "@barwise/core/mapping": ["packages/core/src/mapping/index.ts"],
       "@barwise/core/query": ["packages/core/src/query/index.ts"],
+      "@barwise/core/rename": ["packages/core/src/rename/index.ts"],
       "@barwise/core/sql": ["packages/core/src/sql/index.ts"],
       "@barwise/core/verbalization": ["packages/core/src/verbalization/index.ts"],
       "@barwise/diagram/theme": ["packages/diagram/src/render/theme.ts"],

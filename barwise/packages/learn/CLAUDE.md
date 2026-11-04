@@ -54,7 +54,7 @@ tests/            Vitest; tests/helpers/ModelBuilder.ts (copied from @barwise/co
   flag correct answers.
 - **`forbids_population` is the keystone.** It derives the population a
   reference constraint forbids (via core's
-  `generateCounterexampleForConstraint`), maps it onto the candidate by
+  `generateCounterexampleInView`), maps it onto the candidate by
   object-type name and role position (`populationMapping.ts`), injects it,
   and requires the candidate's own constraints to reject it. The candidate
   is mutated transiently and restored -- it is left unchanged.

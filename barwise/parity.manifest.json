@@ -151,6 +151,94 @@
           "symbol": "CREATE_TABLE_PREFIX"
         }
       ]
+    },
+    {
+      "name": "staged-write",
+      "why": "the CLI's migrate and rename and the MCP server's rename_element must write files the same way (stage every file, then rename them, naming what was replaced on a part-way failure); the MCP server does not depend on the CLI, so the module is deliberately parallel and only its header may differ",
+      "ignore": "leading-docblock",
+      "members": [
+        "packages/cli/src/workspace/stagedWrite.ts",
+        "packages/mcp/src/workspace/stagedWrite.ts"
+      ]
+    },
+    {
+      "name": "package-model-builder",
+      "why": "formats, dbt and learn tests build models through one shorthand; a fixture in one package must mean the same model in the others. Core keeps its own builder, which reads core source rather than the package build and carries fields only core tests use; its roleId and preferredId are tied to these by the model-builder-roleId and model-builder-preferredId sets.",
+      "members": [
+        "packages/formats/tests/helpers/ModelBuilder.ts",
+        "packages/dbt/tests/helpers/ModelBuilder.ts",
+        "packages/learn/tests/helpers/ModelBuilder.ts"
+      ]
+    },
+    {
+      "name": "model-builder-roleId",
+      "why": "the id format the test builders mint must be the same in core's builder and the package builders (iri-identity 6a); the package-model-builder set ties the three package copies, this ties core to them",
+      "members": [
+        {
+          "file": "packages/core/tests/helpers/ModelBuilder.ts",
+          "symbol": "roleId"
+        },
+        {
+          "file": "packages/formats/tests/helpers/ModelBuilder.ts",
+          "symbol": "roleId"
+        }
+      ]
+    },
+    {
+      "name": "model-builder-preferredId",
+      "why": "the id format the test builders mint must be the same in core's builder and the package builders (iri-identity 6a); the package-model-builder set ties the three package copies, this ties core to them",
+      "members": [
+        {
+          "file": "packages/core/tests/helpers/ModelBuilder.ts",
+          "symbol": "preferredId"
+        },
+        {
+          "file": "packages/formats/tests/helpers/ModelBuilder.ts",
+          "symbol": "preferredId"
+        }
+      ]
+    },
+    {
+      "name": "lineage-read-manifest",
+      "why": "the CLI and the MCP server must read one .barwise/lineage.yaml the same way, or a manifest one surface wrote reads differently on the other; each package owns its own filesystem I/O, so the reader is deliberately parallel (iri-identity 6a)",
+      "members": [
+        {
+          "file": "packages/cli/src/workspace/lineageIo.ts",
+          "symbol": "readManifest"
+        },
+        {
+          "file": "packages/mcp/src/workspace/lineageIo.ts",
+          "symbol": "readManifest"
+        }
+      ]
+    },
+    {
+      "name": "lineage-models-beside",
+      "why": "the CLI and the MCP server must agree on which model files sit beside a manifest: it decides whether an export is orphaned and whether a model is alone in its directory, so the two would report one manifest differently (iri-identity 6a)",
+      "members": [
+        {
+          "file": "packages/cli/src/workspace/lineageIo.ts",
+          "symbol": "modelsBeside"
+        },
+        {
+          "file": "packages/mcp/src/workspace/lineageIo.ts",
+          "symbol": "modelsBeside"
+        }
+      ]
+    },
+    {
+      "name": "lineage-model-location",
+      "why": "the CLI and the MCP server must find a model's manifest and name the model the same way, from one real path, or one surface matches a model to its exports and the other refuses it (iri-identity 6a)",
+      "members": [
+        {
+          "file": "packages/cli/src/workspace/lineageIo.ts",
+          "symbol": "modelLocation"
+        },
+        {
+          "file": "packages/mcp/src/workspace/lineageIo.ts",
+          "symbol": "modelLocation"
+        }
+      ]
     }
   ]
 }

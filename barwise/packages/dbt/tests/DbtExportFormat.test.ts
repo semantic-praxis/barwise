@@ -7,7 +7,7 @@
  */
 import { describe, expect, it } from "vitest";
 import { DbtExportFormat } from "../src/DbtExportFormat.js";
-import { ModelBuilder } from "./helpers/ModelBuilder.js";
+import { ModelBuilder, roleId } from "./helpers/ModelBuilder.js";
 
 const dbtFormat = new DbtExportFormat();
 
@@ -30,12 +30,12 @@ function buildEnrollmentModelWithIncompleteInstance() {
     .withPopulation("Student enrolls Course", [
       {
         roleValues: {
-          "Student enrolls Course::role1": "S001",
-          "Student enrolls Course::role2": "Design, 101",
+          [roleId("Student enrolls Course", 1)]: "S001",
+          [roleId("Student enrolls Course", 2)]: "Design, 101",
         },
       },
       // Missing the Course role value -- an incomplete instance.
-      { roleValues: { "Student enrolls Course::role1": "S002" } },
+      { roleValues: { [roleId("Student enrolls Course", 1)]: "S002" } },
     ])
     .build();
 }
@@ -238,6 +238,34 @@ describe("DbtExportFormat", () => {
         expect(file.name).toMatch(/^models\//);
       }
     });
+
+    it("writes the model files and schema.yml under modelsDir, and only those", () => {
+      // The editor's palette asks for models/staging (palette-file-export-routing.spec.md).
+      const model = buildEnrollmentModelWithIncompleteInstance();
+      const names = dbtFormat
+        .export(model, { modelsDir: "models/staging" })
+        .files!.map((f) => f.name)
+        .sort();
+      expect(names).toEqual([
+        "models/staging/course.sql",
+        "models/staging/schema.yml",
+        "models/staging/student.sql",
+        "models/staging/student_enrolls_course.sql",
+        "seeds/student_enrolls_course.csv",
+      ]);
+    });
+
+    it("refuses a modelsDir that would leave the project", () => {
+      const model = buildEnrollmentModelWithIncompleteInstance();
+      for (const modelsDir of ["", "/abs", "../up", "models/../..", "..\\evil", "C:/x", 5]) {
+        expect(() => dbtFormat.export(model, { modelsDir }), String(modelsDir)).toThrow(
+          /modelsDir must be a relative path/,
+        );
+      }
+      // Extra slashes are not a different directory.
+      const names = dbtFormat.export(model, { modelsDir: "models/staging/" }).files!;
+      expect(names.some((f) => f.name === "models/staging/schema.yml")).toBe(true);
+    });
   });
 });
 
@@ -253,5 +281,48 @@ describe("the project's identifier strategy (identifier-strategy-in-exports.spec
     expect(withStrategy).toContain("data_type: INTEGER");
     expect(withStrategy).toContain("exported as INTEGER by the project's identifier strategy");
     expect(schemaYml({})).toContain("data_type: TEXT");
+  });
+});
+
+/**
+ * The format renders only the relational schema, so the constraints that
+ * schema does not carry are reported (schema-export-constraint-specs.spec.md):
+ * the ring is, the mandatory the mapping enforces as NOT NULL is not.
+ */
+describe("constraints the export does not carry", () => {
+  function mentors(withRing: boolean) {
+    const model = new ModelBuilder("Test")
+      .withEntityType("Person", { referenceMode: "person_id" })
+      .withValueType("Name", { dataType: { name: "text" } })
+      .withBinaryFactType("Person has Name", {
+        role1: { player: "Person", name: "has" },
+        role2: { player: "Name", name: "is of" },
+        uniqueness: "role1",
+        mandatory: "role1",
+      })
+      .withBinaryFactType("Person mentors Person", {
+        role1: { player: "Person", name: "mentors" },
+        role2: { player: "Person", name: "is mentored by" },
+        uniqueness: "role2",
+      })
+      .build();
+    if (withRing) {
+      model.getFactTypeByName("Person mentors Person")!.addConstraint({
+        type: "ring",
+        roleId1: roleId("Person mentors Person", 1),
+        roleId2: roleId("Person mentors Person", 2),
+        ringType: "irreflexive",
+      });
+    }
+    return model;
+  }
+
+  it("reports each one as a constraint spec", () => {
+    const specs = new DbtExportFormat().export(mentors(true)).constraintSpecs;
+    expect(specs?.map((s) => s.pseudocode)).toEqual(["for all x: not Person mentors Person(x, x)"]);
+  });
+
+  it("sets no constraintSpecs when the schema carries them all", () => {
+    expect(new DbtExportFormat().export(mentors(false)).constraintSpecs).toBeUndefined();
   });
 });

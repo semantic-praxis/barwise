@@ -1,7 +1,10 @@
 import {
   type Diagnostic as OrmDiagnostic,
+  type OrmModel,
   OrmYamlSerializer,
   ProjectSerializer,
+  type RuleId,
+  storeIds,
   ValidationEngine,
 } from "@barwise/core";
 import type { TextDocument } from "vscode-languageserver-textdocument";
@@ -45,9 +48,17 @@ export class DiagnosticsProvider {
       // a reason to show nothing but a parse error (barwise-977).
       const model = this.serializer.deserialize(text, { lenient: true });
       const ormDiagnostics = this.validationEngine.validate(model);
+      // An id the file does not state is found by where its element sits
+      // (decision 17); asked only when there is one, since it reads again.
+      const unstoredAt = unstoredPaths(text, model);
 
       for (const d of ormDiagnostics) {
-        const pos = sourceMap.getPosition(d.elementId);
+        // A 3.x file states the id the element had before the load replayed
+        // it into 4.0's (iri-identity WS6), so that is the one its text holds.
+        const path = unstoredAt.get(d.elementId);
+        const pos = path !== undefined
+          ? sourceMap.getPathPosition(path)
+          : sourceMap.getPosition(model.priorIds?.get(d.elementId) ?? d.elementId);
         const range = pos
           ? {
             start: { line: pos.line, character: pos.character },
@@ -59,7 +70,7 @@ export class DiagnosticsProvider {
           severity: mapSeverity(d.severity),
           range,
           message: d.message,
-          source: `barwise (${d.ruleId})`,
+          source: diagnosticSource(d.ruleId),
         });
       }
     } catch (err) {
@@ -103,6 +114,28 @@ export class DiagnosticsProvider {
       uri: document.uri,
       diagnostics,
     });
+  }
+}
+
+/** The LSP `source` of a diagnostic a core rule reported. */
+export function diagnosticSource(ruleId: RuleId): string {
+  return `barwise (${ruleId})`;
+}
+
+/**
+ * Where each element the file gives no id sits, by its id. Only placement
+ * depends on it, so a failure here places those diagnostics at the top of
+ * the file rather than replacing every diagnostic with a parse error.
+ */
+function unstoredPaths(
+  text: string,
+  model: OrmModel,
+): ReadonlyMap<string, readonly (string | number)[]> {
+  try {
+    // The model already loaded, so the file is not read twice per change.
+    return new Map(storeIds(text, model).stored.map((s) => [s.id, s.path] as const));
+  } catch {
+    return new Map();
   }
 }
 

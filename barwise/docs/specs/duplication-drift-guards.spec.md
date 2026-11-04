@@ -2,7 +2,7 @@
 
 Status: Implemented (all six workstreams; see Implementation notes)
 Created: 2026-08-26
-Last-updated: 2026-08-26
+Last-updated: 2026-10-25
 Tracking: `docs/logic-duplication-audit-2026-08-26.md` (all classes);
 extends the remedy of `docs/specs/artifact-resolution-parity.spec.md`
 (implemented, PR #347) from one instance to the class. Issues:
@@ -71,6 +71,8 @@ manifest line and forbids nothing about the design, while an
 extraction is a design change each time. Checking first also converts
 every later share into a safe refactor -- the check is the test that
 the share preserved behavior.
+
+Recorded as `docs/adr/must-agree-copies.md`.
 
 ## Scope
 
@@ -399,6 +401,8 @@ is resolved, it shall exit nonzero naming the stale entry; when the
 baseline is read, its `tracked` entries shall enumerate exactly the
 detectable findings still open; and when the skill's method section
 is read, detection shall be one command, not a grep procedure.
+
+Recorded as `docs/adr/findings-close-by-mechanism.md`.
 
 ### 6. Write the rule where authors will meet it
 

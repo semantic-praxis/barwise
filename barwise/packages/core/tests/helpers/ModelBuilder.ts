@@ -1,4 +1,6 @@
 import type { Constraint } from "../../src/model/Constraint.js";
+import { storePreferredFlags } from "../../src/model/identification.js";
+import { localName } from "../../src/model/name.js";
 import type {
   DataTypeDef,
   ObjectTypeKind,
@@ -8,12 +10,33 @@ import { OrmModel } from "../../src/model/OrmModel.js";
 import type { FactInstanceConfig } from "../../src/model/Population.js";
 
 /**
+ * The id the builder gives a binary fact type's role, by its position (1 or
+ * 2, as `role1` and `role2` name them): `<fact type>.roleN`, a format 4.0
+ * role id under the fact type's id, which the model mints from its name. A
+ * test that names a role by id calls this, so the format is decided here
+ * (iri-identity, WS6 6a and 6b). Two fact types whose names differ only in
+ * whitespace or `_` would share these ids; no test builds such a pair.
+ */
+export function roleId(factTypeName: string, position: 1 | 2): string {
+  return `${localName(factTypeName)}.role${position}`;
+}
+
+/** The id of the uniqueness a fact type's `isPreferred` flags: a local name. */
+export function preferredId(factTypeName: string): string {
+  return `${localName(factTypeName)}_preferred`;
+}
+
+/**
  * Shorthand options for adding an object type via the builder.
  */
 interface ObjectTypeOptions {
   kind?: ObjectTypeKind;
   referenceMode?: string;
   definition?: string;
+  /**
+   * Make it a shadow of this context's element: the id `<context>:<name>`
+   * and an import of the context, as a 4.0 file states one (iri-identity 6d).
+   */
   sourceContext?: string;
   valueConstraint?: ValueConstraintDef;
   dataType?: DataTypeDef;
@@ -40,7 +63,11 @@ interface BinaryFactTypeOptions {
   uniqueness?: "role1" | "role2" | "both" | "spanning";
   /** Shorthand: "role1" or "role2" for mandatory role constraint. */
   mandatory?: "role1" | "role2" | "both";
-  /** Mark the uniqueness constraint as preferred identifier. */
+  /**
+   * Mark the uniqueness constraint as a preferred identifier, as a 2.0
+   * file's `is_preferred` flag would: `build` places it on the entity it
+   * identifies with the 2.0 loader's rule (`storePreferredFlags`).
+   */
   isPreferred?: boolean;
   definition?: string;
 }
@@ -182,7 +209,7 @@ export class ModelBuilder {
    * Add a population with sample instances for a fact type.
    *
    * Instance values use the builder's deterministic role IDs:
-   * "FactTypeName::role1" and "FactTypeName::role2".
+   * `roleId(name, 1)` and `roleId(name, 2)`.
    */
   withPopulation(
     factTypeName: string,
@@ -225,19 +252,34 @@ export class ModelBuilder {
    * @throws If any referenced object types don't exist.
    */
   build(): OrmModel {
+    // The flagged uniqueness of each fact type, by the id it is given.
+    const flagged = new Set<string>();
+    const flag = (factTypeName: string) => {
+      const id = preferredId(factTypeName);
+      flagged.add(id);
+      return id;
+    };
+    const contexts = [
+      ...new Set(this.objectTypeConfigs.flatMap(({ options }) => options.sourceContext ?? [])),
+    ];
     const model = new OrmModel({
       name: this.modelName,
       domainContext: this.domainContext,
+      ...(contexts.length > 0
+        ? { imports: Object.fromEntries(contexts.map((c) => [localName(c), c])) }
+        : {}),
     });
 
     // Add all object types first.
     for (const { name, options } of this.objectTypeConfigs) {
       model.addObjectType({
+        ...(options.sourceContext !== undefined
+          ? { id: `${localName(options.sourceContext)}:${localName(name)}` }
+          : {}),
         name,
         kind: options.kind ?? "entity",
         referenceMode: options.referenceMode,
         definition: options.definition,
-        sourceContext: options.sourceContext,
         valueConstraint: options.valueConstraint,
         dataType: options.dataType,
         aliases: options.aliases,
@@ -274,8 +316,8 @@ export class ModelBuilder {
 
       // We need to generate role ids ahead of time so constraints can reference them.
       // We use deterministic ids based on fact type name + position.
-      const role1Id = `${name}::role1`;
-      const role2Id = `${name}::role2`;
+      const role1Id = roleId(name, 1);
+      const role2Id = roleId(name, 2);
 
       if (options.uniqueness) {
         const preferred = options.isPreferred ?? false;
@@ -284,20 +326,23 @@ export class ModelBuilder {
             constraints.push({
               type: "internal_uniqueness",
               roleIds: [role1Id],
-              ...(preferred ? { isPreferred: true } : {}),
+              ...(preferred ? { id: flag(name) } : {}),
             });
             break;
           case "role2":
             constraints.push({
               type: "internal_uniqueness",
               roleIds: [role2Id],
-              ...(preferred ? { isPreferred: true } : {}),
+              ...(preferred ? { id: flag(name) } : {}),
             });
             break;
           case "both":
+            // A preferred flag goes on role1, as "role1" puts it; an
+            // entity-value binary is identified whichever role carries it.
             constraints.push({
               type: "internal_uniqueness",
               roleIds: [role1Id],
+              ...(preferred ? { id: flag(name) } : {}),
             });
             constraints.push({
               type: "internal_uniqueness",
@@ -308,7 +353,7 @@ export class ModelBuilder {
             constraints.push({
               type: "internal_uniqueness",
               roleIds: [role1Id, role2Id],
-              ...(preferred ? { isPreferred: true } : {}),
+              ...(preferred ? { id: flag(name) } : {}),
             });
             break;
         }
@@ -410,6 +455,9 @@ export class ModelBuilder {
       model.addDefinition(def);
     }
 
+    // After the objectifications: an objectified fact type's flag names
+    // the objectifying type.
+    storePreferredFlags(model, (c) => c.id !== undefined && flagged.has(c.id));
     return model;
   }
 }

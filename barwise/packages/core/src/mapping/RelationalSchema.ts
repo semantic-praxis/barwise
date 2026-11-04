@@ -41,6 +41,12 @@ export interface Column {
   readonly sourceRoleId?: string;
   /** Default value (from the value type's default), rendered as SQL DEFAULT. */
   readonly defaultValue?: string;
+  /**
+   * For a key `withSurrogateKeys` generated, the columns of this table it
+   * is a hash of, in order: what the dbt model computes it from and the
+   * annotation describes (surrogate-key-export.spec.md).
+   */
+  readonly generatedFrom?: readonly string[];
 }
 
 export interface PrimaryKey {
@@ -62,6 +68,22 @@ export interface Table {
   readonly foreignKeys: readonly ForeignKey[];
   /** The model element id this table was derived from. */
   readonly sourceElementId: string;
+  /**
+   * The key a generated key replaced, which routing writes as a uniqueness
+   * so the business rule stays enforced (surrogate-key-export.spec.md).
+   */
+  readonly naturalKey?: readonly string[];
+}
+
+/**
+ * A UNIQUE the DDL export writes, as a table and its columns: what
+ * `routeUniqueOnly` decides and the dbt renderer writes. Here, beside the
+ * schema it names, so the renderers need not import the router, which
+ * reaches them through the export types.
+ */
+export interface RoutedUnique {
+  readonly tableName: string;
+  readonly columns: readonly string[];
 }
 
 export interface RelationalSchema {

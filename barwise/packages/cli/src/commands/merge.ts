@@ -16,7 +16,7 @@
  */
 
 import { OrmYamlSerializer } from "@barwise/core";
-import { diffModels, mergeAndValidate } from "@barwise/core/diff";
+import { diffModels, MERGE_DIFF_OPTIONS, mergeAndValidate } from "@barwise/core/diff";
 import type { Command } from "commander";
 import { loadModel, writeOutput } from "../workspace/io.js";
 
@@ -41,7 +41,7 @@ export function registerMergeCommand(program: Command): void {
           // The incoming model may reference base types without
           // redefining them, the same allowance the MCP tool makes.
           const incomingModel = loadModel(incoming, { lenient: true });
-          const diff = diffModels(baseModel, incomingModel);
+          const diff = diffModels(baseModel, incomingModel, MERGE_DIFF_OPTIONS);
 
           if (!diff.hasChanges) {
             if (opts.format === "json") {
@@ -65,7 +65,7 @@ export function registerMergeCommand(program: Command): void {
             if (d.kind === "added" || d.kind === "modified") accepted.add(i);
           }
 
-          const result = mergeAndValidate(baseModel, incomingModel, diff.deltas, accepted);
+          const result = mergeAndValidate(baseModel, incomingModel, diff, accepted);
 
           if (!result.isValid || !result.model) {
             // Nothing is written on a structural error, to stdout or to

@@ -9,29 +9,38 @@
  * mutation of the model it was computed from. See the module comment on
  * `changeDescription.ts` for why.
  */
-import type { Constraint, JoinOperand } from "../model/Constraint.js";
+import type { Constraint, ExternalConstraint } from "../model/Constraint.js";
 import type { Definition } from "../model/Definition.js";
 import type { DerivationRule, FactType } from "../model/FactType.js";
-import {
-  isEntityType,
-  isValueType,
-  type ObjectType,
-  type ValueConstraintDef,
-  type ValueType,
-} from "../model/ObjectType.js";
+import { resolvePreferredIdentifier } from "../model/identification.js";
+import { ownerContextOf } from "../model/namespace.js";
+import { isEntityType, isValueType, type ObjectType, type ValueType } from "../model/ObjectType.js";
 import type { OrmModel } from "../model/OrmModel.js";
 import type { FactInstance, Population } from "../model/Population.js";
 import type { Role } from "../model/Role.js";
 import type { SubtypeFact } from "../model/SubtypeFact.js";
 import type { ChangeDescription, RoleSummary } from "./changeDescription.js";
+import { constraintKey, type RoleKeys, valueConstraintKey } from "./constraintKey.js";
+import {
+  type DiffIdentity,
+  diffIdentity,
+  type ElementMatching,
+  NO_RENAME_RECOGNITION,
+  type RenameRecognition,
+} from "./identity.js";
 
 export function diffObjectType(
   a: ObjectType,
   b: ObjectType,
-  _existingModel: OrmModel,
-  _incomingModel: OrmModel,
+  existingModel: OrmModel,
+  incomingModel: OrmModel,
+  identity: DiffIdentity,
+  ownerChanges = true,
 ): ChangeDescription[] {
   const changes: ChangeDescription[] = [];
+
+  // Paired by id, so the name is now something that can change.
+  if (a.name !== b.name) changes.push({ change: "name", from: a.name, to: b.name });
 
   // The diff is one of the few places that genuinely holds both variants
   // at once -- `a` and `b` may differ in kind, and that difference is
@@ -55,11 +64,32 @@ export function diffObjectType(
       to: referenceModeOf(b),
     });
   }
+  // Compared by what the identifier is, not by its constraint's id: two
+  // models built apart (an import, independent LLM samples) give the same
+  // uniqueness different ids.
+  // Compared by the identity keys of what it names, reported by name, so
+  // renaming the identifying fact type or a covered role's player does not
+  // read as a new identifier.
+  const fromKey = preferredIdentifierLabel(existingModel, a.id, incomingModel, identity);
+  const toKey = preferredIdentifierLabel(incomingModel, b.id, existingModel, identity);
+  if (fromKey !== toKey) {
+    changes.push({
+      change: "preferredIdentifier",
+      from: preferredIdentifierLabel(existingModel, a.id, incomingModel),
+      to: preferredIdentifierLabel(incomingModel, b.id, existingModel),
+    });
+  }
   if ((a.definition ?? "") !== (b.definition ?? "")) {
     changes.push({ change: "definition", from: a.definition, to: b.definition });
   }
-  if ((a.sourceContext ?? "") !== (b.sourceContext ?? "")) {
-    changes.push({ change: "sourceContext", from: a.sourceContext, to: b.sourceContext });
+  // Whose element it is, read from the id's alias (iri-identity 6d): an
+  // owned type and a shadow of one pair by name, under different ids.
+  // Paired by id, it is one element whoever imports what: a change to the
+  // import is the header's delta, not this one's.
+  const ownerA = ownerContextOf(existingModel, a.id);
+  const ownerB = ownerContextOf(incomingModel, b.id);
+  if (ownerChanges && a.id !== b.id && (ownerA ?? "") !== (ownerB ?? "")) {
+    changes.push({ change: "sourceContext", from: ownerA, to: ownerB });
   }
 
   if (valueConstraintKey(aValue?.valueConstraint) !== valueConstraintKey(bValue?.valueConstraint)) {
@@ -159,6 +189,64 @@ export function isDanglingFactType(a: OrmModel, b: OrmModel, factTypeId: string)
   return !a.getFactType(factTypeId) && !b.getFactType(factTypeId);
 }
 
+/**
+ * How one diff pairs elements, fixed once for the whole pair of models:
+ * whether ids count (`ElementMatching`), which object types and fact types
+ * are the same element (`DiffIdentity`), and which constraint ids are too
+ * ambiguous to pair by.
+ */
+export interface ConstraintPairing {
+  readonly matching: ElementMatching;
+  readonly identity: DiffIdentity;
+  /** A role's holding fact type, keyed by identity in the model it came from. */
+  readonly homeKey: (home: FactType) => string;
+  /**
+   * Ids given to more than one constraint anywhere in each model
+   * (barwise-b2s). They pair nothing by id: uniqueness is a whole-model
+   * condition, so a list of one fact type's constraints cannot decide it.
+   */
+  readonly repeatedA: ReadonlySet<string>;
+  readonly repeatedB: ReadonlySet<string>;
+}
+
+/** The pairing for diffing `existing` against `incoming`. */
+export function constraintPairing(
+  existing: OrmModel,
+  incoming: OrmModel,
+  matching: ElementMatching,
+  recognition: RenameRecognition = NO_RENAME_RECOGNITION,
+): ConstraintPairing {
+  const identity = diffIdentity(existing, incoming, matching, recognition);
+  const homeKey = (home: FactType) =>
+    identity.factTypeKey(existing.getFactType(home.id) === home ? existing : incoming, home.id);
+  // Content matching never reads the repeated ids, and the sample fold
+  // diffs every pair of samples, so it skips the two model walks.
+  if (matching !== "id-first") {
+    return { matching, identity, homeKey, repeatedA: NO_IDS, repeatedB: NO_IDS };
+  }
+  return {
+    matching,
+    identity,
+    homeKey,
+    repeatedA: repeatedIds(existing),
+    repeatedB: repeatedIds(incoming),
+  };
+}
+
+const NO_IDS: ReadonlySet<string> = new Set();
+
+/** The constraint ids that occur more than once in the model. */
+function repeatedIds(model: OrmModel): ReadonlySet<string> {
+  const seen = new Set<string>();
+  const repeated = new Set<string>();
+  for (const [c] of model.everyConstraint()) {
+    if (c.id === undefined) continue;
+    if (seen.has(c.id)) repeated.add(c.id);
+    seen.add(c.id);
+  }
+  return repeated;
+}
+
 export function diffFactType(
   a: FactType,
   b: FactType,
@@ -168,10 +256,13 @@ export function diffFactType(
     existing: roleHolders(existingModel),
     incoming: roleHolders(incomingModel),
   },
+  pairing: ConstraintPairing = constraintPairing(existingModel, incomingModel, "id-first"),
 ): ChangeDescription[] {
   const changes: ChangeDescription[] = [];
 
-  // Compare roles by position: player name and role name.
+  if (a.name !== b.name) changes.push({ change: "name", from: a.name, to: b.name });
+
+  // Compare roles by position: player (by identity, not name) and role name.
   if (a.arity !== b.arity) {
     changes.push({ change: "arity", from: a.arity, to: b.arity });
   } else {
@@ -180,7 +271,11 @@ export function diffFactType(
       const rb = b.roles[i]!;
       const summaryA = roleSummary(ra, existingModel, incomingModel);
       const summaryB = roleSummary(rb, incomingModel, existingModel);
-      if (summaryA.playerName !== summaryB.playerName) {
+      const { identity } = pairing;
+      if (
+        identity.objectTypeKey(existingModel, ra.playerId)
+          !== identity.objectTypeKey(incomingModel, rb.playerId)
+      ) {
         changes.push({ change: "rolePlayer", index: i, from: summaryA, to: summaryB });
       }
       if (ra.name !== rb.name) {
@@ -198,14 +293,18 @@ export function diffFactType(
 
   // Constraints -- pass both role arrays and both models' role-holder
   // indexes, so constraintKey can resolve role IDs to positions (stable
-  // across LLM re-extractions and imports).
+  // across LLM re-extractions and imports), or, for a pair joined by its
+  // constraint id, to the role ids themselves (see `pairRoleKeys`).
+  // A fact type's own constraints only: one across fact types is the
+  // model's, and its own delta (`pairModelConstraints`) reports it.
   const constraintDiff = diffConstraints(
-    a.constraints,
-    b.constraints,
+    a.internalConstraints,
+    b.internalConstraints,
     a.roles,
     b.roles,
     holders.existing,
     holders.incoming,
+    pairing,
   );
   changes.push(...constraintDiff);
 
@@ -259,35 +358,11 @@ function copy<T>(value: T): T {
   return value === undefined ? value : (structuredClone(value) as T);
 }
 
-/**
- * A stable key for a value constraint, order-insensitive on both halves.
- *
- * Both halves: the comparison read `values` alone until barwise-934, so a
- * narrowed range between two models with the same enumerated values --
- * `1..10` becoming `1..5` -- was invisible, which is the one omission here
- * that changed what the model permits rather than what it documents.
- */
-function valueConstraintKey(vc: ValueConstraintDef | undefined): string {
-  if (!vc) return "";
-  const values = vc.values.slice().sort().join(",");
-  const ranges = (vc.ranges ?? [])
-    .map((r) =>
-      `${r.minInclusive === false ? "(" : "["}${r.min ?? ""}..${r.max ?? ""}`
-      + `${r.maxInclusive === false ? ")" : "]"}`
-    )
-    .sort()
-    .join(",");
-  return `${values}|${ranges}`;
-}
-
 /** A stable key for a derivation rule, or "" when absent (asserted). */
 function derivationKey(d: DerivationRule | undefined): string {
   if (!d) return "";
   return `${d.kind}|${d.storage ?? "derive_on_request"}|${d.expression}|${d.isFormal ? "f" : ""}`;
 }
-
-/** A role id's stable key within one model. */
-type RoleKeys = (id: string) => string;
 
 /**
  * Every fact type that holds each role id, in one model. Built once per
@@ -331,6 +406,7 @@ function roleKeys(
   roles: readonly Role[],
   holders: RoleHolders,
   otherHolders: RoleHolders,
+  homeKey: (home: FactType) => string,
 ): RoleKeys {
   // Each kind of key carries its own tag, and the free text in it is
   // JSON-quoted, so a raw id can never read as a resolved one: a dangling
@@ -343,104 +419,102 @@ function roleKeys(
     const own = host.get(id);
     if (own !== undefined) return own;
     const home = homes[0]!;
-    return `f${JSON.stringify([home.name, home.roles.findIndex((r) => r.id === id)])}`;
+    return `f${JSON.stringify([homeKey(home), home.roles.findIndex((r) => r.id === id)])}`;
   };
 }
 
-function resolveRole(id: string, keys: RoleKeys): string {
-  return keys(id);
+/**
+ * The role keys for a constraint already paired by its own id, and only
+ * then: a role both models hold, once each, is keyed by its id as well as
+ * its `roleKeys` position. The pair's id already says the two are one
+ * constraint, so its roles' ids are evidence: by position alone, a
+ * constraint moved onto the role that took the old position kept its key
+ * (orm-format-3 WS3a-iii review). Position stays because readings refer
+ * to roles by it: in "Person is parent of Person" two roles can share a
+ * player and a name, so a reorder under the same reading changes what the
+ * constraint says while every per-role comparison of the fact type
+ * agrees. The position is `roleKeys`' own -- host position, or the other
+ * fact type's identity key and position there -- so a holder renamed under
+ * a kept id is the same fact type, as `DiffIdentity` pairs it.
+ *
+ * The content pass uses `roleKeys` alone and never reads a role id: it
+ * pairs constraints whose ids say nothing, and keying by role id there
+ * would let a coincidental role id pair two different constraints, which
+ * is what content matching exists to rule out. Two functions rather than
+ * a flag, so the content pass cannot reach this one.
+ */
+function pairRoleKeys(
+  position: RoleKeys,
+  holders: RoleHolders,
+  otherHolders: RoleHolders,
+): RoleKeys {
+  return (id) =>
+    holders.get(id)?.length === 1 && otherHolders.get(id)?.length === 1
+      ? `i${JSON.stringify([id, position(id)])}`
+      : position(id);
 }
 
 /**
- * Produce a stable, comparable string key for a constraint, normalized
- * so that role IDs are replaced with positions (see `roleKeys`). This
- * eliminates false-positive diffs caused by fresh UUIDs from LLM
- * re-extractions and imports.
+ * Keys a subtype fact by its subtype's and supertype's names, as
+ * `roleKeys` keys a role by its fact type's name and position, so a
+ * subtype constraint pairs by content across models whose subtype fact
+ * ids are unrelated (an import, independent LLM samples). Only constraints
+ * across fact types can name one, so only `pairModelConstraints` wraps
+ * its keys with this (orm-format-3 WS4b).
  */
-function constraintKey(
-  c: Constraint,
-  idxMap: RoleKeys,
-): string {
-  const base = constraintTypeKey(c, idxMap);
-  // Modality is part of a constraint's identity: alethic vs deontic is a
-  // real change, so a deontic constraint keys distinctly from its alethic
-  // twin.
-  return c.modality === "deontic" ? `${base}|deontic` : base;
+function withSubtypeFacts(
+  keys: RoleKeys,
+  model: OrmModel,
+  other: OrmModel,
+  identity: DiffIdentity,
+): RoleKeys {
+  return (id) => {
+    // Its ends are named in the model that holds it: two files can give one
+    // id to different object types.
+    const owner = model.getSubtypeFact(id) ? model : other;
+    const sf = owner.getSubtypeFact(id);
+    if (!sf) return keys(id);
+    const keyOf = (ot: string) => identity.objectTypeKey(owner, ot);
+    return `s${JSON.stringify([keyOf(sf.subtypeId), keyOf(sf.supertypeId)])}`;
+  };
 }
 
-function constraintTypeKey(
-  c: Constraint,
-  idxMap: RoleKeys,
-): string {
-  switch (c.type) {
-    case "internal_uniqueness": {
-      const indices = c.roleIds.map((id) => resolveRole(id, idxMap)).sort();
-      return `IU:${indices.join(",")}:${c.isPreferred ? "P" : ""}`;
-    }
-    case "mandatory":
-      return `M:${resolveRole(c.roleId, idxMap)}`;
-    case "external_uniqueness": {
-      const indices = c.roleIds.map((id) => resolveRole(id, idxMap)).sort();
-      return `EU:${indices.join(",")}`;
-    }
-    case "value_constraint": {
-      const role = c.roleId ? resolveRole(c.roleId, idxMap) : "";
-      const vals = [...c.values].sort().join(",");
-      return `VC:${role}:${vals}`;
-    }
-    case "disjunctive_mandatory": {
-      const indices = c.roleIds.map((id) => resolveRole(id, idxMap)).sort();
-      return `DM:${indices.join(",")}`;
-    }
-    case "exclusion": {
-      const indices = c.roleIds.map((id) => resolveRole(id, idxMap)).sort();
-      return `EX:${indices.join(",")}`;
-    }
-    case "exclusive_or": {
-      const indices = c.roleIds.map((id) => resolveRole(id, idxMap)).sort();
-      return `XO:${indices.join(",")}`;
-    }
-    case "subset": {
-      const sub = c.subsetRoleIds.map((id) => resolveRole(id, idxMap));
-      const sup = c.supersetRoleIds.map((id) => resolveRole(id, idxMap));
-      return `SUB:${sub.join(",")}:${sup.join(",")}`;
-    }
-    case "equality": {
-      const ids1 = c.roleIds1.map((id) => resolveRole(id, idxMap));
-      const ids2 = c.roleIds2.map((id) => resolveRole(id, idxMap));
-      return `EQ:${ids1.join(",")}:${ids2.join(",")}`;
-    }
-    case "ring":
-      return `RING:${resolveRole(c.roleId1, idxMap)},${
-        resolveRole(c.roleId2, idxMap)
-      }:${c.ringType}`;
-    case "frequency": {
-      const indices = c.roleIds.map((id) => resolveRole(id, idxMap)).sort();
-      return `FREQ:${indices.join(",")}:${c.min}:${c.max}`;
-    }
-    case "value_comparison":
-      return `VCMP:${resolveRole(c.roleId1, idxMap)},${
-        resolveRole(c.roleId2, idxMap)
-      }:${c.operator}`;
-    case "cardinality":
-      return `CARD:${resolveRole(c.roleId, idxMap)}:${c.min}:${c.max}`;
-    // Join constraints carry inline role paths whose role ids span fact
-    // types, so they key by their (stable) role ids rather than by the
-    // owner fact type's positional index. Subset is ordered; equality and
-    // exclusion are an unordered set of operand paths.
-    case "join_subset":
-      return `JSUB:${operandKey(c.subset)}::${operandKey(c.superset)}`;
-    case "join_equality":
-      return `JEQ:${c.operands.map(operandKey).sort().join("::")}`;
-    case "join_exclusion":
-      return `JEXC:${c.operands.map(operandKey).sort().join("::")}`;
+/**
+ * The constraints of `a` paired by id with one of `b`, where an id names
+ * exactly one constraint in each model, and whether the pair says
+ * something different. An id given twice anywhere in a model
+ * (barwise-b2s) pairs nothing, so those constraints fall through to
+ * content rather than pairing one of them arbitrarily. Content matching
+ * pairs nothing here. One function for a fact type's own constraints and
+ * the model's, so the two cannot come to pair differently.
+ */
+function pairById<C extends Constraint>(
+  a: readonly C[],
+  b: readonly C[],
+  keysA: RoleKeys,
+  keysB: RoleKeys,
+  holdersA: RoleHolders,
+  holdersB: RoleHolders,
+  pairing: ConstraintPairing,
+): Map<C, { readonly to: C; readonly changed: boolean; }> {
+  const pairs = new Map<C, { readonly to: C; readonly changed: boolean; }>();
+  if (pairing.matching !== "id-first") return pairs;
+  // The key for comparing a pair joined by id; see `pairRoleKeys`.
+  const pairA = pairRoleKeys(keysA, holdersA, holdersB);
+  const pairB = pairRoleKeys(keysB, holdersB, holdersA);
+  const { existingPairId, incomingPairId } = pairing.identity;
+  const byIdB = new Map(
+    b.flatMap((c) =>
+      c.id !== undefined && !pairing.repeatedB.has(c.id) ? [[incomingPairId(c.id), c]] : []
+    ),
+  );
+  for (const ca of a) {
+    if (ca.id === undefined || pairing.repeatedA.has(ca.id)) continue;
+    const cb = byIdB.get(existingPairId(ca.id));
+    if (!cb) continue;
+    pairs.set(ca, { to: cb, changed: constraintKey(ca, pairA) !== constraintKey(cb, pairB) });
   }
-}
-
-/** A stable structural key for a join operand: its path plus its projection. */
-function operandKey(o: JoinOperand): string {
-  const path = `${o.path.root}|${o.path.steps.map((s) => `${s.entry}>${s.exit}`).join(",")}`;
-  return `${path}#${o.projection.join(",")}`;
+  return pairs;
 }
 
 function diffConstraints(
@@ -450,17 +524,36 @@ function diffConstraints(
   rolesB: readonly Role[],
   holdersA: RoleHolders,
   holdersB: RoleHolders,
+  pairing: ConstraintPairing,
 ): ChangeDescription[] {
   const changes: ChangeDescription[] = [];
 
-  const idxMapA = roleKeys(rolesA, holdersA, holdersB);
-  const idxMapB = roleKeys(rolesB, holdersB, holdersA);
+  const idxMapA = roleKeys(rolesA, holdersA, holdersB, pairing.homeKey);
+  const idxMapB = roleKeys(rolesB, holdersB, holdersA, pairing.homeKey);
 
-  const keysA = new Set(a.map((c) => constraintKey(c, idxMapA)));
-  const keysB = new Set(b.map((c) => constraintKey(c, idxMapB)));
+  // Pair by id first, where an id names exactly one constraint in each
+  // model. An id given twice anywhere in a model (barwise-b2s) pairs
+  // nothing, so those constraints fall through to content rather than
+  // pairing one of them arbitrarily. The id is optional in the type until
+  // WS3c, though every constraint in a model has one (barwise-nkq).
+  const paired = new Set<Constraint>();
+  const modified: { from: Constraint; to: Constraint; }[] = [];
+  for (
+    const [ca, { to, changed }] of pairById(a, b, idxMapA, idxMapB, holdersA, holdersB, pairing)
+  ) {
+    paired.add(ca).add(to);
+    if (changed) modified.push({ from: ca, to });
+  }
+  const restA = a.filter((c) => !paired.has(c));
+  const restB = b.filter((c) => !paired.has(c));
 
-  const added = b.filter((c) => !keysA.has(constraintKey(c, idxMapB)));
-  const removed = a.filter((c) => !keysB.has(constraintKey(c, idxMapA)));
+  const keyA = new Map(restA.map((c) => [c, constraintKey(c, idxMapA)]));
+  const keyB = new Map(restB.map((c) => [c, constraintKey(c, idxMapB)]));
+  const keysA = new Set(keyA.values());
+  const keysB = new Set(keyB.values());
+
+  const added = restB.filter((c) => !keysA.has(keyB.get(c)!));
+  const removed = restA.filter((c) => !keysB.has(keyA.get(c)!));
 
   // The constraints themselves, copied: the prose renders only their
   // deduplicated type names, and that was the whole of what a consumer
@@ -471,8 +564,130 @@ function diffConstraints(
   if (removed.length > 0) {
     changes.push({ change: "constraintsRemoved", constraints: removed.map(copy) });
   }
+  if (modified.length > 0) {
+    changes.push({
+      change: "constraintsModified",
+      constraints: modified.map(({ from, to }) => ({ from: copy(from), to: copy(to) })),
+    });
+  }
 
   return changes;
+}
+
+/** One constraint across fact types matched, or not, between two models. */
+export interface ConstraintPair {
+  readonly existing?: ExternalConstraint;
+  readonly incoming?: ExternalConstraint;
+  /** Paired by id and saying something different. */
+  readonly modified: boolean;
+}
+
+/**
+ * Match the constraints across fact types of two models one to one
+ * (orm-format-3 WS3c): by id first, as `diffConstraints` does, then by
+ * content. With no host, every role is keyed by its fact type's name and
+ * position there (`roleKeys` given no host roles), so the key no longer
+ * depends on where a 2.0 file nested the constraint. Content pairs are
+ * taken one for one, so a second identical copy in one model reads as
+ * added or removed, where a fact type's list compares keys as a set.
+ * Existing order first, then what only the incoming model has.
+ */
+export function pairModelConstraints(
+  existing: OrmModel,
+  incoming: OrmModel,
+  holders: { readonly existing: RoleHolders; readonly incoming: RoleHolders; },
+  pairing: ConstraintPairing,
+): ConstraintPair[] {
+  const a = existing.constraints;
+  const b = incoming.constraints;
+  const keysA = withSubtypeFacts(
+    roleKeys([], holders.existing, holders.incoming, pairing.homeKey),
+    existing,
+    incoming,
+    pairing.identity,
+  );
+  const keysB = withSubtypeFacts(
+    roleKeys([], holders.incoming, holders.existing, pairing.homeKey),
+    incoming,
+    existing,
+    pairing.identity,
+  );
+  return pairOneToOne(a, b, keysA, keysB, holders, pairing);
+}
+
+/** One of a fact type's own constraints matched, or not, between two models. */
+export interface InternalConstraintPair {
+  readonly existing?: Constraint;
+  readonly incoming?: Constraint;
+  /** Paired by id and saying something different. */
+  readonly modified: boolean;
+}
+
+/**
+ * Match the constraints of two versions of one fact type one to one, as
+ * `pairModelConstraints` matches the model's: by id first, as
+ * `diffConstraints` does, then by content, each role keyed by its
+ * position in the fact type. For a merge that keeps the base's id and
+ * stored key for each pair (iri-identity 6d). `diffConstraints` compares
+ * the content keys as sets, since it reports only changes; this takes
+ * them one for one, so a second identical copy reads as added or removed.
+ */
+export function pairFactTypeConstraints(
+  a: FactType,
+  b: FactType,
+  holders: { readonly existing: RoleHolders; readonly incoming: RoleHolders; },
+  pairing: ConstraintPairing,
+): InternalConstraintPair[] {
+  const keysA = roleKeys(a.roles, holders.existing, holders.incoming, pairing.homeKey);
+  const keysB = roleKeys(b.roles, holders.incoming, holders.existing, pairing.homeKey);
+  return pairOneToOne(
+    a.internalConstraints,
+    b.internalConstraints,
+    keysA,
+    keysB,
+    holders,
+    pairing,
+  );
+}
+
+/** By id where `pairById` pairs, then by content key one for one. */
+function pairOneToOne<C extends Constraint>(
+  a: readonly C[],
+  b: readonly C[],
+  keysA: RoleKeys,
+  keysB: RoleKeys,
+  holders: { readonly existing: RoleHolders; readonly incoming: RoleHolders; },
+  pairing: ConstraintPairing,
+): { readonly existing?: C; readonly incoming?: C; readonly modified: boolean; }[] {
+  type Pair = { readonly existing?: C; readonly incoming?: C; readonly modified: boolean; };
+  const pairOf = new Map<C, Pair>();
+  const taken = new Set<C>();
+  const byId = pairById(a, b, keysA, keysB, holders.existing, holders.incoming, pairing);
+  for (const [ca, { to, changed }] of byId) {
+    taken.add(to);
+    pairOf.set(ca, { existing: ca, incoming: to, modified: changed });
+  }
+  const byKeyB = new Map<string, C[]>();
+  for (const cb of b) {
+    if (taken.has(cb)) continue;
+    const key = constraintKey(cb, keysB);
+    const list = byKeyB.get(key);
+    if (list) list.push(cb);
+    else byKeyB.set(key, [cb]);
+  }
+  for (const ca of a) {
+    if (pairOf.has(ca)) continue;
+    const cb = byKeyB.get(constraintKey(ca, keysA))?.shift();
+    if (cb) taken.add(cb);
+    pairOf.set(
+      ca,
+      cb ? { existing: ca, incoming: cb, modified: false } : { existing: ca, modified: false },
+    );
+  }
+  return [
+    ...a.map((ca) => pairOf.get(ca)!),
+    ...b.filter((cb) => !taken.has(cb)).map((cb) => ({ incoming: cb, modified: false })),
+  ];
 }
 
 /**
@@ -492,12 +707,6 @@ export function diffSubtypeFact(a: SubtypeFact, b: SubtypeFact): ChangeDescripti
       from: a.providesIdentification,
       to: b.providesIdentification,
     });
-  }
-  if (a.isExclusive !== b.isExclusive) {
-    changes.push({ change: "subtypeExclusive", from: a.isExclusive, to: b.isExclusive });
-  }
-  if (a.isExhaustive !== b.isExhaustive) {
-    changes.push({ change: "subtypeExhaustive", from: a.isExhaustive, to: b.isExhaustive });
   }
   if (derivationKey(a.definingRule) !== derivationKey(b.definingRule)) {
     changes.push({
@@ -597,4 +806,57 @@ export function diffDefinition(a: Definition, b: Definition): ChangeDescription[
     changes.push({ change: "context", from: a.context, to: b.context });
   }
   return changes;
+}
+
+/**
+ * An entity's preferred identifier, named by content: the identifying
+ * fact type, the roles its uniqueness covers, and its modality when
+ * deontic, or the stored id when the reference identifies nothing
+ * (validation reports that). A role is named by its position and its
+ * player (`playerName`, so a lenient fragment names a player it takes from
+ * the other side), sorted by position with any repeat kept, as
+ * `constraintKey` keys a uniqueness: renaming a role, or listing the roles
+ * in another order, leaves the identifier what it was. A role id the fact
+ * type lacks is named as such rather than by its id, which two models built
+ * apart do not share. An external identifier is named by its components,
+ * each a fact type and its far role's position and player, sorted by that
+ * text for the same reason the roles are sorted
+ * (external-preferred-identifier.spec.md).
+ */
+function preferredIdentifierLabel(
+  model: OrmModel,
+  entityId: string,
+  other: OrmModel,
+  keyedBy?: DiffIdentity,
+): string | undefined {
+  const resolved = resolvePreferredIdentifier(model, entityId);
+  const nameOf = (ft: FactType) => keyedBy ? keyedBy.factTypeKey(model, ft.id) : `"${ft.name}"`;
+  const player = (id: string) =>
+    keyedBy ? keyedBy.objectTypeKey(model, id) : playerName(model, id, other);
+  if (resolved.ok && resolved.at.kind === "external") {
+    const { components, constraint } = resolved.at;
+    const parts = components.map(({ factType, farRole }) =>
+      `${nameOf(factType)} role ${factType.roles.indexOf(farRole) + 1}: ${player(farRole.playerId)}`
+    ).sort();
+    const modality = constraint.modality === "deontic" ? ", deontic" : "";
+    return `external (${parts.join("; ")}${modality})`;
+  }
+  if (resolved.ok && resolved.at.kind === "internal") {
+    const { factType, constraint } = resolved.at;
+    const at = (id: string) => factType.roles.findIndex((r) => r.id === id);
+    const roles = constraint.roleIds.map(at).sort((x, y) => x - y).map((i) =>
+      i < 0
+        ? "a role the fact type lacks"
+        : `role ${i + 1}: ${
+          keyedBy
+            ? keyedBy.objectTypeKey(model, factType.roles[i]!.playerId)
+            : playerName(model, factType.roles[i]!.playerId, other)
+        }`
+    );
+    const modality = constraint.modality === "deontic" ? ", deontic" : "";
+    const named = keyedBy ? keyedBy.factTypeKey(model, factType.id) : `"${factType.name}"`;
+    return `${named} (${roles.join(", ")}${modality})`;
+  }
+  const stored = model.preferredIdentifierOf(entityId);
+  return stored === undefined ? undefined : `constraint "${stored}"`;
 }

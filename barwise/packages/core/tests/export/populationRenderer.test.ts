@@ -23,13 +23,13 @@ describe("renderPopulationAsSql", () => {
       .withBinaryFactType("Student has StudentId", {
         role1: { player: "Student", name: "has" },
         role2: { player: "StudentId", name: "identifies" },
-        uniqueness: "role1",
+        uniqueness: "both",
         isPreferred: true,
       })
       .withBinaryFactType("Course has CourseId", {
         role1: { player: "Course", name: "has" },
         role2: { player: "CourseId", name: "identifies" },
-        uniqueness: "role1",
+        uniqueness: "both",
         isPreferred: true,
       })
       .withBinaryFactType("Student enrolls in Course", {
@@ -100,13 +100,13 @@ describe("renderPopulationAsSql", () => {
       .withBinaryFactType("Customer has CustomerId", {
         role1: { player: "Customer", name: "has" },
         role2: { player: "CustomerId", name: "identifies" },
-        uniqueness: "role1",
+        uniqueness: "both",
         isPreferred: true,
       })
       .withBinaryFactType("Order has OrderNumber", {
         role1: { player: "Order", name: "has" },
         role2: { player: "OrderNumber", name: "identifies" },
-        uniqueness: "role1",
+        uniqueness: "both",
         isPreferred: true,
       })
       .withBinaryFactType("Customer places Order", {
@@ -246,7 +246,7 @@ describe("renderPopulationAsOpenApiExamples", () => {
       .withBinaryFactType("Customer has CustomerId", {
         role1: { player: "Customer", name: "has" },
         role2: { player: "CustomerId", name: "identifies" },
-        uniqueness: "role1",
+        uniqueness: "both",
         isPreferred: true,
       })
       .build();
@@ -295,7 +295,7 @@ describe("renderPopulationAsOpenApiExamples", () => {
       .withBinaryFactType("Customer has CustomerId", {
         role1: { player: "Customer", name: "has" },
         role2: { player: "CustomerId", name: "identifies" },
-        uniqueness: "role1",
+        uniqueness: "both",
         isPreferred: true,
       })
       .build();
@@ -335,7 +335,7 @@ describe("renderPopulationAsOpenApiExamples", () => {
       .withBinaryFactType("Customer has CustomerId", {
         role1: { player: "Customer", name: "has" },
         role2: { player: "CustomerId", name: "identifies" },
-        uniqueness: "role1",
+        uniqueness: "both",
         isPreferred: true,
       })
       // No population added.
@@ -352,7 +352,7 @@ describe("renderPopulationAsOpenApiExamples", () => {
       .withBinaryFactType("Customer has CustomerId", {
         role1: { player: "Customer", name: "has" },
         role2: { player: "CustomerId", name: "identifies" },
-        uniqueness: "role1",
+        uniqueness: "both",
         isPreferred: true,
       })
       .build();

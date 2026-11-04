@@ -126,7 +126,7 @@ describe("FactType", () => {
     expect(ft.rolesForPlayer("nobody")).toHaveLength(0);
   });
 
-  it("accepts and stores constraints", () => {
+  it("accepts and stores its own constraints", () => {
     const ft = new FactType({
       name: "Test",
       roles: [
@@ -140,7 +140,48 @@ describe("FactType", () => {
       ],
     });
 
-    expect(ft.constraints).toHaveLength(2);
+    expect(ft.internalConstraints.map((c) => c.type)).toEqual(["internal_uniqueness", "mandatory"]);
+  });
+
+  it("refuses a constraint across fact types, naming where it goes", () => {
+    const ft = new FactType({
+      name: "Test",
+      roles: [
+        { name: "r1", playerId: player1Id, id: "role-1" },
+        { name: "r2", playerId: player2Id, id: "role-2" },
+      ],
+      readings: ["{0} test {1}"],
+    });
+    const across = { type: "exclusion", roleIds: ["role-1", "role-2"] } as never;
+    expect(() => ft.addConstraint(across)).toThrow(
+      /lives in the model, not in fact type "Test": add it with OrmModel\.addConstraint/,
+    );
+    expect(() => ft.addConstraint({ type: "nonsense" } as never)).toThrow(
+      /Fact type "Test" has no constraint kind "nonsense"/,
+    );
+    expect(ft.internalConstraints).toEqual([]);
+  });
+
+  it("returns the constraint as stored, with the id it was given or none", () => {
+    // A preferred identifier set right after the add needs the id
+    // (iri-identity 6a); the caller's own object never gets one.
+    const ft = new FactType({
+      name: "Test",
+      roles: [
+        { name: "r1", playerId: player1Id, id: "role-1" },
+        { name: "r2", playerId: player2Id, id: "role-2" },
+      ],
+      readings: ["{0} test {1}"],
+    });
+    const given = { type: "internal_uniqueness" as const, roleIds: ["role-1"] };
+    const stored = ft.addConstraint(given);
+    // Outside a model nothing names it (iri-identity 6b-4b): no id, as a
+    // constraint a model cannot name has none, and the input is untouched.
+    expect(stored.id).toBeUndefined();
+    expect(given).not.toHaveProperty("id");
+    expect(ft.internalConstraints).toContain(stored);
+    const named = ft.addConstraint({ type: "mandatory", id: "c-given", roleId: "role-2" });
+    expect(named.id).toBe("c-given");
   });
 
   it("allows adding constraints after construction", () => {
@@ -153,9 +194,9 @@ describe("FactType", () => {
       readings: ["{0} test {1}"],
     });
 
-    expect(ft.constraints).toHaveLength(0);
+    expect(ft.internalConstraints).toHaveLength(0);
     ft.addConstraint({ type: "mandatory", roleId: "role-1" });
-    expect(ft.constraints).toHaveLength(1);
+    expect(ft.internalConstraints.map((c) => c.type)).toEqual(["mandatory"]);
   });
 
   it("stores a definition", () => {

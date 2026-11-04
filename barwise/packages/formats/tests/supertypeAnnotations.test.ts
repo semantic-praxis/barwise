@@ -4,7 +4,12 @@
  * any naming rule, and checks each entry against the DDL
  * (key-reference-tables.spec.md, requirements 4, 4a, 4b and 5).
  */
-import { completenessWarnings, OrmModel, OrmYamlSerializer } from "@barwise/core";
+import {
+  completenessWarnings,
+  OrmModel,
+  OrmYamlSerializer,
+  subtypeFlagsFromConstraints,
+} from "@barwise/core";
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -15,15 +20,19 @@ import { DdlImportFormat } from "../src/ddl/DdlImportFormat.js";
 const ddl = new DdlImportFormat();
 const exportDdl = (model: OrmModel) => new DdlExportFormat().export(model, { annotate: true }).text;
 
-/** Each subtype fact by names and every stored field. */
+/**
+ * Each subtype fact by names and every stored field, with what the
+ * constraints over subtypes say of it (orm-format-3 WS4b).
+ */
 function subtypes(model: OrmModel) {
   const name = (id: string) => model.getObjectType(id)?.name ?? "?";
+  const flags = subtypeFlagsFromConstraints(model.constraints);
   return model.subtypeFacts.map((sf) => ({
     sub: name(sf.subtypeId),
     sup: name(sf.supertypeId),
     providesIdentification: sf.providesIdentification,
-    isExclusive: sf.isExclusive,
-    isExhaustive: sf.isExhaustive,
+    exclusive: flags.get(sf.id)?.exclusive ?? false,
+    exhaustive: flags.get(sf.id)?.exhaustive ?? false,
     definingRule: sf.definingRule,
   })).sort((a, b) => `${a.sub}<${a.sup}`.localeCompare(`${b.sub}<${b.sup}`));
 }
@@ -99,14 +108,13 @@ describe("barwise's own export keeps its subtypes, annotated", () => {
       supertypeId: period.id,
       providesIdentification: true,
     });
-    model.addSubtypeFact({
+    const assists = model.addSubtypeFact({
       subtypeId: assistant.id,
       supertypeId: person.id,
       providesIdentification: true,
-      isExclusive: true,
-      isExhaustive: true,
       definingRule: { kind: "derived", expression: "each Person who assists a course" },
     });
+    model.addConstraint({ type: "disjunctive_mandatory", subtypeFactIds: [assists.id] });
     model.addSubtypeFact({
       subtypeId: assistant.id,
       supertypeId: staff.id,

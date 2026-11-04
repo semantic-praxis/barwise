@@ -6,7 +6,7 @@
  * an instance might be { "role-customer": "C001", "role-order": "O123" }.
  */
 import type { Complete } from "../util/complete.js";
-import { generateId } from "./id.js";
+import { populationIdBase } from "./idRules.js";
 export interface FactInstance {
   /** Unique identifier for this instance. */
   readonly id: string;
@@ -21,7 +21,7 @@ export interface FactInstance {
  * Configuration for creating a new FactInstance.
  */
 export interface FactInstanceConfig {
-  /** Optional stable identifier. Generated if omitted. */
+  /** Optional stable identifier. If omitted, `<population>.N`, the next number. */
   readonly id?: string;
   /** Role ID to value mapping. */
   readonly roleValues: Record<string, string>;
@@ -31,7 +31,7 @@ export interface FactInstanceConfig {
  * Configuration for creating a new Population.
  */
 export interface PopulationConfig {
-  /** Optional stable identifier. Generated if omitted. */
+  /** Optional stable identifier. In a model, `<fact type>.population` if omitted; standalone, the same. */
   readonly id?: string;
   /** The id of the fact type this population samples. */
   readonly factTypeId: string;
@@ -84,17 +84,62 @@ export class Population {
   /** See `PopulationConfig.sample`. Positive evidence only when true. */
   readonly sample: boolean;
   private readonly _instances: FactInstance[] = [];
+  /**
+   * The number the next unnamed instance takes: one past the highest this
+   * population has used, stated or given, so a number is never reused once
+   * an instance holding it is removed (iri-identity, decision 7).
+   */
+  private _next = 1;
 
   constructor(config: PopulationConfig) {
-    this.id = config.id ?? generateId();
+    // Outside a model, its fact type's id and `.population` (decision 7).
+    this.id = config.id ?? populationIdBase(config.factTypeId);
     this.factTypeId = config.factTypeId;
     this.description = config.description;
     this.sample = config.sample ?? false;
 
     if (config.instances) {
+      // Every stated number first, so an unnamed instance listed before a
+      // stated one does not take its number.
       for (const inst of config.instances) {
-        this._instances.push(createInstance(inst));
+        if (inst.id !== undefined) this.countPast(inst.id);
       }
+      for (const inst of config.instances) {
+        this._instances.push(this.createInstance(inst));
+      }
+    }
+  }
+
+  /**
+   * An instance with its id: its own, or the population's id and the next
+   * number (`<population>.3`). A stated id of that form moves the count
+   * past it, so a later unnamed instance cannot take it.
+   */
+  private createInstance(config: FactInstanceConfig): FactInstance {
+    const prefix = `${this.id}.`;
+    let id = config.id;
+    if (id === undefined) {
+      if (!Number.isSafeInteger(this._next + 1)) {
+        throw new Error(`Population "${this.id}" has no instance number left to give.`);
+      }
+      id = `${prefix}${this._next++}`;
+    } else {
+      this.countPast(id);
+    }
+    return { id, roleValues: { ...config.roleValues } };
+  }
+
+  /** Move the count past a stated id of the form `<population>.<n>`. */
+  private countPast(id: string): void {
+    const prefix = `${this.id}.`;
+    if (!id.startsWith(prefix)) return;
+    // Plain decimal only: `Number` also reads "1e21", "0x10" and " 3",
+    // and a count past 2^53 stops moving, so every later instance would
+    // take one id.
+    const suffix = id.slice(prefix.length);
+    const n = Number(suffix);
+    if (/^[1-9]\d*$/.test(suffix) && Number.isSafeInteger(n + 1) && n >= this._next) {
+      this._next = n + 1;
     }
   }
 
@@ -113,7 +158,7 @@ export class Population {
    * @returns The created instance.
    */
   addInstance(config: FactInstanceConfig): FactInstance {
-    const instance = createInstance(config);
+    const instance = this.createInstance(config);
     this._instances.push(instance);
     return instance;
   }
@@ -136,13 +181,6 @@ export class Population {
   getInstance(id: string): FactInstance | undefined {
     return this._instances.find((i) => i.id === id);
   }
-}
-
-function createInstance(config: FactInstanceConfig): FactInstance {
-  return {
-    id: config.id ?? generateId(),
-    roleValues: { ...config.roleValues },
-  };
 }
 
 /**

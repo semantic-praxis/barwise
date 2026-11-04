@@ -50,7 +50,7 @@ export function checkUnaryRoleCardinalityViolations(model: OrmModel): Diagnostic
   const diagnostics: Diagnostic[] = [];
 
   for (const ft of model.factTypes) {
-    for (const c of ft.constraints) {
+    for (const c of ft.internalConstraints) {
       if (!isCardinality(c)) continue;
       const values = valuesPlayedInRole(model, c.roleId);
       if (values.size === 0) continue; // no population data

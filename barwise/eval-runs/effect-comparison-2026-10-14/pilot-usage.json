@@ -1,0 +1,23 @@
+{
+  "$comment": "D3's corrected measure for the pilot runs, read from each run's transcript by `measure:comparison -- usage` on 2026-10-14. inputProcessed sums every turn's input (uncached, cache read, cache written); finalContext is the last turn's. harnessTokens is the figure the pilot recorded, which matches finalContext rather than cost. The pilot's own records (plain-t1-p*.json) are left as scored.",
+  "runs": {
+    "plain-t1-p1": {
+      "turns": 54,
+      "inputProcessed": 6217250,
+      "finalContext": 140740,
+      "harnessTokens": 143020
+    },
+    "plain-t1-p2": {
+      "turns": 48,
+      "inputProcessed": 5298939,
+      "finalContext": 137217,
+      "harnessTokens": 139448
+    },
+    "plain-t1-p3": {
+      "turns": 44,
+      "inputProcessed": 4690099,
+      "finalContext": 134126,
+      "harnessTokens": 136006
+    }
+  }
+}

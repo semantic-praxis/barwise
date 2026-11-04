@@ -43,8 +43,9 @@ export class HoverProvider {
       return this.objectTypeHover(ot, model);
     }
 
-    // Check if the word matches an object type id (for player references).
-    const otById = model.getObjectType(word);
+    // Check if the word matches an object type id (for player references):
+    // in a 3.x file, the id it states, which the load replayed into 4.0's.
+    const otById = model.getObjectType(model.idFromPrior(word) ?? word);
     if (otById) {
       return this.objectTypeHover(otById, model);
     }
@@ -81,7 +82,9 @@ export class HoverProvider {
     // Counterexamples: what the object type's constraints rule out.
     if (this.showCounterexamples && factTypes.length > 0) {
       const ftIds = new Set(factTypes.map((ft) => ft.id));
-      const ces = generateCounterexamples(model).filter((c) => ftIds.has(c.factTypeId));
+      const ces = generateCounterexamples(model).filter((c) =>
+        c.factTypeIds.some((id) => ftIds.has(id))
+      );
       if (ces.length > 0) {
         lines.push("", "**Rules out:**");
         for (const c of ces) {

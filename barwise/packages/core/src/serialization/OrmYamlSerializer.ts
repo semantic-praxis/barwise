@@ -1,73 +1,72 @@
 import { parse, stringify } from "yaml";
+import {
+  type DecodedExternalConstraint,
+  type DecodedInternalConstraint,
+  modelConstraint,
+} from "../decode/constraint.js";
+import { DecodeError } from "../decode/decoder.js";
+import { type DecodedDocument, runDocumentDecode } from "../decode/document.js";
+import { type DecodedDocument40, runDocument40Decode } from "../decode/document40.js";
+import type { DecodeProblem } from "../decode/problems.js";
+import { describeConstraintRepeat, describeConstraintRepeats } from "../model/Constraint.js";
+import type { Constraint } from "../model/Constraint.js";
+import type { IdKind } from "../model/idIndex.js";
+import type { ObjectifiedFactType } from "../model/ObjectifiedFactType.js";
 import { OrmModel } from "../model/OrmModel.js";
+import type { SubtypeFact } from "../model/SubtypeFact.js";
+import { groupRepeats } from "../util/groupRepeats.js";
+import { DeserializationError, refusingHeldIds } from "./deserializationError.js";
+import { type MigrationNote, migrationNotes, readLegacy } from "./reader20.js";
+import { replayInto40, type ReplayOptions } from "./replay.js";
 import { type SchemaValidationResult, SchemaValidator } from "./SchemaValidator.js";
 import {
   applyMigrations,
   CURRENT_ORM_VERSION,
-  type MigrationPlan,
-  planMigration,
+  LEGACY_ORM_VERSION,
+  planRead,
+  PREVIOUS_ORM_VERSION,
+  unsupportedVersionMessage,
 } from "./schemaVersion.js";
-import { deserializeDefinition, serializeDefinition } from "./yaml/definition.js";
-import { deserializeDiagramLayout, serializeDiagramLayout } from "./yaml/diagram.js";
-import type { OrmYamlDocument } from "./yaml/document.js";
-import { deserializeFactType, serializeFactType } from "./yaml/factType.js";
+import { type OrmYamlConstraint, serializeConstraint } from "./yaml/constraint.js";
+import { serializeDefinition } from "./yaml/definition.js";
+import { serializeDiagramLayout } from "./yaml/diagram.js";
+import type { OrmYamlDocument, OrmYamlDocument40 } from "./yaml/document.js";
+import { type OrmYamlFactType, serializeFactType } from "./yaml/factType.js";
 import {
-  deserializeObjectifiedFactType,
   serializeObjectifiedFactType,
+  serializeObjectifiedFactType40,
 } from "./yaml/objectified.js";
-import { deserializeObjectType, serializeObjectType } from "./yaml/objectType.js";
-import {
-  deserializeFactInstance,
-  deserializePopulation,
-  serializePopulation,
-} from "./yaml/population.js";
-import { deserializeSubtypeFact, serializeSubtypeFact } from "./yaml/subtype.js";
+import { serializeObjectType } from "./yaml/objectType.js";
+import { serializePopulation } from "./yaml/population.js";
+import { serializeSubtypeFact, serializeSubtypeFact40 } from "./yaml/subtype.js";
 
-/**
- * Error thrown when deserialization fails due to schema validation
- * or model construction errors.
- */
-export class DeserializationError extends Error {
-  constructor(
-    message: string,
-    readonly validationResult?: SchemaValidationResult,
-  ) {
-    super(message);
-    this.name = "DeserializationError";
-  }
-}
+export { DeserializationError } from "./deserializationError.js";
+export { type MigrationNote, readDocument20 } from "./reader20.js";
 
-/**
- * Build a clear, actionable message for a document whose `orm_version`
- * cannot be brought to the current version.
- */
-function versionErrorMessage(
-  version: string,
-  plan: Extract<MigrationPlan, { ok: false; }>,
-): string {
-  const advice = {
-    newer: "the file was written by a newer barwise; upgrade barwise to read it.",
-    unknown: "no migration path is available; re-export from a compatible version.",
-    cycle: "the migration registry loops back on itself, which is a bug in barwise.",
-  };
-  const head = `Unsupported orm_version "${version}" (this build reads ${CURRENT_ORM_VERSION}):`;
-  return `${head} ${advice[plan.reason]}`;
+/** A file read into the model, with the version it stated and its notes. */
+export interface MigrationResult {
+  readonly model: OrmModel;
+  /** The `orm_version` the file stated; a file without one fails to load. */
+  readonly from: string;
+  readonly notes: readonly MigrationNote[];
 }
 
 /**
  * Serializes OrmModel instances to YAML strings and deserializes
  * YAML strings back to OrmModel instances.
  *
- * The serializer produces YAML that conforms to the orm-model.schema.json
- * schema. The deserializer validates incoming YAML against the schema
- * before constructing the model.
+ * The serializer produces format 4.0, which orm-model.schema.json states.
+ * The deserializer reads a 4.0 file through the Effect decoders in
+ * `src/decode/`; a 3.0 file through the frozen 3.0 decoders, and a file
+ * below 3.0 through the 2.0 reader, which validates it against the frozen
+ * 2.0 schema; and replays either into 4.0's ids (`replay.ts`).
  */
 export class OrmYamlSerializer {
   /**
    * Compiled on first use, not in the constructor.
    *
-   * Only `deserialize` validates, and `new Ajv().compile(ormModelSchema)`
-   * costs about 34ms -- so every caller that constructs a serializer to
+   * Only the 2.0 reader validates with ajv, and an ajv compile costs
+   * about 34ms -- so every caller that constructs a serializer to
    * SERIALIZE paid for a validator it never touched. `hashModel` builds
    * one per call, which made the laws that hash a model twice per
    * generated case take 25s under coverage instrumentation and time out
@@ -94,12 +93,14 @@ export class OrmYamlSerializer {
   /**
    * Deserialize a YAML string into an OrmModel.
    *
-   * The YAML is first validated against the JSON Schema. If validation
-   * fails, a DeserializationError is thrown with the validation errors.
+   * A 4.0 or 3.0 document is first decoded by its Effect decoders, and a
+   * document below 3.0 validated against the frozen 2.0 schema. If either
+   * fails, a DeserializationError is thrown with every problem found. A 3.0
+   * or older model is then replayed into 4.0's ids.
    *
-   * The model is then constructed from the validated document. Construction
-   * errors (e.g. referential integrity violations) are thrown as
-   * DeserializationError.
+   * The model is then constructed from the decoded document. A held id or a
+   * repeated constraint id is thrown as DeserializationError; a check only an
+   * element's constructor makes is thrown as that constructor throws it.
    */
   /**
    * @param yaml - The YAML string to deserialize.
@@ -120,14 +121,67 @@ export class OrmYamlSerializer {
    *   used to (barwise-997).
    */
   deserialize(yaml: string, options?: { lenient?: boolean; }): OrmModel {
+    return this.migrate(yaml, options).model;
+  }
+
+  /**
+   * `deserialize`, saying where the file came from and what reading it
+   * changed beyond its format: the version it states, and each 2.0
+   * `is_preferred` flag the model could not carry as written
+   * (`MigrationNote`). A 3.0 file has no notes. `barwise migrate` reports
+   * them; every other caller wants only the model (orm-format-3 WS4b-iii).
+   */
+  migrate(yaml: string, options?: { lenient?: boolean; } & ReplayOptions): MigrationResult {
+    return refusingHeldIds(() => this.read(yaml, options, true));
+  }
+
+  /**
+   * The model a file states under its own ids: a 3.x or 2.0 file as the
+   * frozen readers build it, before the replay into 4.0's ids; a 4.0 file
+   * as `deserialize` reads it. For a document whose ids are the point: the
+   * tests that hold the frozen readers and the replay to the tracked corpus,
+   * and Ossie's export check, which reads back a model under its source's
+   * ids. Not for a file a person opened: that is `deserialize`'s.
+   */
+  deserializeAsWritten(yaml: string, options?: { lenient?: boolean; }): OrmModel {
+    return refusingHeldIds(() => this.read(yaml, options, false)).model;
+  }
+
+  private read(
+    yaml: string,
+    options: ({ lenient?: boolean; } & ReplayOptions) | undefined,
+    replay: boolean,
+  ): MigrationResult {
+    const into40 = (model: OrmModel) => (replay ? replayInto40(model, options) : model);
     const raw = parse(yaml) as unknown;
+    const { doc, version, stated: from } = this.bringToReadableVersion(raw);
 
-    // Bring older documents up to the current version before schema
-    // validation, and reject unsupported versions with a clear message
-    // rather than the schema's cryptic `const` mismatch.
-    const migrated = this.migrateToCurrentVersion(raw);
+    // A 2.0 file is read by the 2.0 reader, against the 2.0 schema frozen
+    // when 3.0 landed, and a 3.0 file by the frozen 3.0 decoders; each
+    // model is then replayed into 4.0's ids (iri-identity WS6, decision
+    // 18), and saved as 4.0. A note names an element by its id in the file
+    // read, which is what it describes.
+    if (version === LEGACY_ORM_VERSION) {
+      this.check(this.validator.validateLegacyModel(doc));
+      const { model, placed, flags } = readLegacy(doc as OrmYamlDocument, options);
+      const notes = migrationNotes(model, placed, flags);
+      return { model: into40(model), from: from!, notes };
+    }
+    if (version === PREVIOUS_ORM_VERSION) {
+      return {
+        model: into40(fromDecoded(decodeOrRefuse(doc), options)),
+        from: from!,
+        notes: [],
+      };
+    }
+    // Every other document is read as 4.0, by the Effect decoders alone
+    // (effect-adoption 1r, R4): every problem the file has, each named by
+    // its element and field, in one pass. A document with no orm_version
+    // comes here too, and is told it is missing.
+    return { model: readDocument40(doc, options), from: from!, notes: [] };
+  }
 
-    const result = this.validator.validateModel(migrated);
+  private check(result: SchemaValidationResult): void {
     if (!result.valid) {
       throw new DeserializationError(
         `YAML does not conform to orm-model schema: ${
@@ -136,156 +190,374 @@ export class OrmYamlSerializer {
         result,
       );
     }
-
-    const doc = migrated as OrmYamlDocument;
-    return this.fromDocument(doc, options);
   }
 
   /**
-   * Migrate a freshly parsed document to {@link CURRENT_ORM_VERSION}.
+   * Bring a freshly parsed document to a version a reader exists for:
+   * the current version, which earlier minors of its major migrate to;
+   * 3.0; or 2.0, which older documents migrate to first (`planRead`).
    *
-   * Documents already at the current version, and documents whose
-   * `orm_version` is missing or malformed, are passed through untouched
-   * so that schema validation reports those cases as it always has.
-   * A present-but-unsupported version throws a {@link DeserializationError}
-   * describing whether the file is too new or simply unreachable.
+   * Documents whose `orm_version` is missing or malformed are passed
+   * through untouched so that the reader reports them: the decoders for
+   * 4.0, which name the missing or malformed version as a problem. A
+   * present-but-unsupported version throws a
+   * {@link DeserializationError} describing whether the file is too new or
+   * simply unreachable.
    */
-  private migrateToCurrentVersion(raw: unknown): unknown {
+  private bringToReadableVersion(
+    raw: unknown,
+  ): { doc: unknown; version: unknown; stated: string | undefined; } {
     if (typeof raw !== "object" || raw === null) {
-      return raw;
+      return { doc: raw, version: undefined, stated: undefined };
     }
     const doc = raw as Record<string, unknown>;
     const version = doc.orm_version;
-    if (typeof version !== "string" || version === CURRENT_ORM_VERSION) {
-      return raw;
-    }
-
-    const plan = planMigration(version);
+    if (typeof version !== "string") return { doc: raw, version, stated: undefined };
+    const plan = planRead(version);
     if (!plan.ok) {
-      throw new DeserializationError(versionErrorMessage(version, plan));
+      throw new DeserializationError(
+        unsupportedVersionMessage("orm_version", version, CURRENT_ORM_VERSION, plan.reason),
+      );
     }
-    return applyMigrations(doc, plan.steps);
+    return {
+      doc: applyMigrations(doc, plan.steps),
+      version: plan.target,
+      stated: version,
+    };
   }
 
   // -- Internal: model -> document --
 
-  private toDocument(model: OrmModel): OrmYamlDocument {
-    const doc: OrmYamlDocument = {
-      orm_version: CURRENT_ORM_VERSION,
-      model: {
-        name: model.name,
+  private toDocument(model: OrmModel): OrmYamlDocument40 {
+    return writeDocument40(model);
+  }
+}
+
+/**
+ * Decode a 3.0 document (or, given its decoder, a 4.0 one), or refuse it
+ * with every problem it has, each
+ * naming its element and field. The message is one line, its problems
+ * sentences one after another, because surfaces print it after a file name
+ * (`barwise migrate` gives one line per file); a line break inside a name
+ * the file states is written as `\n` there, and kept in `validationResult`. The problems are also kept
+ * as a `validationResult`, its paths JSON Pointers into the file, "/" for
+ * the document itself, as ajv's were (effect-adoption 1r, R4).
+ */
+function decodeOrRefuse(doc: unknown): DecodedDocument;
+function decodeOrRefuse<D>(doc: unknown, decode: (doc: unknown) => D, version: string): D;
+function decodeOrRefuse(
+  doc: unknown,
+  decode: (doc: unknown) => unknown = runDocumentDecode,
+  version = "3.0",
+): unknown {
+  try {
+    return decode(doc);
+  } catch (err) {
+    if (!(err instanceof DecodeError)) throw err;
+    const pointer = (p: DecodeProblem) =>
+      [...p.at, ...p.path].map((s) => `/${String(s).replace(/~/g, "~0").replace(/\//g, "~1")}`)
+        .join("") || "/";
+    throw new DeserializationError(
+      `The model file does not conform to format ${version}: ${
+        err.problems.map((p) => p.message.replace(/\r?\n/g, "\\n")).join(" ")
+      }`,
+      {
+        valid: false,
+        errors: err.problems.map((p) => ({ path: pointer(p), message: p.message })),
       },
-    };
+    );
+  }
+}
 
-    if (model.domainContext) {
-      doc.model.domain_context = model.domainContext;
-    }
-    if (model.note) {
-      doc.model.note = model.note;
-    }
+/**
+ * Build the model from a decoded 3.0 or 4.0 document, with the ids a 4.0
+ * file states reserved for the load. What decoding cannot see is
+ * checked here, as it was on the validated document: constraint ids
+ * repeated across the file, and, unless `lenient`, the references the
+ * model's constructors check.
+ */
+function fromDecoded(
+  doc: DecodedDocument | DecodedDocument40,
+  options?: { lenient?: boolean; },
+  reserved: Iterable<string> = [],
+  idsAcrossKinds = false,
+): OrmModel {
+  const model = new OrmModel({ ...doc.header, idsAcrossKinds });
+  return model.withReserved(reserved, () => addDecoded(model, doc, options));
+}
 
-    const objectTypes = model.objectTypes;
-    if (objectTypes.length > 0) {
-      doc.model.object_types = objectTypes.map((ot) => serializeObjectType(ot));
-    }
+function addDecoded(
+  model: OrmModel,
+  doc: DecodedDocument | DecodedDocument40,
+  options?: { lenient?: boolean; },
+): OrmModel {
+  for (const ot of doc.objectTypes) model.addObjectType(ot.record);
 
-    const factTypes = model.factTypes;
-    if (factTypes.length > 0) {
-      doc.model.fact_types = factTypes.map((ft) => serializeFactType(ft));
-    }
-
-    const subtypeFacts = model.subtypeFacts;
-    if (subtypeFacts.length > 0) {
-      doc.model.subtype_facts = subtypeFacts.map((sf) => serializeSubtypeFact(sf));
-    }
-
-    const objectifiedFactTypes = model.objectifiedFactTypes;
-    if (objectifiedFactTypes.length > 0) {
-      doc.model.objectified_fact_types = objectifiedFactTypes.map((oft) =>
-        serializeObjectifiedFactType(oft)
-      );
-    }
-
-    const populations = model.populations;
-    if (populations.length > 0) {
-      doc.model.populations = populations.map((p) => serializePopulation(p));
-    }
-
-    const definitions = model.definitions;
-    if (definitions.length > 0) {
-      doc.model.definitions = definitions.map((d) => serializeDefinition(d));
-    }
-
-    const diagrams = model.diagramLayouts;
-    if (diagrams.length > 0) {
-      doc.model.diagrams = diagrams.map((dl) => serializeDiagramLayout(dl));
-    }
-
-    return doc;
+  // Every constraint id is stated (the format requires it) and is
+  // model-wide, so a 3.0 file holding a repeat is refused, lenient or
+  // not, before anything is added. Read from what the file states, not
+  // from the built model: two fact types sharing an id collapse into one
+  // in the id-keyed store, and the dropped one's constraints would go
+  // with it unreported. The lenient refusal is load-bearing: `barwise
+  // migrate` re-reads its own 3.0 output leniently to refuse writing a
+  // file a strict load would reject. A 2.0 file and a model built in code
+  // are reported by `structural/duplicate-constraint-id` instead, which
+  // asks the same `groupRepeats` of the built model. Holders whose fact
+  // types also share an id never reach it: the store refuses the second
+  // fact type (`DuplicateIdError`, model-invariants WS3).
+  const stated = [
+    ...doc.factTypes.flatMap((ft) => ft.constraints.map((c) => [c, ft.name] as const)),
+    ...doc.constraints.map((c) => [c, undefined] as const),
+  ];
+  // `groupRepeats` passes over an absent key, so a 4.0 constraint that
+  // leaves its id to the model is never a repeat.
+  const repeats = [...groupRepeats(stated, ([c]) => c.id)];
+  if (repeats.length > 0) {
+    const named = describeConstraintRepeats(
+      repeats.map(([id, holders]) => describeConstraintRepeat(id, holders)),
+    );
+    throw new DeserializationError(
+      `Constraint ids are held by more than one constraint: ${named}. `
+        + "A constraint id names one constraint.",
+    );
   }
 
-  // -- Internal: document -> model --
+  for (const ft of doc.factTypes) {
+    model.addFactType(
+      {
+        ...ft,
+        constraints: ft.constraints.map((c) => modelConstraint(c as DecodedInternalConstraint)),
+      },
+      { skipPlayerValidation: options?.lenient },
+    );
+  }
+  for (const sf of doc.subtypeFacts) {
+    model.addSubtypeFact(sf, { skipPlayerValidation: options?.lenient });
+  }
+  for (const c of doc.constraints) {
+    model.addConstraint(modelConstraint(c as DecodedExternalConstraint));
+  }
 
-  private fromDocument(
-    doc: OrmYamlDocument,
-    options?: { lenient?: boolean; },
-  ): OrmModel {
-    const model = new OrmModel({
-      name: doc.model.name,
-      domainContext: doc.model.domain_context,
-      note: doc.model.note,
-    });
-
-    // Add object types first (fact types reference them).
-    for (const otDoc of doc.model.object_types ?? []) {
-      model.addObjectType(deserializeObjectType(otDoc));
+  // After every constraint, so a reference resolves whatever order the
+  // file lists them in. A reference to a constraint that does not exist,
+  // or does not identify the entity, is validation's to report.
+  for (const ot of doc.objectTypes) {
+    if (ot.preferredIdentifier !== undefined) {
+      model.setPreferredIdentifier(ot.record.id, ot.preferredIdentifier);
     }
+  }
 
-    // Add fact types.
-    for (const ftDoc of doc.model.fact_types ?? []) {
-      model.addFactType(
-        deserializeFactType(ftDoc),
-        { skipPlayerValidation: options?.lenient },
-      );
-    }
+  for (const oft of doc.objectifiedFactTypes) {
+    model.addObjectifiedFactType(oft, { skipPlayerValidation: options?.lenient });
+  }
+  for (const { config, instances } of doc.populations) {
+    const pop = model.addPopulation(config, { skipPlayerValidation: options?.lenient });
+    for (const inst of instances) pop.addInstance(inst);
+  }
+  for (const d of doc.definitions) model.addDefinition(d);
+  for (const dl of doc.diagrams) model.addDiagramLayout(dl);
+  return model;
+}
 
-    // Add subtype facts (after object types and fact types).
-    for (const sfDoc of doc.model.subtype_facts ?? []) {
-      model.addSubtypeFact(
-        deserializeSubtypeFact(sfDoc),
-        { skipPlayerValidation: options?.lenient },
-      );
-    }
-
-    // Add objectified fact types (after object types and fact types).
-    for (const oftDoc of doc.model.objectified_fact_types ?? []) {
-      model.addObjectifiedFactType(
-        deserializeObjectifiedFactType(oftDoc),
-        { skipPlayerValidation: options?.lenient },
-      );
-    }
-
-    // Add populations (after fact types, since they reference them).
-    for (const popDoc of doc.model.populations ?? []) {
-      const pop = model.addPopulation(
-        deserializePopulation(popDoc),
-        { skipPlayerValidation: options?.lenient },
-      );
-      for (const instDoc of popDoc.instances) {
-        pop.addInstance(deserializeFactInstance(instDoc));
-      }
-    }
-
-    // Add definitions.
-    for (const defDoc of doc.model.definitions ?? []) {
-      model.addDefinition(deserializeDefinition(defDoc));
-    }
-
-    // Add diagram layouts.
-    for (const dlDoc of doc.model.diagrams ?? []) {
-      model.addDiagramLayout(deserializeDiagramLayout(dlDoc));
-    }
-
+/**
+ * Read a format 4.0 document into the model (iri-identity WS6, 6b-2b-1):
+ * decoded by the 4.0 decoders, every problem at once; then every id the
+ * file states collected before the first add. An id stated by two
+ * elements is refused, whatever their kinds, because in 4.0 an id names
+ * one element; the rest are reserved for the load, so a name the model
+ * mints for an element the file gives no id skips them, and the element
+ * stating each takes it wherever it sits in the file.
+ */
+export function readDocument40(doc: unknown, options?: { lenient?: boolean; }): OrmModel {
+  const decoded = decodeOrRefuse(doc, runDocument40Decode, "4.0");
+  const stated = statedIds40(decoded);
+  const repeats = [...groupRepeats(stated, ([id]) => id)];
+  if (repeats.length > 0) {
+    const named = repeats.map(([id, holders]) => `"${id}" (${holdersOf(holders)})`).join("; ");
+    throw new DeserializationError(
+      `Ids are stated by more than one element: ${named}. An id names one element.`,
+    );
+  }
+  // The pre-pass names every repeat in one message; the model refuses
+  // across kinds as well, for an id added in code after the load.
+  return refusingHeldIds(() => {
+    const model = fromDecoded(decoded, options, stated.map(([id]) => id), true);
+    // Every key held now was minted by this load, for an element the file
+    // gives no id; the keys the file states are recorded after.
+    model.recordUnstoredIds();
+    for (const [id, key] of decoded.mintedFrom) model.recordMintedFrom(id, key);
     return model;
+  });
+}
+
+/** "an object type and a fact type", or "2 fact types". */
+function holdersOf(holders: readonly (readonly [string, IdKind])[]): string {
+  const kinds = [...new Set(holders.map(([, kind]) => kind))];
+  if (kinds.length === 1) return `${holders.length} ${kinds[0]}s`;
+  const article = (kind: string) => (/^[aeiou]/.test(kind) ? `an ${kind}` : `a ${kind}`);
+  return kinds.map(article).join(" and ");
+}
+
+/** Every id a 4.0 document states, with the kind of element stating it. */
+function statedIds40(doc: DecodedDocument40): (readonly [string, IdKind])[] {
+  const ids: (readonly [string, IdKind])[] = [];
+  const add = (id: string | undefined, kind: IdKind) => {
+    if (id !== undefined) ids.push([id, kind]);
+  };
+  for (const ot of doc.objectTypes) add(ot.record.id, "object type");
+  for (const ft of doc.factTypes) {
+    add(ft.id, "fact type");
+    for (const r of ft.roles) add(r.id, "role");
+    for (const c of ft.constraints) add(c.id, "constraint");
   }
+  for (const c of doc.constraints) add(c.id, "constraint");
+  for (const sf of doc.subtypeFacts) add(sf.id, "subtype fact");
+  for (const o of doc.objectifiedFactTypes) add(o.id, "objectification");
+  for (const p of doc.populations) add(p.config.id, "population");
+  return ids;
+}
+
+/**
+ * The 3.0 document for a model (orm-format-3, Target architecture): each
+ * fact type with its own constraints, the model's constraints in one list,
+ * and each entity's preferred identifier by constraint id.
+ */
+export function writeDocument(model: OrmModel): OrmYamlDocument {
+  return documentOf(model, PREVIOUS_ORM_VERSION, {
+    // A 3.x shadow's owner, which only a model read as written still holds.
+    sourceContext: true,
+    constraint: (c) => {
+      if (c.id === undefined) {
+        throw new Error(
+          `Format 3.0 states every constraint's id, and this ${c.type} constraint has none `
+            + "(its sentence cannot be minted, iri-identity decision 19); format 4.0 writes it "
+            + "without one.",
+        );
+      }
+      return serializeConstraint(c);
+    },
+    subtypeFact: serializeSubtypeFact,
+    objectification: serializeObjectifiedFactType,
+  });
+}
+
+/**
+ * The format 4.0 document for a model (iri-identity WS6, 6b-2b-2b): 3.0's
+ * layout, with a constraint, subtype fact or objectification the model
+ * left unnamed written without an id (decision 19), and beside each id the
+ * model minted, or read with one, the key it was minted from
+ * (`minted_from`, decision 14).
+ */
+export function writeDocument40(model: OrmModel): OrmYamlDocument40 {
+  // A constraint's written form types no id (`serializeConstraint` sets
+  // one when it has one), so the id is read off the record as written; the
+  // key goes right after it, beside the id it names.
+  const minted = <R extends object>(record: R): R & { minted_from?: string; } => {
+    const id = (record as { readonly id?: string; }).id;
+    const key = id === undefined ? undefined : model.mintedFromOf(id);
+    if (key === undefined) return record;
+    return Object.fromEntries(
+      Object.entries(record).flatMap(([k, v]) =>
+        k === "id" ? [[k, v], ["minted_from", key]] : [[k, v]]
+      ),
+    ) as R & { minted_from: string; };
+  };
+  const doc = documentOf(model, CURRENT_ORM_VERSION, {
+    constraint: (c) => minted(serializeConstraint(c)),
+    subtypeFact: (sf) => minted(serializeSubtypeFact40(sf)),
+    objectification: (o) => minted(serializeObjectifiedFactType40(o)),
+  });
+  if (model.imports.size === 0) return doc;
+  // After `namespace`, where the schema lists it; 3.0 has no imports.
+  const { name, domain_context, namespace, ...rest } = doc.model;
+  return {
+    ...doc,
+    model: {
+      name,
+      ...(domain_context !== undefined ? { domain_context } : {}),
+      ...(namespace !== undefined ? { namespace } : {}),
+      imports: Object.fromEntries(model.imports),
+      ...rest,
+    },
+  };
+}
+
+/** How one format writes the elements its ids differ on. */
+interface ElementWriters<C extends OrmYamlConstraint, S, O> {
+  /** Whether the format states a shadow's `source_context` (3.0 does, 4.0 does not). */
+  readonly sourceContext?: boolean;
+  constraint(c: Constraint): C;
+  subtypeFact(sf: SubtypeFact): S;
+  objectification(o: ObjectifiedFactType): O;
+}
+
+/**
+ * The document both formats share the layout of, its elements written by
+ * the format's own writers, whose return types type the lists they write.
+ */
+function documentOf<V extends string, C extends OrmYamlConstraint, S, O>(
+  model: OrmModel,
+  version: V,
+  writers: ElementWriters<C, S, O>,
+): {
+  orm_version: V;
+  model:
+    & Omit<
+      OrmYamlDocument["model"],
+      "fact_types" | "constraints" | "subtype_facts" | "objectified_fact_types"
+    >
+    & {
+      fact_types?: (Omit<OrmYamlFactType, "constraints"> & { constraints?: C[]; })[];
+      constraints?: C[];
+      subtype_facts?: S[];
+      objectified_fact_types?: O[];
+    };
+} {
+  const listed = <E, R>(elements: readonly E[], write: (e: E) => R): R[] | undefined =>
+    elements.length > 0 ? elements.map(write) : undefined;
+  const lists = {
+    object_types: listed(
+      model.objectTypes,
+      (ot) =>
+        serializeObjectType(ot, model.preferredIdentifierOf(ot.id), {
+          sourceContext: writers.sourceContext === true,
+        }),
+    ),
+    fact_types: listed(model.factTypes, (ft) => serializeFactType(ft, writers.constraint)),
+    constraints: listed(model.constraints, writers.constraint),
+    subtype_facts: listed(model.subtypeFacts, writers.subtypeFact),
+    objectified_fact_types: listed(model.objectifiedFactTypes, writers.objectification),
+    populations: listed(model.populations, serializePopulation),
+    definitions: listed(model.definitions, serializeDefinition),
+    diagrams: listed(model.diagramLayouts, serializeDiagramLayout),
+  };
+  const {
+    object_types,
+    fact_types,
+    constraints,
+    subtype_facts,
+    objectified_fact_types,
+    populations,
+    definitions,
+    diagrams,
+  } = lists;
+  // Each key spelled once more, so the compiler checks it against the
+  // document; an absent list is left out, and the order is the file's.
+  return {
+    orm_version: version,
+    model: {
+      name: model.name,
+      ...(model.domainContext ? { domain_context: model.domainContext } : {}),
+      ...(model.namespace ? { namespace: model.namespace } : {}),
+      ...(model.note ? { note: model.note } : {}),
+      ...(object_types ? { object_types } : {}),
+      ...(fact_types ? { fact_types } : {}),
+      ...(constraints ? { constraints } : {}),
+      ...(subtype_facts ? { subtype_facts } : {}),
+      ...(objectified_fact_types ? { objectified_fact_types } : {}),
+      ...(populations ? { populations } : {}),
+      ...(definitions ? { definitions } : {}),
+      ...(diagrams ? { diagrams } : {}),
+    },
+  };
 }

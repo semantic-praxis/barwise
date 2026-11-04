@@ -5,7 +5,13 @@
  * Used by phase 2 while resolving a fact type's InternalConstraints and by
  * the top-level constraint passes.
  */
-import type { Constraint, JoinOperand, ValueComparisonOperator } from "@barwise/core";
+import {
+  canonicalJson,
+  type Constraint,
+  type ExternalConstraint,
+  type JoinOperand,
+  type ValueComparisonOperator,
+} from "@barwise/core";
 import type {
   NormaConstraint,
   NormaEqualityConstraint,
@@ -21,6 +27,7 @@ import type {
   NormaValueComparisonOperator,
   NormaValueConstraint,
 } from "../NormaXmlTypes.js";
+import type { ConstraintIdAllocator } from "./context.js";
 import type { NormaJoinDecoder } from "./joinPaths.js";
 
 /**
@@ -31,26 +38,94 @@ import type { NormaJoinDecoder } from "./joinPaths.js";
 export function mapNormaConstraint(
   nc: NormaConstraint,
   nft: NormaFactType,
+  exclusiveOrHalf: boolean,
   joinDecoder?: NormaJoinDecoder,
 ): Constraint | undefined {
   const factRoleIds = new Set(nft.roles.map((r) => r.id));
-  const mapped = mapByType(nc, factRoleIds, joinDecoder);
-  if (!mapped) return undefined;
-  // Deontic modality survives the trip; alethic is the default and stays
-  // implicit on both sides.
+  const mapped = mapByType(nc, factRoleIds, exclusiveOrHalf, joinDecoder);
+  return mapped && withModality(nc, mapped);
+}
+
+/**
+ * `mapped` carrying `nc`'s modality. Deontic survives the trip; alethic is
+ * the default and stays implicit on both sides. Every phase applies this,
+ * so whether a constraint keeps its modality never depends on whether a
+ * fact type lists it.
+ */
+export function withModality<C extends Constraint>(nc: NormaConstraint, mapped: C): C {
   return nc.modality === "deontic" ? { ...mapped, modality: "deontic" } : mapped;
+}
+
+/**
+ * True when `held` already has a constraint saying exactly what
+ * `candidate` says: same kind, fields, role order and modality, id aside.
+ * The one duplicate rule for every phase. What it is checked against is the
+ * caller's: phase 1 passes one fact type's list, and phase 3 passes the
+ * fact type for a constraint of one fact type and the whole model for one
+ * across fact types, so until 3c places by kind, a copy two fact types'
+ * InternalConstraints both list survives phase 1.
+ *
+ * Per-kind checks over a few fields used to stand here, and they drifted --
+ * a subset compared only its subset roles, an equality only its first
+ * sequence, a ring ignored its ring type -- and each drift dropped a
+ * distinct constraint and its NORMA id without a word, from files NORMA
+ * writes (two subsets from one role). Whole content can only keep a
+ * constraint that says something different; at worst one written twice in
+ * another role order is kept twice, which loses nothing.
+ *
+ * An exclusive_or is the one exception, merged by its role SET and modality
+ * in `ConstraintIdAllocator.buildExclusiveOr`: its role order carries no
+ * meaning, and its two halves may name the roles in different orders.
+ */
+export function holdsSame(held: readonly Constraint[], candidate: Constraint): boolean {
+  const content = (c: Constraint) => canonicalJson({ ...c, id: undefined });
+  const key = content(candidate);
+  // The kind first: phase 3 checks every constraint across fact types in
+  // the model, and most of them cannot match.
+  return held.some((c) => c.type === candidate.type && content(c) === key);
+}
+
+type ExclusiveOr = Extract<Constraint, { type: "exclusive_or"; }>;
+
+/**
+ * The exclusive_or `mapped` from the half `nc`, with its modality and id,
+ * ready to attach -- or undefined when its pair, or another pair over the
+ * same roles, already has one (`ConstraintIdAllocator.buildExclusiveOr`).
+ * The one step every exclusive_or site takes, so none attaches one without
+ * the check.
+ */
+export function exclusiveOrToAdd(
+  ids: ConstraintIdAllocator,
+  nc: NormaConstraint,
+  mapped: ExclusiveOr,
+): ExternalConstraint | undefined {
+  // A fact type's xor pair is over roles; one over subtypes is mapped
+  // with the subtype facts (`mapSubtypeFacts`), never here.
+  if (!mapped.roleIds) throw new Error("An exclusive-or over subtypes is mapped with them.");
+  const id = ids.buildExclusiveOr(nc, mapped.roleIds);
+  return id === undefined ? undefined : { ...withModality(nc, mapped), id };
+}
+
+/**
+ * The exclusive_or a mandatory half builds, over its own roles: the one
+ * shape both phases build, whichever reaches the pair (modality is added by
+ * `withModality`).
+ */
+export function exclusiveOrFromMandatory(nc: NormaMandatoryConstraint): ExclusiveOr {
+  return { type: "exclusive_or", roleIds: [...nc.roleRefs] };
 }
 
 function mapByType(
   nc: NormaConstraint,
   factRoleIds: Set<string>,
+  exclusiveOrHalf: boolean,
   joinDecoder?: NormaJoinDecoder,
 ): Constraint | undefined {
   switch (nc.type) {
     case "uniqueness":
       return mapUniquenessConstraint(nc, factRoleIds);
     case "mandatory":
-      return mapMandatoryConstraint(nc, factRoleIds);
+      return mapMandatoryConstraint(nc, factRoleIds, exclusiveOrHalf);
     case "frequency":
       return mapFrequencyConstraint(nc, factRoleIds);
     case "value_constraint":
@@ -58,7 +133,7 @@ function mapByType(
     case "subset":
       return mapSubsetConstraint(nc, joinDecoder);
     case "exclusion":
-      return mapExclusionConstraint(nc, joinDecoder);
+      return mapExclusionConstraint(nc, exclusiveOrHalf, joinDecoder);
     case "equality":
       return mapEqualityConstraint(nc, joinDecoder);
     case "ring":
@@ -79,14 +154,9 @@ function mapUniquenessConstraint(
   if (relevantRoles.length === 0) return undefined;
 
   if (nc.isInternal) {
-    const result: Constraint = {
-      type: "internal_uniqueness",
-      roleIds: relevantRoles,
-    };
-    if (nc.isPreferred) {
-      return { ...result, isPreferred: true } as Constraint;
-    }
-    return result;
+    // Whether it is an entity's preferred identifier is the entity's to
+    // say (`mapPreferredIdentifiers`), not the constraint's.
+    return { type: "internal_uniqueness", roleIds: relevantRoles };
   } else {
     return {
       type: "external_uniqueness",
@@ -95,9 +165,15 @@ function mapUniquenessConstraint(
   }
 }
 
+/**
+ * `exclusiveOrHalf` says whether `nc` maps as an exclusive-or, paired or
+ * alone (`ExclusiveOrPairs.exclusiveOrIds`); a half's own coupler alone is
+ * not enough to tell, since a file may carry only the other's.
+ */
 function mapMandatoryConstraint(
   nc: NormaMandatoryConstraint,
   factRoleIds: Set<string>,
+  exclusiveOrHalf: boolean,
 ): Constraint | undefined {
   // NORMA auto-generates implied mandatory constraints for all played roles.
   // These are not part of the user's model and must be excluded.
@@ -108,14 +184,12 @@ function mapMandatoryConstraint(
     const roleId = nc.roleRefs.find((r) => factRoleIds.has(r));
     if (!roleId) return undefined;
     return { type: "mandatory", roleId };
-  } else if (nc.exclusiveOrExclusionRef !== undefined) {
+  } else if (exclusiveOrHalf) {
     // Coupled to an exclusion: NORMA's exclusive-or encoding. The pair
     // maps to one exclusive_or; the paired exclusion maps to the same
-    // constraint and duplicates are dropped by the callers.
-    return {
-      type: "exclusive_or",
-      roleIds: nc.roleRefs,
-    };
+    // constraint, and `ConstraintIdAllocator.buildExclusiveOr` lets only the
+    // first to reach the pair build it.
+    return exclusiveOrFromMandatory(nc);
   } else {
     // Disjunctive mandatory -> maps to disjunctive_mandatory.
     return {
@@ -178,8 +252,23 @@ export function mapSubsetConstraint(
 
 export function mapExclusionConstraint(
   nc: NormaExclusionConstraint,
+  exclusiveOrHalf: boolean,
   joinDecoder?: NormaJoinDecoder,
 ): Constraint | undefined {
+  // Flatten role sequences into a single array of role ids.
+  const allRoleIds = nc.roleSequences.flat();
+
+  // Coupled to a disjunctive mandatory: NORMA's exclusive-or encoding. Only
+  // an unpaired half reaches here (`exclusiveOrHalf`): plain, over single
+  // roles (`collectExclusiveOrPairs`). A paired exclusion never does --
+  // phase 1 maps its pair from the mandatory and phase 3 skips it.
+  if (exclusiveOrHalf) {
+    return {
+      type: "exclusive_or",
+      roleIds: allRoleIds,
+    };
+  }
+
   const joinOperands = decodeSequenceOperands(
     nc.roleSequences,
     nc.joinPaths,
@@ -188,18 +277,7 @@ export function mapExclusionConstraint(
   if (joinOperands) {
     return { type: "join_exclusion", operands: joinOperands };
   }
-
-  // Flatten role sequences into a single array of role ids.
-  const allRoleIds = nc.roleSequences.flat();
   if (allRoleIds.length === 0) return undefined;
-
-  // Coupled to a disjunctive mandatory: NORMA's exclusive-or encoding.
-  if (nc.exclusiveOrMandatoryRef !== undefined) {
-    return {
-      type: "exclusive_or",
-      roleIds: allRoleIds,
-    };
-  }
 
   return {
     type: "exclusion",
@@ -239,7 +317,6 @@ export function mapValueComparisonConstraint(
     roleId1: roleId1!,
     roleId2: roleId2!,
     operator,
-    ...(nc.modality === "deontic" ? { modality: "deontic" as const } : {}),
   };
 }
 
@@ -289,10 +366,18 @@ function decodeSequenceOperands(
   return operands;
 }
 
+/**
+ * A flat ring, from a fact type that lists it. A ring whose sequence carries
+ * a `JoinRule`, readable or not, is never read here: its two roles can
+ * both belong to one fact type (a grandparent self-join projects the child
+ * and parent roles of the one parenthood fact type), and the flat ring over
+ * them says something else. `mapJoinRing` reads it, once, in the ring pass.
+ */
 function mapRingConstraint(
   nc: NormaRingConstraint,
   factRoleIds: Set<string>,
 ): Constraint | undefined {
+  if (nc.joinPath || nc.unreadableJoin) return undefined;
   const relevantRoles = nc.roleRefs.filter((r) => factRoleIds.has(r));
   if (relevantRoles.length < 2) return undefined;
   return {
@@ -301,4 +386,28 @@ function mapRingConstraint(
     roleId2: relevantRoles[1]!,
     ringType: nc.ringType,
   };
+}
+
+/**
+ * A ring over its join path, wherever the file lists it. A path one hop
+ * long projecting both of its ends is the plain ring spelled the long way,
+ * so it maps to `ring` (`join-ring-constraint.spec.md`, Open decision 3);
+ * any other decodable path to a `join_ring`, a malformed projection
+ * included, so validation can report it rather than the import hiding it.
+ * A path outside the grammar maps to nothing.
+ */
+export function mapJoinRing(
+  nc: NormaRingConstraint,
+  joinDecoder: NormaJoinDecoder,
+): Constraint | undefined {
+  if (!nc.joinPath) return undefined;
+  const operand = joinDecoder.decodeOperand(nc.roleRefs, nc.joinPath);
+  if (!operand) return undefined;
+  const [from, to] = operand.projection;
+  const step = operand.path.steps[0];
+  if (operand.path.steps.length === 1 && step && operand.projection.length === 2 && from !== to) {
+    const [roleId1, roleId2] = from === 0 ? [step.entry, step.exit] : [step.exit, step.entry];
+    return { type: "ring", roleId1, roleId2, ringType: nc.ringType };
+  }
+  return { type: "join_ring", operand, ringType: nc.ringType };
 }

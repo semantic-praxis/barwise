@@ -11,6 +11,7 @@
 import type { OrmModel } from "@barwise/core";
 import { diffModels } from "@barwise/core/diff";
 import { suggestMaxTokens } from "./budget.js";
+import { UNRELATED_IDS_DIFF } from "./diffOptions.js";
 import { parseDraftModel } from "./DraftModelParser.js";
 import { enforceConformance } from "./ExtractionConformance.js";
 import {
@@ -158,10 +159,7 @@ export async function processTranscript(
         built: {
           objectTypes: result.model.objectTypes.length,
           factTypes: result.model.factTypes.length,
-          constraints: result.model.factTypes.reduce(
-            (n, ft) => n + ft.constraints.length,
-            0,
-          ),
+          constraints: result.model.everyConstraint().length,
         },
       }),
     );
@@ -231,7 +229,9 @@ function buildCandidateFramings(
         rationale: alt.rationale,
         ambiguityDescription: alt.ambiguity_description,
         model: altResult.model,
-        diff: diffModels(primaryModel, altResult.model),
+        // An alternative is an independent extraction, so its ids are
+        // unrelated to the primary's.
+        diff: diffModels(primaryModel, altResult.model, UNRELATED_IDS_DIFF),
       });
     } catch (err) {
       warnings.push(

@@ -15,7 +15,8 @@ import { describe, expect, it } from "vitest";
 import { RelationalMapper } from "../../src/mapping/RelationalMapper.js";
 import { renderDdl } from "../../src/mapping/renderers/ddl.js";
 import { OrmModel } from "../../src/model/OrmModel.js";
-import { ModelBuilder } from "../helpers/ModelBuilder.js";
+import { ModelBuilder, roleId } from "../helpers/ModelBuilder.js";
+import { placeFlags } from "../helpers/placeFlags.js";
 
 const mapper = new RelationalMapper();
 
@@ -315,7 +316,7 @@ describe("RelationalMapper", () => {
         readings: ["{0} has {1} at {2}"],
         constraints: constraints.map((c) => ({ type: "internal_uniqueness" as const, ...c })),
       });
-      return mapper.map(model).tables.find((t) =>
+      return mapper.map(placeFlags(model)).tables.find((t) =>
         t.name === "encounter_has_diagnosis_at_diagnosis_rank"
       )!;
     }
@@ -705,7 +706,7 @@ describe("RelationalMapper", () => {
         .withBinaryFactType("Patient has MedicalRecordNumber", {
           role1: { player: "Patient", name: "has" },
           role2: { player: "MedicalRecordNumber", name: "is of" },
-          uniqueness: "role1",
+          uniqueness: "both",
           mandatory: "role1",
           isPreferred: true,
         })
@@ -1324,7 +1325,7 @@ describe("RelationalMapper", () => {
         ],
       });
 
-      const schema = mapper.map(model);
+      const schema = mapper.map(placeFlags(model));
       const table = schema.tables.find((t) => t.name === "person")!;
       const pkCol = table.columns.find((c) => c.name === "person_code")!;
       const ddl = renderDdl(schema);
@@ -1483,7 +1484,7 @@ describe("RelationalMapper", () => {
 
       // Find the uniqueness constraint ID
       const ft = model.getFactTypeByName("Customer places Order")!;
-      const uniquenessConstraint = ft.constraints.find(
+      const uniquenessConstraint = ft.internalConstraints.find(
         (c) => c.type === "internal_uniqueness",
       )!;
       expect(uniquenessConstraint).toBeDefined();
@@ -1513,7 +1514,7 @@ describe("RelationalMapper", () => {
         .build();
 
       const ft = model.getFactTypeByName("Customer places Order")!;
-      const uniquenessConstraint = ft.constraints.find(
+      const uniquenessConstraint = ft.internalConstraints.find(
         (c) => c.type === "internal_uniqueness",
       )!;
 
@@ -1525,7 +1526,7 @@ describe("RelationalMapper", () => {
       expect(fk.sourceConstraintId).toBe(uniquenessConstraint.id);
     });
 
-    it("omits sourceConstraintId when the uniqueness constraint has no id", () => {
+    it("traces a uniqueness constraint added in code to the id addConstraint gives it", () => {
       const model = new OrmModel({ name: "Test" });
       const customer = model.addObjectType({
         name: "Customer",
@@ -1545,13 +1546,15 @@ describe("RelationalMapper", () => {
         ],
         readings: ["{0} places {1}", "{1} is placed by {0}"],
       });
-      // addConstraint (unlike the fact-type constructor) does not
-      // backfill a missing id.
+      // addConstraint fills a missing id, as the fact type constructor
+      // does (barwise-nkq).
       ft.addConstraint({ type: "internal_uniqueness", roleIds: ["r2"] });
+      const filled = ft.internalConstraints[0]!.id;
+      expect(filled).toEqual(expect.any(String));
 
       const schema = mapper.map(model);
       const orderTable = schema.tables.find((t) => t.name === "order")!;
-      expect(orderTable.foreignKeys[0]!.sourceConstraintId).toBeUndefined();
+      expect(orderTable.foreignKeys[0]!.sourceConstraintId).toBe(filled);
     });
   });
 });
@@ -1583,8 +1586,8 @@ describe("well-formedness the mapper law generalises", () => {
       model.addFactType({
         name: name!,
         roles: [
-          { id: `${name}::r1`, name: verb!, playerId: student.id },
-          { id: `${name}::r2`, name: "is of", playerId: grade.id },
+          { id: roleId(name!, 1), name: verb!, playerId: student.id },
+          { id: roleId(name!, 2), name: "is of", playerId: grade.id },
         ],
         readings: [`{0} ${verb} {1}`, `{1} is of {0}`],
       });

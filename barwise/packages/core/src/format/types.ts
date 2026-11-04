@@ -37,6 +37,13 @@ export interface FormatDescriptor {
    */
   readonly extension?: string;
 
+  /**
+   * True when the exporter honours `ExportOptions.surrogateKeys`. Declared
+   * here so the CLI and MCP refuse the option for any other format from
+   * one list rather than two (surrogate-key-export.spec.md).
+   */
+  readonly surrogateKeys?: true;
+
   /** Import capability, if the format supports importing. */
   readonly importer?: ImportFormat;
 

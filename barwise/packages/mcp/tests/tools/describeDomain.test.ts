@@ -299,7 +299,7 @@ model:
       const artifactPath = join(dir, "schema.sql");
       writeFileSync(artifactPath, "CREATE TABLE customer;", "utf-8");
       writeManifest(dir, {
-        version: 1,
+        version: 2,
         sourceModel: "model.orm.yaml",
         sourceModelHash: "abc123",
         exports: [
@@ -375,7 +375,7 @@ model:
       const artifactPath = join(dir, "schema.sql");
       writeFileSync(artifactPath, "CREATE TABLE x;", "utf-8");
       writeManifest(dir, {
-        version: 1,
+        version: 2,
         sourceModel: "does-not-exist.orm.yaml",
         sourceModelHash: "abc123",
         exports: [
@@ -434,5 +434,66 @@ model:
       expect(parsed.warnings).toBeDefined();
       expect(parsed.warnings[0]).toContain("ghost");
     });
+  });
+});
+
+describe("describe_domain over a constraint across fact types (orm-format-3, Open decision 9)", () => {
+  /** A composite key across two fact types, nested under the second. */
+  const roomsModel = `
+orm_version: "1.0"
+model:
+  name: Facilities
+  object_types:
+    - { id: ot-room, name: Room, kind: entity, reference_mode: id }
+    - { id: ot-building, name: Building, kind: entity, reference_mode: code }
+    - { id: ot-nr, name: RoomNumber, kind: value }
+  fact_types:
+    - id: ft-in
+      name: Room is in Building
+      roles:
+        - { id: r-1, player: ot-room, role_name: is in }
+        - { id: r-2, player: ot-building, role_name: houses }
+      readings: ["{0} is in {1}"]
+      constraints:
+        - { id: c-one-building, type: internal_uniqueness, roles: [r-1] }
+    - id: ft-nr
+      name: Room has RoomNumber
+      roles:
+        - { id: r-3, player: ot-room, role_name: has }
+        - { id: r-4, player: ot-nr, role_name: is of }
+      readings: ["{0} has {1}"]
+      constraints:
+        - { id: c-one-nr, type: internal_uniqueness, roles: [r-3] }
+        - { id: c-room-key, type: external_uniqueness, roles: [r-2, r-4] }
+`;
+
+  it("names each constraint by every fact type it applies to, and counts it under each", () => {
+    const parsed = JSON.parse(executeDescribeDomain(roomsModel, "Room").content[0]!.text);
+    const constraints = parsed.constraints as Record<string, unknown>[];
+    // A 1.0 file, read through the replay into 4.0's ids: each constraint
+    // is named from its sentence (iri-identity WS6).
+    expect(constraints.map((c) => [c.id, c.type, c.factTypes, c.factTypeIds])).toEqual([
+      ["Each_Room_is_in_at_most_one_Building", "internal_uniqueness", ["Room is in Building"], [
+        "Room_is_in_Building",
+      ]],
+      [
+        "The_combination_of_Building_and_RoomNumber_is_unique_across_fact_types",
+        "external_uniqueness",
+        ["Room is in Building", "Room has RoomNumber"],
+        ["Room_is_in_Building", "Room_has_RoomNumber"],
+      ],
+      ["Each_Room_has_at_most_one_RoomNumber", "internal_uniqueness", ["Room has RoomNumber"], [
+        "Room_has_RoomNumber",
+      ]],
+    ]);
+    for (const c of constraints) expect(c).not.toHaveProperty("affectedFactType");
+    expect(
+      (parsed.factTypes as { id: string; name: string; constraintCount: number; }[])
+        .map((ft) => [ft.id, ft.name, ft.constraintCount]),
+    ).toEqual([["Room_is_in_Building", "Room is in Building", 2], [
+      "Room_has_RoomNumber",
+      "Room has RoomNumber",
+      2,
+    ]]);
   });
 });

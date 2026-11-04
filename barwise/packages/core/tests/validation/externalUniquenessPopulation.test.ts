@@ -66,7 +66,7 @@ function roomModel(violate: boolean): OrmModel {
     { player: room, name: "has", id: "rn1" },
     { player: roomNumber, name: "numbers", id: "rn2" },
   );
-  inBuilding.addConstraint({ type: "external_uniqueness", roleIds: ["rb2", "rn2"] });
+  m.addConstraint({ type: "external_uniqueness", roleIds: ["rb2", "rn2"] });
   pop(m, inBuilding.id, { rb1: "R1", rb2: "B1" });
   pop(m, hasNumber.id, { rn1: "R1", rn2: "N1" });
   pop(m, inBuilding.id, { rb1: "R2", rb2: "B1" });
@@ -93,7 +93,7 @@ function unInferableModel(): OrmModel {
     ],
     readings: ["{0} books {1} on {2}"],
   });
-  booking.addConstraint({ type: "external_uniqueness", roleIds: ["bk2", "bk3"] });
+  m.addConstraint({ type: "external_uniqueness", roleIds: ["bk2", "bk3"] });
   pop(m, booking.id, { bk1: "G1", bk2: "RM1", bk3: "D1" });
   pop(m, booking.id, { bk1: "G2", bk2: "RM1", bk3: "D1" });
   return m;
@@ -129,7 +129,7 @@ function nAryRoomModel(violate: boolean): OrmModel {
     { player: room, name: "on", id: "rf1" },
     { player: floor, name: "floors", id: "rf2" },
   );
-  inBuilding.addConstraint({ type: "external_uniqueness", roleIds: ["rb2", "rn2", "rf2"] });
+  m.addConstraint({ type: "external_uniqueness", roleIds: ["rb2", "rn2", "rf2"] });
   pop(m, inBuilding.id, { rb1: "R1", rb2: "B1" });
   pop(m, hasNumber.id, { rn1: "R1", rn2: "101" });
   pop(m, onFloor.id, { rf1: "R1", rf2: "2" });
@@ -162,7 +162,7 @@ function noCommonObjectModel(): OrmModel {
     { player: dept, name: "has", id: "hb1" },
     { player: budget, name: "of", id: "hb2" },
   );
-  owns.addConstraint({ type: "external_uniqueness", roleIds: ["o2", "hb2"] });
+  m.addConstraint({ type: "external_uniqueness", roleIds: ["o2", "hb2"] });
   pop(m, owns.id, { o1: "P1", o2: "CAR1" });
   pop(m, hasBudget.id, { hb1: "D1", hb2: "CAR1" });
   pop(m, owns.id, { o1: "P2", o2: "CAR1" });

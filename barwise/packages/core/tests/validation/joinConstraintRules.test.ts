@@ -7,7 +7,8 @@
  * satisfaction is a separate rule.
  */
 import { describe, expect, it } from "vitest";
-import type { Constraint, JoinOperand } from "../../src/model/Constraint.js";
+import type { ExternalConstraint, JoinOperand } from "../../src/model/Constraint.js";
+import { constraintRef } from "../../src/model/constraintRef.js";
 import { OrmModel } from "../../src/model/OrmModel.js";
 import { joinConstraintRules } from "../../src/validation/rules/joinConstraintRules.js";
 import { graphFor, unresolvedDiagnostics } from "../helpers/graphFor.js";
@@ -21,7 +22,7 @@ const citizenOf: JoinOperand = {
   projection: [0, 1],
 };
 
-function buildModel(constraint: Constraint): OrmModel {
+function buildModel(constraint: ExternalConstraint): OrmModel {
   const model = new OrmModel({ name: "Test" });
   const person = model.addObjectType({
     id: "ot-person",
@@ -49,8 +50,8 @@ function buildModel(constraint: Constraint): OrmModel {
       { name: "has citizen", playerId: country.id, id: "pc-country" },
     ],
     readings: ["{0} is citizen of {1}"],
-    constraints: [constraint],
   });
+  model.addConstraint(constraint);
   return model;
 }
 
@@ -135,7 +136,7 @@ describe("joinConstraintRules", () => {
       .toContain("constraint/join-empty-projection");
   });
 
-  it("falls back to the fact type id when a malformed join constraint has no id of its own", () => {
+  it("reports a malformed join constraint added in code, which the model leaves unnamed", () => {
     const model = new OrmModel({ name: "Test" });
     const person = model.addObjectType({
       id: "ot-person",
@@ -144,7 +145,7 @@ describe("joinConstraintRules", () => {
       referenceMode: "person_id",
     });
     model.addObjectType({ name: "Country", kind: "entity", referenceMode: "country_code" });
-    const ft = model.addFactType({
+    model.addFactType({
       name: "Person is citizen of Country",
       roles: [
         { name: "is citizen of", playerId: person.id, id: "pc-person" },
@@ -152,14 +153,18 @@ describe("joinConstraintRules", () => {
       ],
       readings: ["{0} is citizen of {1}"],
     });
-    // addConstraint (unlike the fact-type constructor) does not backfill
-    // a missing id.
+    // Its root dangles, so it has no sentence to mint a name from and stays
+    // unnamed (iri-identity decision 19); the diagnostic still names the
+    // constraint, by the reference constraintRef builds, not a fact type.
     const bad: JoinOperand = { path: { root: "ot-missing", steps: [] }, projection: [0] };
-    ft.addConstraint({ type: "join_equality", operands: [bad, citizenOf] });
+    model.addConstraint({ type: "join_equality", operands: [bad, citizenOf] });
+    const added = model.constraints.at(-1)!;
+    expect(added.id).toBeUndefined();
 
     const diags = unresolvedDiagnostics(model);
     const unknownRoot = diags.find((d) => d.ruleId === "constraint/join-unknown-root");
     expect(unknownRoot).toBeDefined();
-    expect(unknownRoot!.elementId).toBe(ft.id);
+    expect(unknownRoot!.elementId).toBe(constraintRef(added));
+    expect(unknownRoot!.elementId).toMatch(/^unnamed:join_equality</);
   });
 });

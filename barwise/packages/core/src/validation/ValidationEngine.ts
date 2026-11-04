@@ -81,7 +81,7 @@ export class ValidationEngine {
         diagnostics.push(...rule(model, result.graph));
       }
     } else {
-      diagnostics.push(...referenceDiagnostics(result.unresolved));
+      diagnostics.push(...referenceDiagnostics(model, result.unresolved));
     }
 
     for (const rule of this.rules) {

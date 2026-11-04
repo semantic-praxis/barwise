@@ -43,14 +43,15 @@ describe("Full pipeline integration: load -> validate -> verbalize -> map -> DDL
     });
 
     it("loads population instances correctly", () => {
-      const ordersPop = model.getPopulation("pop-orders");
+      // Under the ids the replay into 4.0 gives a 3.x file (iri-identity WS6).
+      const ordersPop = model.getPopulation("Customer_places_Order.population");
       expect(ordersPop).toBeDefined();
       expect(ordersPop!.description).toBe("Sample customer orders");
       expect(ordersPop!.instances).toHaveLength(3);
 
-      const inst1 = ordersPop!.getInstance("inst-1")!;
-      expect(inst1.roleValues["r-cust-places"]).toBe("C001");
-      expect(inst1.roleValues["r-order-placed-by"]).toBe("O100");
+      const inst1 = ordersPop!.getInstance("Customer_places_Order.population.1")!;
+      expect(inst1.roleValues["Customer_places_Order.places"]).toBe("C001");
+      expect(inst1.roleValues["Customer_places_Order.is_placed_by"]).toBe("O100");
     });
 
     it("passes validation with valid populations (no constraint violations)", () => {
@@ -195,7 +196,7 @@ describe("Full pipeline integration: load -> validate -> verbalize -> map -> DDL
       // The Customer rates Product fact type has a frequency constraint.
       const ratesFt = model.getFactTypeByName("Customer rates Product");
       expect(ratesFt).toBeDefined();
-      const freqConstraint = ratesFt!.constraints.find(
+      const freqConstraint = ratesFt!.internalConstraints.find(
         (c) => c.type === "frequency",
       );
       expect(freqConstraint).toBeDefined();
@@ -211,9 +212,7 @@ describe("Full pipeline integration: load -> validate -> verbalize -> map -> DDL
     const model = serializer.deserialize(yaml);
 
     it("loads all Phase 2 constraint types", () => {
-      const allConstraints = model.factTypes.flatMap(
-        (ft) => ft.constraints,
-      );
+      const allConstraints = model.everyConstraint().map(([c]) => c);
       const types = new Set(allConstraints.map((c) => c.type));
 
       expect(types.has("exclusive_or")).toBe(true);
@@ -274,8 +273,8 @@ describe("Full pipeline integration: load -> validate -> verbalize -> map -> DDL
       expect(model.objectifiedFactTypes).toHaveLength(1);
 
       const oft = model.objectifiedFactTypes[0]!;
-      expect(oft.factTypeId).toBe("ft-student-enrolls-course");
-      expect(oft.objectTypeId).toBe("ot-enrollment");
+      expect(oft.factTypeId).toBe("Student_enrolls_in_Course");
+      expect(oft.objectTypeId).toBe("Enrollment");
     });
 
     it("passes validation with no errors", () => {

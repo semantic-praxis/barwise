@@ -136,9 +136,13 @@ its rules.
 **Barwise: Export...** offers:
 
 - **As dbt Project**: pick an existing dbt project folder; it writes
-  `models/schema.yml` and one SQL model per table.
-- **As DDL**: choose where to save the `.sql` file.
-- **As Avro Schemas**: pick a folder; it writes one `.avsc` per table.
+  `models/staging/schema.yml` and one SQL model per table there, the files
+  `barwise export --format dbt` writes under `models/`, and no seed files.
+- **As DDL**: choose where to save the `.sql` file. It writes the DDL the
+  diagram's DDL tab shows (the CLI's `barwise export --format ddl`), and when a
+  constraint has no SQL form, a warning offers a report naming each one.
+- **As Avro Schemas**: pick a folder; it writes one `.avsc` per table, with
+  the export's review notes in the schema docs.
 
 OpenAPI and NORMA export are available only through `#barwiseExport` in chat.
 Neither the palette nor the chat tool lets you choose a SQL dialect for DDL;
@@ -153,6 +157,10 @@ These are chat tools; the palette has no equivalent.
 - `#barwiseMerge` folds one model into another, taking additions and changes
   and refusing removals. It writes the result over the base model's file, so
   commit first. (The CLI's `barwise merge` does not touch its inputs.)
+- `#barwiseRename` renames an object type, a fact type or a role, and given a
+  project, follows it into the other domains and mapping files. It writes the
+  files it changes, as the CLI's `barwise rename` does, and refuses a model
+  with unsaved changes: save first.
 - `#barwiseLineage` reports which exported artifacts are out of date, and
   `#barwiseImpact` lists the artifacts built from one element. Both read the
   lineage manifest that only the CLI's `barwise export` writes; exports made

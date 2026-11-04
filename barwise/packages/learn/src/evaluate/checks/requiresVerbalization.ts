@@ -1,5 +1,5 @@
 import type { OrmModel } from "@barwise/core";
-import { Verbalizer } from "@barwise/core/verbalization";
+import { isStatement, Verbalizer } from "@barwise/core/verbalization";
 import type { CheckResult } from "../GymReport.js";
 
 /** Collapse runs of whitespace so comparison ignores incidental spacing. */
@@ -19,7 +19,10 @@ export function requiresVerbalization(
   hint?: string,
 ): CheckResult {
   const target = normalize(sentence);
-  const produced = new Verbalizer().verbalizeModel(candidate).map((v) => normalize(v.text));
+  const produced = new Verbalizer()
+    .verbalizeModel(candidate)
+    .filter(isStatement)
+    .map((v) => normalize(v.text));
 
   if (produced.includes(target)) {
     return {

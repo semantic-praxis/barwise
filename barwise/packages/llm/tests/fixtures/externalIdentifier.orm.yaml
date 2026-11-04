@@ -1,0 +1,37 @@
+orm_version: "3.0"
+model:
+  name: Rooms
+  object_types:
+    - { id: ot-building, name: Building, kind: entity, reference_mode: building_code }
+    - { id: ot-room, name: Room, kind: entity, reference_mode: room_id, preferred_identifier: c-room-id }
+    - { id: ot-roomnr, name: RoomNr, kind: value, data_type: { name: integer } }
+    - { id: ot-seats, name: SeatCount, kind: value, data_type: { name: integer } }
+  fact_types:
+    - id: ft-room-in-building
+      name: Room is in Building
+      roles:
+        - { id: r-rib-room, player: ot-room, role_name: is in }
+        - { id: r-rib-building, player: ot-building, role_name: houses }
+      readings: ["{0} is in {1}"]
+      constraints:
+        - { id: c-rib-u, type: internal_uniqueness, roles: [r-rib-room] }
+        - { id: c-rib-m, type: mandatory, role: r-rib-room }
+    - id: ft-room-has-nr
+      name: Room has RoomNr
+      roles:
+        - { id: r-rhn-room, player: ot-room, role_name: has }
+        - { id: r-rhn-nr, player: ot-roomnr, role_name: is of }
+      readings: ["{0} has {1}"]
+      constraints:
+        - { id: c-rhn-u, type: internal_uniqueness, roles: [r-rhn-room] }
+        - { id: c-rhn-m, type: mandatory, role: r-rhn-room }
+    - id: ft-room-seats
+      name: Room has SeatCount
+      roles:
+        - { id: r-rs-room, player: ot-room, role_name: has }
+        - { id: r-rs-seats, player: ot-seats, role_name: is of }
+      readings: ["{0} has {1}"]
+      constraints:
+        - { id: c-rs-u, type: internal_uniqueness, roles: [r-rs-room] }
+  constraints:
+    - { id: c-room-id, type: external_uniqueness, roles: [r-rib-building, r-rhn-nr] }

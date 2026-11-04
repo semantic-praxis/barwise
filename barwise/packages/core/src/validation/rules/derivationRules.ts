@@ -1,5 +1,6 @@
 import type { ModelGraph } from "../../model/graph.js";
 import type { OrmModel } from "../../model/OrmModel.js";
+import { subtypeFactRef } from "../../model/SubtypeFact.js";
 import type { Diagnostic } from "../Diagnostic.js";
 import { report, RULE_ID } from "../ruleId.js";
 
@@ -7,7 +8,7 @@ import { report, RULE_ID } from "../ruleId.js";
  * Derivation consistency rules.
  *
  * These check the _declaration_ of a derivation, never its meaning -- core
- * stores derivation rules as data and never evaluates them (ADR-0001 filter
+ * stores derivation rules as data and never evaluates them (ADR `metamodel-evolution-policy` filter
  * 3). Two structural checks:
  *
  * - A derived or semiderived element (fact type or subtype) whose rule text
@@ -44,7 +45,13 @@ export function derivationRules(model: OrmModel, graph: ModelGraph): Diagnostic[
     if (!d) continue;
     if (d.expression.trim() === "") {
       diagnostics.push(
-        report(RULE_ID.missingRule, "subtype", sf.id, graph.objectType(sf.subtypeId).name, d.kind),
+        report(
+          RULE_ID.missingRule,
+          "subtype",
+          subtypeFactRef(sf),
+          graph.objectType(sf.subtypeId).name,
+          d.kind,
+        ),
       );
     }
   }

@@ -1,5 +1,6 @@
 import {
   type Constraint,
+  type ConstraintInView,
   evaluateConstraintEnforcement,
   type FactType,
   isDisjunctiveMandatory,
@@ -12,7 +13,7 @@ import {
   type OrmModel,
   type PopulationConfig,
 } from "@barwise/core";
-import { generateCounterexampleForConstraint } from "@barwise/core/counterexample";
+import { generateCounterexampleInView } from "@barwise/core/counterexample";
 import type { ConstraintKind, NameLicence } from "../../exercise/types.js";
 import type { CheckResult } from "../GymReport.js";
 import {
@@ -75,8 +76,9 @@ const CANDIDATE_GUARDS: Record<ConstraintKind, readonly ((c: Constraint) => bool
 };
 
 /**
- * Every (fact type, constraint) pair in the candidate that could carry
- * the rule, for one set of populations about to be injected.
+ * Every constraint in the candidate that could carry the rule, for one set
+ * of populations about to be injected, as the pair a view returns: with
+ * the fact type it lives in, or with none for one across fact types.
  *
  * Two sources, and the asymmetry between them is load-bearing.
  * `correspondents` is the candidate's answer to the fact type the check
@@ -102,7 +104,7 @@ function constraintsUnderTest(
   correspondents: readonly FactType[],
   configs: readonly PopulationConfig[],
   kind: ConstraintKind,
-): Array<{ readonly ft: FactType; readonly c: Constraint; }> {
+): readonly ConstraintInView[] {
   const carriers = new Map<string, FactType>();
   for (const ft of correspondents) carriers.set(ft.id, ft);
   if (kind !== "mandatory") {
@@ -112,14 +114,12 @@ function constraintsUnderTest(
     }
   }
 
+  // Every constraint that applies to a carrier, each once: a candidate's
+  // external uniqueness or disjunctive mandatory spans its fact types
+  // wherever a 2.0 file nests it (orm-format-3, Open decision 9).
   const guards = CANDIDATE_GUARDS[kind];
-  const pairs: Array<{ ft: FactType; c: Constraint; }> = [];
-  for (const ft of carriers.values()) {
-    for (const c of ft.constraints) {
-      if (guards.some((g) => g(c))) pairs.push({ ft, c });
-    }
-  }
-  return pairs;
+  return candidate.constraintsTouchingAny([...carriers.keys()])
+    .filter(([c]) => guards.some((g) => g(c)));
 }
 
 /**
@@ -148,13 +148,13 @@ function constraintsUnderTest(
 function candidateRejects(
   candidate: OrmModel,
   configs: PopulationConfig[],
-  under: ReadonlyArray<{ readonly ft: FactType; readonly c: Constraint; }>,
+  under: readonly ConstraintInView[],
 ): boolean {
   if (under.length === 0) return false;
 
-  const errorCounts = (ft: FactType, c: Constraint): Map<string, number> => {
+  const errorCounts = (inView: ConstraintInView): Map<string, number> => {
     const counts = new Map<string, number>();
-    const verdict = evaluateConstraintEnforcement(candidate, ft, c);
+    const verdict = evaluateConstraintEnforcement(candidate, inView);
     if (!verdict.enforced) return counts;
     for (const d of verdict.diagnostics) {
       if (d.severity !== "error") continue;
@@ -164,13 +164,13 @@ function candidateRejects(
     return counts;
   };
 
-  const before = under.map(({ ft, c }) => errorCounts(ft, c));
+  const before = under.map(errorCounts);
   const addedIds: string[] = [];
   try {
     for (const cfg of configs) addedIds.push(candidate.addPopulation(cfg).id);
-    for (const [i, { ft, c }] of under.entries()) {
+    for (const [i, inView] of under.entries()) {
       const was = before[i]!;
-      for (const [key, count] of errorCounts(ft, c)) {
+      for (const [key, count] of errorCounts(inView)) {
         if (count > (was.get(key) ?? 0)) return true;
       }
     }
@@ -183,7 +183,7 @@ function candidateRejects(
 /**
  * Pass iff the candidate rejects the population the named reference
  * constraint forbids. The population is derived from the reference model
- * (via `generateCounterexampleForConstraint`) and mapped onto the
+ * (via `generateCounterexampleInView`) and mapped onto the
  * candidate, so a candidate that has not encoded the constraint -- or has
  * not modeled the relationship at all -- fails, with a concrete message.
  */
@@ -204,14 +204,15 @@ export function forbidsPopulation(
     return fail(`The reference model has no fact type named "${factTypeName}" (exercise error).`);
   }
 
-  const constraint = refFt.constraints.find(GUARDS[constraintKind]);
+  // Every kind GUARDS names lives in its fact type.
+  const constraint = refFt.internalConstraints.find(GUARDS[constraintKind]);
   if (!constraint) {
     return fail(
       `The reference fact type "${factTypeName}" has no ${constraintKind} constraint (exercise error).`,
     );
   }
 
-  const counterexample = generateCounterexampleForConstraint(constraint, refFt, reference);
+  const counterexample = generateCounterexampleInView([constraint, refFt], reference);
   if (!counterexample || counterexample.forbidden.length === 0) {
     return fail(
       `Could not generate a forbidden population for the ${constraintKind} constraint on `

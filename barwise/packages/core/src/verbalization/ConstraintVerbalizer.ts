@@ -1,6 +1,12 @@
-import { type Constraint, requiresLocalRoles, roleIdsOf } from "../model/Constraint.js";
+import {
+  type Constraint,
+  type ExternalConstraint,
+  type InternalConstraint,
+  isExternalConstraint,
+  roleIdsOf,
+} from "../model/Constraint.js";
+import type { ConstraintInView, ConstraintModel } from "../model/constraintModel.js";
 import type { FactType } from "../model/FactType.js";
-import type { OrmModel } from "../model/OrmModel.js";
 import {
   verbalizeExternalUniqueness,
   verbalizeInternalUniqueness,
@@ -16,9 +22,11 @@ import {
   verbalizeFrequency,
   verbalizeJoinEquality,
   verbalizeJoinExclusion,
+  verbalizeJoinRing,
   verbalizeJoinSubset,
   verbalizeRing,
   verbalizeSubset,
+  verbalizeSubtypeConstraint,
   verbalizeValueComparison,
 } from "./constraints/phase2.js";
 import { buildVerbalization, kwSeg, refSeg, textSeg, type Verbalization } from "./Verbalization.js";
@@ -41,6 +49,7 @@ const KIND_NAME: Record<Constraint["type"], string> = {
   join_subset: "join subset",
   join_equality: "join equality",
   join_exclusion: "join exclusion",
+  join_ring: "join ring",
 };
 
 /**
@@ -64,12 +73,8 @@ function verbalizeMalformedConstraint(
   foreignRoleIds: readonly string[],
 ): Verbalization {
   const plural = foreignRoleIds.length > 1;
-  // `factType.id`, as every other constraint row in phase1 and phase2
-  // passes. `constraint.id ?? factType.id` would put two id spaces in
-  // one field depending on whether the constraint happened to carry an
-  // id, and `barwise verbalize --format json` emits it: a consumer
-  // resolving rows with `getFactType(sourceElementId)` would get
-  // `undefined` for exactly the malformed ones.
+  // Built against the fact type; `verbalize` then gives it the
+  // constraint's id and fact types like every other constraint row.
   return buildVerbalization(factType.id, "constraint", [
     kwSeg("Malformed: "),
     textSeg(`the ${KIND_NAME[constraint.type]} constraint on `),
@@ -100,109 +105,153 @@ function toDeontic(v: Verbalization): Verbalization {
 }
 
 /**
+ * A constraint row as every surface sees it (orm-format-3, Open decision
+ * 9): `sourceElementId` is the constraint's own id, and `factTypeIds` names
+ * the fact types it applies to, one for an internal constraint and every
+ * fact type holding one of its roles, in model order, for one across fact
+ * types. One rule for every constraint row, so a consumer resolves the row
+ * with `model.getConstraint` and the fact types with `getFactType`, whatever
+ * the kind. Every constraint has an id (barwise-nkq); the fact type id is
+ * only the type system's fallback.
+ */
+function asConstraintRow(
+  v: Verbalization,
+  constraint: Constraint,
+  factTypeIds: readonly string[],
+  fallbackId: string,
+): Verbalization {
+  return { ...v, sourceElementId: constraint.id ?? fallbackId, factTypeIds };
+}
+
+/** What `ConstraintVerbalizer.reportInView` says about a constraint. */
+export interface ConstraintReport {
+  /** The constraint's own id. */
+  readonly id: string;
+  /** Its FORML sentence. */
+  readonly verbalization: string;
+  /** Names of the fact types it applies to, in model order. */
+  readonly factTypes: readonly string[];
+  /** Ids of the same fact types, in the same order. */
+  readonly factTypeIds: readonly string[];
+}
+
+/**
  * Verbalizes ORM constraints using FORML sentence patterns. The
  * per-constraint logic lives in ./constraints/{phase1,phase2,sentence}.
  */
 export class ConstraintVerbalizer {
   /**
-   * Verbalize all constraints on a fact type.
+   * Verbalize every constraint that applies to a fact type: its internal
+   * constraints, then each constraint across fact types that names one of
+   * its roles (`OrmModel.constraintsTouching`). This is the view of one
+   * fact type; a whole-model verbalization says each constraint across fact
+   * types once, in its own section (`Verbalizer.verbalizeModel`).
+   *
+   * Takes an id, like `constraintsTouching`: the list, the fact type the
+   * text is built from and the object type names all come from `model`,
+   * so no row can mix two models. A fact type `model` does not have
+   * yields nothing.
    */
-  verbalizeAll(
-    factType: FactType,
-    model: OrmModel,
-  ): Verbalization[] {
-    return factType.constraints.map((c) => this.verbalize(c, factType, model));
+  verbalizeAll(factTypeId: string, model: ConstraintModel): Verbalization[] {
+    const ft = model.getFactType(factTypeId);
+    if (!ft) return [];
+    return model.constraintsTouching(ft.id).map((c) => this.verbalize(c, ft, model));
   }
 
   /**
-   * Verbalize a single constraint.
+   * Verbalize a single constraint. For an internal constraint `factType` is
+   * its fact type; a constraint across fact types belongs to none, so
+   * `factType` is ignored for it and the sentence is the one
+   * `verbalizeExternal` gives.
    */
   verbalize(
     constraint: Constraint,
     factType: FactType,
-    model: OrmModel,
+    model: ConstraintModel,
   ): Verbalization {
-    // One guard for every kind, before dispatch, rather than a fallback
-    // at each of the places a role lookup can miss. Below this line a
-    // local-role constraint's roles are all roles of `factType`, which
-    // is what lets the per-kind verbalizers index them without guarding
-    // (barwise-979).
-    //
-    // `requiresLocalRoles` is what stops this flagging the constraints
-    // that span fact types on purpose -- an external uniqueness
-    // constraint is SUPPOSED to reach across, and reporting it here
-    // would be a false finding on a correct model.
-    if (requiresLocalRoles(constraint)) {
-      const foreign = roleIdsOf(constraint).filter((rid) => !factType.hasRole(rid));
-      if (foreign.length > 0) {
-        return verbalizeMalformedConstraint(constraint, factType, foreign);
-      }
+    if (isExternalConstraint(constraint)) return this.verbalizeExternal(constraint, model);
+    return asConstraintRow(
+      this.verbalizeInternal(constraint, factType, model),
+      constraint,
+      model.factTypesNaming([constraint, factType]).map((ft) => ft.id),
+      factType.id,
+    );
+  }
+
+  /**
+   * A constraint as a view of the model reports it: verbalized in the fact
+   * type it lives in if it is internal, in none if it spans fact types, and
+   * named by its own id and the fact types it applies to (orm-format-3, Open
+   * decision 9). Query and describe both report constraints through this,
+   * so they cannot disagree about any of the four.
+   */
+  reportInView(inView: ConstraintInView, model: ConstraintModel): ConstraintReport {
+    const [constraint, factType] = inView;
+    const row = factType === undefined
+      ? this.verbalizeExternal(constraint, model)
+      : this.verbalize(constraint, factType, model);
+    // Every id here came from [factType.id] or factTypesHolding, so each
+    // resolves.
+    const factTypeIds = row.factTypeIds ?? [];
+    return {
+      id: row.sourceElementId,
+      verbalization: row.text,
+      factTypes: factTypeIds.map((id) => model.getFactType(id)!.name),
+      factTypeIds,
+    };
+  }
+
+  /**
+   * Verbalize a constraint across fact types. It needs no fact type: its
+   * roles are resolved model-wide and the sentence names each role's fact
+   * type wherever they differ.
+   */
+  verbalizeExternal(constraint: ExternalConstraint, model: ConstraintModel): Verbalization {
+    const spanned = model.factTypesNaming([constraint, undefined]).map((ft) => ft.id);
+    const id = constraint.id ?? spanned[0] ?? "";
+    const v = this.verbalizeExternalByType(constraint, id, model);
+    return asConstraintRow(
+      constraint.modality === "deontic" ? toDeontic(v) : v,
+      constraint,
+      spanned,
+      id,
+    );
+  }
+
+  private verbalizeInternal(
+    constraint: InternalConstraint,
+    factType: FactType,
+    model: ConstraintModel,
+  ): Verbalization {
+    // One guard for every internal kind, before dispatch, rather than a
+    // fallback at each of the places a role lookup can miss. Below this
+    // line an internal constraint's roles are all roles of `factType`,
+    // which is what lets the per-kind verbalizers index them without
+    // guarding (barwise-979). A constraint across fact types never reaches
+    // here: reaching across is the point of those kinds.
+    const foreign = roleIdsOf(constraint).filter((rid) => !factType.hasRole(rid));
+    if (foreign.length > 0) {
+      return verbalizeMalformedConstraint(constraint, factType, foreign);
     }
-    const v = this.verbalizeByType(constraint, factType, model);
+    const v = this.verbalizeInternalByType(constraint, factType, model);
     return constraint.modality === "deontic" ? toDeontic(v) : v;
   }
 
-  private verbalizeByType(
-    constraint: Constraint,
+  private verbalizeInternalByType(
+    constraint: InternalConstraint,
     factType: FactType,
-    model: OrmModel,
+    model: ConstraintModel,
   ): Verbalization {
     switch (constraint.type) {
       case "internal_uniqueness":
-        return verbalizeInternalUniqueness(
-          constraint.roleIds,
-          factType,
-          model,
-        );
+        return verbalizeInternalUniqueness(constraint.roleIds, factType, model);
       case "mandatory":
-        return verbalizeMandatory(
-          constraint.roleId,
-          factType,
-          model,
-        );
+        return verbalizeMandatory(constraint.roleId, factType, model);
       case "value_constraint":
         return verbalizeValueConstraint(
           constraint.roleId,
           constraint.values,
           constraint.ranges,
-          factType,
-          model,
-        );
-      case "external_uniqueness":
-        return verbalizeExternalUniqueness(
-          constraint.roleIds,
-          factType,
-          model,
-        );
-      case "disjunctive_mandatory":
-        return verbalizeDisjunctiveMandatory(
-          constraint.roleIds,
-          factType,
-          model,
-        );
-      case "exclusion":
-        return verbalizeExclusion(
-          constraint.roleIds,
-          factType,
-          model,
-        );
-      case "exclusive_or":
-        return verbalizeExclusiveOr(
-          constraint.roleIds,
-          factType,
-          model,
-        );
-      case "subset":
-        return verbalizeSubset(
-          constraint.subsetRoleIds,
-          constraint.supersetRoleIds,
-          factType,
-          model,
-        );
-      case "equality":
-        return verbalizeEquality(
-          constraint.roleIds1,
-          constraint.roleIds2,
           factType,
           model,
         );
@@ -238,12 +287,41 @@ export class ConstraintVerbalizer {
           factType,
           model,
         );
+    }
+  }
+
+  private verbalizeExternalByType(
+    constraint: ExternalConstraint,
+    id: string,
+    model: ConstraintModel,
+  ): Verbalization {
+    switch (constraint.type) {
+      case "external_uniqueness":
+        return verbalizeExternalUniqueness(constraint.roleIds, id, model);
+      case "disjunctive_mandatory":
+        return constraint.subtypeFactIds
+          ? verbalizeSubtypeConstraint(constraint.type, constraint.subtypeFactIds, id, model)
+          : verbalizeDisjunctiveMandatory(constraint.roleIds, id, model);
+      case "exclusion":
+        return constraint.subtypeFactIds
+          ? verbalizeSubtypeConstraint(constraint.type, constraint.subtypeFactIds, id, model)
+          : verbalizeExclusion(constraint.roleIds, id, model);
+      case "exclusive_or":
+        return constraint.subtypeFactIds
+          ? verbalizeSubtypeConstraint(constraint.type, constraint.subtypeFactIds, id, model)
+          : verbalizeExclusiveOr(constraint.roleIds, id, model);
+      case "subset":
+        return verbalizeSubset(constraint.subsetRoleIds, constraint.supersetRoleIds, id, model);
+      case "equality":
+        return verbalizeEquality(constraint.roleIds1, constraint.roleIds2, id, model);
       case "join_subset":
-        return verbalizeJoinSubset(constraint.subset, constraint.superset, factType, model);
+        return verbalizeJoinSubset(constraint.subset, constraint.superset, id, model);
       case "join_equality":
-        return verbalizeJoinEquality(constraint.operands, factType, model);
+        return verbalizeJoinEquality(constraint.operands, id, model);
       case "join_exclusion":
-        return verbalizeJoinExclusion(constraint.operands, factType, model);
+        return verbalizeJoinExclusion(constraint.operands, id, model);
+      case "join_ring":
+        return verbalizeJoinRing(constraint.operand, constraint.ringType, id, model);
     }
   }
 }

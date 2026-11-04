@@ -1,0 +1,698 @@
+/**
+ * The 3.x replay into format 4.0 (iri-identity WS6, 6b-2b-2a): every
+ * tracked model replays to one that states the same things -- the same
+ * elements, readings, constraints over the same roles, populations and
+ * diagrams -- under new ids. Checked by writing the replayed model as a 3.0
+ * document, mapping each id-bearing field back through the model's prior
+ * ids, and requiring the document the original model writes. Only fields
+ * that hold ids are mapped, so a name equal to some new id stays a name.
+ */
+import * as Schema from "effect/Schema";
+import { describe, expect, it } from "vitest";
+import { IDS_40 } from "../../src/decode/ids.js";
+import { diffModels } from "../../src/diff/ModelDiff.js";
+import { constraintRef } from "../../src/model/constraintRef.js";
+import { LOCAL_NAME_PATTERN, REFERENCE_PATTERN, ROLE_ID_PATTERN } from "../../src/model/name.js";
+import { OrmModel } from "../../src/model/OrmModel.js";
+import {
+  OrmYamlSerializer,
+  readDocument40,
+  writeDocument40,
+} from "../../src/serialization/OrmYamlSerializer.js";
+import { replayIds, replayInto40, RESHAPE } from "../../src/serialization/replay.js";
+import { modelCorpus } from "../helpers/modelCorpus.js";
+
+/** Fields whose string value, or each string in whose list, is an id. */
+const ID_FIELDS = new Set([
+  "id",
+  "player",
+  "subtype",
+  "supertype",
+  "fact_type",
+  "object_type",
+  "preferred_identifier",
+  "role",
+  "roles",
+  "role_1",
+  "role_2",
+  "roles_1",
+  "roles_2",
+  "subset_roles",
+  "superset_roles",
+  "subtype_facts",
+  "elements",
+  "root",
+  "entry",
+  "exit",
+]);
+/** Fields whose object's keys are ids. */
+const ID_KEYED = new Set(["role_values", "positions", "orientations"]);
+
+function mapIds(value: unknown, back: (id: string) => string, field?: string): unknown {
+  if (typeof value === "string") {
+    return field !== undefined && ID_FIELDS.has(field)
+      ? back(value)
+      : value;
+  }
+  if (Array.isArray(value)) return value.map((v) => mapIds(v, back, field));
+  if (value !== null && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>).map(([k, v]) => [
+        field !== undefined && ID_KEYED.has(field) ? back(k) : k,
+        mapIds(v, back, k),
+      ]),
+    );
+  }
+  return value;
+}
+
+/** Each old id to the id it now has, from the model's map back. */
+const oldToNew = (model: OrmModel) => new Map([...model.priorIds!].map(([now, old]) => [old, now]));
+
+/**
+ * The model as a 3.0-shaped document: the 4.0 writer's, which has 3.0's
+ * layout, without the keys a name was minted from and the imports the
+ * replay adds for its shadows' aliases, which 3.0 has no field for. The 4.0 writer, because a constraint the replay leaves unnamed has
+ * no id, which the 3.0 writer refuses.
+ */
+const asText = (model: OrmModel) => {
+  const strip = (v: unknown): unknown =>
+    Array.isArray(v)
+      ? v.map(strip)
+      : v !== null && typeof v === "object"
+      ? Object.fromEntries(
+        Object.entries(v).filter(([k]) => k !== "minted_from").map(([k, x]) => [k, strip(x)]),
+      )
+      : v;
+  const doc = strip(JSON.parse(JSON.stringify(writeDocument40(model)))) as {
+    model: Record<string, unknown>;
+  };
+  const { imports: _added, ...header } = doc.model;
+  // A 3.0 shadow states its owner in `source_context`; 4.0 in its id's
+  // alias, which the replay binds to that owner (iri-identity 6d). Read
+  // off the id and the imports by hand, not through `ownerContextOf`, so
+  // the expectation does not move with the code it checks (the pr-review
+  // on 6d).
+  const objectTypes = header["object_types"] as Record<string, unknown>[] | undefined;
+  if (objectTypes) {
+    header["object_types"] = objectTypes.map((ot) => {
+      const id = ot["id"] as string;
+      const owner = id.includes(":") ? model.imports.get(id.slice(0, id.indexOf(":"))) : undefined;
+      return owner === undefined ? ot : { ...ot, source_context: owner };
+    });
+  }
+  return { ...doc, model: header, orm_version: "3.0" };
+};
+
+/** The document without the ids of the constraints the replay left unnamed. */
+function withoutUnnamed(doc: Record<string, any>, model: OrmModel): Record<string, any> {
+  // A key the model holds: an unnamed constraint's is its reference.
+  const named = new Set(
+    [...model.priorIds!].filter(([now]) => !now.startsWith("unnamed:")).map(([, old]) => old),
+  );
+  const drop = (c: Record<string, unknown>) => {
+    if (typeof c.id !== "string" || named.has(c.id)) return c;
+    const { id: _unnamed, ...rest } = c;
+    return rest;
+  };
+  return {
+    ...doc,
+    model: {
+      ...doc.model,
+      ...(doc.model.fact_types
+        ? {
+          fact_types: doc.model.fact_types.map((ft: Record<string, any>) => ({
+            ...ft,
+            ...(ft.constraints ? { constraints: ft.constraints.map(drop) } : {}),
+          })),
+        }
+        : {}),
+      ...(doc.model.constraints ? { constraints: doc.model.constraints.map(drop) } : {}),
+    },
+  };
+}
+
+describe("replaying a 3.x model into format 4.0", () => {
+  const corpus = modelCorpus();
+
+  it("reads the corpus", () => {
+    expect(corpus.length).toBeGreaterThan(40);
+  });
+
+  it("holds shadows, so the shadow cases below have something to read", () => {
+    // The corpus is written by the 3.0 writer; when a change stopped it
+    // writing `source_context`, every file lost its shadows and each case
+    // below still passed, on less (Copilot, on 6d). Counted, not assumed.
+    const shadows = corpus.flatMap((c) =>
+      (c.doc.model.object_types ?? []).filter((ot: Record<string, unknown>) =>
+        ot["source_context"] !== undefined
+      )
+    );
+    expect(shadows.length).toBeGreaterThan(20);
+  });
+
+  it.each(corpus.map((c) => [c.file, c] as const))(
+    "%s states the same model under new ids",
+    (_, c) => {
+      const source = new OrmYamlSerializer().deserializeAsWritten(JSON.stringify(c.doc));
+      const model = replayInto40(source);
+      const ids = oldToNew(model);
+      const prior = model.priorIds!;
+      const back = (id: string) => prior.get(id) ?? id;
+      // A constraint the model cannot name is left unnamed (decision 19), so
+      // its id is the one thing the replayed model does not state.
+      expect(mapIds(asText(model), back)).toEqual(withoutUnnamed(c.doc, model));
+      // And the ids are 4.0's: a replay that kept the old ones would pass
+      // the line above with an empty map.
+      const off = [
+        ...model.objectTypes.map((o) => [o.id, REFERENCE_PATTERN] as const),
+        ...model.factTypes.flatMap((ft) => [
+          [ft.id, LOCAL_NAME_PATTERN] as const,
+          ...ft.roles.map((r) => [r.id, ROLE_ID_PATTERN] as const),
+        ]),
+        ...model.populations.map((p) => [p.id, ROLE_ID_PATTERN] as const),
+      ].filter(([id, pattern]) => !pattern.test(id)).map(([id]) => id);
+      expect(off).toEqual([]);
+      // Each shadow's alias is imported, bound to the context it stood for.
+      const shadows = source.objectTypes.filter((o) => o.sourceContext !== undefined);
+      expect(
+        shadows.map((o) => {
+          const id = ids.get(o.id)!;
+          return [id, model.imports.get(id.slice(0, id.indexOf(":")))];
+        }),
+      ).toEqual(shadows.map((o) => [ids.get(o.id), o.sourceContext]));
+      // No reference left on an old id: an unmapped one maps back to itself,
+      // so the comparison above cannot see it.
+      const fresh = new Set(ids.values());
+      const left: string[] = [];
+      mapIds(asText(model), (id) => {
+        if (ids.has(id) && !fresh.has(id)) left.push(id);
+        return id;
+      });
+      expect(left).toEqual([]);
+    },
+  );
+
+  it("names a shadow, an objectified fact type, repeated roles and the rest by 4.0's rules", () => {
+    const source = new OrmYamlSerializer().deserializeAsWritten(
+      `orm_version: "3.0"
+model:
+  name: School
+  object_types:
+    - { id: u1, name: Student, kind: entity, reference_mode: nr, preferred_identifier: c1 }
+    - { id: u2, name: Course, kind: entity, reference_mode: code, source_context: catalog }
+    - { id: u3, name: Enrollment, kind: entity, reference_mode: nr }
+    - { id: u4, name: Nr, kind: value }
+  fact_types:
+    - id: f1
+      name: Student has Nr
+      roles:
+        - { id: r1, player: u1, role_name: has }
+        - { id: r2, player: u4, role_name: is of }
+      readings: ["{0} has {1}"]
+      constraints:
+        - { id: c1, type: internal_uniqueness, roles: [r2] }
+    - id: f2
+      name: Enrollment
+      roles:
+        - { id: r3, player: u1, role_name: is in }
+        - { id: r4, player: u2, role_name: is in }
+      readings: ["{0} enrolls in {1}"]
+      constraints:
+        - { id: c2, type: internal_uniqueness, roles: [r3, r4] }
+        - { id: bad, type: internal_uniqueness, roles: [r1] }
+  objectified_fact_types:
+    - { id: o1, fact_type: f2, object_type: u3 }
+  populations:
+    - id: p1
+      fact_type: f1
+      instances:
+        - { id: i1, role_values: { r1: s1, r2: "7" } }
+  diagrams:
+    - { name: Main, elements: [u1, u2], positions: { u1: { x: 1, y: 2 } } }
+`,
+      { lenient: true },
+    );
+    const model = replayInto40(source);
+    const ids = oldToNew(model);
+    expect(Object.fromEntries(ids)).toMatchObject({
+      u1: "Student",
+      u2: "catalog:Course",
+      u3: "Enrollment",
+      // Decision 20: named like its objectifier, so its id is its reading's.
+      f2: "Student_enrolls_in_Course",
+      // Two roles named alike take the suffix rule (decision 5).
+      r3: "Student_enrolls_in_Course.is_in",
+      r4: "Student_enrolls_in_Course.is_in_2",
+      c1: "For_each_Nr,_at_most_one_Student_has_that_Nr",
+      p1: "Student_has_Nr.population",
+      i1: "Student_has_Nr.population.1",
+    });
+    // An internal constraint naming another fact type's role cannot be
+    // named, so it is left unnamed (decision 19); its old id is kept against
+    // its reference, which is what a diagnostic about it names.
+    expect(ids.get("bad")).toMatch(/^unnamed:internal_uniqueness</);
+    expect(
+      model.getFactType("Student_enrolls_in_Course")!.internalConstraints.map((c) => c.id),
+    ).toContain(undefined);
+    expect(model.getFactType("Student_enrolls_in_Course")!.name).toBe("Enrollment");
+    expect(model.preferredIdentifierOf("Student")).toBe(
+      "For_each_Nr,_at_most_one_Student_has_that_Nr",
+    );
+    expect(model.populations[0]!.instances[0]!.roleValues).toEqual({
+      "Student_has_Nr.has": "s1",
+      "Student_has_Nr.is_of": "7",
+    });
+    expect(model.diagramLayouts[0]).toMatchObject({
+      elements: ["Student", "catalog:Course"],
+      positions: { Student: { x: 1, y: 2 } },
+    });
+  });
+
+  it("lets diff pair two replayed revisions of one file by their old ids", () => {
+    const revision = (cardName: string, ownMax: string, exclusion: string) =>
+      replayInto40(new OrmYamlSerializer().deserializeAsWritten(`orm_version: "3.0"
+model:
+  name: Shop
+  object_types:
+    - { id: u1, name: Customer, kind: entity, reference_mode: nr }
+    - { id: u2, name: ${cardName}, kind: entity, reference_mode: nr }
+  fact_types:
+    - id: f1
+      name: Customer owns ${cardName}
+      roles:
+        - { id: r1, player: u1, role_name: owns }
+        - { id: r2, player: u2, role_name: is owned by }
+      readings: ["{0} owns {1}"]
+      constraints:
+        - { id: c1, type: ${ownMax} }
+    - id: f2
+      name: Customer lends ${cardName}
+      roles:
+        - { id: r3, player: u1, role_name: lends }
+        - { id: r4, player: u2, role_name: is lent by }
+      readings: ["{0} lends {1}"]
+  constraints:
+    - { id: x1, type: exclusion, roles: [r1, r3]${exclusion} }
+`));
+    // The second revision renames the card and changes the constraint, so
+    // every replayed id that names them differs between the two.
+    const before = revision("Card", "internal_uniqueness, roles: [r2]", "");
+    const after = revision(
+      "Voucher",
+      "internal_uniqueness, roles: [r1, r2]",
+      ", modality: deontic",
+    );
+    expect(before.getObjectType("Card")).toBeDefined();
+    expect(after.getObjectType("Voucher")).toBeDefined();
+    const deltas = diffModels(before, after).deltas
+      .filter((d) => d.kind !== "unchanged")
+      .map((d) => [d.elementType, d.kind]);
+    // Paired through the old ids: a change each, nothing removed or added
+    // (a fact type's own constraint changes with its fact type).
+    expect(deltas).toEqual([
+      ["object_type", "modified"],
+      ["fact_type", "modified"],
+      ["fact_type", "modified"],
+      ["constraint", "modified"],
+    ]);
+    // Without the old ids, the same two models pair by name and lose them.
+    const plain = (m: OrmModel) =>
+      new OrmYamlSerializer().deserialize(new OrmYamlSerializer().serialize(m))!;
+    expect(diffModels(plain(before), plain(after)).deltas.some((d) => d.kind === "removed")).toBe(
+      true,
+    );
+  });
+
+  it("keeps two kinds that shared an old id apart, and leaves a dangling reference dangling", () => {
+    // Built in code: a 3.0 file refuses a repeated constraint id, and a 2.0
+    // file or a model built in code is how one reaches the replay.
+    const source = new OrmModel({ name: "Shared" });
+    source.addObjectType({ id: "x1", name: "Person", kind: "entity", referenceMode: "nr" });
+    source.addObjectType({ id: "ot-7", name: "Order", kind: "entity", referenceMode: "nr" });
+    source.addFactType({
+      id: "x1",
+      name: "Person places Order",
+      roles: [
+        { id: "r1", name: "places", playerId: "x1" },
+        { id: "r2", name: "is placed by", playerId: "Order" },
+      ],
+      readings: ["{0} places {1}"],
+      // A ring over two players: no sentence names it.
+      constraints: [{
+        id: "c9",
+        type: "ring",
+        roleId1: "r1",
+        roleId2: "r2",
+        ringType: "irreflexive",
+      }],
+    }, { skipPlayerValidation: true });
+    source.addConstraint({ id: "c9", type: "exclusion", roleIds: ["r1", "gone"] } as never);
+    // A reference to the object type x1 read after the fact type x1 is in.
+    source.addDiagramLayout({ name: "Main", elements: ["x1"], positions: {}, orientations: {} });
+    const model = replayInto40(source);
+    const ft = model.factTypes[0]!;
+    // The role's player is the object type, though a fact type shared x1.
+    expect(ft.id).toBe("Person_places_Order");
+    expect(ft.roles[0]!.playerId).toBe("Person");
+    // "Order" was a dangling player in the file; the object type named
+    // Order is not given that id, so the reference still resolves to nothing.
+    expect(model.getObjectTypeByName("Order")!.id).toBe("Order_2");
+    expect(ft.roles[1]!.playerId).toBe("Order");
+    expect(model.diagramLayouts[0]!.elements).toEqual(["Person"]);
+    // Two constraints the model cannot name, sharing an old id: the second
+    // takes one derived from it, rather than the replay refusing the file.
+    const kept = model.everyConstraint().map(([c]) => c.id).filter((id) =>
+      id?.startsWith("c9") || /^[0-9a-f]{8}-/.test(id ?? "")
+    );
+    expect(new Set(kept).size).toBe(kept.length);
+  });
+
+  it("leaves one fact type's two unnamable constraints sharing an id both unnamed", () => {
+    const source = new OrmModel({ name: "Rings" });
+    source.addObjectType({ id: "a", name: "A", kind: "entity", referenceMode: "nr" });
+    source.addObjectType({ id: "b", name: "B", kind: "entity", referenceMode: "nr" });
+    const ring = {
+      id: "k",
+      type: "ring",
+      roleId1: "r1",
+      roleId2: "r2",
+      ringType: "irreflexive",
+    } as const;
+    source.addFactType({
+      id: "f",
+      name: "A r B",
+      roles: [{ id: "r1", name: "r", playerId: "a" }, { id: "r2", name: "s", playerId: "b" }],
+      readings: ["{0} r {1}"],
+      constraints: [ring, { ...ring, ringType: "acyclic" }],
+    });
+    // A 2.0 file may hold them; a ring over two players has no sentence.
+    const ids = replayInto40(source).factTypes[0]!.internalConstraints.map((c) => c.id);
+    expect(ids).toEqual([undefined, undefined]);
+  });
+
+  it("leaves a reference to a subtype fact it leaves unnamed dangling (decisions 17 and 19)", () => {
+    const source = new OrmYamlSerializer().deserializeAsWritten(
+      `orm_version: "3.0"
+model:
+  name: Gone
+  object_types:
+    - { id: a, name: A, kind: entity, reference_mode: nr }
+    - { id: b, name: B, kind: entity, reference_mode: nr }
+  subtype_facts:
+    - { id: sf1, subtype: a, supertype: gone }
+    - { id: sf2, subtype: b, supertype: gone }
+  constraints:
+    - { id: x, type: exclusion, subtype_facts: [sf1, sf2] }
+`,
+      { lenient: true },
+    );
+    const model = replayInto40(source);
+    expect(model.subtypeFacts.map((sf) => sf.id)).toEqual([undefined, undefined]);
+    // Nothing may refer to an unnamed element by id, so the constraint
+    // names the old ids, which resolve to nothing, and validation says so.
+    expect(model.constraints[0]).toMatchObject({ subtypeFactIds: ["sf1", "sf2"] });
+  });
+
+  it("maps a diagram's orientations by fact type, keeps stale position and orientation keys apart, and names a shadow's context locally", () => {
+    const source = new OrmModel({ name: "Layout" });
+    source.addObjectType({ id: "x1", name: "Person", kind: "entity", referenceMode: "nr" });
+    source.addObjectType({ id: "u1", name: "Customer", kind: "entity", referenceMode: "nr" });
+    source.addObjectType({
+      id: "s1",
+      name: "Order",
+      kind: "entity",
+      referenceMode: "nr",
+      sourceContext: "Order Management",
+    });
+    source.addFactType({
+      id: "x1",
+      name: "Person knows Customer",
+      roles: [{ id: "r1", name: "knows", playerId: "x1" }, {
+        id: "r2",
+        name: "is known by",
+        playerId: "u1",
+      }],
+      readings: ["{0} knows {1}"],
+    });
+    source.addDiagramLayout({
+      name: "Main",
+      // "Customer" and "Person_knows_Customer" are stale keys: no element
+      // holds either id in the file, and each is a name the replay would mint.
+      positions: { u1: { x: 1, y: 1 }, Customer: { x: 9, y: 9 } },
+      orientations: { x1: "vertical", Person_knows_Customer: "horizontal" },
+    });
+    const model = replayInto40(source);
+    const layout = model.diagramLayouts[0]!;
+    expect(model.getObjectTypeByName("Customer")!.id).toBe("Customer_2");
+    expect(layout.positions).toEqual({ Customer_2: { x: 1, y: 1 }, Customer: { x: 9, y: 9 } });
+    expect(layout.orientations).toEqual({
+      Person_knows_Customer_2: "vertical",
+      Person_knows_Customer: "horizontal",
+    });
+    expect(model.getObjectTypeByName("Order")!.id).toBe("Order_Management:Order");
+  });
+
+  it("gives a dangling role reference 4.0 could not read a shape it can, still dangling", () => {
+    const source = new OrmModel({ name: "Fragment" });
+    source.addObjectType({ id: "x1", name: "Person", kind: "entity", referenceMode: "nr" });
+    // A fact type named like the reshaped references' fact type part: it
+    // must not take that id, or they would resolve to it.
+    source.addFactType({
+      id: "f1",
+      name: "unresolved",
+      roles: [{ id: "r1", name: "a", playerId: "x1" }, { id: "r2", name: "b", playerId: "x1" }],
+      readings: ["{0} a {1}"],
+    });
+    // Unmintable (a role dangles), so it keeps its old id unless something
+    // holds it -- here the reshaped reference does.
+    source.addConstraint({
+      id: "unresolved.r-elsewhere",
+      type: "subset",
+      subsetRoleIds: ["r1"],
+      supersetRoleIds: ["r-elsewhere", "Other.role"],
+    });
+    const model = replayInto40(source);
+    expect(model.factTypes[0]!.id).toBe("unresolved_2");
+    // Not shaped like a role id: reshaped. Shaped: carried as written.
+    expect(model.constraints[0]).toMatchObject({
+      supersetRoleIds: ["unresolved.r-elsewhere", "Other.role"],
+    });
+    expect(model.factTypesHolding(["unresolved.r-elsewhere"])).toEqual([]);
+    expect(model.priorIds!.get("unresolved.r-elsewhere")).toBe("r-elsewhere");
+    expect(model.constraints[0]!.id).not.toBe("unresolved.r-elsewhere");
+  });
+
+  it("points a preferred identifier that named an unnamed constraint at nothing 4.0 can read", () => {
+    const source = new OrmModel({ name: "Keys" });
+    source.addObjectType({ id: "x1", name: "Person", kind: "entity", referenceMode: "nr" });
+    source.addObjectType({ id: "x2", name: "Nr", kind: "value" });
+    source.addFactType({
+      id: "f1",
+      name: "Person has Nr",
+      roles: [{ id: "r1", name: "has", playerId: "x1" }, {
+        id: "r2",
+        name: "is of",
+        playerId: "x2",
+      }],
+      readings: ["{0} has {1}"],
+      // Names a role of no fact type, so it cannot be minted.
+      constraints: [{ id: "Person.pk", type: "internal_uniqueness", roleIds: ["r2", "elsewhere"] }],
+    });
+    source.setPreferredIdentifier("x1", "Person.pk");
+    const model = replayInto40(source);
+    const preferred = model.preferredIdentifierOf("Person")!;
+    expect(preferred).toBe("Person%2Epk");
+    expect(model.getConstraint(preferred)).toBeUndefined();
+    const doc = JSON.parse(JSON.stringify(writeDocument40(model)));
+    expect(() => readDocument40(doc, { lenient: true })).not.toThrow();
+  });
+
+  it("gives that preferred identifier the suffix rule past an id the model holds", () => {
+    // The old id is the object type's new one: taking it as it is would make
+    // the preferred identifier name the entity itself.
+    const source = new OrmModel({ name: "Keys" });
+    source.addObjectType({ id: "x1", name: "Person", kind: "entity", referenceMode: "nr" });
+    source.addObjectType({ id: "x2", name: "Nr", kind: "value" });
+    source.addFactType({
+      id: "f1",
+      name: "Person has Nr",
+      roles: [{ id: "r1", name: "has", playerId: "x1" }, {
+        id: "r2",
+        name: "is of",
+        playerId: "x2",
+      }],
+      readings: ["{0} has {1}"],
+      constraints: [{ id: "Person", type: "internal_uniqueness", roleIds: ["r2", "elsewhere"] }],
+    });
+    source.setPreferredIdentifier("x1", "Person");
+    expect(replayInto40(source).preferredIdentifierOf("Person")).toBe("Person_2");
+  });
+
+  it("keeps the old id of each of two identical unnamed constraints", () => {
+    const source = new OrmModel({ name: "Twice" });
+    source.addObjectType({ id: "x1", name: "Person", kind: "entity", referenceMode: "nr" });
+    source.addObjectType({ id: "x2", name: "Nr", kind: "value" });
+    const twice = { type: "internal_uniqueness", roleIds: ["r2", "elsewhere"] } as const;
+    source.addFactType({
+      id: "f1",
+      name: "Person has Nr",
+      roles: [{ id: "r1", name: "has", playerId: "x1" }, {
+        id: "r2",
+        name: "is of",
+        playerId: "x2",
+      }],
+      readings: ["{0} has {1}"],
+      constraints: [{ id: "u.1", ...twice }, { id: "u.2", ...twice }],
+    });
+    // The first names the entity. Were the two kept under their shared
+    // reference, its old id would be lost and pass through as written, a
+    // shape 4.0 refuses.
+    source.setPreferredIdentifier("x1", "u.1");
+    expect(replayInto40(source).preferredIdentifierOf("Person")).toBe("u%2E1");
+  });
+
+  it("refers to two unnamed constraints over one pair apart", () => {
+    const ring = (ringType: "irreflexive" | "asymmetric") =>
+      ({ type: "ring", roleId1: "f.a", roleId2: "f.b", ringType }) as const;
+    expect(constraintRef(ring("irreflexive"))).not.toBe(constraintRef(ring("asymmetric")));
+    expect(constraintRef(ring("irreflexive"))).toMatch(/^unnamed:ring<f\.a,f\.b>#[0-9a-f]{8}$/);
+    expect(constraintRef(ring("irreflexive"))).toBe(constraintRef(ring("irreflexive")));
+  });
+
+  it("leaves an unmintable constraint unnamed, whatever its old id", () => {
+    const source = new OrmModel({ name: "Rings" });
+    source.addObjectType({ id: "x1", name: "Person", kind: "entity", referenceMode: "nr" });
+    source.addObjectType({ id: "x2", name: "Dog", kind: "entity", referenceMode: "nr" });
+    source.addFactType({
+      id: "f1",
+      name: "Person owns Dog",
+      roles: [{ id: "r1", name: "owns", playerId: "x1" }, {
+        id: "r2",
+        name: "is owned by",
+        playerId: "x2",
+      }],
+      readings: ["{0} owns {1}"],
+      // A ring over two players: its sentence cannot be minted.
+      constraints: [
+        { id: "ring.1", type: "ring", roleId1: "r1", roleId2: "r2", ringType: "irreflexive" },
+        { id: "ring-2", type: "ring", roleId1: "r1", roleId2: "r2", ringType: "asymmetric" },
+      ],
+    });
+    // Neither a 4.0-shaped old id (ring-2) nor one 4.0 refuses (ring.1) is
+    // kept: the model names a constraint, and one it cannot is unnamed.
+    const ids = replayInto40(source).factTypes[0]!.internalConstraints.map((c) => c.id);
+    expect(ids).toEqual([undefined, undefined]);
+  });
+
+  it("gives a dangling reference of any kind 4.0 could not read its local name, still dangling", () => {
+    const source = new OrmModel({ name: "Fragment" });
+    source.addObjectType({ id: "x1", name: "Person", kind: "entity", referenceMode: "nr" });
+    // An object type reference with a space, a fact type reference with a
+    // dot, and a preferred identifier with a dot: none is a 4.0 reference.
+    source.addSubtypeFact({ id: "s1", subtypeId: "x1", supertypeId: "Some Thing" }, {
+      skipPlayerValidation: true,
+    });
+    source.addPopulation({ id: "p1", factTypeId: "ft.gone" }, { skipPlayerValidation: true });
+    source.setPreferredIdentifier("x1", "uc.1");
+    const model = replayInto40(source);
+    expect(model.subtypeFacts[0]!.supertypeId).toBe("Some_Thing");
+    expect(model.populations[0]!.factTypeId).toBe("ft%2Egone");
+    expect(model.preferredIdentifierOf("Person")).toBe("uc%2E1");
+    expect([model.getObjectType("Some_Thing"), model.getFactType("ft%2Egone")]).toEqual([
+      undefined,
+      undefined,
+    ]);
+    // And the 4.0 reader reads back what the writer makes of it.
+    const doc = JSON.parse(JSON.stringify(writeDocument40(model)));
+    expect(() => readDocument40(doc, { lenient: true })).not.toThrow();
+  });
+
+  it("finds an element by the id its 3.x file stated, unless two kinds stated it", () => {
+    const source = new OrmModel({ name: "Shared" });
+    source.addObjectType({ id: "x1", name: "Person", kind: "entity", referenceMode: "nr" });
+    // 3.x let an object type and a fact type share an id.
+    source.addFactType({
+      id: "x1",
+      name: "Person smokes",
+      roles: [{ id: "r1", name: "smokes", playerId: "x1" }],
+      readings: ["{0} smokes"],
+    });
+    const model = replayInto40(source);
+    expect(model.idFromPrior("r1")).toBe("Person_smokes.smokes");
+    expect(model.idFromPrior("x1")).toBeUndefined();
+    expect(model.idFromPrior("nothing")).toBeUndefined();
+    expect(new OrmModel({ name: "Plain" }).idFromPrior("r1")).toBeUndefined();
+  });
+
+  it("leaves a fact type named unresolved alone when nothing is reshaped", () => {
+    const source = new OrmModel({ name: "Clean" });
+    source.addObjectType({ id: "x1", name: "Person", kind: "entity", referenceMode: "nr" });
+    source.addFactType({
+      id: "f1",
+      name: "unresolved",
+      roles: [{ id: "r1", name: "a", playerId: "x1" }],
+      readings: ["{0} a"],
+    });
+    expect(replayInto40(source).factTypes[0]!.id).toBe("unresolved");
+  });
+
+  it("gives one model for one input, on every run", () => {
+    for (const c of corpus) {
+      const load = () => new OrmYamlSerializer().deserializeAsWritten(JSON.stringify(c.doc));
+      expect([c.file, asText(replayInto40(load()))]).toEqual([
+        c.file,
+        asText(replayInto40(load())),
+      ]);
+    }
+  });
+});
+
+describe("replayIds, the replay without recording the map", () => {
+  // For an importer that builds under its source's ids (NORMA, 6c): the same
+  // model and map, with nothing on the model saying it was read from 3.x.
+  it.each(modelCorpus().slice(0, 12).map((c) => [c.file, c] as const))(
+    "%s gives replayInto40's model and map, the map left off the model",
+    (_, c) => {
+      const read = () => new OrmYamlSerializer().deserializeAsWritten(JSON.stringify(c.doc));
+      const recorded = replayInto40(read());
+      const { model, priorIds } = replayIds(read());
+      expect(model.priorIds).toBeUndefined();
+      expect([...priorIds]).toEqual([...recorded.priorIds!]);
+      expect(asText(model)).toEqual(asText(recorded));
+    },
+  );
+});
+
+describe("the replay's reshape table, against the 4.0 decoders", () => {
+  // RESHAPE restates which id shape 4.0 reads at each reference; IDS_40 is
+  // the authority. A sample of shapes either side could get wrong.
+  const leaves = {
+    objectType: IDS_40.objectTypeRef,
+    factType: IDS_40.factType,
+    role: IDS_40.roleInList,
+    subtypeFact: IDS_40.subtypeFactInList,
+    constraint: IDS_40.localRef,
+  } as const;
+  const samples = [
+    "a",
+    "a_b",
+    "a.b",
+    "a.b.c",
+    "a:b",
+    ":b",
+    "a b",
+    "%2E",
+    "%2e",
+    "Ü",
+    "r-1",
+    "",
+    "a b",
+  ];
+  it.each(Object.keys(leaves) as (keyof typeof leaves)[])("agrees for a %s reference", (kind) => {
+    const is = Schema.is(leaves[kind]);
+    expect(samples.map((s) => [s, RESHAPE[kind].pattern.test(s)])).toEqual(
+      samples.map((s) => [s, is(s)]),
+    );
+  });
+});

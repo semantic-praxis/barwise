@@ -1,8 +1,9 @@
 // Verbalization.
-export { ConstraintVerbalizer } from "./ConstraintVerbalizer.js";
+export { type ConstraintReport, ConstraintVerbalizer } from "./ConstraintVerbalizer.js";
 export { FactTypeVerbalizer } from "./FactTypeVerbalizer.js";
 export {
   buildVerbalization,
+  isStatement,
   type SegmentKind,
   type Verbalization,
   type VerbalizationSegment,

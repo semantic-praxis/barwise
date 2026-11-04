@@ -7,12 +7,18 @@
  * returns a `not-found` result rather than throwing.
  */
 
-import { type Constraint, isInternalUniqueness, isMandatoryRole } from "../model/Constraint.js";
+import { type Constraint, isMandatoryRole } from "../model/Constraint.js";
 import { matchesConstraintType } from "../model/constraintKeyword.js";
 import type { FactType } from "../model/FactType.js";
 import { type ModelGraph, requireGraph } from "../model/graph.js";
+import {
+  identifyingFactTypes,
+  isIdentified,
+  type PreferredIdentifiers,
+  preferredIdentifiers,
+} from "../model/identification.js";
 import { type ObjectType, referenceModeOf } from "../model/ObjectType.js";
-import type { OrmModel } from "../model/OrmModel.js";
+import type { ConstraintInView, OrmModel } from "../model/OrmModel.js";
 import { expandReading } from "../model/ReadingOrder.js";
 import type { Role } from "../model/Role.js";
 import { Verbalizer } from "../verbalization/Verbalizer.js";
@@ -76,6 +82,7 @@ export function queryModel(model: OrmModel, query: ModelQuery): QueryResult {
  */
 class QueryContext {
   private readonly verbalizer = new Verbalizer();
+  private identifiers: PreferredIdentifiers | undefined;
 
   constructor(
     private readonly model: OrmModel,
@@ -115,14 +122,22 @@ class QueryContext {
     };
   }
 
-  private constraintRef(c: Constraint, ft: FactType, index: number): ConstraintRef {
-    return {
-      id: c.id ?? `${ft.id}-constraint-${index}`,
-      constraintType: c.type,
-      verbalization: this.verbalizer.constraints.verbalize(c, ft, this.model).text,
-      factType: ft.name,
-      factTypeId: ft.id,
-    };
+  /**
+   * A constraint as a query reports it. The id and the fact types come from
+   * its verbalization row, which already answers both for every kind (the
+   * constraint's own id; the fact types it applies to), so query and
+   * verbalize cannot disagree. An internal constraint is verbalized in the
+   * fact type it lives in; one across fact types has none.
+   */
+  private constraintRef(inView: ConstraintInView): ConstraintRef {
+    const report = this.verbalizer.constraints.reportInView(inView, this.model);
+    return { ...report, constraintType: inView[0].type };
+  }
+
+  /** Each constraint touching any of these fact types, once, in order. */
+  private refsTouching(factTypes: readonly FactType[]): ConstraintRef[] {
+    return this.model.constraintsTouchingAny(factTypes.map((ft) => ft.id))
+      .map((inView) => this.constraintRef(inView));
   }
 
   private roleRef(role: Role, ft: FactType): RoleRef {
@@ -155,14 +170,11 @@ class QueryContext {
 
   listConstraints(constraintType?: string): QueryResult {
     const keyword = constraintType;
-    const constraints: ConstraintRef[] = [];
-    for (const ft of this.model.factTypes) {
-      ft.constraints.forEach((c, i) => {
-        if (keyword === undefined || matchesConstraintType(c.type, keyword)) {
-          constraints.push(this.constraintRef(c, ft, i));
-        }
-      });
-    }
+    const matches = (c: Constraint) =>
+      keyword === undefined || matchesConstraintType(c.type, keyword);
+    const constraints = this.model.everyConstraint()
+      .filter(([c]) => matches(c))
+      .map((inView) => this.constraintRef(inView));
     return { kind: "constraints", constraints };
   }
 
@@ -172,15 +184,12 @@ class QueryContext {
 
     const factTypes = this.model.factTypesForObjectType(entity.id);
     const roles: RoleRef[] = [];
-    const constraints: ConstraintRef[] = [];
     for (const ft of factTypes) {
       for (const role of ft.rolesForPlayer(entity.id)) {
         roles.push(this.roleRef(role, ft));
       }
-      ft.constraints.forEach((c, i) => {
-        constraints.push(this.constraintRef(c, ft, i));
-      });
     }
+    const constraints = this.refsTouching(factTypes);
 
     return {
       kind: "entity-detail",
@@ -211,7 +220,7 @@ class QueryContext {
         factType: this.factTypeRef(ft),
         roles: ft.roles.map((r) => this.roleRef(r, ft)),
         readings: ft.readings.map((r) => expandReading(r.template, playerNames)),
-        constraints: ft.constraints.map((c, i) => this.constraintRef(c, ft, i)),
+        constraints: this.refsTouching([ft]),
         objectified: this.model.objectificationOf(ft.id) !== undefined,
       },
     };
@@ -247,21 +256,15 @@ class QueryContext {
     // A name may refer to a fact type or to an entity.
     const ft = this.findFactType(name);
     if (ft) {
-      return {
-        kind: "constraints",
-        constraints: ft.constraints.map((c, i) => this.constraintRef(c, ft, i)),
-      };
+      return { kind: "constraints", constraints: this.refsTouching([ft]) };
     }
 
     const entity = this.findEntity(name);
     if (entity) {
-      const constraints: ConstraintRef[] = [];
-      for (const factType of this.model.factTypesForObjectType(entity.id)) {
-        factType.constraints.forEach((c, i) => {
-          constraints.push(this.constraintRef(c, factType, i));
-        });
-      }
-      return { kind: "constraints", constraints };
+      return {
+        kind: "constraints",
+        constraints: this.refsTouching(this.model.factTypesForObjectType(entity.id)),
+      };
     }
 
     return {
@@ -324,7 +327,7 @@ class QueryContext {
 
     const roles: RoleRef[] = [];
     for (const ft of this.model.factTypes) {
-      for (const c of ft.constraints) {
+      for (const c of ft.internalConstraints) {
         if (c.type !== "mandatory") continue;
         const role = ft.getRoleById(c.roleId);
         if (!role) continue;
@@ -419,22 +422,30 @@ class QueryContext {
 
   /** Compute the identification anchors of a single entity type. */
   private entityAnchors(entity: ObjectType): EntityAnchors {
-    let preferredIdentifier: EntityAnchors["preferredIdentifier"];
+    this.identifiers ??= preferredIdentifiers(this.model);
+    const identifying = this.identifiers.byEntity.get(entity.id);
+    const preferredIdentifier: EntityAnchors["preferredIdentifier"] =
+      identifying?.kind === "external"
+        ? {
+          factTypes: identifyingFactTypes(identifying).map((ft) => ft.name),
+          identifierTypes: identifying.components.map((c) => this.graph.player(c.farRole).name),
+        }
+        : identifying && {
+          factType: identifying.factType.name,
+          factTypes: [identifying.factType.name],
+          // The roles the uniqueness covers: for an objectified type
+          // identified by all but one role, the uncovered one identifies
+          // nothing.
+          identifierTypes: identifying.factType.roles
+            .filter((r) =>
+              identifying.constraint.roleIds.includes(r.id) && r.playerId !== entity.id
+            )
+            .map((r) => this.graph.player(r).name),
+        };
     const mandatoryFactTypes = new Set<string>();
 
     for (const ft of this.model.factTypesForObjectType(entity.id)) {
-      for (const c of ft.constraints) {
-        if (
-          preferredIdentifier === undefined
-          && isInternalUniqueness(c)
-          && c.isPreferred
-          && c.roleIds.some((rid) => ft.getRoleById(rid)?.playerId === entity.id)
-        ) {
-          const identifierTypes = ft.roles
-            .filter((r) => r.playerId !== entity.id)
-            .map((r) => this.graph.player(r).name);
-          preferredIdentifier = { factType: ft.name, identifierTypes };
-        }
+      for (const c of ft.internalConstraints) {
         if (isMandatoryRole(c) && ft.getRoleById(c.roleId)?.playerId === entity.id) {
           mandatoryFactTypes.add(ft.name);
         }
@@ -447,17 +458,21 @@ class QueryContext {
       ...(referenceMode !== undefined ? { referenceMode } : {}),
       ...(preferredIdentifier !== undefined ? { preferredIdentifier } : {}),
       mandatoryRoles: [...mandatoryFactTypes].sort(),
-      missingIdentifier: preferredIdentifier === undefined,
+      // An objectification or an identifying subtype identifies too.
+      missingIdentifier: !isIdentified(this.model, entity.id, this.identifiers),
     };
   }
 
   stats(): QueryResult {
     const entityTypes = this.model.objectTypes.filter((ot) => ot.kind === "entity").length;
     const valueTypes = this.model.objectTypes.filter((ot) => ot.kind === "value").length;
-    const constraints = this.model.factTypes.reduce(
-      (sum, ft) => sum + ft.constraints.length,
+    // Each fact type's own constraints, plus each constraint across fact
+    // types once.
+    const internal = this.model.factTypes.reduce(
+      (sum, ft) => sum + ft.internalConstraints.length,
       0,
     );
+    const constraints = internal + this.model.constraints.length;
     const stats: ModelStats = {
       modelName: this.model.name,
       ...(this.model.domainContext !== undefined

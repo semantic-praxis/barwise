@@ -19,6 +19,12 @@
 #
 set -u
 
+# The CLI runs here expecting non-zero exits by design, and this script
+# reads each status itself, so the session's exit recorder must not
+# report them as hidden failures
+# (docs/specs/masked-exit-report.spec.md, the declared opt-out).
+unset BARWISE_EXIT_DIR
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(dirname "${SCRIPT_DIR}")"
 FIX="${SCRIPT_DIR}/fixtures"

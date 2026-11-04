@@ -10,9 +10,11 @@
  */
 import { describe, expect, it } from "vitest";
 import { isInternalUniqueness, isMandatoryRole } from "../../src/model/Constraint.js";
+import { LOCAL_NAME_PATTERN, ROLE_ID_PATTERN } from "../../src/model/name.js";
+import { ownerContextOf } from "../../src/model/namespace.js";
 import { isEntityType, isValueType } from "../../src/model/ObjectType.js";
 import { expandReading } from "../../src/model/ReadingOrder.js";
-import { ModelBuilder } from "../helpers/ModelBuilder.js";
+import { ModelBuilder, preferredId, roleId } from "../helpers/ModelBuilder.js";
 
 describe("ModelBuilder", () => {
   it("builds the order management example from the architecture doc", () => {
@@ -68,7 +70,9 @@ describe("ModelBuilder", () => {
     expect(isEntityType(customer!)).toBe(true);
     expect(customer!.referenceMode).toBe("customer_id");
     expect(customer!.definition).toContain("placed at least one order");
-    expect(customer!.sourceContext).toBe("crm");
+    // A shadow of crm's Customer: its id's alias names the owner (iri-identity 6d).
+    expect(customer!.id).toBe("crm:Customer");
+    expect(ownerContextOf(model, customer!.id)).toBe("crm");
 
     const rating = model.getObjectTypeByName("Rating");
     expect(rating).toBeDefined();
@@ -100,13 +104,14 @@ describe("ModelBuilder", () => {
     ).toBe("Order is placed by Customer");
 
     // Verify constraints on Customer places Order.
-    expect(placesOrder!.constraints).toHaveLength(2);
-    const uniquenessConstraint = placesOrder!.constraints.find(
+    expect(placesOrder!.internalConstraints).toHaveLength(2);
+    expect(model.constraints).toEqual([]);
+    const uniquenessConstraint = placesOrder!.internalConstraints.find(
       isInternalUniqueness,
     );
     expect(uniquenessConstraint).toBeDefined();
 
-    const mandatoryConstraint = placesOrder!.constraints.find(isMandatoryRole);
+    const mandatoryConstraint = placesOrder!.internalConstraints.find(isMandatoryRole);
     expect(mandatoryConstraint).toBeDefined();
 
     // Verify spanning uniqueness on Order contains Product.
@@ -114,7 +119,7 @@ describe("ModelBuilder", () => {
       "Order contains Product",
     );
     expect(containsProduct).toBeDefined();
-    const spanningUniqueness = containsProduct!.constraints.find(isInternalUniqueness);
+    const spanningUniqueness = containsProduct!.internalConstraints.find(isInternalUniqueness);
     expect(spanningUniqueness).toBeDefined();
     expect(spanningUniqueness!.roleIds).toHaveLength(2);
 
@@ -157,5 +162,32 @@ describe("ModelBuilder", () => {
     expect(
       model.getObjectTypeByName("Customer")?.referenceMode,
     ).toBe("customer_id");
+  });
+
+  it("gives roles and the preferred uniqueness 4.0 ids, through roleId and preferredId", () => {
+    // A saved model is read back as format 4.0, which takes a role id
+    // `<fact type>.<role>` and reserves `:` for an alias (iri-identity 6a,
+    // 6b). A test that hard-codes a role id reads it from `roleId`, so this
+    // is the one place the builder's format is pinned.
+    const model = new ModelBuilder("Ids")
+      .withEntityType("Customer", { referenceMode: "customer_id" })
+      .withEntityType("Order", { referenceMode: "order_number" })
+      .withBinaryFactType("Customer places Order", {
+        role1: { player: "Customer", name: "places" },
+        role2: { player: "Order", name: "is placed by" },
+        uniqueness: "role2",
+        isPreferred: true,
+      })
+      .build();
+    const ft = model.getFactTypeByName("Customer places Order")!;
+    expect(ft.roles.map((r) => r.id)).toEqual([
+      roleId("Customer places Order", 1),
+      roleId("Customer places Order", 2),
+    ]);
+    expect(ft.internalConstraints.map((c) => c.id)).toContain(preferredId("Customer places Order"));
+    const ids = [...ft.roles.map((r) => r.id), ...ft.internalConstraints.map((c) => c.id)];
+    expect(ids.filter((id) => id?.includes(":"))).toEqual([]);
+    expect(ft.roles.every((r) => ROLE_ID_PATTERN.test(r.id))).toBe(true);
+    expect(LOCAL_NAME_PATTERN.test(preferredId("Customer places Order"))).toBe(true);
   });
 });

@@ -167,6 +167,23 @@ describe("HoverProvider", () => {
       expect(markdown!).toContain("**Rules out:**");
     });
 
+    it("shows a constraint across fact types on each player it touches, not only the nesting fact type's (orm-format-3, Open decision 9)", () => {
+      // The exclusion is nested under "Person rides Bus" and spans
+      // "Person drives Car", the only fact type Car plays in.
+      const content = loadFixture("commute.orm.yaml");
+      const lines = content.split("\n");
+      const nameLineIdx = lines.findIndex((l) => l.includes('name: "Car"'));
+      const charIdx = lines[nameLineIdx]!.indexOf("Car");
+      const hover = new HoverProvider(true).provideHover(makeDocument(content), {
+        line: nameLineIdx,
+        character: charIdx + 1,
+      });
+      expect(hover).not.toBeNull();
+      const markdown = (hover!.contents as { value: string; }).value;
+      expect(markdown).toContain("**Rules out:**");
+      expect(markdown).toContain("excluded roles");
+    });
+
     it("omits the 'Rules out' section when enabled but the fact type has no constraints", () => {
       const content = loadFixture("hover-edge-cases.orm.yaml");
       const doc = makeDocument(content);

@@ -4,11 +4,11 @@
  * Lineage tracking and staleness detection.
  */
 
+import type { OrmModel } from "@barwise/core";
 import { analyzeImpact, checkStaleness } from "@barwise/core/lineage";
 import type { Command } from "commander";
-import { dirname, resolve } from "node:path";
 import { loadModel } from "../workspace/io.js";
-import { readManifest } from "../workspace/lineageIo.js";
+import { modelLocation, modelsBeside, readManifest } from "../workspace/lineageIo.js";
 
 export function registerLineageCommand(program: Command): void {
   const lineage = program
@@ -24,8 +24,11 @@ export function registerLineageCommand(program: Command): void {
     .action(async (source: string, opts: { format: string; }) => {
       try {
         const model = loadModel(source);
-        const dir = dirname(resolve(source));
-        const report = checkStaleness(readManifest(dir), model);
+        const { dir, sourceModel } = modelLocation(source);
+        const report = checkStaleness(readManifest(dir), model, {
+          sourceModel,
+          modelsBeside: modelsBeside(dir),
+        });
 
         if (opts.format === "json") {
           process.stdout.write(JSON.stringify(report, null, 2) + "\n");
@@ -40,8 +43,47 @@ export function registerLineageCommand(program: Command): void {
           return;
         }
 
+        // Neither fresh nor stale can be said of these, so they fail the
+        // check as a stale one does, until their model re-exports them.
+        if (report.unattributedArtifacts.length > 0) {
+          process.stdout.write(
+            `${report.unattributedArtifacts.length} artifact(s) name no model, and this model `
+              + "does not own them; re-export each from its model, or remove its entry from "
+              + ".barwise/lineage.yaml if its model is gone:\n",
+          );
+          for (const artifact of report.unattributedArtifacts) {
+            process.stdout.write(`  ${artifact}\n`);
+          }
+          process.stdout.write("\n");
+          process.exitCode = 1;
+        }
+
+        // A renamed or moved model's exports still name its old file; its
+        // artifacts cannot be checked until it re-exports them.
+        if (report.orphanedArtifacts.length > 0) {
+          process.stdout.write(
+            `${report.orphanedArtifacts.length} artifact(s) name a model file that no longer `
+              + "exists; re-export each from the model it now lives in, or remove its entry from "
+              + ".barwise/lineage.yaml if its model is gone:\n",
+          );
+          for (const artifact of report.orphanedArtifacts) {
+            process.stdout.write(`  ${artifact}\n`);
+          }
+          process.stdout.write("\n");
+          process.exitCode = 1;
+        }
+
+        if (report.staleArtifacts.length === 0 && report.freshArtifacts.length === 0) {
+          process.stdout.write("No artifacts are recorded for this model.\n");
+          return;
+        }
+
         if (report.staleArtifacts.length === 0) {
-          process.stdout.write("All artifacts are fresh.\n");
+          process.stdout.write(
+            report.unattributedArtifacts.length > 0 || report.orphanedArtifacts.length > 0
+              ? "All of this model's artifacts are fresh.\n"
+              : "All artifacts are fresh.\n",
+          );
           if (report.freshArtifacts.length > 0) {
             process.stdout.write(
               `${report.freshArtifacts.length} artifact(s) up to date.\n`,
@@ -84,20 +126,66 @@ export function registerLineageCommand(program: Command): void {
     .action(
       async (source: string, opts: { element: string; format: string; }) => {
         try {
-          const dir = dirname(resolve(source));
-          const report = analyzeImpact(readManifest(dir), opts.element);
+          const { dir, sourceModel } = modelLocation(source);
+          // The model, when it loads, so an id a 3.x file states finds the
+          // exports that recorded its 4.0 id (barwise-wcg.v5k).
+          const manifest = readManifest(dir);
+          const model = manifest === undefined ? undefined : modelIfItLoads(source);
+          const report = analyzeImpact(
+            manifest,
+            opts.element,
+            { sourceModel, modelsBeside: modelsBeside(dir) },
+            model,
+          );
+
+          // Without the model a 3.x id cannot be read, which changes the
+          // answer; say so, in either format, rather than let a load error
+          // pass silently.
+          const modelDidNotLoad = manifest !== undefined && model === undefined;
 
           if (opts.format === "json") {
-            process.stdout.write(JSON.stringify(report, null, 2) + "\n");
+            const out = modelDidNotLoad ? { ...report, modelDidNotLoad: true } : report;
+            process.stdout.write(JSON.stringify(out, null, 2) + "\n");
             return;
           }
 
           process.stdout.write(
             `Impact analysis for element: ${report.changedElement}\n\n`,
           );
+          if (modelDidNotLoad) {
+            process.stdout.write(
+              `The model did not load (run barwise validate ${source}), so the element's `
+                + "id is read as a 4.0 id.\n\n",
+            );
+          }
+          if (report.ambiguous !== undefined) {
+            process.stdout.write(
+              `"${report.changedElement}" is a 3.x id the file states for more than one `
+                + `element (${report.ambiguous.join(", ")}), so exports written under 3.x ids `
+                + "that hold it are not matched by it.\n\n",
+            );
+          }
 
+          const before40 = () => {
+            if (report.exportsBefore40.length === 0) return;
+            process.stdout.write(
+              `\n${report.exportsBefore40.length} artifact(s) were exported under 3.x ids, so `
+                + "whether they depend on it is unknown; re-export them: "
+                + `${report.exportsBefore40.join(", ")}\n`,
+            );
+          };
           if (report.affectedArtifacts.length === 0) {
-            process.stdout.write("No artifacts depend on this element.\n");
+            // With 3.x exports unaccounted for, a 3.x id unread because the
+            // model did not load, or an id naming two elements, "none" would
+            // read as safe.
+            process.stdout.write(
+              modelDidNotLoad
+                ? "No artifact records this id under a 4.0 id.\n"
+                : report.exportsBefore40.length === 0 && report.ambiguous === undefined
+                ? "No artifacts depend on this element.\n"
+                : "No artifact recorded under 4.0 ids depends on this element.\n",
+            );
+            before40();
             return;
           }
 
@@ -110,7 +198,11 @@ export function registerLineageCommand(program: Command): void {
               `  ${affected.artifact} (${affected.format})\n`,
             );
             process.stdout.write(`    ${affected.relationship}\n`);
+            if (affected.sourceModel === undefined) {
+              process.stdout.write("    (names no model; re-export it to record one)\n");
+            }
           }
+          before40();
         } catch (err) {
           process.stderr.write(`Error: ${(err as Error).message}\n`);
           process.exitCode = 1;
@@ -126,7 +218,7 @@ export function registerLineageCommand(program: Command): void {
     .option("--format <format>", "Output format (text or json)", "text")
     .action(async (source: string, opts: { format: string; }) => {
       try {
-        const dir = dirname(resolve(source));
+        const { dir } = modelLocation(source);
         const manifest = readManifest(dir);
 
         if (!manifest) {
@@ -144,7 +236,7 @@ export function registerLineageCommand(program: Command): void {
 
         process.stdout.write(`Lineage Manifest\n`);
         process.stdout.write(`================\n\n`);
-        process.stdout.write(`Source Model: ${manifest.sourceModel}\n`);
+        process.stdout.write(`Last exported from: ${manifest.sourceModel}\n`);
         process.stdout.write(
           `Model Hash: ${manifest.sourceModelHash.substring(0, 16)}...\n`,
         );
@@ -153,6 +245,7 @@ export function registerLineageCommand(program: Command): void {
         for (const exp of manifest.exports) {
           process.stdout.write(`${exp.artifact}\n`);
           process.stdout.write(`  Format: ${exp.format}\n`);
+          process.stdout.write(`  Model: ${exp.sourceModel ?? "(none recorded)"}\n`);
           process.stdout.write(`  Exported: ${exp.exportedAt}\n`);
           process.stdout.write(
             `  Model Hash: ${exp.modelHash.substring(0, 16)}...\n`,
@@ -164,4 +257,13 @@ export function registerLineageCommand(program: Command): void {
         process.exitCode = 1;
       }
     });
+}
+
+/** The model at `source`, or undefined when it does not load: impact still reads the manifest. */
+function modelIfItLoads(source: string): OrmModel | undefined {
+  try {
+    return loadModel(source);
+  } catch {
+    return undefined;
+  }
 }

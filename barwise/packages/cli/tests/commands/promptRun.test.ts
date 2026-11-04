@@ -23,7 +23,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { type FakeOllama, startFakeOllama } from "../workspace/fakeOllama.js";
-import { runCli } from "../workspace/run.js";
+import { runCli, warmPromptCommand } from "../workspace/run.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const fixtures = resolve(here, "../fixtures");
@@ -111,6 +111,8 @@ function systemPromptSent(): string {
 function modelSent(): unknown {
   return fake!.requests[0]!["model"];
 }
+
+warmPromptCommand();
 
 describe("barwise prompt run", () => {
   it("sends an unshipped extraction candidate, not the shipped artifact", async () => {
@@ -225,12 +227,12 @@ describe("the production surfaces stay narrow", () => {
   // flag, the recorded prompt hash stops resolving to a shipped
   // artifact and this decision has been reversed without anyone saying
   // so (docs/specs/artifact-resolution-parity.spec.md, open decision 1).
-  it("barwise review has no --artifacts", async () => {
+  it("barwise review has no --artifacts [adr:production-prompt-resolution#candidates-in-prompt-lane]", async () => {
     const { stdout } = await runCli(["review", "--help"]);
     expect(stdout).not.toContain("--artifacts");
   });
 
-  it("barwise import transcript has no --artifacts", async () => {
+  it("barwise import transcript has no --artifacts [adr:production-prompt-resolution#candidates-in-prompt-lane]", async () => {
     const { stdout } = await runCli(["import", "transcript", "--help"]);
     expect(stdout).not.toContain("--artifacts");
   });

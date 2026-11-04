@@ -1,7 +1,7 @@
 /**
  * Tests for the lineage command group.
  */
-import { hashModel, type LineageManifest } from "@barwise/core/lineage";
+import { hashModel, type LineageManifest, serializeManifest } from "@barwise/core/lineage";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import { dirname, resolve } from "node:path";
@@ -94,7 +94,7 @@ describe("barwise lineage", () => {
       const modelHash = hashModel(model);
 
       const manifest: LineageManifest = {
-        version: 1,
+        version: 2,
         sourceModel: "test.orm.yaml",
         sourceModelHash: modelHash,
         exports: [
@@ -104,6 +104,7 @@ describe("barwise lineage", () => {
             exportedAt: "2026-03-06T12:00:00Z",
             modelHash,
             sources: [],
+            sourceModel: "test.orm.yaml",
           },
         ],
       };
@@ -126,7 +127,7 @@ describe("barwise lineage", () => {
       // Create manifest with a different hash (simulating old model)
       const oldHash = "a1b2c3d4e5f6000000000000000000000000000000000000000000000000";
       const manifest: LineageManifest = {
-        version: 1,
+        version: 2,
         sourceModel: "test.orm.yaml",
         sourceModelHash: oldHash,
         exports: [
@@ -136,6 +137,7 @@ describe("barwise lineage", () => {
             exportedAt: "2026-03-06T12:00:00Z",
             modelHash: oldHash,
             sources: [],
+            sourceModel: "test.orm.yaml",
           },
           {
             artifact: "models/game.sql",
@@ -143,6 +145,7 @@ describe("barwise lineage", () => {
             exportedAt: "2026-03-06T12:00:00Z",
             modelHash: oldHash,
             sources: [],
+            sourceModel: "test.orm.yaml",
           },
         ],
       };
@@ -166,7 +169,7 @@ describe("barwise lineage", () => {
       const modelHash = hashModel(model);
 
       const manifest: LineageManifest = {
-        version: 1,
+        version: 2,
         sourceModel: "test.orm.yaml",
         sourceModelHash: modelHash,
         exports: [
@@ -176,6 +179,7 @@ describe("barwise lineage", () => {
             exportedAt: "2026-03-06T12:00:00Z",
             modelHash,
             sources: [],
+            sourceModel: "test.orm.yaml",
           },
         ],
       };
@@ -207,7 +211,7 @@ describe("barwise lineage", () => {
       const oldHash = "a1b2c3d4e5f6000000000000000000000000000000000000000000000000";
 
       const manifest: LineageManifest = {
-        version: 1,
+        version: 2,
         sourceModel: "test.orm.yaml",
         sourceModelHash: modelHash,
         exports: [
@@ -217,6 +221,7 @@ describe("barwise lineage", () => {
             exportedAt: "2026-03-06T12:00:00Z",
             modelHash: oldHash,
             sources: [],
+            sourceModel: "test.orm.yaml",
           },
           {
             artifact: "fresh.sql",
@@ -224,6 +229,7 @@ describe("barwise lineage", () => {
             exportedAt: "2026-03-06T12:00:00Z",
             modelHash,
             sources: [],
+            sourceModel: "test.orm.yaml",
           },
         ],
       };
@@ -234,6 +240,59 @@ describe("barwise lineage", () => {
       expect(result.stdout).toContain("1 stale artifact(s) found");
       expect(result.stdout).toContain("1 artifact(s) still fresh.");
       expect(result.exitCode).toBe(1);
+    });
+
+    it("fails on an artifact it cannot place, though nothing is stale", async () => {
+      // An export written before exports named their model, with no sources
+      // to attribute it by (iri-identity 6a), in a directory with a second
+      // model, so neither can say whose it is: neither fresh nor stale.
+      const modelPath = path.join(tempDir, "test.orm.yaml");
+      fs.writeFileSync(modelPath, DETERMINISTIC_MODEL);
+      fs.copyFileSync(`${fixtures}/simple.orm.yaml`, path.join(tempDir, "other.orm.yaml"));
+      const modelHash = hashModel(loadModel(modelPath));
+      writeManifest(tempDir, {
+        version: 2,
+        sourceModel: "test.orm.yaml",
+        sourceModelHash: modelHash,
+        exports: [
+          {
+            artifact: "schema.sql",
+            format: "ddl",
+            exportedAt: "2026-03-06T12:00:00Z",
+            modelHash,
+            sources: [],
+          },
+        ],
+      });
+
+      const result = await runCli(["lineage", "status", modelPath]);
+
+      expect(result.stdout).toContain("1 artifact(s) name no model");
+      expect(result.stdout).toContain("No artifacts are recorded for this model.");
+      expect(result.exitCode).toBe(1);
+    });
+
+    it("counts such an artifact as the model's when it is alone in its directory", async () => {
+      const modelPath = path.join(tempDir, "test.orm.yaml");
+      fs.writeFileSync(modelPath, DETERMINISTIC_MODEL);
+      const modelHash = hashModel(loadModel(modelPath));
+      writeManifest(tempDir, {
+        version: 2,
+        sourceModel: "test.orm.yaml",
+        sourceModelHash: modelHash,
+        exports: [{
+          artifact: "schema.sql",
+          format: "ddl",
+          exportedAt: "2026-03-06T12:00:00Z",
+          modelHash,
+          sources: [],
+        }],
+      });
+
+      const result = await runCli(["lineage", "status", modelPath]);
+
+      expect(result.stdout).toContain("All artifacts are fresh.");
+      expect(result.exitCode).toBe(0);
     });
   });
 
@@ -246,7 +305,7 @@ describe("barwise lineage", () => {
       const modelHash = hashModel(model);
 
       const manifest: LineageManifest = {
-        version: 1,
+        version: 2,
         sourceModel: "test.orm.yaml",
         sourceModelHash: modelHash,
         exports: [
@@ -256,6 +315,7 @@ describe("barwise lineage", () => {
             exportedAt: "2026-03-06T12:00:00Z",
             modelHash,
             sources: [],
+            sourceModel: "test.orm.yaml",
           },
         ],
       };
@@ -285,7 +345,7 @@ describe("barwise lineage", () => {
       const elementId = "550e8400-e29b-41d4-a716-446655440000";
 
       const manifest: LineageManifest = {
-        version: 1,
+        version: 2,
         sourceModel: "test.orm.yaml",
         sourceModelHash: modelHash,
         exports: [
@@ -344,7 +404,7 @@ describe("barwise lineage", () => {
       const modelHash = hashModel(model);
 
       const manifest: LineageManifest = {
-        version: 1,
+        version: 2,
         sourceModel: "test.orm.yaml",
         sourceModelHash: modelHash,
         exports: [],
@@ -369,6 +429,152 @@ describe("barwise lineage", () => {
     });
   });
 
+  describe("impact under format 4.0 (6e)", () => {
+    const SHOP_3X = `orm_version: "3.0"
+model:
+  name: Shop
+  object_types:
+    - { id: ot-1, name: Customer, kind: entity, reference_mode: nr }
+`;
+    const exportOf = (elementId: string) => ({
+      artifact: "schema.sql",
+      format: "ddl",
+      exportedAt: "2026-11-04T00:00:00Z",
+      modelHash: "h",
+      sources: [{ elementId, elementType: "EntityType", elementName: "Customer" }],
+      sourceModel: "shop.orm.yaml",
+    });
+
+    it("finds by an id the 3.x file states the export that recorded its 4.0 id", async () => {
+      const modelPath = path.join(tempDir, "shop.orm.yaml");
+      fs.writeFileSync(modelPath, SHOP_3X);
+      writeManifest(tempDir, {
+        version: 2,
+        sourceModel: "shop.orm.yaml",
+        sourceModelHash: "h",
+        exports: [exportOf("Customer")],
+      });
+      const result = await runCli(["lineage", "impact", modelPath, "--element", "ot-1"]);
+      expect(result.stdout).toContain("1 artifact(s) affected");
+      expect(result.exitCode).toBe(0);
+    });
+
+    it("says when the model did not load, since a 3.x id is then not read", async () => {
+      const modelPath = path.join(tempDir, "shop.orm.yaml");
+      fs.writeFileSync(modelPath, "model: [not a model\n");
+      writeManifest(tempDir, {
+        version: 2,
+        sourceModel: "shop.orm.yaml",
+        sourceModelHash: "h",
+        exports: [exportOf("Customer")],
+      });
+      const result = await runCli(["lineage", "impact", modelPath, "--element", "ot-1"]);
+      expect(result.stdout).toContain("The model did not load");
+      // The export does depend on ot-1 (Customer's 3.x id), so the answer
+      // must not read as "nothing depends" (the pr-review on 6e).
+      expect(result.stdout).not.toContain("No artifacts depend");
+      expect(result.stdout).toContain("No artifact records this id under a 4.0 id.");
+    });
+
+    it("names the elements a shared 3.x id names, rather than saying none depend", async () => {
+      const modelPath = path.join(tempDir, "shop.orm.yaml");
+      fs.writeFileSync(
+        modelPath,
+        `orm_version: "3.0"
+model:
+  name: Shop
+  object_types:
+    - { id: x1, name: Person, kind: entity, reference_mode: nr }
+  fact_types:
+    - id: x1
+      name: Person smokes
+      roles:
+        - { id: r1, player: x1, role_name: smokes }
+      readings: ["{0} smokes"]
+`,
+      );
+      writeManifest(tempDir, {
+        version: 2,
+        sourceModel: "shop.orm.yaml",
+        sourceModelHash: "h",
+        exports: [exportOf("Person")],
+      });
+      const result = await runCli(["lineage", "impact", modelPath, "--element", "x1"]);
+      expect(result.stdout).not.toContain("No artifacts depend");
+      expect(result.stdout).toContain(
+        '"x1" is a 3.x id the file states for more than one element (Person, Person_smokes), '
+          + "so exports written under 3.x ids that hold it are not matched by it.",
+      );
+    });
+
+    it("says the model did not load in json too (Copilot, on 6e)", async () => {
+      const modelPath = path.join(tempDir, "shop.orm.yaml");
+      fs.writeFileSync(modelPath, "model: [not a model\n");
+      writeManifest(tempDir, {
+        version: 2,
+        sourceModel: "shop.orm.yaml",
+        sourceModelHash: "h",
+        exports: [exportOf("Customer")],
+      });
+      const result = await runCli([
+        "lineage",
+        "impact",
+        modelPath,
+        "--element",
+        "ot-1",
+        "--format",
+        "json",
+      ]);
+      expect(JSON.parse(result.stdout).modelDidNotLoad).toBe(true);
+      fs.writeFileSync(modelPath, SHOP_3X);
+      const loaded = await runCli([
+        "lineage",
+        "impact",
+        modelPath,
+        "--element",
+        "ot-1",
+        "--format",
+        "json",
+      ]);
+      expect(JSON.parse(loaded.stdout)).not.toHaveProperty("modelDidNotLoad");
+    });
+
+    it("says nothing about loading when there is no manifest, since no model is read", async () => {
+      const modelPath = path.join(tempDir, "shop.orm.yaml");
+      fs.writeFileSync(modelPath, SHOP_3X);
+      const result = await runCli(["lineage", "impact", modelPath, "--element", "ot-1"]);
+      expect(result.stdout).not.toContain("did not load");
+      expect(result.stdout).toContain("No artifacts depend on this element");
+    });
+
+    it("names the exports made under 3.x ids rather than reporting nothing", async () => {
+      // A 4.0 model: it knows no 3.x id, so whether the export used one is unknown.
+      const modelPath = path.join(tempDir, "shop.orm.yaml");
+      fs.writeFileSync(
+        modelPath,
+        SHOP_3X.replace('"3.0"', '"4.0"').replace("id: ot-1", "id: Customer"),
+      );
+      fs.mkdirSync(path.join(tempDir, ".barwise"), { recursive: true });
+      fs.writeFileSync(
+        path.join(tempDir, ".barwise/lineage.yaml"),
+        serializeManifest({
+          version: 1,
+          sourceModel: "shop.orm.yaml",
+          sourceModelHash: "h",
+          exports: [exportOf("some-uuid")],
+        }),
+      );
+      const result = await runCli(["lineage", "impact", modelPath, "--element", "Customer"]);
+      // Not "No artifacts depend", which would read as safe.
+      expect(result.stdout).not.toContain("No artifacts depend");
+      expect(result.stdout).toContain("No artifact recorded under 4.0 ids depends on this element");
+      expect(result.stdout).toContain(
+        "1 artifact(s) were exported under 3.x ids, so whether they depend on it is unknown; "
+          + "re-export them: schema.sql",
+      );
+    });
+  });
+
   describe("show", () => {
     it("reports no manifest when none exists", async () => {
       const modelPath = path.join(tempDir, "test.orm.yaml");
@@ -388,7 +594,7 @@ describe("barwise lineage", () => {
       const modelHash = hashModel(model);
 
       const manifest: LineageManifest = {
-        version: 1,
+        version: 2,
         sourceModel: "test.orm.yaml",
         sourceModelHash: modelHash,
         exports: [
@@ -413,10 +619,12 @@ describe("barwise lineage", () => {
       const result = await runCli(["lineage", "show", modelPath]);
 
       expect(result.stdout).toContain("Lineage Manifest");
-      expect(result.stdout).toContain("Source Model: test.orm.yaml");
+      expect(result.stdout).toContain("Last exported from: test.orm.yaml");
       expect(result.stdout).toContain("Exports: 1");
       expect(result.stdout).toContain("schema.sql");
       expect(result.stdout).toContain("Format: ddl");
+      // Written before exports named their model (iri-identity 6a).
+      expect(result.stdout).toContain("Model: (none recorded)");
       expect(result.stdout).toContain("Sources: 1 element(s)");
       expect(result.exitCode).toBe(0);
     });
@@ -429,7 +637,7 @@ describe("barwise lineage", () => {
       const modelHash = hashModel(model);
 
       const manifest: LineageManifest = {
-        version: 1,
+        version: 2,
         sourceModel: "test.orm.yaml",
         sourceModelHash: modelHash,
         exports: [
@@ -439,6 +647,7 @@ describe("barwise lineage", () => {
             exportedAt: "2026-03-06T12:00:00Z",
             modelHash,
             sources: [],
+            sourceModel: "test.orm.yaml",
           },
         ],
       };
@@ -454,7 +663,7 @@ describe("barwise lineage", () => {
       ]);
 
       const parsed = JSON.parse(result.stdout);
-      expect(parsed).toHaveProperty("version", 1);
+      expect(parsed).toHaveProperty("version", 2);
       expect(parsed).toHaveProperty("sourceModel");
       expect(parsed).toHaveProperty("sourceModelHash");
       expect(parsed).toHaveProperty("exports");

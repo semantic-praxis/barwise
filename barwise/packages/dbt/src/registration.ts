@@ -19,6 +19,7 @@ import { DbtImportFormat } from "./DbtImportFormat.js";
 export function createDbtFormat(): FormatDescriptor {
   return {
     name: "dbt",
+    surrogateKeys: true,
     description: "dbt project (schema YAML + SQL models)",
     extension: "yml",
     importer: new DbtImportFormat(),

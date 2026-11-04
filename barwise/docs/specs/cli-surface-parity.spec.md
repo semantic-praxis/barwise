@@ -2,7 +2,7 @@
 
 Status: Implemented (all three workstreams)
 Created: 2026-08-21
-Last-updated: 2026-08-21
+Last-updated: 2026-10-27
 Tracking: barwise-809 (`review`), barwise-810 (`merge`). Resolves
 findings 1 and 2 of `docs/unwired-capability-audit-2026-08-20.md`.
 
@@ -71,6 +71,8 @@ The point is not the table's contents but that a reader can tell
 absence-by-choice from absence-by-oversight. A generated matrix that
 fails CI on drift would be stronger and is out of scope; see Open
 decisions.
+
+Recorded as `docs/adr/surface-capability-parity.md`.
 
 ## Scope
 

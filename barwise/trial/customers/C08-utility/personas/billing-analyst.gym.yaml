@@ -70,7 +70,7 @@ checks:
       bill and neither is responsible for it; the uniqueness on the account
       role is the responsibility rule.
   - kind: "requires_verbalization"
-    sentence: "It is obligatory that each Meter was estimated in at least 1 and at most 3 BillingCycle."
+    sentence: "It is obligatory that each Meter that was estimated in some BillingCycle was estimated in at least 1 and at most 3 instances of BillingCycle."
     diagnosis: >-
       If the estimated-read limit is written as an alethic constraint the
       model rejects the very rows the regulator asks us to report; it has to

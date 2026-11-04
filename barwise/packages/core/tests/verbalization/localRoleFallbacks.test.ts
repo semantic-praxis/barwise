@@ -26,7 +26,7 @@ const CONSTRAINTS_DIR = resolve(
 
 /**
  * Where a role-id fallback is allowed: code serving a kind
- * `requiresLocalRoles` marks false, for which a role of another fact
+ * `isInternalConstraint` marks false, for which a role of another fact
  * type is correct rather than a defect.
  *
  * `spanningRoleLabel` and `spanningArm` are here and hold no `??`

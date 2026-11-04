@@ -77,7 +77,7 @@ describe("NORMA XML Import integration", () => {
 
     it("imports uniqueness constraints", () => {
       const places = model.getFactTypeByName("Customer places Order")!;
-      const uc = places.constraints.find(
+      const uc = places.internalConstraints.find(
         (c) => c.type === "internal_uniqueness",
       );
       expect(uc).toBeDefined();
@@ -85,7 +85,7 @@ describe("NORMA XML Import integration", () => {
 
     it("imports mandatory constraints", () => {
       const places = model.getFactTypeByName("Customer places Order")!;
-      const mc = places.constraints.find((c) => c.type === "mandatory");
+      const mc = places.internalConstraints.find((c) => c.type === "mandatory");
       expect(mc).toBeDefined();
     });
 
@@ -161,7 +161,7 @@ describe("NORMA XML Import integration", () => {
     it("imports ring constraint on self-referencing fact type", () => {
       const mentors = model.getFactTypeByName("Person mentors Person")!;
       expect(mentors).toBeDefined();
-      const ring = mentors.constraints.find((c) => c.type === "ring");
+      const ring = mentors.internalConstraints.find((c) => c.type === "ring");
       expect(ring).toBeDefined();
       if (ring?.type === "ring") {
         expect(ring.ringType).toBe("irreflexive");
@@ -170,7 +170,7 @@ describe("NORMA XML Import integration", () => {
 
     it("imports spanning uniqueness on the objectified fact type", () => {
       const enrolls = model.getFactTypeByName("Student enrolls in Course")!;
-      const uc = enrolls.constraints.find(
+      const uc = enrolls.internalConstraints.find(
         (c) => c.type === "internal_uniqueness",
       );
       expect(uc).toBeDefined();
@@ -298,7 +298,7 @@ describe("NORMA XML Import integration", () => {
 
     it("imports uniqueness constraints from constraint role refs", () => {
       const personHasId = model.getFactTypeByName("PersonHasPersonId")!;
-      const ucs = personHasId.constraints.filter(
+      const ucs = personHasId.internalConstraints.filter(
         (c) => c.type === "internal_uniqueness",
       );
       // PersonHasPersonId has 2 uniqueness constraints (one on each role)
@@ -307,7 +307,7 @@ describe("NORMA XML Import integration", () => {
 
     it("imports mandatory constraints", () => {
       const personHasId = model.getFactTypeByName("PersonHasPersonId")!;
-      const mcs = personHasId.constraints.filter(
+      const mcs = personHasId.internalConstraints.filter(
         (c) => c.type === "mandatory",
       );
       expect(mcs.length).toBeGreaterThanOrEqual(1);
@@ -316,10 +316,11 @@ describe("NORMA XML Import integration", () => {
     it("imports preferred identifier flag on uniqueness constraints", () => {
       // PersonHasPersonId should have a uniqueness constraint marked as preferred.
       const personHasId = model.getFactTypeByName("PersonHasPersonId")!;
-      const preferredUcs = personHasId.constraints.filter(
-        (c) => c.type === "internal_uniqueness" && c.isPreferred,
+      const person = model.getObjectTypeByName("Person")!;
+      const stored = personHasId.internalConstraints.find(
+        (c) => c.id === model.preferredIdentifierOf(person.id),
       );
-      expect(preferredUcs.length).toBeGreaterThanOrEqual(1);
+      expect(stored?.type).toBe("internal_uniqueness");
     });
 
     it("does not import implied mandatory constraints as explicit constraints", () => {
@@ -328,7 +329,7 @@ describe("NORMA XML Import integration", () => {
       // Count total mandatory constraints across all fact types.
       let mandatoryCount = 0;
       for (const ft of model.factTypes) {
-        mandatoryCount += ft.constraints.filter(
+        mandatoryCount += ft.internalConstraints.filter(
           (c) => c.type === "mandatory",
         ).length;
       }
@@ -411,7 +412,7 @@ describe("NORMA XML Import integration", () => {
         ]
       ) {
         const ft = model.getFactTypeByName(ftName)!;
-        const ucs = ft.constraints.filter(
+        const ucs = ft.internalConstraints.filter(
           (c) => c.type === "internal_uniqueness",
         );
         expect(ucs.length).toBeGreaterThanOrEqual(1);
@@ -427,15 +428,15 @@ describe("NORMA XML Import integration", () => {
         ]
       ) {
         const ft = model.getFactTypeByName(ftName)!;
-        const mcs = ft.constraints.filter((c) => c.type === "mandatory");
+        const mcs = ft.internalConstraints.filter((c) => c.type === "mandatory");
         expect(mcs.length).toBeGreaterThanOrEqual(1);
       }
     });
 
     it("imports external uniqueness constraint spanning FirstName and LastName", () => {
-      // The external uniqueness constraint should be attached to one of the
-      // fact types that contain a referenced role.
-      const allConstraints = model.factTypes.flatMap((ft) => ft.constraints);
+      // The external uniqueness constraint is a model-level constraint over
+      // roles of both fact types.
+      const allConstraints = model.everyConstraint().map(([c]) => c);
       const extUcs = allConstraints.filter(
         (c) => c.type === "external_uniqueness",
       );
@@ -443,21 +444,22 @@ describe("NORMA XML Import integration", () => {
 
       const extUc = extUcs[0]!;
       if (extUc.type === "external_uniqueness") {
-        // Should reference roles from both the FirstName and LastName fact types.
+        // Roles from both the FirstName and LastName fact types, under the ids
+        // their fact types and names give (iri-identity 6c).
         expect(extUc.roleIds).toHaveLength(2);
-        expect(extUc.roleIds).toContain("_r_fn_of");
-        expect(extUc.roleIds).toContain("_r_ln_of");
+        expect(extUc.roleIds).toContain("Employee_has_FirstName.is_of");
+        expect(extUc.roleIds).toContain("Employee_has_LastName.is_of");
       }
     });
 
     it("imports role-level value constraint on RoleName role", () => {
       const ft = model.getFactTypeByName("Employee has RoleName")!;
-      const vcs = ft.constraints.filter((c) => c.type === "value_constraint");
+      const vcs = ft.internalConstraints.filter((c) => c.type === "value_constraint");
       expect(vcs).toHaveLength(1);
 
       const vc = vcs[0]!;
       if (vc.type === "value_constraint") {
-        expect(vc.roleId).toBe("_r_role_of");
+        expect(vc.roleId).toBe("Employee_has_RoleName.is_of");
         expect(vc.values).toEqual(["dev", "qa", "pm"]);
       }
     });

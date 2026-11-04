@@ -2,10 +2,15 @@
  * Phase 3: create fact types with roles and constraints.
  */
 
-import { type Constraint, generateId } from "@barwise/core";
-import { compositeRoleColumns } from "./compositeKeys.js";
+import type { InternalConstraint } from "@barwise/core";
+import {
+  combinationOf,
+  compositeRoleColumns,
+  holdsForEveryRow,
+  sameColumns,
+} from "./compositeKeys.js";
 import { buildConstraints, hasTest } from "./constraints.js";
-import type { DbtMapperContext } from "./context.js";
+import { type DbtMapperContext, readsAsReference, referenceName } from "./context.js";
 import { toPascalCase } from "./naming.js";
 
 export function createFactTypes(ctx: DbtMapperContext): void {
@@ -17,8 +22,11 @@ export function createFactTypes(ctx: DbtMapperContext): void {
     // A role of the fact type a composite key reads as is that fact type's
     // (compositeKeys.ts), not an attribute or a reference of the entity.
     const roleCols = compositeRoleColumns(ctx, m.name);
-    const rels = (ctx.relMap.get(m.name) ?? []).filter((r) => !roleCols.has(r.columnName));
-    const relColNames = new Set(rels.map((r) => r.columnName));
+    const rels = (ctx.relMap.get(m.name) ?? []).filter((r) =>
+      !r.columns.some((c) => roleCols.has(c))
+    );
+    const read = rels.filter((r) => readsAsReference(ctx, r));
+    const relColNames = new Set(read.flatMap((r) => r.columns));
 
     // Create fact types for value columns.
     for (const col of m.columns) {
@@ -35,24 +43,23 @@ export function createFactTypes(ctx: DbtMapperContext): void {
       const vtName = ctx.model.getObjectType(vtId)?.name ?? toPascalCase(col.name);
       const factName = `${entityName} has ${vtName}`;
 
-      // Minted, never built from names: the id policy is generateId's, and
-      // the surface installs UUIDv7 behind it (importer-role-ids.spec.md).
-      const role1Id = generateId();
-      const role2Id = generateId();
-      ctx.columnRoleIdMap.set(`${m.name}::${col.name}`, role1Id);
-
-      // Build constraints from tests.
-      const constraints = buildConstraints(col, role1Id, role2Id, ctx.report, m.name);
-
-      ctx.model.addFactType({
+      // The model names the roles (`<fact type>.<role>`, iri-identity
+      // decision 17); the constraints from the column's tests are stated over
+      // the ids it gives them.
+      const ft = ctx.model.addFactType({
         name: factName,
         roles: [
-          { id: role1Id, name: "has", playerId: entityId },
-          { id: role2Id, name: "is of", playerId: vtId },
+          { name: "has", playerId: entityId },
+          { name: "is of", playerId: vtId },
         ],
         readings: [`{0} has {1}`, `{1} is of {0}`],
-        constraints,
+      }, {
+        constraintsOver: ([role1Id, role2Id]) =>
+          buildConstraints(col, role1Id!, role2Id!, ctx.report, m.name),
       });
+      const [role1Id, role2Id] = ft.roles.map((r) => r.id) as [string, string];
+      ctx.columnRoleIdMap.set(`${m.name}::${col.name}`, role1Id);
+      ctx.farRoleIdMap.set(`${m.name}::${col.name}`, role2Id);
     }
 
     // Create fact types for FK (relationship) columns. A target reached
@@ -68,12 +75,15 @@ export function createFactTypes(ctx: DbtMapperContext): void {
     }
     for (const rel of rels) {
       const targetEntityId = ctx.entityIdMap.get(rel.targetModelName);
+      const name = referenceName(rel);
       if (!targetEntityId) {
         ctx.report.gap(
           "relationship",
           m.name,
-          `Relationship column "${rel.columnName}" references model "${rel.targetModelName}" which has no identifiable PK -- skipped.`,
-          rel.columnName,
+          rel.columns.length > 1
+            ? `Foreign key (${name}) references model "${rel.targetModelName}" which has no identifiable PK -- its columns are kept as values.`
+            : `Relationship column "${name}" references model "${rel.targetModelName}" which has no identifiable PK -- skipped.`,
+          rel.columns[0],
         );
         continue;
       }
@@ -84,46 +94,71 @@ export function createFactTypes(ctx: DbtMapperContext): void {
       const sourceEntityName = toPascalCase(m.name);
       const targetEntityName = toPascalCase(rel.targetModelName);
       const qualifier = (relsPerTarget.get(rel.targetModelName) ?? 0) > 1
-        ? relationshipQualifier(rel.columnName, rel.targetField)
+        ? relationshipQualifier(rel.columns[0]!, rel.targetFields[0] ?? "")
         : "";
       const plainName = qualifier
         ? `${sourceEntityName} has ${qualifier} ${targetEntityName}`
         : `${sourceEntityName} has ${targetEntityName}`;
-      const factName = freeFactTypeName(ctx, plainName, rel.columnName);
+      const factName = freeFactTypeName(ctx, plainName, name);
       if (factName !== plainName) {
         ctx.report.warning(
           "relationship",
           m.name,
-          `Relationship "${rel.columnName}" would be named "${plainName}", which another fact type already has; named "${factName}" instead.`,
-          rel.columnName,
+          `Relationship "${name}" would be named "${plainName}", which another fact type already has; named "${factName}" instead.`,
+          rel.columns[0],
         );
       }
 
-      // Minted, never built from names: the id policy is generateId's, and
-      // the surface installs UUIDv7 behind it (importer-role-ids.spec.md).
-      const role1Id = generateId();
-      const role2Id = generateId();
+      const relationshipConstraints = (role1Id: string, role2Id: string): InternalConstraint[] => {
+        // Mandatory when every one of its columns is not_null: a row with a
+        // null in any of them references nothing.
+        const isMandatory = rel.columns.every((c) => {
+          const col = m.columns.find((mc) => mc.name === c);
+          return col !== undefined && hasTest(col, "not_null");
+        });
 
-      // FK column: find the column to get its tests.
-      const fkCol = m.columns.find((c) => c.name === rel.columnName);
-      const isMandatory = fkCol ? hasTest(fkCol, "not_null") : false;
+        const constraints: InternalConstraint[] = [
+          // The FK side (role2) gets uniqueness -- each target entity appears
+          // at most once per source entity in this relationship.
+          // This is a heuristic: many-to-one is the common case.
+          { type: "internal_uniqueness", roleIds: [role2Id] },
+        ];
 
-      const constraints: Constraint[] = [
-        // The FK side (role2) gets uniqueness -- each target entity appears
-        // at most once per source entity in this relationship.
-        // This is a heuristic: many-to-one is the common case.
-        { type: "internal_uniqueness", roleIds: [role2Id] },
-      ];
+        if (isMandatory) {
+          constraints.push({ type: "mandatory", roleId: role2Id });
+        }
+        // A unique single-column reference is a one-to-one, as the DDL
+        // importer reads a UNIQUE on a foreign key column
+        // (dbt-alternate-uniqueness.spec.md). Not on the key column, whose
+        // reference the DDL importer does not read at all (barwise-1078).
+        const refCol = rel.columns.length === 1
+          ? m.columns.find((c) => c.name === rel.columns[0])
+          : undefined;
+        if (refCol && refCol.name !== pk?.columnName && hasTest(refCol, "unique")) {
+          constraints.push({ type: "internal_uniqueness", roleIds: [role1Id] });
+        }
+        // A combination test over exactly a foreign key's columns: each
+        // target row is referenced at most once, as the DDL importer reads a
+        // UNIQUE over them (composite-foreign-key-round-trip.spec.md).
+        if (
+          rel.columns.length > 1
+          && m.modelTests.some((t) => {
+            const names = combinationOf(t);
+            return names !== undefined && sameColumns(names, rel.columns) && holdsForEveryRow(t);
+          })
+        ) {
+          constraints.push({ type: "internal_uniqueness", roleIds: [role1Id] });
+        }
+        return constraints;
+      };
 
-      if (isMandatory) {
-        constraints.push({ type: "mandatory", roleId: role2Id });
-      }
-
-      ctx.model.addFactType({
+      // The model names the roles (`<fact type>.<role>`, iri-identity
+      // decision 17); the constraints are stated over the ids it gives them.
+      const ft = ctx.model.addFactType({
         name: factName,
         roles: [
-          { id: role1Id, name: "has", playerId: targetEntityId },
-          { id: role2Id, name: "is of", playerId: entityId },
+          { name: "has", playerId: targetEntityId },
+          { name: "is of", playerId: entityId },
         ],
         // A qualified relationship reads source-first ("Leg has origin
         // Port"). The unqualified one keeps its existing readings so no
@@ -131,14 +166,26 @@ export function createFactTypes(ctx: DbtMapperContext): void {
         readings: qualifier
           ? [`{1} has ${qualifier} {0}`, `{0} is ${qualifier} of {1}`]
           : [`{0} has {1}`, `{1} is of {0}`],
-        constraints,
-      });
+      }, { constraintsOver: ([role1Id, role2Id]) => relationshipConstraints(role1Id!, role2Id!) });
+      const role1Id = ft.roles[0]!.id;
+
+      // The key column keeps its identifier's role, as DDL step 3b reads the
+      // key; a column of two references stands for neither, as DDL refuses
+      // a UNIQUE naming one (`shared`).
+      for (const c of rel.columns) {
+        const at = `${m.name}::${c}`;
+        if (c === pk?.columnName) continue;
+        if (ctx.farRoleIdMap.has(at)) ctx.sharedReferenceColumns.add(at);
+        else ctx.farRoleIdMap.set(at, role1Id);
+      }
 
       ctx.report.info(
         "relationship",
         m.name,
-        `Relationship "${rel.columnName}" -> "${rel.targetModelName}.${rel.targetField}" mapped as many-to-one fact type.`,
-        rel.columnName,
+        `Relationship "${name}" -> "${rel.targetModelName}.${
+          rel.targetFields.join(", ")
+        }" mapped as many-to-one fact type.`,
+        rel.columns[0],
       );
     }
   }

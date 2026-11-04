@@ -266,6 +266,9 @@ function parseObjectifiedTypes(
       id: asNormaId(attr(ot, "id") ?? ""),
       name: attr(ot, "Name") ?? "",
       nestedFactTypeRef: nested ? asNormaId(attr(nested, "ref") ?? "") : asNormaId(""),
+      ...(nested && attr(nested, "id")
+        ? { nestedPredicateId: asNormaId(attr(nested, "id")!) }
+        : {}),
       referenceMode: attr(ot, "_ReferenceMode"),
       note: parseNotesText(ot),
       preferredIdentifier: prefId ? attr(prefId, "ref") : undefined,
@@ -838,6 +841,9 @@ function parseConstraints(
   for (const rc of asArray(constraints["RingConstraint"])) {
     const roleSeq = firstRoleSequence(rc);
     const ringTypeStr = attr(rc, "Type") ?? attr(rc, "RingType") ?? "";
+    const joinPath = roleSeq ? parseJoinRule(roleSeq) : undefined;
+    const unreadableJoin = !joinPath && roleSeq !== undefined
+      && child(roleSeq, "JoinRule") !== undefined;
     result.push({
       type: "ring",
       id: asNormaId(attr(rc, "id") ?? ""),
@@ -845,6 +851,8 @@ function parseConstraints(
       ...(attr(rc, "Modality") === "Deontic" ? { modality: "deontic" as const } : {}),
       ringType: normalizeRingType(ringTypeStr),
       roleRefs: roleSeq ? parseRoleSequenceRefs(roleSeq) : [],
+      ...(joinPath ? { joinPath } : {}),
+      ...(unreadableJoin ? { unreadableJoin: true as const } : {}),
     });
   }
 

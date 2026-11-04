@@ -1,4 +1,5 @@
 import type { OrmModel } from "@barwise/core";
+import { subtypeFactRef } from "@barwise/core";
 
 /**
  * The set of element IDs in an N-hop neighborhood around a focus entity.
@@ -53,14 +54,14 @@ export function computeNeighborhood(
       // Traverse subtype relationships in both directions.
       for (const sf of model.subtypeFacts) {
         if (sf.subtypeId === otId) {
-          subtypeFactIds.add(sf.id);
+          subtypeFactIds.add(subtypeFactRef(sf));
           if (!objectTypeIds.has(sf.supertypeId)) {
             objectTypeIds.add(sf.supertypeId);
             nextFrontier.add(sf.supertypeId);
           }
         }
         if (sf.supertypeId === otId) {
-          subtypeFactIds.add(sf.id);
+          subtypeFactIds.add(subtypeFactRef(sf));
           if (!objectTypeIds.has(sf.subtypeId)) {
             objectTypeIds.add(sf.subtypeId);
             nextFrontier.add(sf.subtypeId);

@@ -11,9 +11,14 @@ import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { executeImpactAnalysis } from "../../src/tools/impactAnalysis.js";
 import { writeManifest } from "../workspace/manifestFixture.js";
+import { usePrivateCwd } from "../workspace/privateCwd.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const fixtures = resolve(__dirname, "../fixtures");
+
+// The inline-source fallback reads the cwd: a private one, so another test
+// file cleaning up the shared package directory cannot remove this manifest.
+const ws = usePrivateCwd();
 
 describe("impact_analysis tool", () => {
   let tempDir: string;
@@ -38,7 +43,7 @@ describe("impact_analysis tool", () => {
     const modelHash = hashModel(model);
 
     const manifest: LineageManifest = {
-      version: 1,
+      version: 2,
       sourceModel: "test.orm.yaml",
       sourceModelHash: modelHash,
       exports: [
@@ -73,7 +78,7 @@ describe("impact_analysis tool", () => {
     const elementId = "550e8400-e29b-41d4-a716-446655440000";
 
     const manifest: LineageManifest = {
-      version: 1,
+      version: 2,
       sourceModel: "test.orm.yaml",
       sourceModelHash: modelHash,
       exports: [
@@ -147,7 +152,7 @@ describe("impact_analysis tool", () => {
     const elementId = "550e8400-e29b-41d4-a716-446655440000";
 
     const manifest: LineageManifest = {
-      version: 1,
+      version: 2,
       sourceModel: "test.orm.yaml",
       sourceModelHash: modelHash,
       exports: [
@@ -167,25 +172,13 @@ describe("impact_analysis tool", () => {
       ],
     };
 
-    writeManifest(process.cwd(), manifest);
+    writeManifest(ws.dir(), manifest);
 
-    try {
-      const result = executeImpactAnalysis(yaml, elementId);
-      const parsed = JSON.parse(result.content[0]!.text);
+    const result = executeImpactAnalysis(yaml, elementId);
+    const parsed = JSON.parse(result.content[0]!.text);
 
-      expect(parsed.changedElement).toBe(elementId);
-      expect(parsed.affectedArtifacts).toHaveLength(1);
-    } finally {
-      // Clean up manifest in cwd
-      const manifestPath = path.join(process.cwd(), ".barwise", "lineage.yaml");
-      if (fs.existsSync(manifestPath)) {
-        fs.unlinkSync(manifestPath);
-        const dir = path.dirname(manifestPath);
-        if (fs.existsSync(dir) && fs.readdirSync(dir).length === 0) {
-          fs.rmdirSync(dir);
-        }
-      }
-    }
+    expect(parsed.changedElement).toBe(elementId);
+    expect(parsed.affectedArtifacts).toHaveLength(1);
   });
 
   it("handles different element types correctly", () => {
@@ -200,7 +193,7 @@ describe("impact_analysis tool", () => {
     const valueTypeId = "v2222222-e29b-41d4-a716-446655440000";
 
     const manifest: LineageManifest = {
-      version: 1,
+      version: 2,
       sourceModel: "test.orm.yaml",
       sourceModelHash: modelHash,
       exports: [
@@ -239,7 +232,7 @@ describe("impact_analysis tool", () => {
     const constraintResult = executeImpactAnalysis(modelPath, constraintId);
     const constraintParsed = JSON.parse(constraintResult.content[0]!.text);
     expect(constraintParsed.affectedArtifacts).toHaveLength(1);
-    expect(constraintParsed.affectedArtifacts[0].relationship).toContain("enforces constraint");
+    expect(constraintParsed.affectedArtifacts[0].relationship).toContain("states constraint");
 
     // Test value type impact
     const valueTypeResult = executeImpactAnalysis(modelPath, valueTypeId);
@@ -257,7 +250,7 @@ describe("impact_analysis tool", () => {
     const modelHash = hashModel(model);
 
     const manifest: LineageManifest = {
-      version: 1,
+      version: 2,
       sourceModel: "test.orm.yaml",
       sourceModelHash: modelHash,
       exports: [],
@@ -271,5 +264,95 @@ describe("impact_analysis tool", () => {
     expect(result.content[0]!.type).toBe("text");
     expect(typeof result.content[0]!.text).toBe("string");
     expect(() => JSON.parse(result.content[0]!.text)).not.toThrow();
+  });
+
+  // iri-identity 6a: with a path, only that model's exports; inline, every
+  // export holding the id, each naming its model.
+  it("reads one model's exports given a path, and names each export's model inline", () => {
+    const exportOf = (artifact: string, sourceModel: string | undefined) => ({
+      artifact,
+      format: "ddl",
+      exportedAt: "2026-10-29T00:00:00Z",
+      modelHash: "h",
+      sources: [{
+        elementId: "ot-customer",
+        elementType: "EntityType" as const,
+        elementName: "Customer",
+      }],
+      ...(sourceModel !== undefined ? { sourceModel } : {}),
+    });
+
+    const modelPath = path.join(tempDir, "a.orm.yaml");
+    fs.copyFileSync(`${fixtures}/simple.orm.yaml`, modelPath);
+    // b's file is there, so its export is b's and is skipped; were it
+    // gone, the export would be read as a renamed model's.
+    fs.copyFileSync(`${fixtures}/simple.orm.yaml`, path.join(tempDir, "b.orm.yaml"));
+    // Version 1: the model is format 1.0, so its exports recorded 3.x ids,
+    // which impact matches by the model's 3.x id (6e).
+    const manifest = {
+      version: 1 as const,
+      sourceModel: "b.orm.yaml",
+      sourceModelHash: "h",
+      exports: [exportOf("a.sql", "a.orm.yaml"), exportOf("b.sql", "b.orm.yaml")],
+    };
+    writeManifest(tempDir, manifest);
+    const byPath = JSON.parse(executeImpactAnalysis(modelPath, "ot-customer").content[0]!.text);
+    expect(byPath.affectedArtifacts.map((a: { artifact: string; }) => a.artifact)).toEqual([
+      "a.sql",
+    ]);
+
+    // Inline there is no model to read 3.x ids through, so the id is a 4.0
+    // id, held by exports a 4.0 build wrote (version 2).
+    writeManifest(ws.dir(), {
+      ...manifest,
+      version: 2,
+      exports: manifest.exports.map((e) => ({
+        ...e,
+        sources: e.sources.map((s) => ({ ...s, elementId: "Customer" })),
+      })),
+    });
+    const yaml = fs.readFileSync(`${fixtures}/simple.orm.yaml`, "utf-8");
+    const inline = JSON.parse(executeImpactAnalysis(yaml, "Customer").content[0]!.text);
+    expect(inline.affectedArtifacts.map((a: { sourceModel: string; }) => a.sourceModel)).toEqual([
+      "a.orm.yaml",
+      "b.orm.yaml",
+    ]);
+  });
+
+  it("finds by an id a 3.x file states the export that recorded its 4.0 id (6e)", () => {
+    const modelPath = path.join(tempDir, "shop.orm.yaml");
+    fs.writeFileSync(
+      modelPath,
+      `orm_version: "3.0"
+model:
+  name: Shop
+  object_types:
+    - { id: ot-1, name: Customer, kind: entity, reference_mode: nr }
+`,
+    );
+    writeManifest(tempDir, {
+      version: 2,
+      sourceModel: "shop.orm.yaml",
+      sourceModelHash: "h",
+      exports: [{
+        artifact: "a.sql",
+        format: "ddl",
+        exportedAt: "2026-11-04T00:00:00Z",
+        modelHash: "h",
+        sources: [{ elementId: "Customer", elementType: "EntityType", elementName: "Customer" }],
+        sourceModel: "shop.orm.yaml",
+      }],
+    });
+    const report = JSON.parse(executeImpactAnalysis(modelPath, "ot-1").content[0]!.text);
+    expect(report.affectedArtifacts.map((a: { artifact: string; }) => a.artifact)).toEqual([
+      "a.sql",
+    ]);
+    expect(report.exportsBefore40).toEqual([]);
+    expect(report).not.toHaveProperty("modelDidNotLoad");
+
+    // A model that does not load is said to have not loaded (Copilot, on 6e).
+    fs.writeFileSync(modelPath, "model: [not a model\n");
+    const unloaded = JSON.parse(executeImpactAnalysis(modelPath, "ot-1").content[0]!.text);
+    expect(unloaded.modelDidNotLoad).toBe(true);
   });
 });

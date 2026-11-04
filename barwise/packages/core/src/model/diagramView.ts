@@ -8,7 +8,9 @@
  * Pure and deterministic, so it lives in core.
  */
 import { type DiagramLayout, isScopedView } from "./DiagramLayout.js";
+import { preferredIdentifiers, preferredIdentifyingBinary } from "./identification.js";
 import type { OrmModel } from "./OrmModel.js";
+import { subtypeFactRef } from "./SubtypeFact.js";
 
 /** The elements a view draws, by id. Fresh sets: the caller owns them. */
 export interface ViewMembership {
@@ -19,8 +21,8 @@ export interface ViewMembership {
 
 /**
  * Reference-mode patterns a diagram folds into the entity's label: an
- * entity with a reference mode, a binary fact type with a preferred
- * uniqueness, and the value type on its other end are drawn as
+ * entity with a reference mode, the binary that identifies it
+ * (`preferredIdentifiers`), and the value type on its other end are drawn as
  * "Entity (.ref_mode)" -- no value-type box, no fact-type shape. A value
  * type that also plays an ordinary role stays drawn (hiding it would leave
  * that role's edge pointing at nothing); its identifying fact type is still
@@ -32,26 +34,13 @@ export function absorbedReferenceModes(
 ): { valueTypeIds: Set<string>; factTypeIds: Set<string>; } {
   const valueTypeIds = new Set<string>();
   const factTypeIds = new Set<string>();
+  const identifiers = preferredIdentifiers(model);
   for (const ot of model.objectTypes) {
     if (ot.kind !== "entity" || !ot.referenceMode) continue;
-    for (const ft of model.factTypes) {
-      if (ft.arity !== 2) continue;
-      const hasPreferred = ft.constraints.some(
-        (c) => c.type === "internal_uniqueness" && c.isPreferred,
-      );
-      if (!hasPreferred) continue;
-      const p0 = model.getObjectType(ft.roles[0]!.playerId);
-      const p1 = model.getObjectType(ft.roles[1]!.playerId);
-      if (!p0 || !p1) continue;
-      const valueTypeId = p0.id === ot.id && p1.kind === "value"
-        ? p1.id
-        : p1.id === ot.id && p0.kind === "value"
-        ? p0.id
-        : undefined;
-      if (valueTypeId) {
-        valueTypeIds.add(valueTypeId);
-        factTypeIds.add(ft.id);
-      }
+    const binary = preferredIdentifyingBinary(model, ot, identifiers);
+    if (binary) {
+      valueTypeIds.add(binary.valuePlayer.id);
+      factTypeIds.add(binary.factType.id);
     }
   }
   for (const vtId of [...valueTypeIds]) {
@@ -93,7 +82,7 @@ export function containedRelations(
   }
   for (const sf of model.subtypeFacts) {
     if (objectTypeIds.has(sf.subtypeId) && objectTypeIds.has(sf.supertypeId)) {
-      subtypeFactIds.add(sf.id);
+      subtypeFactIds.add(subtypeFactRef(sf));
     }
   }
   return { factTypeIds, subtypeFactIds };
@@ -110,7 +99,7 @@ export function viewMembership(model: OrmModel, layout: DiagramLayout): ViewMemb
     return {
       objectTypeIds: new Set(model.objectTypes.map((ot) => ot.id)),
       factTypeIds: new Set(model.factTypes.map((ft) => ft.id)),
-      subtypeFactIds: new Set(model.subtypeFacts.map((sf) => sf.id)),
+      subtypeFactIds: new Set(model.subtypeFacts.map(subtypeFactRef)),
     };
   }
   const objectTypeIds = new Set(

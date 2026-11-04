@@ -155,7 +155,7 @@ function parseManifestOrThrow(manifestYaml: string): OrmProject {
  * Rebuild a ContextMappingConfig from a deserialized ContextMapping so
  * it can be added to the project.
  */
-function toMappingConfig(mapping: ContextMapping): ContextMappingConfig {
+export function toMappingConfig(mapping: ContextMapping): ContextMappingConfig {
   return {
     path: mapping.path,
     sourceContext: mapping.sourceContext,

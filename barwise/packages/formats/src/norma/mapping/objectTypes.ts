@@ -8,6 +8,7 @@
  * NORMA round-trip.
  */
 import type { ConceptualDataTypeName, DataTypeDef, ValueConstraintDef } from "@barwise/core";
+import { snakeCase } from "../../naming.js";
 import type {
   NormaCardinality,
   NormaDataType,
@@ -161,16 +162,4 @@ export function resolveDataType(
   if (length !== undefined) result.length = length;
   if (scale !== undefined) result.scale = scale;
   return result;
-}
-
-/**
- * Convert a PascalCase or camelCase name to snake_case.
- */
-export function snakeCase(name: string): string {
-  return name
-    .replace(/([A-Z])/g, "_$1")
-    .toLowerCase()
-    .replace(/^_/, "")
-    .replace(/\s+/g, "_")
-    .replace(/_+/g, "_");
 }

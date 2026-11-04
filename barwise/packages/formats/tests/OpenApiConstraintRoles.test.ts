@@ -6,7 +6,12 @@
  * tests checked that some uniqueness existed, which is how the importer
  * shipped with both constraints on the value's role.
  */
-import { type FactType, type OrmModel, ValidationEngine } from "@barwise/core";
+import {
+  type FactType,
+  type OrmModel,
+  preferredIdentifiers,
+  ValidationEngine,
+} from "@barwise/core";
 import { Verbalizer } from "@barwise/core/verbalization";
 import { describe, expect, it } from "vitest";
 import { OpenApiImportFormat } from "../src/openapi/OpenApiImportFormat.js";
@@ -30,7 +35,7 @@ function factType(model: OrmModel, name: string): FactType {
 
 /** The names of the players whose roles carry a constraint of `type`. */
 function constrainedPlayers(model: OrmModel, ft: FactType, type: string): string[] {
-  const roleIds = ft.constraints.flatMap((c) =>
+  const roleIds = ft.internalConstraints.flatMap((c) =>
     c.type !== type ? [] : "roleIds" in c ? c.roleIds : "roleId" in c ? [c.roleId] : []
   );
   return roleIds.map((id) => {
@@ -160,10 +165,15 @@ describe("R3: the reference-mode property is the entity's preferred identifier",
   function shape(model: OrmModel, ft: FactType): string[] {
     const player = (id: string) =>
       model.getObjectType(ft.roles.find((r) => r.id === id)!.playerId)!.name;
-    return ft.constraints.map((c) => {
+    // Every constraint touching the fact type, so a stray constraint across
+    // fact types from the importer shows in the shape.
+    const preferred = new Set(preferredIdentifiers(model).byConstraint.keys());
+    return model.constraintsTouching(ft.id).map((c) => {
       if (c.type === "mandatory") return `mandatory:${player(c.roleId)}`;
       if (c.type === "internal_uniqueness") {
-        return `unique:${c.roleIds.map(player).join(",")}${c.isPreferred ? ":preferred" : ""}`;
+        return `unique:${c.roleIds.map(player).join(",")}${
+          preferred.has(c.id!) ? ":preferred" : ""
+        }`;
       }
       return c.type;
     }).sort();

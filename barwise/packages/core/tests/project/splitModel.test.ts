@@ -10,6 +10,7 @@ import { parse } from "yaml";
 import { ModelSplitError, splitFiles, splitModel } from "../../src/project/splitModel.js";
 import { OrmYamlSerializer } from "../../src/serialization/OrmYamlSerializer.js";
 import { assembleProject, type ProjectFiles } from "../../src/serialization/projectAssembly.js";
+import { ProjectSerializer } from "../../src/serialization/ProjectSerializer.js";
 import { projectRules } from "../../src/validation/rules/projectRules.js";
 import { ValidationEngine } from "../../src/validation/ValidationEngine.js";
 
@@ -129,6 +130,35 @@ describe("splitModel", () => {
     expect(splitFiles(result).at(-1)?.content).toBe(result.manifestYaml);
   });
 
+  it("makes a /-ending source namespace the project's iri_base (iri-identity WS4)", () => {
+    const serializer = new OrmYamlSerializer();
+    const model = serializer.deserialize(SHOP_MODEL);
+    model.namespace = "https://data.acme.com/shop/";
+    const result = splitModel(serializer.serialize(model), {
+      projectName: "Shop",
+      domains: { crm: ["Customer"], billing: ["Invoice"] },
+    });
+    expect(new ProjectSerializer().deserialize(result.manifestYaml).iriBase).toBe(
+      "https://data.acme.com/shop/",
+    );
+    for (const d of result.domains) expect(parse(d.yaml).model.namespace).toBeUndefined();
+    expect(result.warnings.some((w) => w.includes("namespace"))).toBe(false);
+  });
+
+  it("drops a #-ending source namespace with a warning, since it cannot be a base", () => {
+    const serializer = new OrmYamlSerializer();
+    const model = serializer.deserialize(SHOP_MODEL);
+    model.namespace = "https://data.acme.com/shop#";
+    const result = splitModel(serializer.serialize(model), {
+      projectName: "Shop",
+      domains: { crm: ["Customer"], billing: ["Invoice"] },
+    });
+    expect(parse(result.manifestYaml).project.iri_base).toBeUndefined();
+    expect(result.warnings).toContainEqual(
+      expect.stringContaining('namespace "https://data.acme.com/shop#" ends in "#"'),
+    );
+  });
+
   it("produces one domain file per configured context", () => {
     const result = splitModel(SHOP_MODEL, {
       projectName: "Shop",
@@ -164,8 +194,14 @@ describe("splitModel", () => {
     const crmYaml = result.domains.find((d) => d.context === "crm")!.yaml;
     const crm = new OrmYamlSerializer().deserialize(crmYaml);
     const invoice = crm.getObjectTypeByName("Invoice");
-    expect(invoice).toBeDefined();
-    expect(crmYaml).toContain("source_context: billing");
+    // The shadow's id names its owner, through an import; nothing else
+    // states ownership (iri-identity 6d).
+    expect(invoice?.id).toBe("billing:Invoice");
+    expect([...crm.imports]).toEqual([["billing", "billing"]]);
+    expect(crmYaml).not.toContain("source_context");
+    // Every reference to it names the shadow.
+    expect(crm.getFactTypeByName("Customer pays Invoice")!.roles.map((r) => r.playerId))
+      .toContain("billing:Invoice");
 
     expect(result.mappings).toHaveLength(1);
     expect(result.mappings[0]?.fileName).toBe("mappings/billing-crm.map.yaml");
@@ -395,12 +431,12 @@ model:
       result.domains.find((d) => d.context === "identity")!.yaml,
     );
     const born = identity.getFactTypeByName("Person was born in Country")!;
-    expect(born.constraints).toHaveLength(0);
+    expect(identity.constraintsTouching(born.id)).toHaveLength(0);
     expect(
       result.warnings.some((w) =>
-        w.includes('Dropped a "join_equality" constraint')
-        && w.includes('"Person was born in Country"')
-        && w.includes('"identity"')
+        // A constraint across fact types is the model's, with no host fact
+        // type to name (orm-format-3 WS4b): the warning names the domain.
+        w.includes('Dropped a "join_equality" constraint from domain "identity"')
       ),
     ).toBe(true);
   });

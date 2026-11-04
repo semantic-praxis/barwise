@@ -1,6 +1,6 @@
 ---
 name: steward
-description: Use when driving a barwise PR to green - acting on CI failures, review events, or merge conflicts as the PR's agent. Carries only the repo-specific mechanics the generic drive-to-green rules cannot know; conventions themselves live in CLAUDE.md, AGENTS.md, and the scripts this file points at.
+description: Use when driving a barwise PR to green - acting on CI failures, review events, or merge conflicts as the PR's agent, and before merging it. Carries the repo-specific mechanics the generic drive-to-green rules cannot know, and the owner's condition for merging; conventions themselves live in CLAUDE.md, AGENTS.md, and the scripts this file points at.
 ---
 
 # Stewarding a barwise PR
@@ -15,27 +15,53 @@ pointer (spec: `docs/specs/steward-skill.spec.md`).
 The issue tracker is a git-native JSONL file; a merge conflict there
 is data to reconstruct, not hunks to pick.
 
-- Never commit merge markers, and never resolve by keeping one side
-  wholesale -- both sides usually added different issues. Take the
-  union of issues by id; for an id both sides changed, keep the line
-  with the later `updated_at`.
-- Two sessions can allocate the same new id concurrently
-  (`docs/specs/beads-issue-crud-scripts.spec.md`); that surfaces as a
-  duplicate-id error. Re-file the newer issue under a fresh id with
-  `node barwise/scripts/beads-crud.mjs create` and delete the colliding line
-  with `... delete`.
-- The union above is only safe when both sides mean the same issue by
-  the id. Before keeping the later `updated_at`, compare the titles: an
-  id whose title differs across the sides is a collision, not an edit,
-  and "later wins" deletes one issue on each side without a conflict
-  marker to show it. PR #486 lost main's barwise-981 and its own
-  barwise-982 exactly this way, pushed the result, and had to restore
-  and re-file. Keep main's line, re-file the branch's issue under a
-  fresh id, and rewrite the branch's references to it.
+- **A local merge resolves it for you.** `npm run prepare` installs a
+  merge driver (`scripts/beads-merge-driver.mjs`,
+  `docs/specs/beads-merge-driver.spec.md`) into the clone's git
+  directory, and `.gitattributes` routes the tracker to it. So
+  `git merge origin/main` on a branch whose PR GitHub shows as
+  conflicted on the tracker completes without hand work, unless the
+  two sides changed the same field of one issue differently (below). GitHub runs
+  no custom driver, which is why the PR page still says conflicted
+  until that merge is pushed. The tracker-conflicts workflow comments
+  on such a PR, saying whether the merge resolves it or which issues need
+  a person (`docs/specs/tracker-conflict-comment.spec.md`); that comment
+  is the cue to merge main. If the session-start hook warned that the
+  driver is not installed, run `npm run prepare` from `barwise/`
+  first.
+- **What the driver decides.** It merges three-way, per issue and then
+  per field: a field only one side changed takes that side's value,
+  `updated_at` and `closed_at` take the later value, and an issue one side deleted and
+  the other left alone stays deleted. It does NOT keep "the line with
+  the later `updated_at`" wholesale: that rule lost concurrent edits to
+  different fields, such as a closure on main and a later note on a
+  branch.
+- **What it reports instead of deciding**, each as a conflict block
+  naming the id, with the reason on stderr:
+  - the same id with a different `created_at` on the two sides -- a
+    collision, two issues minted one id (barwise-984). Titles are not
+    the test, because titles are edited. Keep main's line, re-file the
+    branch's issue under a fresh id with
+    `node barwise/scripts/beads-crud.mjs create`, and rewrite the
+    branch's references to it. PR #486 lost main's barwise-981 and its
+    own barwise-982 by treating a collision as an edit.
+  - an issue deleted on one side and edited on the other: decide
+    whether the deletion or the edit stands.
+  - a field both sides changed to different values: each candidate
+    line already carries every field the driver merged, so keep the
+    candidate with the value you want, or edit it.
+- If the driver itself fails (a malformed line, a crash), the file
+  holds git's ordinary line-merge markers instead; resolve by hand as
+  above, by issue id.
+- Never commit merge markers -- the validator rejects them -- and never
+  resolve by keeping one side wholesale.
 - Write lines only through `scripts/beads-crud.mjs` -- canonical form
   (compact JSON, `&<>` escaped) is what the validator enforces.
 - Gate: `npm run check:beads -- --strict` must pass before the
-  resolution is committed. CI runs it on every PR.
+  resolution is committed. The pre-commit and pre-merge-commit hooks
+  run it on the staged file, which catches what no per-issue rule can
+  see: a dependency on an issue the other side deleted. CI runs it on
+  every PR, and is the only check on a rebase.
 
 ## 2. Generated files: regenerate, never hand-edit
 
@@ -45,7 +71,8 @@ output, golden files) is fixed by rerunning its regenerator on the
 merged source, not by editing the output. The failing drift test's
 message names its regenerator; the full list is the `regen:*` scripts
 in `barwise/package.json` (`regen:builtins`, `regen:examples`,
-`regen:tutorial`, `regen:references`), plus `UPDATE_GOLDEN=1` for the
+`regen:tutorial`, `regen:references`, and `regen:architecture` for the
+generated first section of `ARCHITECTURE.md`), plus `UPDATE_GOLDEN=1` for the
 golden tests that document it.
 
 ## 3. The duplication ratchet can fire on your own fix
@@ -111,12 +138,41 @@ need its predecessor's code in the diff is better cut against `main`
 directly. Stack only when the later work genuinely will not compile or
 test without the earlier, and then expect this step.
 
+## 4b. Before merging: `/code-review` and `/pr-review`, on the head being merged
+
+The owner lets the agent driving a PR merge it, on one condition
+(2026-10-18): the `pr-review` skill, which runs `/code-review` as its
+correctness engine, has recommended `merge` on the exact head being
+merged. This is the one permission rule in this file, because it is a
+delegation the owner made for this repo, which no generic rule can know.
+
+- **Review the current head, then merge that SHA.** Run the `pr-review`
+  skill, delivered in the session. On `merge`, merge with the reviewed
+  SHA pinned (the GitHub MCP merge's `expectedHeadSha`, or `gh pr
+  merge --match-head-commit`), so a commit pushed after the review is
+  refused rather than merged; once merged, post one PR comment naming
+  the SHA and the recommendation. On anything else, fix what it lists,
+  push, and review the new head. Any push needs a new review.
+- **Ask the owner instead** when the review cannot tell, when
+  `/code-review` could not run, when the PR body leaves the owner a
+  decision they have not answered, or after two reviews of this PR that
+  did not recommend `merge` -- a fresh review always finds something to
+  say, and chasing it ran 28 rounds on one PR (barwise-q93). The owner's
+  answer decides, and resets the count.
+- **The owner's instruction overrides this.** The rule is a condition
+  on a delegation; when the owner says to merge a PR, merge it.
+- **No exemption by size.** Tracker-only and docs-only PRs, including
+  section 5's follow-up, get the review too; PR #679 only closed two
+  issues and merged without it, which is how this rule came to be
+  written down. Nothing mechanical enforces it yet (barwise-zdd).
+
 ## 5. After the PR merges
 
 Close the issues it resolved via
 `node barwise/scripts/beads-crud.mjs close <id> --reason "..."` in a
-tracker-only follow-up commit -- not in the code PR, whose body should
-say the closures follow. `npm run check:tracker-closes` (a CI step on every
+tracker-only follow-up PR -- not in the code PR, whose body should
+say the closures follow. That follow-up is a PR like any other: section
+4b applies before merging it. `npm run check:tracker-closes` (a CI step on every
 pull request, and part of the pre-push run) fails a diff that closes an
 issue and changes anything outside `.beads/`, docs included. Then push and verify per the Session
 Completion section of the root `CLAUDE.md`: work is not done until

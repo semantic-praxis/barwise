@@ -1,0 +1,96 @@
+{
+  "run": "plain-t1-r3",
+  "arm": "plain",
+  "task": "T1",
+  "phase": "second-series",
+  "pair": "r3",
+  "start": "8398a193",
+  "head": "7ff4c6da",
+  "startedAt": "2026-10-15T04:58:33Z",
+  "rounds": 1,
+  "leftoverCommit": false,
+  "outcome": "pass",
+  "readSpec": false,
+  "usage": {
+    "inputProcessed": 4514634,
+    "turns": 42,
+    "finalContext": 133402,
+    "rounds": [
+      {
+        "round": 1,
+        "turns": 42,
+        "inputProcessed": 4514634
+      }
+    ],
+    "source": "measure:comparison -- usage over the run's transcript; per turn in plain-t1-r3.usage.json"
+  },
+  "scoring": [
+    {
+      "round": 1,
+      "head": "7ff4c6da",
+      "trial": {
+        "exit": 0,
+        "protectedTouched": []
+      },
+      "heldout": {
+        "passed": 13,
+        "of": 13
+      },
+      "build": 0,
+      "test": 0,
+      "validateExamples": 0,
+      "promptlabDrift": {
+        "exit": 0,
+        "tests": "15 passed"
+      },
+      "harness": {
+        "tokens": 135733,
+        "toolCalls": 73,
+        "wallMs": 746837
+      }
+    }
+  ],
+  "diff": {
+    "files": 7,
+    "hunks": 15,
+    "added": 44,
+    "removed": 1,
+    "consumerFiles": [
+      "barwise/packages/core/schemas/orm-model.schema.json",
+      "barwise/packages/core/src/diff/breakingLevel.ts",
+      "barwise/packages/core/src/diff/changeDescription.ts",
+      "barwise/packages/core/src/diff/elementDiff.ts"
+    ],
+    "sliceLines": 985
+  },
+  "redChecks": [
+    {
+      "class": "environment",
+      "command": "git ... / compound shell command",
+      "firstError": "the worktree sandbox refused a command it could not verify stayed inside the worktree",
+      "note": "harness isolation, not the code (1 times)"
+    },
+    {
+      "class": "task logic",
+      "command": "npx vitest run (packages/core)",
+      "firstError": "FAIL tests/diff/changeDescription.test.ts > has a golden for every kind of change the diff can emit",
+      "note": "the new unit change had no expected sentence yet; added"
+    },
+    {
+      "class": "task logic",
+      "command": "npx vitest run (packages/core)",
+      "firstError": "FAIL tests/laws/counterexample.law.test.ts (3 failed): the seeded sample moved",
+      "note": "a newly drawn unit in tests/arbitraries/model.ts shifted the seeded samples; the unit is now derived from the data type already chosen (decimal gives kg, money gives USD), so the stream did not move"
+    }
+  ],
+  "observations": [
+    "did not edit the protected layout test, under the amended prompt and without reading the experiment spec",
+    "refused an empty unit in round 1, at the decoder's shape check, matching the schema's minLength 1, for a file and a config alike"
+  ],
+  "agentJudgmentCalls": [
+    "empty unit refused (round 1)",
+    "unit written after data_type",
+    "unit change is breaking level caution",
+    "unit derived from the data type in the random model generator, so the seeded law samples did not move"
+  ]
+}

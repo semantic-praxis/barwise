@@ -1,3 +1,6 @@
+import type { DomainModel } from "../../model/DomainModel.js";
+import { ABSOLUTE_IRI_PATTERN } from "../../model/iri.js";
+import { namespaceOf } from "../../model/namespace.js";
 import type { OrmProject } from "../../model/OrmProject.js";
 import type { Diagnostic } from "../Diagnostic.js";
 import { report, RULE_ID } from "../ruleId.js";
@@ -17,6 +20,12 @@ export type ProjectValidationRule = (project: OrmProject) => Diagnostic[];
  * - Entity mappings in context mappings reference object types that exist
  *   in the source and target domains (when loaded).
  * - Product dependencies reference existing domains and mappings.
+ * - Each domain has one namespace source and its own namespace
+ *   (iri-identity WS4).
+ * - Each alias a domain imports names a context the project supplies, or
+ *   an absolute namespace IRI (iri-identity WS6). A domain loaded on its
+ *   own has no project, so this is a warning here and not a refusal at
+ *   load, and a standalone domain still loads.
  */
 export function projectRules(project: OrmProject): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
@@ -24,8 +33,30 @@ export function projectRules(project: OrmProject): Diagnostic[] {
   diagnostics.push(...checkMappingContextsExist(project));
   diagnostics.push(...checkEntityMappingReferences(project));
   diagnostics.push(...checkProductDependencies(project));
+  diagnostics.push(...checkNamespaces(project));
+  diagnostics.push(...checkImports(project));
 
   return diagnostics;
+}
+
+/** An import bound to an absolute IRI names a namespace, not a context. */
+function checkImports(project: OrmProject): Diagnostic[] {
+  const contexts = new Set(project.domains.map((d) => d.context));
+  return project.domains.flatMap((domain) =>
+    [...(domain.model?.imports ?? [])]
+      .filter(([, target]) => !ABSOLUTE_IRI_PATTERN.test(target) && !contexts.has(target))
+      .map(([alias, target]) =>
+        report(
+          RULE_ID.importedContextMissing,
+          "default",
+          domain.path,
+          domain.path,
+          domain.context,
+          alias,
+          target,
+        )
+      )
+  );
 }
 
 /**
@@ -162,6 +193,64 @@ function checkProductDependencies(project: OrmProject): Diagnostic[] {
         );
       }
     }
+  }
+
+  return diagnostics;
+}
+
+/**
+ * A namespace has one source and one owner (iri-identity WS4). A domain
+ * file that declares its own `namespace` in a project with `iri_base` is
+ * overridden, and said so, rather than refused, so the domain still loads
+ * and a project that gains `iri_base` keeps working. Two domains with one
+ * namespace -- contexts that normalize alike, or two declared alike --
+ * would give their elements one IRI once ids are names (WS6).
+ */
+function checkNamespaces(project: OrmProject): Diagnostic[] {
+  const diagnostics: Diagnostic[] = [];
+  const byNamespace = new Map<string, DomainModel[]>();
+  const iriBase = project.iriBase;
+
+  for (const domain of project.domains) {
+    const namespace = namespaceOf(domain.model, { iriBase, context: domain.context });
+    const own = domain.model?.namespace;
+    if (iriBase !== undefined && own !== undefined) {
+      const projects = namespaceOf(undefined, { iriBase, context: domain.context });
+      // A domain's own namespace equal to the project's is harmless, and
+      // keeps a load of the domain file on its own giving the same answer.
+      if (own !== projects) {
+        diagnostics.push(
+          report(
+            RULE_ID.domainNamespaceOverridden,
+            "default",
+            domain.path,
+            domain.path,
+            domain.context,
+            own,
+            projects,
+          ),
+        );
+      }
+    }
+    if (namespace === undefined) continue;
+    const domains = byNamespace.get(namespace) ?? [];
+    domains.push(domain);
+    byNamespace.set(namespace, domains);
+  }
+
+  for (const [namespace, domains] of byNamespace) {
+    if (domains.length < 2) continue;
+    // Pinned to the first domain's file, as every other project rule names
+    // a file, so a consumer can open where the conflict starts.
+    diagnostics.push(
+      report(
+        RULE_ID.duplicateNamespace,
+        iriBase === undefined ? "default" : "fromIriBase",
+        domains[0]!.path,
+        namespace,
+        domains.map((d) => JSON.stringify(d.context)).join(", "),
+      ),
+    );
   }
 
   return diagnostics;

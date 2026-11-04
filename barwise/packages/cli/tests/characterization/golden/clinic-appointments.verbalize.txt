@@ -24,7 +24,7 @@ Specialty is specialty of Doctor
   Each Doctor has at least one Specialty.
 Appointment is for Patient with Doctor on AppointmentDate at TimeSlot
   For each Appointment combination, at most one Patient and Doctor and AppointmentDate and TimeSlot applies.
-  Each Appointment must: Appointment is for Appointment with Appointment on Appointment at Appointment.
+  Each Appointment is for some Patient with some Doctor on some AppointmentDate at some TimeSlot.
   For each Patient, AppointmentDate and TimeSlot combination, at most one Appointment and Doctor applies.
   For each Doctor, AppointmentDate and TimeSlot combination, at most one Appointment and Patient applies.
 Appointment has VisitReason
@@ -37,10 +37,11 @@ AppointmentStatus is status of Appointment
 Appointment has FollowUpNote
 FollowUpNote is for Appointment
   Each Appointment has at most one FollowUpNote.
-  If Appointment then Appointment in Appointment has AppointmentStatus.
 Doctor is assigned to ExamRoom on AppointmentDate
   For each Doctor and AppointmentDate combination, at most one ExamRoom applies.
 Patient has Doctor as primary doctor
 Doctor is primary doctor of Patient
-  Each Patient has at most one Doctor.
-  Each Patient has at least one Doctor.
+  Each Patient has at most one Doctor as primary doctor.
+  Each Patient has at least one Doctor as primary doctor.
+Constraints across fact types
+  If Appointment in Appointment has FollowUpNote then Appointment in Appointment has AppointmentStatus.

@@ -2,7 +2,7 @@
 
 Status: Implemented (the skill lands alongside this spec)
 Created: 2026-08-27
-Last-updated: 2026-08-27
+Last-updated: 2026-10-18
 Tracking: barwise-876
 
 ## Principle
@@ -44,7 +44,15 @@ In scope, stated in EARS form:
 - When the agent prepares to push a fix, the skill shall give the
   local pre-push gate in CI order and the stale-`dist` trap.
 - When the PR merges, the skill shall state the tracker-closure
-  convention (a follow-up tracker-only commit, not the code PR).
+  convention (a follow-up tracker-only PR, not the code PR).
+- When the agent is about to merge a PR, the skill shall require that
+  `/code-review` and the `pr-review` skill have both run on the head
+  commit being merged and the review recommends `merge`, asking the
+  owner after two full reviews that do not, for every PR whatever its
+  size (added 2026-10-18, when the owner delegated merging; section 4b).
+  This is the one permission rule in the skill, and it is in scope
+  because it is a delegation the owner made for this repo, which no
+  generic rule can know; the posture rules below stay out.
 
 Out of scope: a `babysit/` variant (the harness prefers `steward/`
 when both exist, so one file suffices); any change to CI, scripts, or

@@ -30,7 +30,10 @@
  * repo has form for built-but-never-called code (barwise-811).
  */
 
-import { readFileSync } from "node:fs";
+import { ELEMENT_MATCHINGS } from "@barwise/core/diff";
+import { DIFF_RENAME_KINDS } from "@barwise/mcp";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -44,17 +47,36 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
  * factory and the tests hold, so `mcpEnabled` is a knob rather than a
  * second `vi.doMock` that the already-imported binding would ignore.
  */
-const state = vi.hoisted(() => ({ registered: [] as string[], mcpEnabled: true }));
+const state = vi.hoisted(() => ({
+  registered: [] as string[],
+  tools: new Map<string, { invoke: (options: { input: unknown; }, token: unknown) => unknown; }>(),
+  mcpEnabled: true,
+  documents: [] as { uri: { fsPath: string; }; isDirty: boolean; }[],
+}));
 
 vi.mock("vscode", () => ({
   lm: {
-    registerTool: (name: string) => {
+    registerTool: (
+      name: string,
+      tool: { invoke: (options: { input: unknown; }, token: unknown) => unknown; },
+    ) => {
       state.registered.push(name);
+      state.tools.set(name, tool);
       return { dispose: () => {} };
     },
   },
+  // What `toToolResult` builds, so a registered tool can be invoked here.
+  LanguageModelToolResult: class {
+    constructor(readonly content: { value: string; }[]) {}
+  },
+  LanguageModelTextPart: class {
+    constructor(readonly value: string) {}
+  },
   workspace: {
     getConfiguration: () => ({ get: (_key: string, _fallback?: unknown) => state.mcpEnabled }),
+    get textDocuments() {
+      return state.documents;
+    },
   },
 }));
 
@@ -78,7 +100,7 @@ describe("VS Code language-model tool registration", () => {
     state.mcpEnabled = true;
   });
 
-  it("registers exactly these tools", () => {
+  it("registers exactly these tools [adr:surface-capability-parity#pinned-tool-lists]", () => {
     // The complete list, not a sample. Changing it means changing the
     // capability matrix in CLAUDE.md in the same commit.
     expect(registerAll()).toEqual([
@@ -93,6 +115,7 @@ describe("VS Code language-model tool registration", () => {
       "barwise_lineage_status",
       "barwise_merge_models",
       "barwise_query_model",
+      "barwise_rename_element",
       "barwise_review_model",
       "barwise_split_model",
       "barwise_validate_model",
@@ -126,5 +149,173 @@ describe("VS Code language-model tool registration", () => {
     // qualifier is visible in the suite rather than discovered later.
     state.mcpEnabled = false;
     expect(registerAll()).toEqual([]);
+  });
+});
+
+describe("barwise_diff_models passes matching through", () => {
+  // From the retroactive review of #735: dropping `matching` at the
+  // registration survived the whole vscode suite, and the manifest's enum
+  // was an unchecked copy of the modes core defines.
+  const a =
+    'orm_version: "3.0"\nmodel:\n  name: S\n  object_types:\n    - { id: ot0, name: Dog, kind: value }\n    - { id: ot1, name: Cat, kind: value }\n';
+  const b =
+    'orm_version: "3.0"\nmodel:\n  name: S\n  object_types:\n    - { id: ot0, name: Cat, kind: value }\n    - { id: ot1, name: Dog, kind: value }\n';
+  const changed = async (matching?: string) => {
+    registerAll();
+    const tool = state.tools.get("barwise_diff_models")!;
+    const result = (await tool.invoke({ input: { base: a, incoming: b, matching } }, {})) as {
+      content: { value: string; }[];
+    };
+    return JSON.parse(result.content[0]!.value).deltas.length as number;
+  };
+
+  it("reads a swap of coinciding ids as renames by default, and as nothing under content", async () => {
+    expect(await changed()).toBe(2);
+    expect(await changed("content")).toBe(0);
+  });
+
+  it("declares exactly the modes core defines", () => {
+    const tool = (manifest.contributes?.languageModelTools ?? []).find(
+      (t) => t.name === "barwise_diff_models",
+    ) as { inputSchema?: { properties?: { matching?: { enum?: string[]; }; }; }; } | undefined;
+    expect(tool?.inputSchema?.properties?.matching?.enum).toEqual([...ELEMENT_MATCHINGS]);
+  });
+
+  it("declares the renames shape the MCP tool takes", () => {
+    // The manifest's JSON schema is a second copy of the MCP tool's zod
+    // schema; this keeps the two agreeing (iri-identity 6a).
+    const tool = (manifest.contributes?.languageModelTools ?? []).find(
+      (t) => t.name === "barwise_diff_models",
+    ) as { inputSchema?: { properties?: Record<string, unknown>; }; } | undefined;
+    const renames = tool?.inputSchema?.properties?.renames as {
+      items: {
+        properties: Record<string, { enum?: string[]; minLength?: number; }>;
+        required: string[];
+      };
+    };
+    expect(renames.items.properties.kind!.enum).toEqual([...DIFF_RENAME_KINDS]);
+    expect(renames.items.properties.from!.minLength).toBe(1);
+    expect(renames.items.properties.to!.minLength).toBe(1);
+    expect(renames.items.required.sort()).toEqual(["from", "kind", "to"]);
+  });
+});
+
+describe("barwise_export_model carries the constraint report", () => {
+  // The editor tool joins the MCP blocks into one text part, so the report
+  // reaches the model only if that join keeps the second block (barwise-wc0).
+  const ring = [
+    'orm_version: "1.0"',
+    "model:",
+    "  name: Ring",
+    "  object_types:",
+    "    - { id: ot-person, name: Person, kind: entity, reference_mode: person_id }",
+    "  fact_types:",
+    "    - id: ft-parent",
+    "      name: Person is parent of Person",
+    "      roles:",
+    "        - { id: r-parent, player: ot-person, role_name: is parent of }",
+    "        - { id: r-child, player: ot-person, role_name: is child of }",
+    '      readings: ["{0} is parent of {1}"]',
+    "      constraints:",
+    "        - { type: internal_uniqueness, roles: [r-parent, r-child] }",
+    "        - { type: ring, role_1: r-parent, role_2: r-child, ring_type: irreflexive }",
+    "",
+  ].join("\n");
+
+  it("barwise_generate_schema carries the same report (barwise-zk4)", async () => {
+    registerAll();
+    const tool = state.tools.get("barwise_generate_schema")!;
+    const result = (await tool.invoke({ input: { source: ring, format: "ddl" } }, {})) as {
+      content: { value: string; }[];
+    };
+    const text = result.content[0]!.value;
+    const report = text.indexOf("1 constraint(s) the ddl format could not express:");
+    expect(report).toBeGreaterThan(text.indexOf("CREATE TABLE person_is_parent_of_person"));
+    expect(text.slice(report)).toContain("- No Person is parent of that same Person.");
+  });
+
+  it("puts the report after the artifact", async () => {
+    registerAll();
+    const tool = state.tools.get("barwise_export_model")!;
+    const result = (await tool.invoke({ input: { source: ring, format: "ddl" } }, {})) as {
+      content: { value: string; }[];
+    };
+    const text = result.content[0]!.value;
+    const report = text.indexOf("1 constraint(s) the ddl format could not express:");
+    expect(report).toBeGreaterThan(text.indexOf("CREATE TABLE person_is_parent_of_person"));
+    expect(text.slice(report)).toContain("- No Person is parent of that same Person.");
+  });
+});
+
+describe("barwise_rename_element", () => {
+  const MODEL = 'orm_version: "4.0"\nmodel:\n  name: Shop\n  object_types:\n'
+    + "    - { id: o, name: Order, kind: entity, reference_mode: order_nr }\n";
+
+  async function rename(path: string, extra: Record<string, unknown> = {}) {
+    registerAll();
+    const result = await state.tools.get("barwise_rename_element")!.invoke(
+      { input: { source: path, objectType: "Order", to: "Purchase", ...extra } },
+      undefined,
+    ) as { content: { value: string; }[]; };
+    return JSON.parse(result.content[0]!.value);
+  }
+
+  it("refuses a model whose editor has unsaved changes, and writes nothing", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "barwise-vscode-rename-"));
+    try {
+      const path = join(dir, "shop.orm.yaml");
+      writeFileSync(path, MODEL, "utf-8");
+      state.documents = [{ uri: { fsPath: path }, isDirty: true }];
+      expect((await rename(path)).error).toContain("has unsaved changes");
+      expect(readFileSync(path, "utf-8")).toBe(MODEL);
+
+      state.documents = [{ uri: { fsPath: path }, isDirty: false }];
+      expect((await rename(path)).written).toBe(true);
+      expect(readFileSync(path, "utf-8")).toContain("name: Purchase");
+    } finally {
+      state.documents = [];
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("refuses when the dirty editor names the file through a symlink", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "barwise-vscode-rename-"));
+    try {
+      const path = join(dir, "shop.orm.yaml");
+      writeFileSync(path, MODEL, "utf-8");
+      symlinkSync(path, join(dir, "link.orm.yaml"));
+      state.documents = [{ uri: { fsPath: join(dir, "link.orm.yaml") }, isDirty: true }];
+      expect((await rename(path)).error).toContain("has unsaved changes");
+      expect(readFileSync(path, "utf-8")).toBe(MODEL);
+    } finally {
+      state.documents = [];
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("refuses a project rename when a domain it would write is dirty, not only the manifest", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "barwise-vscode-rename-"));
+    try {
+      mkdirSync(join(dir, "domains"));
+      const domain = join(dir, "domains", "shop.orm.yaml");
+      writeFileSync(domain, MODEL, "utf-8");
+      const manifest = join(dir, "p.orm-project.yaml");
+      writeFileSync(
+        manifest,
+        'format_version: "1.0"\nproject:\n  name: P\n  domains:\n'
+          + '    - { path: "./domains/shop.orm.yaml", context: "shop" }\n',
+        "utf-8",
+      );
+      state.documents = [{ uri: { fsPath: domain }, isDirty: true }];
+      const refused = await rename(manifest, { domain: "shop" });
+      expect(refused.error).toContain(`${domain} has unsaved changes`);
+      expect(readFileSync(domain, "utf-8")).toBe(MODEL);
+
+      // Under check nothing is written, so a dirty buffer is no reason to refuse.
+      expect((await rename(manifest, { domain: "shop", check: true })).files).toEqual([domain]);
+    } finally {
+      state.documents = [];
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

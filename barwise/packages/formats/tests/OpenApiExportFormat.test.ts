@@ -9,6 +9,7 @@ import { clearFormats, formatRegistry, registerFormat } from "@barwise/core";
 import { beforeEach, describe, expect, it } from "vitest";
 import { openApiExportFormat } from "../src/openapi/OpenApiExportFormat.js";
 import { ModelBuilder } from "./helpers/ModelBuilder.js";
+import { MENTOR_RING_PSEUDOCODE, mentorsModel } from "./helpers/unreportedFixture.js";
 
 describe("OpenApiExportFormat", () => {
   describe("adapter instance", () => {
@@ -266,5 +267,21 @@ describe("OpenApiExportFormat", () => {
       const descriptors = formatRegistry.listExporters();
       expect(descriptors.some((d) => d.name === "openapi")).toBe(true);
     });
+  });
+});
+
+/**
+ * The format renders only the relational schema, so the constraints that
+ * schema does not carry are reported (schema-export-constraint-specs.spec.md):
+ * the ring is, the mandatory the mapping enforces as NOT NULL is not.
+ */
+describe("constraints the export does not carry", () => {
+  it("reports each one as a constraint spec", () => {
+    const specs = openApiExportFormat.export(mentorsModel(true)).constraintSpecs;
+    expect(specs?.map((s) => s.pseudocode)).toEqual([MENTOR_RING_PSEUDOCODE]);
+  });
+
+  it("sets no constraintSpecs when the schema carries them all", () => {
+    expect(openApiExportFormat.export(mentorsModel(false)).constraintSpecs).toBeUndefined();
   });
 });

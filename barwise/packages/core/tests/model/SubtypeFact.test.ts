@@ -26,7 +26,8 @@ describe("SubtypeFact", () => {
       expect(sf.subtypeId).toBe("sub-1");
       expect(sf.supertypeId).toBe("super-1");
       expect(sf.providesIdentification).toBe(true);
-      expect(sf.id).toBeTruthy();
+      // Unnamed until a model names it (iri-identity decision 19).
+      expect(sf.id).toBeUndefined();
     });
 
     it("accepts custom id", () => {
@@ -63,51 +64,6 @@ describe("SubtypeFact", () => {
             supertypeId: "same-id",
           }),
       ).toThrow("same entity");
-    });
-
-    it("defaults isExclusive to false", () => {
-      const sf = new SubtypeFact({
-        subtypeId: "sub-1",
-        supertypeId: "super-1",
-      });
-      expect(sf.isExclusive).toBe(false);
-    });
-
-    it("defaults isExhaustive to false", () => {
-      const sf = new SubtypeFact({
-        subtypeId: "sub-1",
-        supertypeId: "super-1",
-      });
-      expect(sf.isExhaustive).toBe(false);
-    });
-
-    it("accepts isExclusive = true", () => {
-      const sf = new SubtypeFact({
-        subtypeId: "sub-1",
-        supertypeId: "super-1",
-        isExclusive: true,
-      });
-      expect(sf.isExclusive).toBe(true);
-    });
-
-    it("accepts isExhaustive = true", () => {
-      const sf = new SubtypeFact({
-        subtypeId: "sub-1",
-        supertypeId: "super-1",
-        isExhaustive: true,
-      });
-      expect(sf.isExhaustive).toBe(true);
-    });
-
-    it("accepts both exclusive and exhaustive (partition)", () => {
-      const sf = new SubtypeFact({
-        subtypeId: "sub-1",
-        supertypeId: "super-1",
-        isExclusive: true,
-        isExhaustive: true,
-      });
-      expect(sf.isExclusive).toBe(true);
-      expect(sf.isExhaustive).toBe(true);
     });
   });
 });

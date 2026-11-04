@@ -234,7 +234,7 @@ ${diagram}
         Customer places Order: vertical`;
 
   it("rewrites elements, positions and orientations from names to ids", () => {
-    const layout = serializer.deserialize(v1Doc("1.1", byName)).getDiagramLayout("Sales")!;
+    const layout = serializer.deserializeAsWritten(v1Doc("1.1", byName)).getDiagramLayout("Sales")!;
     expect(layout.elements).toEqual(["ot-customer", "ot-order"]);
     expect(layout.positions).toEqual({
       "ot-customer": { x: 10, y: 20 },
@@ -248,20 +248,22 @@ ${diagram}
     // field, and [] is an empty view.
     const empty = `    - name: Sales
       elements: []`;
-    const layout = serializer.deserialize(v1Doc("1.1", empty)).getDiagramLayout("Sales")!;
+    const layout = serializer.deserializeAsWritten(v1Doc("1.1", empty)).getDiagramLayout("Sales")!;
     expect(layout.elements).toBeUndefined();
   });
 
-  it("chains a 1.0 document through 1.1 to 2.0", () => {
-    const model = serializer.deserialize(v1Doc("1.0", byName));
+  it("chains a 1.0 document through 1.1 and 2.0, and a save writes 4.0", () => {
+    const model = serializer.deserializeAsWritten(v1Doc("1.0", byName));
     expect(model.getDiagramLayout("Sales")!.elements).toEqual(["ot-customer", "ot-order"]);
-    expect(serializer.serialize(model)).toContain('orm_version: "2.0"');
+    expect(serializer.serialize(serializer.deserialize(v1Doc("1.0", byName)))).toContain(
+      'orm_version: "4.0"',
+    );
   });
 
   it("keeps a name that matches no element, so validation can report it", () => {
     const stale = `    - name: Sales
       elements: [Customer, Invoice]`;
-    const layout = serializer.deserialize(v1Doc("1.1", stale)).getDiagramLayout("Sales")!;
+    const layout = serializer.deserializeAsWritten(v1Doc("1.1", stale)).getDiagramLayout("Sales")!;
     expect(layout.elements).toEqual(["ot-customer", "Invoice"]);
   });
 
@@ -274,7 +276,9 @@ ${diagram}
       positions:
         Customer: { x: 10, y: 20 }
         ot-customer: { x: 99, y: 99 }`;
-    const layout = serializer.deserialize(v1Doc("1.1", collide)).getDiagramLayout("Sales")!;
+    const layout = serializer.deserializeAsWritten(v1Doc("1.1", collide)).getDiagramLayout(
+      "Sales",
+    )!;
     expect(layout.elements).toEqual(["ot-customer"]);
     expect(layout.positions).toEqual({ "ot-customer": { x: 10, y: 20 } });
   });
@@ -287,7 +291,7 @@ ${diagram}
       `    - name: Sales
       elements: [Customer, ot-order]`,
     );
-    const layout = serializer.deserialize(doc).getDiagramLayout("Sales")!;
+    const layout = serializer.deserializeAsWritten(doc).getDiagramLayout("Sales")!;
     expect(layout.elements).toEqual(["Customer", "ot-order"]);
   });
 
@@ -296,10 +300,12 @@ ${diagram}
     // dropped it from every view that listed it.
     const yaml = serializer.serialize(serializer.deserialize(v1Doc("1.1", byName)));
     const renamed = serializer.deserialize(yaml.replace("name: Customer\n", "name: Client\n"));
-    expect(renamed.getObjectType("ot-customer")!.name).toBe("Client");
+    // Loaded through the replay, Customer's id is its 4.0 local name, and a
+    // rename leaves it there.
+    expect(renamed.getObjectType("Customer")!.name).toBe("Client");
     const layout = renamed.getDiagramLayout("Sales")!;
-    expect(layout.elements).toContain("ot-customer");
-    expect(layout.positions["ot-customer"]).toEqual({ x: 10, y: 20 });
+    expect(layout.elements).toContain("Customer");
+    expect(layout.positions["Customer"]).toEqual({ x: 10, y: 20 });
   });
 });
 

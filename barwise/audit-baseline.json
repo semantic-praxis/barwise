@@ -16,6 +16,11 @@
       "note": "shared surface wording (help text, zod description, UI string, or doc-comment example); repetition is not a decision that must agree",
       "detail": "\"Output as JSON instead of human-readable text\" in packages/cli/src/commands/describe.ts, packages/cli/src/commands/query.ts"
     },
+    "literal:08fb788c0275": {
+      "status": "accepted-benign",
+      "note": "shared surface wording (help text); the behaviour it describes, exit 1 when --check finds a file to rewrite, is pinned per command by the migrate and rename tests, so the help strings need not agree",
+      "detail": "\"Write nothing; exit 1 if any file would be rewritten\" in packages/cli/src/commands/migrate.ts, packages/cli/src/commands/rename.ts"
+    },
     "literal:0f47c7c3ae64": {
       "status": "accepted-benign",
       "note": "shared surface wording (help text, zod description, UI string, or doc-comment example); repetition is not a decision that must agree",
@@ -191,11 +196,6 @@
       "note": "shared surface wording (help text, zod description, UI string, or doc-comment example); repetition is not a decision that must agree",
       "detail": "\"File path to .orm.yaml or inline YAML content\" in packages/mcp/src/tools/diagram.ts, packages/mcp/src/tools/schema.ts"
     },
-    "prose:72691d1d4c85": {
-      "status": "accepted-benign",
-      "note": "the capability matrix's own honesty note. The tool-list halves of the matrix are no longer prose: mcp/tests/serverSpawn.test.ts and vscode/tests/unit/toolRegistration.test.ts pin them with toEqual. What is left is the note explaining that the remaining rows are still hand-maintained, which is a claim about the document rather than a copy of anything",
-      "detail": "../CLAUDE.md: still hand-maintained and is therefore still the kind of claim that"
-    },
     "prose:5236a3a26169": {
       "status": "accepted-benign",
       "note": "descriptive: explains why the hand-maintained value is distrusted, not a live mirror",
@@ -221,10 +221,10 @@
       "note": "guarded restatement: typed Record / derived Set, completeness compile-checked (barwise-869)",
       "detail": "ConceptualDataTypeName restated as record in packages/formats/src/norma/NormaXmlWriter.ts"
     },
-    "union:46780e616ca9": {
+    "union:eb9adc7183dd": {
       "status": "accepted-benign",
       "note": "guarded restatement: typed Record / derived Set, completeness compile-checked (barwise-869)",
-      "detail": "SqlDialect restated as record in packages/formats/src/ddl/dialectCapabilities.ts"
+      "detail": "SqlDialect restated as record in packages/core/src/mapping/dialectCapabilities.ts"
     },
     "union:68fdcce7dcbf": {
       "status": "accepted-benign",
@@ -241,15 +241,25 @@
       "note": "guarded restatement: typed Record / derived Set, completeness compile-checked (barwise-869)",
       "detail": "RingType restated as record in packages/core/src/validation/rules/population/ring.ts"
     },
-    "prose:ef826c8adbf8": {
-      "status": "accepted-benign",
-      "note": "CLAUDE.md's convention summary restating the spec's reason. Kept because this file's job is the convention with its reason attached, and the one half that is a CODE claim -- that audit-duplication.mjs has no writer -- is drift-tested in scripts/tests/gates.test.mjs rather than left to prose.",
-      "detail": "../CLAUDE.md: hand-maintained, which is why it never had this defect."
-    },
     "literal:7daecf42cb3e": {
       "status": "accepted-benign",
       "note": "doc-comment example: both comments cite the same n-ary fact type (barwise-kgh) to explain the mapping and the routing; repetition is not a decision that must agree",
-      "detail": "\"Encounter has Diagnosis at DiagnosisRank\" in packages/core/src/mapping/RelationalMapper.ts, packages/formats/src/ddl/constraintRouting.ts"
+      "detail": "\"Encounter has Diagnosis at DiagnosisRank\" in packages/core/src/mapping/RelationalMapper.ts, packages/core/src/mapping/constraintRouting.ts"
+    },
+    "union:efe33cd8a63e": {
+      "status": "accepted-benign",
+      "note": "guarded restatement: typed Record / derived Set, completeness compile-checked (barwise-869)",
+      "detail": "ConceptualDataTypeName restated as record in packages/formats/src/ossie/writeOssie.ts"
+    },
+    "literal:b8915ff0d86b": {
+      "status": "accepted-benign",
+      "note": "two decisions sharing one sentence: a fact type's roles (FactTypeFile) and a constraint's role list (roleList); neither minimum follows from the other, and each drift test holds its own to the schema",
+      "detail": "packages/core/src/decode/constraint.ts, packages/core/src/decode/factType.ts"
+    },
+    "literal:685446d8a81a": {
+      "status": "accepted-benign",
+      "note": "each format version decoder refuses any other orm_version in the same words: 3.0 is frozen and 4.0 states its own (iri-identity 6b-2b-1); the two must differ, not agree",
+      "detail": "\").annotate({ message: 'must be \" in packages/core/src/decode/document.ts, packages/core/src/decode/document40.ts"
     }
   }
 }

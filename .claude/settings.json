@@ -4,7 +4,7 @@
       {
         "hooks": [
           {
-            "command": "bd prime",
+            "command": "env -u BARWISE_EXIT_DIR bd prime",
             "type": "command"
           }
         ],
@@ -15,7 +15,7 @@
       {
         "hooks": [
           {
-            "command": "bd prime",
+            "command": "env -u BARWISE_EXIT_DIR bd prime",
             "type": "command"
           }
         ],
@@ -24,7 +24,16 @@
       {
         "hooks": [
           {
-            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/session-start.sh",
+            "command": "env -u BARWISE_EXIT_DIR \"$CLAUDE_PROJECT_DIR/.claude/hooks/session-start.sh\"",
+            "type": "command"
+          }
+        ],
+        "matcher": ""
+      },
+      {
+        "hooks": [
+          {
+            "command": "env -u BARWISE_EXIT_DIR node \"$CLAUDE_PROJECT_DIR/barwise/scripts/hooks/masked-exit.mjs\" session",
             "type": "command"
           }
         ],
@@ -37,7 +46,40 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"$CLAUDE_PROJECT_DIR/barwise/scripts/hooks/python-uv-guard.mjs\""
+            "command": "env -u BARWISE_EXIT_DIR node \"$CLAUDE_PROJECT_DIR/barwise/scripts/hooks/python-uv-guard.mjs\""
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "env -u BARWISE_EXIT_DIR node \"$CLAUDE_PROJECT_DIR/barwise/scripts/hooks/masked-exit.mjs\" post"
+          }
+        ]
+      }
+    ],
+    "PostToolUseFailure": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "env -u BARWISE_EXIT_DIR node \"$CLAUDE_PROJECT_DIR/barwise/scripts/hooks/masked-exit.mjs\" failure"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "env -u BARWISE_EXIT_DIR node \"$CLAUDE_PROJECT_DIR/barwise/scripts/hooks/masked-exit.mjs\" stop"
           }
         ]
       }

@@ -2,8 +2,10 @@
 
 Command-line tool for ORM 2 modeling. Wraps the platform-independent
 packages into a `barwise` CLI binary; the authoritative list of
-internal dependencies is the root CLAUDE.md dependency graph (and
-this package's `package.json`).
+internal dependencies is `INTENDED` in
+`barwise/scripts/lib/intended.cjs`, which the root CLAUDE.md graph
+and this package's `package.json` are checked against
+(`npm run check:architecture`).
 
 ## Dependency Rule
 
@@ -26,6 +28,9 @@ src/
     diagram.ts          barwise diagram <file>
     diff.ts             barwise diff <file1> <file2>
     merge.ts            barwise merge <base> <incoming> (non-interactive; stdout by default)
+    migrate.ts          barwise migrate <files...> (rewrites .orm.yaml files in place as 4.0;
+                        a .orm-project.yaml migrates every domain in one write)
+    rename.ts           barwise rename (an element, in a file or across a project; rewrites)
     review.ts           barwise review <file> (LLM semantic review; always exits 0)
     gym.ts              barwise gym list|show|check (modeling gym; miss-card
                         emission + session log at $XDG_STATE_HOME/barwise/)
@@ -41,10 +46,13 @@ src/
     llmUsage.ts         barwise llm-usage (report over the call log)
   workspace/
     io.ts               File I/O helpers (loadModel, writeModel)
+    projectLoader.ts    Read a project manifest and the files it names
     format.ts           Output formatting helpers (JSON, text)
     provenance.ts       Version/commit/dirty for recorded eval runs
     promptArtifacts.ts  The artifact candidate set `prompt` resolves over
     callLogSink.ts      JSONL sink for the observability records
+    stagedWrite.ts      The staged multi-file write migrate and rename share (MCP
+                        holds a copy, paired in parity.manifest.json)
 tests/
   cli.test.ts           Scaffolding tests
   commands/             Command-specific tests
@@ -61,7 +69,14 @@ npx tsc --noEmit            # type-check only
 ## Key Conventions
 
 - Each command is a separate module that registers itself on a
-  Commander program.
+  Commander program, and is loaded only when it runs. `cli.ts` reaches
+  every command through the `COMMANDS` table's dynamic `import()`, never
+  a static import, and the entry points (and `runCli`) register only the
+  command the first argument names, or all of them when it names none.
+  A new command is a new table entry; `tests/commandRouting.test.ts`
+  fails on a static import or a missing entry
+  (`docs/specs/cli-lazy-command-loading.spec.md`). A static import here
+  is what made `barwise validate` load all eighteen commands (barwise-8nx).
 - Commands read `.orm.yaml` files via the shared `loadModel()` helper.
 - Output goes to stdout by default. `--output` writes to a file.
 - `--format json` is available on most commands for machine-readable
@@ -178,14 +193,14 @@ npx tsc --noEmit            # type-check only
 
 ## Dependencies
 
-| Direction | Package                  | What is used                                                       |
-| --------- | ------------------------ | ------------------------------------------------------------------ |
-| Upstream  | `@barwise/core`          | Model, validation, verbalization, mapping, diff, query, describe   |
-| Upstream  | `@barwise/diagram`       | Diagram layout for SVG output                                      |
-| Upstream  | `@barwise/diagram-ui`    | Headless SVG rendering of the positioned graph                     |
-| Upstream  | `@barwise/llm`           | `processTranscript`, `reviewModel`, `createLlmClient`, providers   |
-| Upstream  | `@barwise/code-analysis` | `registerCodeFormats` for TypeScript/Java/Kotlin import            |
-| Upstream  | `@barwise/dbt`           | `registerDbtFormats` for dbt import/export                         |
-| Upstream  | `@barwise/formats`       | `registerStandardFormats` (DDL/OpenAPI/Avro/NORMA/SQL descriptors) |
-| Upstream  | `@barwise/learn`         | Modeling gym (exercise catalog, evaluator, miss cards)             |
-| Upstream  | `@barwise/promptlab`     | Eval suite, scorer, runner, score history for `barwise prompt`     |
+| Direction | Package                  | What is used                                                             |
+| --------- | ------------------------ | ------------------------------------------------------------------------ |
+| Upstream  | `@barwise/core`          | Model, validation, verbalization, mapping, diff, query, describe         |
+| Upstream  | `@barwise/diagram`       | Diagram layout for SVG output                                            |
+| Upstream  | `@barwise/diagram-ui`    | Headless SVG rendering of the positioned graph                           |
+| Upstream  | `@barwise/llm`           | `processTranscript`, `reviewModel`, `createLlmClient`, providers         |
+| Upstream  | `@barwise/code-analysis` | `registerCodeFormats` for TypeScript/Java/Kotlin import                  |
+| Upstream  | `@barwise/dbt`           | `registerDbtFormats` for dbt import/export                               |
+| Upstream  | `@barwise/formats`       | `registerStandardFormats` (DDL/OpenAPI/Avro/NORMA/SQL/Ossie descriptors) |
+| Upstream  | `@barwise/learn`         | Modeling gym (exercise catalog, evaluator, miss cards)                   |
+| Upstream  | `@barwise/promptlab`     | Eval suite, scorer, runner, score history for `barwise prompt`           |

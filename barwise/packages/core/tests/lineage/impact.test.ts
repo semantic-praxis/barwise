@@ -7,7 +7,7 @@ describe("Impact Analysis", () => {
     const customerEntityId = "entity-customer-123";
 
     const manifest: LineageManifest = {
-      version: 1,
+      version: 2,
       sourceModel: "test.orm.yaml",
       sourceModelHash: "abc123",
       exports: [
@@ -83,7 +83,7 @@ describe("Impact Analysis", () => {
     const unusedElementId = "entity-unused-999";
 
     const manifest: LineageManifest = {
-      version: 1,
+      version: 2,
       sourceModel: "test.orm.yaml",
       sourceModelHash: "abc123",
       exports: [
@@ -124,7 +124,7 @@ describe("Impact Analysis", () => {
     const roleId = "role-1";
 
     const manifest: LineageManifest = {
-      version: 1,
+      version: 2,
       sourceModel: "test.orm.yaml",
       sourceModelHash: "abc123",
       exports: [
@@ -222,7 +222,7 @@ describe("Impact Analysis", () => {
   it("describes a SubtypeFact relationship, and falls back generically for an unknown element type", () => {
     const subtypeFactId = "sf-adult-person";
     const manifest: LineageManifest = {
-      version: 1,
+      version: 2,
       sourceModel: "test.orm.yaml",
       sourceModelHash: "abc123",
       exports: [
@@ -269,7 +269,7 @@ describe("Impact Analysis", () => {
     const elementId = "entity-customer-123";
 
     const manifest: LineageManifest = {
-      version: 1,
+      version: 2,
       sourceModel: "test.orm.yaml",
       sourceModelHash: "abc123",
       exports: [

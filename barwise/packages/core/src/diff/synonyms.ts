@@ -6,6 +6,7 @@ import { referenceModeOf, valueConstraintOf } from "../model/ObjectType.js";
 import type { OrmModel } from "../model/OrmModel.js";
 import type { FactTypeDelta, ModelDelta, ObjectTypeDelta, SynonymCandidate } from "./deltas.js";
 import { playerName } from "./elementDiff.js";
+import type { DiffIdentity } from "./identity.js";
 
 /**
  * Extract the reference mode suffix: the part after stripping the
@@ -50,6 +51,7 @@ export function detectSynonymCandidates(
   deltas: readonly ModelDelta[],
   existingModel: OrmModel,
   incomingModel: OrmModel,
+  identity: DiffIdentity,
 ): SynonymCandidate[] {
   const candidates: SynonymCandidate[] = [];
 
@@ -141,9 +143,13 @@ export function detectSynonymCandidates(
       let allCorrespond = true;
       const reasons: string[] = [];
       for (let i = 0; i < rFt.arity; i++) {
+        // The same player by identity corresponds, renamed or not.
+        if (
+          identity.objectTypeKey(existingModel, rFt.roles[i]!.playerId)
+            === identity.objectTypeKey(incomingModel, aFt.roles[i]!.playerId)
+        ) continue;
         const rPlayerName = playerName(existingModel, rFt.roles[i]!.playerId, incomingModel);
         const aPlayerName = playerName(incomingModel, aFt.roles[i]!.playerId, existingModel);
-        if (rPlayerName === aPlayerName) continue;
         // Check if they are an OT synonym pair.
         if (otSynonymPairs.has(`${rPlayerName}::${aPlayerName}`)) continue;
         allCorrespond = false;

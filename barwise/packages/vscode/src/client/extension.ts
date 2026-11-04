@@ -1,10 +1,4 @@
-import {
-  createUuidv7Generator,
-  isScopedView,
-  OrmYamlSerializer,
-  setIdGenerator,
-} from "@barwise/core";
-import { randomBytes } from "node:crypto";
+import { isScopedView, OrmYamlSerializer } from "@barwise/core";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as vscode from "vscode";
@@ -31,8 +25,6 @@ import { ModelTreeProvider } from "../sidebar/ModelTreeProvider.js";
 let client: LanguageClient;
 
 export function activate(context: vscode.ExtensionContext): void {
-  setIdGenerator(createUuidv7Generator({ now: Date.now, randomBytes }));
-
   // Start language server.
   const serverModule = context.asAbsolutePath(
     path.join("dist", "server", "OrmLanguageServer.js"),

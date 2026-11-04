@@ -9,21 +9,27 @@ export {
   type EqualityConstraint,
   type ExclusionConstraint,
   type ExclusiveOrConstraint,
+  type ExternalConstraint,
   type ExternalUniquenessConstraint,
   type FrequencyConstraint,
+  type InternalConstraint,
   type InternalUniquenessConstraint,
   isCardinality,
   isDisjunctiveMandatory,
   isEquality,
   isExclusion,
   isExclusiveOr,
+  isExternalConstraint,
   isExternalUniqueness,
   isFrequency,
+  isInternalConstraint,
   isInternalUniqueness,
   isJoinEquality,
   isJoinExclusion,
+  isJoinRing,
   isJoinSubset,
   isMandatoryRole,
+  isOverSubtypes,
   isRing,
   isSubset,
   isValueComparison,
@@ -31,6 +37,7 @@ export {
   type JoinEqualityConstraint,
   type JoinExclusionConstraint,
   type JoinOperand,
+  type JoinRingConstraint,
   type JoinSubsetConstraint,
   type MandatoryRoleConstraint,
   objectTypeIdsOf,
@@ -39,13 +46,17 @@ export {
   type RingConstraint,
   type RingType,
   roleIdsOf,
+  type RoleOrSubtypeOperand,
   type RolePath,
   type RolePathStep,
   type SubsetConstraint,
+  subtypeFactIdsOf,
   type ValueComparisonConstraint,
   type ValueComparisonOperator,
   type ValueConstraint,
+  withoutSubtypeFacts,
 } from "./model/Constraint.js";
+export { constraintRef } from "./model/constraintRef.js";
 export {
   ContextMapping,
   type ContextMappingConfig,
@@ -79,15 +90,32 @@ export {
   type UnresolvedReference,
 } from "./model/graph.js";
 export {
-  createUuidv7Generator,
-  generateId,
-  type IdGenerator,
-  setIdGenerator,
-  uuidv7FromParts,
-  type Uuidv7Sources,
-} from "./model/id.js";
+  externalIdentifies,
+  externallyIdentifiedEntity,
+  type IdentifyingComponent,
+  identifyingFactTypes,
+  identifyingRoles,
+  type IdentifyingUniqueness,
+  type InternalIdentifyingUniqueness,
+  isIdentified,
+  isMandatoryAlone,
+  isUniqueAlone,
+  type PlacedFlags,
+  placePreferredFlags,
+  type PreferredIdentifierFailure,
+  type PreferredIdentifierResolution,
+  type PreferredIdentifiers,
+  preferredIdentifiers,
+  preferredIdentifyingBinary,
+  resolvePreferredIdentifier,
+  storePreferredFlags,
+} from "./model/identification.js";
+export { type Mintable, mintedName } from "./model/mint.js";
 export { ModelElement } from "./model/ModelElement.js";
+export { localName, ROLE_ID_PATTERN } from "./model/name.js";
+export { aliasOf, type DomainRef, iriOf, namespaceOf, ownerContextOf } from "./model/namespace.js";
 export {
+  objectificationRef,
   ObjectifiedFactType,
   type ObjectifiedFactTypeConfig,
 } from "./model/ObjectifiedFactType.js";
@@ -111,7 +139,14 @@ export {
   type ValueRange,
   type ValueType,
 } from "./model/ObjectType.js";
-export { OrmModel, type OrmModelConfig } from "./model/OrmModel.js";
+export {
+  type ConstraintInView,
+  DuplicateIdError,
+  type IdKeyedKind,
+  type IdKind,
+  OrmModel,
+  type OrmModelConfig,
+} from "./model/OrmModel.js";
 export {
   type ExportFormat,
   OrmProject,
@@ -126,10 +161,17 @@ export {
   type PopulationConfig,
 } from "./model/Population.js";
 export { type ProductConfig, ProductDependency } from "./model/ProductDependency.js";
-export { expandReading, type ReadingOrder, validateReadingTemplate } from "./model/ReadingOrder.js";
+export {
+  expandReading,
+  type ReadingOrder,
+  type ReadingPart,
+  type SplitReading,
+  splitReading,
+  validateReadingTemplate,
+} from "./model/ReadingOrder.js";
 export { Role, type RoleConfig } from "./model/Role.js";
 export { SemanticConflict, type SemanticConflictConfig } from "./model/SemanticConflict.js";
-export { SubtypeFact, type SubtypeFactConfig } from "./model/SubtypeFact.js";
+export { SubtypeFact, type SubtypeFactConfig, subtypeFactRef } from "./model/SubtypeFact.js";
 export { assertNever } from "./util/assertNever.js";
 
 // Serialization
@@ -146,11 +188,21 @@ export {
   splitModel,
   type SplitResult,
 } from "./project/index.js";
+export { canonicalJson, derivedId } from "./serialization/derivedId.js";
 export {
+  CURRENT_MAPPING_FORMAT_VERSION,
   MappingDeserializationError,
   MappingSerializer,
 } from "./serialization/MappingSerializer.js";
-export { DeserializationError, OrmYamlSerializer } from "./serialization/OrmYamlSerializer.js";
+export {
+  DeserializationError,
+  type MigrationNote,
+  type MigrationResult,
+  OrmYamlSerializer,
+  readDocument20,
+  writeDocument,
+  writeDocument40,
+} from "./serialization/OrmYamlSerializer.js";
 export {
   assembleProject,
   type LoadedProject,
@@ -160,15 +212,23 @@ export {
   ProjectLoadError,
 } from "./serialization/projectAssembly.js";
 export {
+  CURRENT_PROJECT_FORMAT_VERSION,
   ProjectDeserializationError,
   ProjectSerializer,
 } from "./serialization/ProjectSerializer.js";
+export { type ReplayedIds, replayIds, type ReplayOptions } from "./serialization/replay.js";
 export {
   type SchemaError,
   type SchemaValidationResult,
   SchemaValidator,
 } from "./serialization/SchemaValidator.js";
 export { CURRENT_ORM_VERSION, type OrmVersionMigration } from "./serialization/schemaVersion.js";
+export { type StoredId, storeIds, type StoreIdsResult } from "./serialization/storeIds.js";
+export {
+  type FlaggedSubtypeFact,
+  subtypeConstraintsFromFlags,
+  subtypeFlagsFromConstraints,
+} from "./serialization/subtypeFlags.js";
 
 // Validation
 export {
@@ -217,5 +277,7 @@ export {
   listFormats,
   listImporters,
   registerFormat,
+  surrogateKeyFormats,
+  surrogateKeysRefusal,
 } from "./format/registry.js";
 export type { FormatDescriptor } from "./format/types.js";

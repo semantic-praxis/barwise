@@ -1,5 +1,5 @@
 -- Table: room
--- Source: Room (ot-room)
+-- Source: Room (Room)
 -- TODO(barwise): No model description. Add a definition to the entity type.
 -- barwise:v1 {"kind":"table","table":"room","entity":"Room","referenceMode":"room_id","supertypes":[]}
 CREATE TABLE room (
@@ -20,7 +20,7 @@ CREATE TABLE room (
 );
 
 -- Table: building
--- Source: Building (ot-building)
+-- Source: Building (Building)
 -- TODO(barwise): No model description. Add a definition to the entity type.
 -- barwise:v1 {"kind":"table","table":"building","entity":"Building","referenceMode":"building_code","supertypes":[]}
 CREATE TABLE building (

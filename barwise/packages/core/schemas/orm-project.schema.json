@@ -7,6 +7,11 @@
   "required": ["project"],
   "additionalProperties": false,
   "properties": {
+    "format_version": {
+      "type": "string",
+      "const": "1.0",
+      "description": "Format version of this project file. Optional: a file without it was written before project files were versioned and is read as 1.0. Must be \"1.0\" for this schema revision."
+    },
     "project": {
       "type": "object",
       "required": ["name"],
@@ -16,6 +21,11 @@
           "type": "string",
           "minLength": 1,
           "description": "The name of the project."
+        },
+        "iri_base": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9+.-]*:\\S*/$",
+          "description": "The absolute IRI every domain namespace starts with: the base and the project's own segments (e.g. https://data.acme.com/acme/), ending in /. A domain's namespace is this, its context name, and /. The project name is not part of it."
         },
         "domains": {
           "type": "array",

@@ -1,12 +1,11 @@
 import type { Complete } from "../util/complete.js";
 import type { DerivationRule } from "./FactType.js";
-import { ModelElement } from "./ModelElement.js";
 
 /**
  * Configuration for creating a new SubtypeFact.
  */
 export interface SubtypeFactConfig {
-  /** Optional stable identifier. Generated if omitted. */
+  /** Optional stable identifier. In a model, its minted name if omitted; standalone, none. */
   readonly id?: string;
   /** The id of the subtype (child) entity type. */
   readonly subtypeId: string;
@@ -19,25 +18,6 @@ export interface SubtypeFactConfig {
    * supertype's PK in relational mapping.
    */
   readonly providesIdentification?: boolean;
-  /**
-   * Whether the subtypes of this supertype are mutually exclusive.
-   * When true, no supertype instance can simultaneously be an instance
-   * of more than one subtype in the same partition group (all
-   * SubtypeFacts sharing the same supertype with isExclusive=true).
-   *
-   * In ORM 2 notation this corresponds to an exclusion constraint
-   * across the supertype meta-roles of the subtype partition.
-   */
-  readonly isExclusive?: boolean;
-  /**
-   * Whether the subtypes of this supertype are exhaustive (cover
-   * all instances). When true, every supertype instance must be an
-   * instance of at least one subtype in the same partition group.
-   *
-   * In ORM 2 notation this corresponds to a disjunctive mandatory
-   * constraint across the supertype meta-roles of the subtype partition.
-   */
-  readonly isExhaustive?: boolean;
   /**
    * Defining rule when this subtype's membership is determined by a
    * derivation rule (Halpin's subtype-defining rules) rather than asserted.
@@ -61,26 +41,23 @@ export interface SubtypeFactConfig {
  * is absorbed into the supertype's table or gets its own table with
  * a FK back to the supertype.
  */
-export class SubtypeFact extends ModelElement {
+export class SubtypeFact {
+  /**
+   * Its id, or none: a subtype fact the model could not name, because the
+   * ends its sentence reads do not resolve, is left unnamed rather than
+   * given a generated id (iri-identity, decision 19).
+   */
+  readonly id: string | undefined;
   readonly subtypeId: string;
   readonly supertypeId: string;
   readonly providesIdentification: boolean;
-  readonly isExclusive: boolean;
-  readonly isExhaustive: boolean;
   readonly definingRule: DerivationRule | undefined;
 
   constructor(config: SubtypeFactConfig) {
-    // Name is derived from the relationship for display purposes.
-    // The actual subtype/supertype names are resolved by the model.
-    super(
-      `subtype:${config.subtypeId}:${config.supertypeId}`,
-      config.id,
-    );
+    this.id = config.id;
     this.subtypeId = config.subtypeId;
     this.supertypeId = config.supertypeId;
     this.providesIdentification = config.providesIdentification ?? true;
-    this.isExclusive = config.isExclusive ?? false;
-    this.isExhaustive = config.isExhaustive ?? false;
     this.definingRule = config.definingRule;
 
     if (config.subtypeId === config.supertypeId) {
@@ -89,6 +66,35 @@ export class SubtypeFact extends ModelElement {
       );
     }
   }
+}
+
+/**
+ * What makes two subtype facts the same relationship: the subtype and
+ * the supertype they relate. One key, read by `OrmModel.addSubtypeFact`
+ * when it refuses a repeat and by `structural/duplicate-subtype-fact`
+ * when it reports one a lenient load let through, so the store and the
+ * rule cannot disagree about what a repeat is.
+ */
+export function subtypePairKey(
+  sf: { readonly subtypeId: string; readonly supertypeId: string; },
+): string {
+  return `${sf.subtypeId}\u0000${sf.supertypeId}`;
+}
+
+/**
+ * How a subtype fact is referred to where a string is needed -- a
+ * diagnostic, a verbalization, a diagram view: its id, or for one the model
+ * left unnamed (decision 19) a fixed reference built from what it relates.
+ * No 4.0 id can take that form: a local name holds no `<`.
+ */
+export function subtypeFactRef(
+  sf: {
+    readonly id: string | undefined;
+    readonly subtypeId: string;
+    readonly supertypeId: string;
+  },
+): string {
+  return sf.id ?? `unnamed:${sf.subtypeId}<${sf.supertypeId}`;
 }
 
 /**
@@ -106,8 +112,6 @@ export function toSubtypeFactConfig(sf: SubtypeFact): SubtypeFactConfig {
     subtypeId: sf.subtypeId,
     supertypeId: sf.supertypeId,
     providesIdentification: sf.providesIdentification,
-    isExclusive: sf.isExclusive,
-    isExhaustive: sf.isExhaustive,
     definingRule: sf.definingRule,
   };
   return config;

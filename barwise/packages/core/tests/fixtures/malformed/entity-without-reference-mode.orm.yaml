@@ -1,0 +1,7 @@
+orm_version: "2.0"
+model:
+  name: Malformed
+  object_types:
+    - id: ot-customer
+      name: Customer
+      kind: entity

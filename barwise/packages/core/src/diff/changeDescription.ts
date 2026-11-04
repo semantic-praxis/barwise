@@ -62,10 +62,21 @@ export interface RoleSummary {
  * consumer would need and could not recover.
  */
 export type ChangeDescription =
+  // --- Object types and fact types, paired by id (model-invariants) ---
+  | { readonly change: "name"; readonly from: string; readonly to: string; }
   // --- Object types ---
   | { readonly change: "kind"; readonly from: ObjectTypeKind; readonly to: ObjectTypeKind; }
   | { readonly change: "referenceMode"; readonly from?: string; readonly to?: string; }
+  | { readonly change: "preferredIdentifier"; readonly from?: string; readonly to?: string; }
   | { readonly change: "sourceContext"; readonly from?: string; readonly to?: string; }
+  // --- The model header (iri-identity WS6) ---
+  | { readonly change: "namespace"; readonly from?: string; readonly to?: string; }
+  | {
+    readonly change: "importBinding";
+    readonly alias: string;
+    readonly from?: string;
+    readonly to?: string;
+  }
   | {
     readonly change: "valueConstraint";
     readonly from?: ValueConstraintDef;
@@ -115,6 +126,12 @@ export type ChangeDescription =
   // told a consumer nothing about which roles the constraint covered.
   | { readonly change: "constraintsAdded"; readonly constraints: readonly Constraint[]; }
   | { readonly change: "constraintsRemoved"; readonly constraints: readonly Constraint[]; }
+  // A constraint paired by id whose content changed (orm-format-3, Open
+  // decision 4): both versions, so a consumer can see what moved.
+  | {
+    readonly change: "constraintsModified";
+    readonly constraints: readonly { readonly from: Constraint; readonly to: Constraint; }[];
+  }
   | {
     readonly change: "derivation";
     readonly from?: DerivationRule;
@@ -134,8 +151,6 @@ export type ChangeDescription =
     readonly from: boolean;
     readonly to: boolean;
   }
-  | { readonly change: "subtypeExclusive"; readonly from: boolean; readonly to: boolean; }
-  | { readonly change: "subtypeExhaustive"; readonly from: boolean; readonly to: boolean; }
   | {
     readonly change: "definingRule";
     readonly from?: DerivationRule;
@@ -200,12 +215,20 @@ const NONE = "(none)";
  */
 export function describeChange(change: ChangeDescription): string {
   switch (change.change) {
+    case "name":
+      return `name: "${change.from}" -> "${change.to}"`;
     case "kind":
       return `kind: ${change.from} -> ${change.to}`;
     case "referenceMode":
       return `reference mode: "${change.from ?? NONE}" -> "${change.to ?? NONE}"`;
+    case "preferredIdentifier":
+      return `preferred identifier: ${change.from ?? NONE} -> ${change.to ?? NONE}`;
     case "sourceContext":
       return `source context: "${change.from ?? NONE}" -> "${change.to ?? NONE}"`;
+    case "namespace":
+      return `namespace: "${change.from ?? NONE}" -> "${change.to ?? NONE}"`;
+    case "importBinding":
+      return `import "${change.alias}": "${change.from ?? NONE}" -> "${change.to ?? NONE}"`;
     case "valueConstraint":
       return "value constraint changed";
     case "cardinality":
@@ -234,6 +257,17 @@ export function describeChange(change: ChangeDescription): string {
       return `constraints added: ${constraintTypes(change.constraints)}`;
     case "constraintsRemoved":
       return `constraints removed: ${constraintTypes(change.constraints)}`;
+    case "constraintsModified":
+      // A kind or modality that changed reads as both, so the prose does
+      // not hide that a mandatory became a frequency, or a necessity an
+      // obligation.
+      return `constraints modified: ${
+        distinctJoined(change.constraints.map((m) =>
+          kindName(m.from) === kindName(m.to)
+            ? kindName(m.to)
+            : `${kindName(m.from)} to ${kindName(m.to)}`
+        ))
+      }`;
     case "derivation":
       return "derivation changed";
     case "definition":
@@ -246,10 +280,6 @@ export function describeChange(change: ChangeDescription): string {
       return `context: "${change.from ?? NONE}" -> "${change.to ?? NONE}"`;
     case "providesIdentification":
       return `provides identification: ${change.from} -> ${change.to}`;
-    case "subtypeExclusive":
-      return `exclusive: ${change.from} -> ${change.to}`;
-    case "subtypeExhaustive":
-      return `exhaustive: ${change.from} -> ${change.to}`;
     case "definingRule":
       return "defining rule changed";
     case "populationDescription":
@@ -275,9 +305,19 @@ function describeInstanceChange(added: number, removed: number): string {
   return "instances reordered";
 }
 
-/** The deduplicated constraint type names, in first-seen order. */
+/** The distinct strings, in first-seen order, comma-joined. */
+function distinctJoined(names: readonly string[]): string {
+  return [...new Set(names)].join(", ");
+}
+
+/** A constraint's kind, with its modality when it is deontic. */
+function kindName(c: Constraint): string {
+  return c.modality === "deontic" ? `${c.type} (deontic)` : c.type;
+}
+
+/** The deduplicated constraint kinds, with modality, in first-seen order. */
 function constraintTypes(constraints: readonly Constraint[]): string {
-  return [...new Set(constraints.map((c) => c.type))].join(", ");
+  return distinctJoined(constraints.map(kindName));
 }
 
 /** Format a DataTypeDef for human-readable diff output. */

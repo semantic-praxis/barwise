@@ -6,7 +6,7 @@ import { registerCodeFormats } from "@barwise/code-analysis";
 import { getImporter, listImporters, OrmYamlSerializer } from "@barwise/core";
 import { SQL_DIALECTS } from "@barwise/core/sql";
 import { registerDbtFormats } from "@barwise/dbt";
-import { registerStandardFormats } from "@barwise/formats";
+import { OSSIE_VERSION, registerStandardFormats } from "@barwise/formats";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { readSource } from "../workspace/resolve.js";
@@ -27,7 +27,7 @@ export function registerImportModelTool(server: McpServer): void {
       title: "Import Model",
       description: "Import an ORM model from a structured format. "
         + "Performs deterministic parsing to produce a draft ORM model. "
-        + "For text formats (ddl, openapi, norma, sql), prefer passing a file path over inline content "
+        + "For text formats (ddl, openapi, norma, ossie, sql), prefer passing a file path over inline content "
         + "(especially for large files like NORMA .orm XML). "
         + "For directory formats (dbt, typescript, java, kotlin), source is a directory path. "
         + "The sql format also supports directory paths for analyzing multiple SQL files.",
@@ -48,6 +48,7 @@ export function registerImportModelTool(server: McpServer): void {
           .describe(
             "Format of the source: 'ddl' for SQL DDL, 'openapi' for OpenAPI 3.x specs, "
               + "'norma' for NORMA .orm XML files, "
+              + `'ossie' for an Apache Ossie ontology document (YAML, version ${OSSIE_VERSION}), `
               + "'dbt' for dbt project directory, 'sql' for raw SQL files/directories, "
               + "'typescript' for TypeScript project directory, 'java' for Java project directory, "
               + "'kotlin' for Kotlin project directory",

@@ -2,7 +2,16 @@ import {
   IDENTIFICATION_SOURCE_LABEL,
   type IdentificationSource,
   identificationSources,
+  identifyingFactTypes,
+  identifyingRoles,
+  isIdentified,
+  isMandatoryAlone,
+  type PreferredIdentifierResolution,
+  type PreferredIdentifiers,
+  preferredIdentifiers,
+  resolvePreferredIdentifier,
 } from "../../model/identification.js";
+import type { ObjectType } from "../../model/ObjectType.js";
 import type { OrmModel } from "../../model/OrmModel.js";
 import type { Diagnostic } from "../Diagnostic.js";
 import { report, RULE_ID } from "../ruleId.js";
@@ -19,6 +28,7 @@ import { report, RULE_ID } from "../ruleId.js";
  * - Value types without a declared data type.
  * - Entity types with zero or multiple preferred identifiers.
  * - Object types that declare their identity in more than one way.
+ * - Entity types whose identifier rests on a role that is not mandatory.
  */
 export function completenessWarnings(model: OrmModel): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
@@ -28,8 +38,12 @@ export function completenessWarnings(model: OrmModel): Diagnostic[] {
   diagnostics.push(...checkFactTypesWithoutUniqueness(model));
   diagnostics.push(...checkIsolatedObjectTypes(model));
   diagnostics.push(...checkMissingValueTypeDataType(model));
-  diagnostics.push(...checkPreferredIdentifiers(model));
-  diagnostics.push(...checkConflictingIdentification(model));
+  // Resolved once: each identification check reads the same answer, and
+  // resolving it walks every stored reference.
+  const identifiers = preferredIdentifiers(model);
+  diagnostics.push(...checkPreferredIdentifiers(model, identifiers));
+  diagnostics.push(...checkConflictingIdentification(model, identifiers));
+  diagnostics.push(...checkOptionalIdentifierRoles(model, identifiers));
   diagnostics.push(...checkFrequencyWithoutEffect(model));
 
   return diagnostics;
@@ -54,13 +68,15 @@ function checkMissingObjectTypeDefinitions(model: OrmModel): Diagnostic[] {
 
 /**
  * Fact types without constraints usually indicate the modeler hasn't
- * finished specifying business rules for that relationship.
+ * finished specifying business rules for that relationship. A constraint
+ * across fact types counts for every fact type it touches, and for no
+ * other -- not for the one a 2.0 file happened to nest it under.
  */
 function checkFactTypesWithoutConstraints(model: OrmModel): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
 
   for (const ft of model.factTypes) {
-    if (ft.constraints.length === 0) {
+    if (model.constraintsTouching(ft.id).length === 0) {
       diagnostics.push(report(RULE_ID.factTypeWithoutConstraints, "default", ft.id, ft.name));
     }
   }
@@ -117,8 +133,8 @@ function checkFactTypesWithoutUniqueness(model: OrmModel): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
 
   for (const ft of model.factTypes) {
-    if (ft.arity < 2 || ft.constraints.length === 0) continue;
-    const hasUniqueness = ft.constraints.some(
+    if (ft.arity < 2 || model.constraintsTouching(ft.id).length === 0) continue;
+    const hasUniqueness = ft.internalConstraints.some(
       (c) => c.type === "internal_uniqueness",
     );
     if (!hasUniqueness) {
@@ -130,76 +146,144 @@ function checkFactTypesWithoutUniqueness(model: OrmModel): Diagnostic[] {
 }
 
 /**
- * Each entity type should have exactly one preferred identifier
- * (an internal uniqueness constraint with isPreferred = true on one
- * of its identifying fact types). Zero means the relational mapper
- * must guess; more than one is contradictory.
+ * Each entity type should have exactly one preferred identifier. Zero
+ * means the relational mapper must guess; more than one is contradictory.
  *
- * What counts as identified is `identificationSources`, not a second
- * enumeration written here. It was one, and it knew about a preferred
- * uniqueness constraint and an identifying subtype fact but not about
- * objectification -- so 25 objectified entity types across this
- * repository were told the mapper must guess their key, while
- * `settleObjectifiedKey` was building it from the absorbed columns and
- * `identificationGraph` was treating the objectification as an
- * identifying edge (barwise-972). An entity that objectifies a fact
- * type is identified BY that fact type; that is what objectification
- * means.
+ * Both halves read core's answers rather than an enumeration written
+ * here (orm-format-3 WS4a). Whether the entity is identified is
+ * `isIdentified` -- an identifying uniqueness, an objectification, or an
+ * identifying subtype of an identified supertype -- the same question the
+ * query anchors, the annotator and NORMA export ask. A second enumeration
+ * here once left 25 objectified entity types reported as unidentified
+ * while the mapper keyed them by their objectification (barwise-972), and
+ * once counted any flag on a fact type the entity played as its own.
  *
- * `checkConflictingIdentification`, twenty lines down this same file,
- * was already reading the shared owner. Two rules in one file
- * disagreeing about what identifies an entity is the shape the
- * duplication rule exists to catch.
- *
- * The MULTIPLE arm still counts preferred uniqueness alone. Objectifying
- * a fact type and also carrying a reference scheme is ordinary ORM --
- * "Review has ReviewId" on a Review that objectifies "Reviewer reviews
- * Paper" -- so counting other kinds here would charge good modelling,
- * which is the measurement recorded on `identificationSources` itself.
+ * The MULTIPLE arm counts the flags that name this entity
+ * (`identificationSources`, from `preferredIdentifiers`' candidates),
+ * before the tie-break that picks one, so resolving them cannot hide the
+ * error, and it runs first: two flags are what the modeller has to fix.
+ * It counts preferred uniqueness alone. Objectifying a fact type and also
+ * carrying a reference scheme is ordinary ORM -- "Review has ReviewId" on a
+ * Review that objectifies "Reviewer reviews Paper" -- so counting other
+ * kinds here would charge good modelling, which is the measurement
+ * recorded on `identificationSources` itself.
  */
-function checkPreferredIdentifiers(model: OrmModel): Diagnostic[] {
+function checkPreferredIdentifiers(
+  model: OrmModel,
+  identifiers: PreferredIdentifiers,
+): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
 
-  const sourcesOf = new Map<string, readonly IdentificationSource[]>();
   for (const ot of model.objectTypes) {
     if (ot.kind !== "entity") continue;
-    sourcesOf.set(ot.id, identificationSources(model, ot));
-  }
-  const countOf = (id: string, kind: IdentificationSource["kind"]): number =>
-    (sourcesOf.get(id) ?? []).filter((s) => s.kind === kind).length;
-
-  /**
-   * Is this entity identified, directly or through its subtype chain?
-   *
-   * The subtype arm recurses because `identificationSources` reports an
-   * identifying subtype fact without asking whether the SUPERTYPE is
-   * itself identified -- inheriting from an unidentified parent
-   * identifies nothing.
-   */
-  const isIdentified = (id: string, seen: Set<string>): boolean => {
-    if (seen.has(id)) return false; // subtype cycle: structural rule reports it
-    seen.add(id);
-    const sources = sourcesOf.get(id) ?? [];
-    if (sources.some((s) => s.kind !== "identifying-subtype")) return true;
-    return sources.some(
-      (s) => s.kind === "identifying-subtype" && isIdentified(s.supertypeId, seen),
-    );
-  };
-
-  for (const ot of model.objectTypes) {
-    if (ot.kind !== "entity") continue;
-    const preferredCount = countOf(ot.id, "preferred-uniqueness");
-
-    if (preferredCount === 0 && !isIdentified(ot.id, new Set())) {
-      diagnostics.push(report(RULE_ID.missingPreferredIdentifier, "default", ot.id, ot.name));
-    } else if (preferredCount > 1) {
+    // A stored reference that identifies nothing is an error, reported
+    // once, and the entity is not also called unidentified for it: the
+    // fix is to the reference.
+    const resolved = resolvePreferredIdentifier(model, ot.id);
+    if (!resolved.ok && resolved.reason !== "none") {
+      const constraintId = model.preferredIdentifierOf(ot.id)!;
+      const named = model.getConstraint(constraintId);
+      const external = externalShapeDiagnostic(model, resolved, ot, constraintId);
+      if (external) {
+        diagnostics.push(external);
+        continue;
+      }
       diagnostics.push(
-        report(RULE_ID.multiplePreferredIdentifiers, "default", ot.id, ot.name, preferredCount),
+        resolved.reason === "dangling"
+          ? report(RULE_ID.preferredIdentifierInvalid, "dangling", ot.id, ot.name, constraintId)
+          : resolved.reason === "not-uniqueness"
+          ? report(
+            RULE_ID.preferredIdentifierInvalid,
+            "notUniqueness",
+            ot.id,
+            ot.name,
+            constraintId,
+            named?.type ?? "",
+          )
+          : report(
+            RULE_ID.preferredIdentifierInvalid,
+            "notThisEntity",
+            ot.id,
+            ot.name,
+            constraintId,
+          ),
       );
+    } else if (!isIdentified(model, ot.id, identifiers)) {
+      diagnostics.push(report(RULE_ID.missingPreferredIdentifier, "default", ot.id, ot.name));
     }
   }
 
   return diagnostics;
+}
+
+/**
+ * An identifier some instances may lack does not identify them: ORM requires
+ * a reference scheme's roles to be mandatory, and nothing checked it
+ * (identifier-roles-mandatory.spec.md). For the entity-value binary and an
+ * external scheme the mapper makes those columns the primary key, so the
+ * schema states the rule the model omits; for the other shapes the scheme
+ * is incomplete all the same, so the rule does not ask what the mapper does.
+ *
+ * Reads `preferredIdentifiers`, so an unresolved reference -- which
+ * `preferred-identifier-invalid` reports -- is not checked here as well.
+ */
+function checkOptionalIdentifierRoles(
+  model: OrmModel,
+  identifiers: PreferredIdentifiers,
+): Diagnostic[] {
+  const diagnostics: Diagnostic[] = [];
+  for (const [entityId, at] of identifiers.byEntity) {
+    const optional = identifyingRoles(at).filter(
+      ({ factType, role }) => !isMandatoryAlone(factType, role.id),
+    );
+    if (optional.length === 0) continue;
+    const ot = model.getObjectType(entityId)!;
+    diagnostics.push(
+      report(
+        RULE_ID.preferredIdentifierOptional,
+        "default",
+        ot.id,
+        ot.name,
+        quotedList(identifyingFactTypes(at).map((ft) => ft.name)),
+        quotedList(optional.map(({ factType }) => factType.name)),
+        optional.length > 1 ? "plural" : "singular",
+      ),
+    );
+  }
+  return diagnostics;
+}
+
+/** `"A"`, `"A" and "B"`, `"A", "B" and "C"`. */
+function quotedList(names: readonly string[]): string {
+  const quoted = names.map((n) => `"${n}"`);
+  return quoted.length < 2
+    ? quoted.join("")
+    : `${quoted.slice(0, -1).join(", ")} and ${quoted.at(-1)}`;
+}
+
+/** The diagnostic for an external uniqueness that fails a shape rule, if that is the reason. */
+function externalShapeDiagnostic(
+  model: OrmModel,
+  failure: Extract<PreferredIdentifierResolution, { ok: false; }>,
+  ot: ObjectType,
+  constraintId: string,
+): Diagnostic | undefined {
+  const rule = RULE_ID.preferredIdentifierInvalid;
+  switch (failure.reason) {
+    case "external-no-common-object":
+      return report(rule, "externalNoCommonObject", ot.id, ot.name, constraintId);
+    case "external-other-entity": {
+      const joined = failure.identifies;
+      const name = joined === undefined ? "" : model.getObjectType(joined)?.name ?? joined;
+      return report(rule, "externalOtherEntity", ot.id, ot.name, constraintId, name);
+    }
+    case "external-not-binary":
+      return report(rule, "externalNotBinary", ot.id, ot.name, constraintId);
+    case "external-near-not-unique":
+      return report(rule, "externalNearNotUnique", ot.id, ot.name, constraintId);
+    default:
+      return undefined;
+  }
 }
 
 /**
@@ -232,12 +316,15 @@ function checkPreferredIdentifiers(model: OrmModel): Diagnostic[] {
  * charging them would have moved six of eight arms' scores for good
  * modelling.
  */
-function checkConflictingIdentification(model: OrmModel): Diagnostic[] {
+function checkConflictingIdentification(
+  model: OrmModel,
+  identifiers: PreferredIdentifiers,
+): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
 
   for (const ot of model.objectTypes) {
     const kinds = new Set<IdentificationSource["kind"]>(
-      identificationSources(model, ot).map((s) => s.kind),
+      identificationSources(model, ot, identifiers).map((s) => s.kind),
     );
     if (!kinds.has("identifying-subtype") || kinds.size < 2) continue;
 
@@ -288,7 +375,7 @@ function checkFrequencyWithoutEffect(model: OrmModel): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
 
   for (const ft of model.factTypes) {
-    for (const c of ft.constraints) {
+    for (const c of ft.internalConstraints) {
       if (c.type !== "frequency") continue;
       if (c.max === "unbounded" && c.min <= 1) {
         diagnostics.push(report(RULE_ID.frequencyWithoutEffect, "default", ft.id, ft.name, c.min));

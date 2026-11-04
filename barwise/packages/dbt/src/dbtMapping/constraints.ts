@@ -2,7 +2,7 @@
  * Pure constraint-building and dbt test helpers for dbt-to-ORM mapping.
  */
 
-import type { Constraint } from "@barwise/core";
+import type { InternalConstraint } from "@barwise/core";
 import type { ReportBuilder } from "../DbtImportReport.js";
 import type { DbtColumn, DbtTest } from "../DbtSchemaTypes.js";
 
@@ -16,8 +16,8 @@ export function buildConstraints(
   role2Id: string,
   report: ReportBuilder,
   modelName: string,
-): Constraint[] {
-  const constraints: Constraint[] = [];
+): InternalConstraint[] {
+  const constraints: InternalConstraint[] = [];
 
   // Entity has Value: uniqueness on role1 means each entity has at most one value.
   // This is the default for value-type attributes.

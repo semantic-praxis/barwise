@@ -67,8 +67,15 @@ describe("split_model tool", () => {
         d.sharedObjectTypes.map((s) => ({ in: d.context, ...s })),
     );
     expect(shared.length).toBeGreaterThan(0);
-    // A shared type is never owned by the domain that borrows it.
+    // A shared type is never owned by the domain that borrows it, nor
+    // counted among that domain's own types (a shadow is known by its id's
+    // alias, iri-identity 6d).
     for (const s of shared) expect(s.owner).not.toBe(s.in);
+    for (const d of out.domains) {
+      const own = new Set<string>(d.entityTypes);
+      const borrowed = d.sharedObjectTypes.map((s: { name: string; }) => s.name);
+      expect(borrowed.filter((n: string) => own.has(n)), d.context).toEqual([]);
+    }
   });
 
   it("writes a project that validate_model accepts", () => {

@@ -153,6 +153,8 @@ export interface NormaObjectifiedType {
   readonly id: NormaId;
   readonly name: string;
   readonly nestedFactTypeRef: NormaId; // ref to Fact id
+  /** The NestedPredicate element's own id, when the file gives it one. */
+  readonly nestedPredicateId?: NormaId;
   readonly referenceMode?: string;
   readonly preferredIdentifier?: string;
   readonly playedRoleRefs: readonly NormaId[];
@@ -444,4 +446,18 @@ export interface NormaRingConstraint {
   readonly modality?: NormaModality;
   readonly ringType: NormaRingType;
   readonly roleRefs: readonly NormaId[];
+  /**
+   * The ring's role sequence join path, when it has one: NORMA's
+   * `RingConstraintType` extends `SetConstraintWithJoinType`, so its one
+   * sequence may carry a `JoinRule`, and the ring is then over the relation
+   * that path projects (`docs/specs/join-ring-constraint.spec.md`, WS2).
+   */
+  readonly joinPath?: NormaJoinPath;
+  /**
+   * The sequence carries a `JoinRule` the parser could not read. Kept apart
+   * from "no join" because the flat ring over the same roles says something
+   * else: the set-comparison kinds fall back to their flat reading, and a
+   * ring must not.
+   */
+  readonly unreadableJoin?: true;
 }

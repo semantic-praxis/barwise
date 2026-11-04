@@ -1,0 +1,386 @@
+/**
+ * The Ossie export's read-back check
+ * (`docs/specs/ossie-export-verified-by-reimport.spec.md`, WS1): an element
+ * that comes back different with no loss line naming it gets one, and the
+ * writer's deliberate changes -- role order, names -- add none.
+ */
+import { type InternalConstraint, OrmModel } from "@barwise/core";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { OssieExportFormat } from "../src/ossie/OssieExportFormat.js";
+import { OssieImportFormat } from "../src/ossie/OssieImportFormat.js";
+
+const exporter = new OssieExportFormat();
+
+function losses(model: OrmModel): string[] {
+  const header = "# barwise: what this document could not carry from the model:";
+  return exporter.export(model).text.split("\n")
+    .filter((l) => l.startsWith("# barwise: ") && l !== header)
+    .map((l) => l.slice("# barwise: ".length));
+}
+
+/** The lines only the read-back adds: every one names how its element comes back. */
+const verified = (model: OrmModel) =>
+  losses(model).filter((l) => /: (comes back|does not come back)/.test(l));
+
+let seq = 0;
+let id = (tag: string) => `${tag}-${++seq}`;
+
+/** Person, identified by a PersonId it references, and a Name it has. */
+function people(opts: { nameMandatory?: InternalConstraint["modality"] | false; } = {}) {
+  const m = new OrmModel({ name: "M" });
+  const person = m.addObjectType({
+    id: id("ot"),
+    name: "Person",
+    kind: "entity",
+    referenceMode: "person_id",
+  });
+  const pid = m.addObjectType({
+    id: id("ot"),
+    name: "PersonId",
+    kind: "value",
+    dataType: { name: "integer" },
+  });
+  const name = m.addObjectType({
+    id: id("ot"),
+    name: "Name",
+    kind: "value",
+    dataType: { name: "text" },
+  });
+  const r = (playerId: string, roleName: string) => ({ id: id("r"), name: roleName, playerId });
+  const idRoles = [r(person.id, "Person"), r(pid.id, "PersonId")];
+  const pidUc = id("uc");
+  m.addFactType({
+    id: id("ft"),
+    name: "Person.person_id",
+    roles: idRoles,
+    readings: ["{0} has {1}"],
+    constraints: [
+      { type: "internal_uniqueness", id: id("uc"), roleIds: [idRoles[0]!.id] },
+      { type: "internal_uniqueness", id: pidUc, roleIds: [idRoles[1]!.id] },
+      { type: "mandatory", id: id("m"), roleId: idRoles[0]!.id },
+    ],
+  });
+  m.setPreferredIdentifier(person.id, pidUc);
+  const nameRoles = [r(person.id, "Person"), r(name.id, "Name")];
+  m.addFactType({
+    id: id("ft"),
+    name: "Person.name",
+    roles: nameRoles,
+    readings: ["{0} has {1}"],
+    constraints: [
+      { type: "internal_uniqueness", id: id("uc"), roleIds: [nameRoles[0]!.id] },
+      ...(opts.nameMandatory === false ? [] : [{
+        type: "mandatory" as const,
+        id: id("m"),
+        roleId: nameRoles[0]!.id,
+        ...(opts.nameMandatory ? { modality: opts.nameMandatory } : {}),
+      }]),
+    ],
+  });
+  return { m, person, name };
+}
+
+describe("Ossie export: the read-back check", () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it("names a deontic mandatory that comes back alethic", () => {
+    expect(verified(people({ nameMandatory: "deontic" }).m)).toEqual([
+      "Fact type: Person.name: comes back changed: constraints added: mandatory; constraints removed: mandatory (deontic)",
+    ]);
+    expect(verified(people({ nameMandatory: "alethic" }).m)).toEqual([]);
+    expect(verified(people().m)).toEqual([]);
+  });
+
+  it("names an entity that comes back with a preferred identifier the model does not store", () => {
+    const m = new OrmModel({ name: "M" });
+    const room = m.addObjectType({
+      id: id("ot"),
+      name: "Room",
+      kind: "entity",
+      referenceMode: "room_id",
+    });
+    const num = m.addObjectType({
+      id: id("ot"),
+      name: "RoomNumber",
+      kind: "value",
+      dataType: { name: "integer" },
+    });
+    const bld = m.addObjectType({
+      id: id("ot"),
+      name: "Building",
+      kind: "value",
+      dataType: { name: "text" },
+    });
+    const binary = (name: string, player: string) => {
+      const roles = [
+        { id: id("r"), name: "Room", playerId: room.id },
+        { id: id("r"), name: m.getObjectType(player)!.name, playerId: player },
+      ];
+      m.addFactType({
+        id: id("ft"),
+        name,
+        roles,
+        readings: ["{0} has {1}"],
+        constraints: [
+          { type: "internal_uniqueness", id: id("uc"), roleIds: [roles[0]!.id] },
+          { type: "mandatory", id: id("m"), roleId: roles[0]!.id },
+        ],
+      });
+      return roles[1]!.id;
+    };
+    m.addConstraint({
+      type: "external_uniqueness",
+      id: id("eu"),
+      roleIds: [binary("Room.number", num.id), binary("Room.building", bld.id)],
+    });
+    const lines = verified(m);
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toMatch(
+      /^Object type: Room: comes back changed: preferred identifier: \(none\) -> external/,
+    );
+  });
+
+  it("adds no line for a role order or names the writer changes on purpose", () => {
+    const { m: model, person, name } = people({ nameMandatory: false });
+    // Name first, Person second, uniqueness on Person: the writer moves
+    // Person first (rule 3), and renames the fact type and both roles.
+    const roles = [
+      { id: id("r"), name: "is of", playerId: name.id },
+      { id: id("r"), name: "has", playerId: person.id },
+    ];
+    model.addFactType({
+      id: id("ft"),
+      name: "Name is the nickname of Person",
+      roles,
+      readings: ["{0} is the nickname of {1}"],
+      constraints: [{ type: "internal_uniqueness", id: id("uc"), roleIds: [roles[1]!.id] }],
+    });
+    const text = exporter.export(model).text;
+    expect(text).toContain("name: name_is_the_nickname_of_person");
+    expect(verified(model)).toEqual([]);
+  });
+
+  it("adds no second line for an element the writer already names", () => {
+    const { m } = people();
+    m.addObjectType({ id: id("ot"), name: "Price", kind: "value", dataType: { name: "money" } });
+    const all = losses(m);
+    expect(all).toContain("Price: data type money written as Decimal");
+    expect(verified(m)).toEqual([]);
+  });
+
+  it("returns a document the importer refuses, with a line saying so", () => {
+    vi.spyOn(OssieImportFormat.prototype, "parse").mockImplementation(() => {
+      throw new Error("refused for the test");
+    });
+    const { m } = people();
+    const result = exporter.export(m);
+    expect(result.text).toContain("concept: Person");
+    expect(losses(m)).toContain("model: the document does not read back: refused for the test");
+  });
+
+  it("writes no id the read-back minted, and the same text twice", () => {
+    const { m } = people({ nameMandatory: "deontic" });
+    const minted: string[] = [];
+    const parse = OssieImportFormat.prototype.parse;
+    vi.spyOn(OssieImportFormat.prototype, "parse").mockImplementation(
+      function(this: OssieImportFormat, input, options) {
+        const result = parse.call(this, input, options);
+        const { model } = result;
+        minted.push(
+          ...model.objectTypes.map((o) => o.id),
+          ...model.factTypes.flatMap((f) => [
+            f.id,
+            ...f.roles.map((r) => r.id),
+            ...f.internalConstraints.map((c) => c.id!),
+          ]),
+          ...model.constraints.map((c) => c.id!),
+        );
+        return result;
+      },
+    );
+    const first = exporter.export(m).text;
+    expect(minted.length).toBeGreaterThan(0);
+    // The read-back's ids are local names now (iri-identity 6b-4b), so one
+    // can equal a name or an id the source holds, which the text may show.
+    // An id only the read-back holds must not reach the text.
+    const sourceWords = new Set([
+      ...m.objectTypes.flatMap((o) => [o.id, o.name]),
+      ...m.factTypes.flatMap((f) => [f.id, f.name, ...f.roles.flatMap((r) => [r.id, r.name])]),
+      ...m.everyConstraint().flatMap(([c]) => (c.id ? [c.id] : [])),
+    ]);
+    const own = minted.filter((id) => !sourceWords.has(id));
+    expect(own.length).toBeGreaterThan(0);
+    for (const mintedId of own) expect(first).not.toContain(mintedId);
+    expect(exporter.export(m).text).toBe(first);
+  });
+
+  it("keeps source ids YAML would read as another type, or as a mapping", () => {
+    const tags = ["1", "true", "a: b", "2", "null", "3", "4", "5", "6", "7", "8", "9", "10"];
+    const plain = id;
+    let next = 0;
+    id = () => tags[next++] ?? plain("x");
+    try {
+      const { m } = people({ nameMandatory: "deontic" });
+      expect(m.objectTypes.map((o) => o.id)).toEqual(["1", "true", "a: b"]);
+      expect(verified(m)).toEqual([
+        "Fact type: Person.name: comes back changed: constraints added: mandatory; constraints removed: mandatory (deontic)",
+      ]);
+    } finally {
+      id = plain;
+    }
+  });
+
+  it("keeps an importer message with a code frame on one comment line", () => {
+    vi.spyOn(OssieImportFormat.prototype, "parse").mockImplementation(() => {
+      throw new Error("Not a readable Ossie document: bad at line 5:\n\n    - id: x\n          ^");
+    });
+    const text = exporter.export(people().m).text;
+    expect(text).toContain(
+      "# barwise: model: the document does not read back: Not a readable Ossie document: bad at line 5: - id: x ^",
+    );
+    expect(text.split("\n").filter((l) => l.trim() === "^")).toEqual([]);
+  });
+
+  it("says an optional identifying role comes back mandatory, though the fact type has another line", () => {
+    // ossie-identifier-implies-mandatory.spec.md: the read-back check is
+    // silent on a fact type that already has a line, so the writer says it.
+    const m = new OrmModel({ name: "M" });
+    const person = m.addObjectType({
+      id: id("ot"),
+      name: "Person",
+      kind: "entity",
+      referenceMode: "person_id",
+    });
+    const pid = m.addObjectType({
+      id: id("ot"),
+      name: "PersonId",
+      kind: "value",
+      dataType: { name: "integer" },
+    });
+    const roles = [
+      { id: id("r"), name: "Person", playerId: person.id },
+      { id: id("r"), name: "PersonId", playerId: pid.id },
+    ];
+    const pidUc = id("uc");
+    m.addFactType({
+      id: id("ft"),
+      name: "Person.person_id",
+      roles,
+      // Brace text the writer reports: the fact type's other line.
+      readings: ["{0} has {1} {sic}"],
+      constraints: [
+        { type: "internal_uniqueness", id: id("uc"), roleIds: [roles[0]!.id] },
+        { type: "internal_uniqueness", id: pidUc, roleIds: [roles[1]!.id] },
+      ],
+    });
+    m.setPreferredIdentifier(person.id, pidUc);
+    const all = losses(m);
+    expect(all.filter((l) => l.startsWith("fact type Person.person_id:"))).toEqual([
+      "fact type Person.person_id: role Person of Person is optional; Ossie's identify_by makes it mandatory on import",
+      'fact type Person.person_id: reading "{0} has {1} {sic}" has brace text, written with parentheses',
+    ]);
+    expect(verified(m)).toEqual([]);
+  });
+
+  /** Room, identified by its number and building, both of whose Room roles are optional. */
+  function rooms(stored: boolean): OrmModel {
+    const m = new OrmModel({ name: "M" });
+    const room = m.addObjectType({
+      id: id("ot"),
+      name: "Room",
+      kind: "entity",
+      referenceMode: "room_id",
+    });
+    const binary = (name: string, valueName: string, roleName: string) => {
+      const v = m.addObjectType({
+        id: id("ot"),
+        name: valueName,
+        kind: "value",
+        dataType: { name: "text" },
+      });
+      const roles = [
+        { id: id("r"), name: roleName, playerId: room.id },
+        { id: id("r"), name: valueName, playerId: v.id },
+      ];
+      m.addFactType({
+        id: id("ft"),
+        name,
+        roles,
+        readings: ["{0} has {1}"],
+        constraints: [{ type: "internal_uniqueness", id: id("uc"), roleIds: [roles[0]!.id] }],
+      });
+      return roles[1]!.id;
+    };
+    const eu = id("eu");
+    m.addConstraint({
+      type: "external_uniqueness",
+      id: eu,
+      roleIds: [
+        binary("Room.number", "RoomNumber", "Room"),
+        binary("Room.building", "Building", "is in"),
+      ],
+    });
+    if (stored) m.setPreferredIdentifier(room.id, eu);
+    return m;
+  }
+
+  for (const stored of [true, false]) {
+    it(`says each optional component comes back mandatory, with the identifier ${stored ? "stored" : "inferred"}`, () => {
+      const lines = losses(rooms(stored)).filter((l) => l.includes("makes it mandatory on import"));
+      expect(lines).toEqual([
+        "fact type Room.number: role Room of Room is optional; Ossie's identify_by makes it mandatory on import",
+        "fact type Room.building: role is in of Room is optional; Ossie's identify_by makes it mandatory on import",
+      ]);
+    });
+  }
+});
+
+describe("the read-back check's alignment, with ids that are names (6b-4b)", () => {
+  /** Customer places Order, each Customer placing some Order. */
+  function shop(extra: (m: OrmModel) => void = () => {}): OrmModel {
+    const m = new OrmModel({ name: "Shop" });
+    m.addObjectType({ id: "Customer", name: "Customer", kind: "entity", referenceMode: "nr" });
+    m.addObjectType({ id: "Order", name: "Order", kind: "entity", referenceMode: "nr" });
+    const ft = m.addFactType({
+      id: "Customer_places_Order",
+      name: "Customer places Order",
+      roles: [
+        { id: "Customer_places_Order.places", name: "places", playerId: "Customer" },
+        { id: "Customer_places_Order.is_placed_by", name: "is placed by", playerId: "Order" },
+      ],
+      readings: ["{0} places {1}"],
+    });
+    ft.addConstraint({ type: "mandatory", id: "c-mand", roleId: "Customer_places_Order.places" });
+    extra(m);
+    return m;
+  }
+
+  it("reports, rather than throws, when a source id equals an id only the read-back holds", () => {
+    // The read-back names the mandatory constraint from its sentence; the
+    // source states another id for it, and gives that sentence's id to a
+    // value type of its own. Before the fix the remap collided.
+    const minted = "Each_Customer_places_at_least_one_Order";
+    const m = shop((model) => model.addObjectType({ id: minted, name: "Tag", kind: "value" }));
+    // The export turns a failed comparison into a loss line, so the
+    // check is that line's absence.
+    expect(exporter.export(m).text).not.toContain("could not be compared");
+  });
+
+  it("aligns a model built in code that gives an object type and a fact type one id", () => {
+    const m = new OrmModel({ name: "Shared" });
+    m.addObjectType({ id: "X", name: "Person", kind: "entity", referenceMode: "nr" });
+    m.addObjectType({ id: "car", name: "Car", kind: "entity", referenceMode: "vin" });
+    m.addFactType({
+      id: "X",
+      name: "Person owns Car",
+      roles: [
+        { id: "X.owns", name: "owns", playerId: "X" },
+        { id: "X.is_owned_by", name: "is owned by", playerId: "car" },
+      ],
+      readings: ["{0} owns {1}"],
+    });
+    // The export turns a failed comparison into a loss line, so the
+    // check is that line's absence.
+    expect(exporter.export(m).text).not.toContain("could not be compared");
+  });
+});

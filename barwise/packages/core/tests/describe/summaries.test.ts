@@ -112,7 +112,8 @@ describe("buildEntityFocusSummary", () => {
       id: `c${i}`,
       type: "mandatory",
       verbalization: `Constraint ${i}`,
-      affectedFactType: "ft",
+      factTypes: ["ft"],
+      factTypeIds: ["ft"],
     }));
     const text = buildEntityFocusSummary(e, [], constraints, undefined);
     expect(text).toContain("... and 2 more");
@@ -142,7 +143,13 @@ describe("buildFactTypeFocusSummary", () => {
       kind: "entity",
       referenceMode: "customer_id",
     });
-    const order = model.addObjectType({ name: "Order", kind: "entity", referenceMode: "order_id" });
+    // Stated, so the test can tell a printed id from the printed name.
+    const order = model.addObjectType({
+      id: "ot-order",
+      name: "Order",
+      kind: "entity",
+      referenceMode: "order_id",
+    });
     const ft = model.addFactType({
       name: "Customer places Order",
       roles: [
@@ -215,13 +222,14 @@ describe("buildFactTypeFocusSummary", () => {
 });
 
 describe("buildConstraintTypeFocusSummary", () => {
-  it("lists each constraint tagged with its affected fact type", () => {
+  it("lists each constraint tagged with the fact types it applies to", () => {
     const constraints: ConstraintSummary[] = [
       {
         id: "c1",
         type: "mandatory",
         verbalization: "Each X has some Y.",
-        affectedFactType: "X has Y",
+        factTypes: ["X has Y"],
+        factTypeIds: ["ft-xy"],
       },
     ];
     const text = buildConstraintTypeFocusSummary("mandatory", constraints);

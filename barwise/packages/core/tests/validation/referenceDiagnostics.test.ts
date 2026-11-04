@@ -15,6 +15,12 @@
  * reporting them had never fired. barwise-977 gave both constructors the
  * escape their two siblings already had, so those cases are now built
  * the same way as the rest and assert the same equivalence.
+ *
+ * One branch breaks the equivalence on purpose and is tested elsewhere: a
+ * dangling role on a constraint across fact types borrowed an internal
+ * kind's id and named the fact type a 2.0 file nested it under, and now
+ * reports `acrossFactTypesUnknownRole` against the constraint's own id
+ * (orm-format-3 WS3a-ii-c; `constraintsAcrossFactTypes.test.ts`).
  */
 import { describe, expect, it } from "vitest";
 import { graphOf } from "../../src/model/graph.js";
@@ -22,7 +28,7 @@ import { OrmModel } from "../../src/model/OrmModel.js";
 import { referenceDiagnostics } from "../../src/validation/referenceDiagnostics.js";
 import { RULE_ID } from "../../src/validation/ruleId.js";
 import { ValidationEngine } from "../../src/validation/ValidationEngine.js";
-import { ModelBuilder } from "../helpers/ModelBuilder.js";
+import { ModelBuilder, roleId } from "../helpers/ModelBuilder.js";
 
 function base(): OrmModel {
   return new ModelBuilder("Ref")
@@ -44,7 +50,7 @@ function today(model: OrmModel, ruleId: string) {
 function mapped(model: OrmModel, ruleId: string) {
   const result = graphOf(model);
   if (result.ok) throw new Error("expected graphOf to fail");
-  return referenceDiagnostics(result.unresolved).filter((d) => d.ruleId === ruleId);
+  return referenceDiagnostics(model, result.unresolved).filter((d) => d.ruleId === ruleId);
 }
 
 /**
@@ -105,13 +111,14 @@ const BEFORE: Record<string, { ruleId: string; severity: string; message: string
     ruleId: "constraint/join-unknown-root",
     severity: "error",
     message:
-      'Join constraint in fact type "Customer has Name" references an unknown root object type "ot-missing".',
+      'Join constraint over no fact type in the model references an unknown root object type "ot-missing".',
   },
   joinStep: {
     ruleId: "constraint/join-bad-step",
     severity: "error",
-    message:
-      'Join constraint in fact type "Customer has Name" has a step whose entry "Customer has Name::role1" / exit "role-missing" are not both roles of one fact type.',
+    message: `Join constraint over fact type "Customer has Name" has a step whose entry "${
+      roleId("Customer has Name", 1)
+    }" / exit "role-missing" are not both roles of one fact type.`,
   },
   rolePlayer: {
     ruleId: "structural/dangling-role-reference",
@@ -221,7 +228,7 @@ describe("referenceDiagnostics for what the graph is first to check", () => {
 
     const result = graphOf(model);
     if (result.ok) throw new Error("expected graphOf to fail on a duplicate role id");
-    const diags = referenceDiagnostics(result.unresolved);
+    const diags = referenceDiagnostics(model, result.unresolved);
 
     expect(diags.map((d) => d.ruleId)).toEqual([RULE_ID.duplicateRoleId]);
     expect(diags[0]!.message).toContain(shared);
@@ -274,7 +281,7 @@ describe("referenceDiagnostics for join constraint paths", () => {
     subsetPath: (m: OrmModel) => { root: string; steps: { entry: string; exit: string; }[]; },
   ): OrmModel {
     const model = base();
-    model.factTypes[0]!.addConstraint({
+    model.addConstraint({
       type: "join_subset",
       id: "jc1",
       subset: { path: subsetPath(model), projection: [0] },

@@ -47,7 +47,21 @@ describe("graphOf: references that do not resolve", () => {
     // kind and name its fact type without a second lookup.
     expect(found.from.constraint.id).toBe("c-bogus");
     expect(found.from.constraint.type).toBe("mandatory");
-    expect(found.from.factType.id).toBe(ft.id);
+    expect(found.from.factType?.id).toBe(ft.id);
+  });
+
+  it("gives a constraint across fact types no fact type", () => {
+    const model = simpleModel();
+    const ft = model.factTypes[0]!;
+    // An exclusion lives in no fact type (orm-format-3, Open decision 9).
+    model.addConstraint({ type: "exclusion", roleIds: [ft.roles[0]!.id, "gone"], id: "c-excl" });
+
+    const result = graphOf(model);
+    if (result.ok) throw new Error("expected an unresolved reference");
+    const found = result.unresolved.find((u) => u.missing === "gone");
+    if (found?.from.kind !== "constraint") throw new Error("expected a constraint source");
+    expect(found.from.constraint.id).toBe("c-excl");
+    expect(found.from.factType).toBeUndefined();
   });
 
   it("fails when a role's player does not exist", () => {
@@ -117,7 +131,7 @@ describe("graphOf: references that do not resolve", () => {
     const model = simpleModel();
     const ft = model.factTypes[0]!;
     const step = { entry: ft.roles[0]!.id, exit: ft.roles[1]!.id };
-    ft.addConstraint({
+    model.addConstraint({
       type: "join_equality",
       id: "je",
       operands: [
@@ -165,7 +179,7 @@ describe("graphOf: a built graph is total", () => {
     if (!result.ok) throw new Error("expected a graph");
 
     const ft = model.factTypes[0]!;
-    const constraint = ft.constraints[0]!;
+    const constraint = ft.internalConstraints[0]!;
     const roles = result.graph.rolesOf(constraint);
     expect(roles.length).toBeGreaterThan(0);
     for (const role of roles) {
@@ -178,7 +192,7 @@ describe("graphOf: a built graph is total", () => {
     const result = graphOf(model);
     if (!result.ok) throw new Error("expected a graph");
 
-    const resolved = result.graph.resolve(model.factTypes[0]!.constraints[0]!);
+    const resolved = result.graph.resolve(model.factTypes[0]!.internalConstraints[0]!);
     expect(resolved.roles.length).toBeGreaterThan(0);
     for (const r of resolved.roles) {
       expect(r.player.id).toBe(r.role.playerId);
@@ -206,7 +220,7 @@ describe("graphOf: a built graph is total", () => {
       .build();
 
     const [ft1, ft2] = model.factTypes;
-    ft1!.addConstraint({
+    model.addConstraint({
       type: "external_uniqueness",
       id: "eu",
       roleIds: [ft1!.roles[1]!.id, ft2!.roles[1]!.id],
@@ -214,7 +228,7 @@ describe("graphOf: a built graph is total", () => {
 
     const result = graphOf(model);
     if (!result.ok) throw new Error("expected a graph");
-    expect(result.graph.resolve(ft1!.constraints[0]!).spansFactTypes).toBe(true);
+    expect(result.graph.resolve(model.constraints[0]!).spansFactTypes).toBe(true);
   });
 
   it("reports commonPlayer only when every role shares one", () => {
@@ -224,16 +238,16 @@ describe("graphOf: a built graph is total", () => {
 
     // The uniqueness constraint covers one role, so its single player is
     // trivially common.
-    const resolved = result.graph.resolve(model.factTypes[0]!.constraints[0]!);
+    const resolved = result.graph.resolve(model.factTypes[0]!.internalConstraints[0]!);
     expect(resolved.commonPlayer).toBeDefined();
   });
 
-  // A constraint's id is OPTIONAL and `addConstraint` does not mint one
-  // (only FactType's constructor does), so an index keyed by `c.id`
-  // reports "no roles" for a constraint that references real ones, on a
-  // graph that built successfully. Found by reviewing this workstream
+  // A constraint's id is OPTIONAL in the type (every path into a model now
+  // fills one, barwise-nkq), so an index keyed by `c.id` could report "no
+  // roles" for a constraint that references real ones, on a graph that
+  // built successfully. Found by reviewing this workstream
   // before it opened; it is the silent-[] shape of barwise-928.
-  it("resolves roles for a constraint that carries no id", () => {
+  it("resolves roles for a constraint added in code", () => {
     const model = simpleModel();
     const ft = model.factTypes[0]!;
     ft.addConstraint({ type: "mandatory", roleId: ft.roles[0]!.id });
@@ -242,13 +256,14 @@ describe("graphOf: a built graph is total", () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
 
-    const idless = ft.constraints.find((c) => !c.id)!;
-    expect(idless).toBeDefined();
-    expect(result.graph.rolesOf(idless).map((r) => r.id)).toEqual([ft.roles[0]!.id]);
-    expect(result.graph.resolve(idless).roles.length).toBe(1);
+    const added = ft.internalConstraints.at(-1)!;
+    expect(added.type).toBe("mandatory");
+    expect(added.id).toEqual(expect.any(String));
+    expect(result.graph.rolesOf(added).map((r) => r.id)).toEqual([ft.roles[0]!.id]);
+    expect(result.graph.resolve(added).roles.length).toBe(1);
   });
 
-  it("carries the constraint and its fact type when the constraint has no id", () => {
+  it("carries the constraint and its fact type for an unresolved role", () => {
     const model = simpleModel();
     const ft = model.factTypes[0]!;
     ft.addConstraint({ type: "mandatory", roleId: "bogus" });
@@ -256,11 +271,12 @@ describe("graphOf: a built graph is total", () => {
     const result = graphOf(model);
     expect(result.ok).toBe(false);
     if (result.ok) return;
-    // A constraint's id is optional, so the record carries the constraint
-    // and its fact type instead of an id that may not exist.
+    // The record carries the constraint and its fact type, not only an
+    // id: a constraint's id is optional in the type, though every path
+    // into a model now fills one (barwise-nkq).
     const found = result.unresolved.find((u) => u.missing === "bogus");
     if (found?.from.kind !== "constraint") throw new Error("expected a constraint source");
-    expect(found.from.constraint.id).toBeUndefined();
+    expect(found.from.constraint.id).toBe(ft.internalConstraints.at(-1)!.id);
     expect(found.from.constraint.type).toBe("mandatory");
     expect(found.from.factType.id).toBe(ft.id);
   });
@@ -374,10 +390,10 @@ describe("graphOf over the shipped example models", () => {
         expect(result.graph.player(role)).toBeDefined();
         expect(result.graph.factTypeOf(role)).toBeDefined();
       }
-      for (const c of ft.constraints) {
-        expect(result.graph.rolesOf(c)).toBeDefined();
-        expect(result.graph.resolve(c).roles.length).toBe(roleIdsOf(c).length);
-      }
+    }
+    for (const [c] of model.everyConstraint()) {
+      expect(result.graph.rolesOf(c)).toBeDefined();
+      expect(result.graph.resolve(c).roles.length).toBe(roleIdsOf(c).length);
     }
   });
 });

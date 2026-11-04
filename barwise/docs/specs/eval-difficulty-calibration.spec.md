@@ -7,7 +7,7 @@ Last-updated: 2026-08-28
 Tracking: barwise-846 (this spec is workstream 3's authoring plan; the
 count and split assignment stay that workstream's to ground).
 Companions: `eval-transcript-realism.spec.md` (the authoring rules this
-extends), `docs/adr/0002-constraint-coverage-policy.md` (the coverage
+extends), `docs/adr/constraint-coverage-policy.md` (the coverage
 budget these transcripts carry),
 `docs/specs/constraint-extraction-coverage.spec.md` (the inventory to
 update as instances land).
@@ -22,7 +22,7 @@ what that costs: the suite's discriminating power is concentrated in
 two cases (one per split carried 76-90% of the noise), and nothing
 says which structural device any case is testing. A new case should
 declare its difficulty the way it declares its split: as a named
-device with a named check that grades it. ADR 0002's comparative frame
+device with a named check that grades it. ADR `constraint-coverage-policy`'s comparative frame
 is the other half of the argument -- a hard case earns its authoring
 cost only if the rubric can see the hardness, because an ungraded
 difficulty is an unreviewed suggestion one level up.
@@ -75,7 +75,7 @@ discriminator until the capability lands:
 
 Such rules may still appear as parked questions (graded via
 `requires_ambiguity`) or as untested reference content, which is the
-state ADR 0002's trust statement already names -- but the case's
+state ADR `constraint-coverage-policy`'s trust statement already names -- but the case's
 difficulty budget must be spent on D3-D5.
 
 ## Scope
@@ -105,7 +105,7 @@ change to scoring, weights, or the collapse floor.
 
 ## Candidate domains
 
-Five candidates, assessed against the taxonomy and the ADR 0002
+Five candidates, assessed against the taxonomy and the ADR `constraint-coverage-policy`
 coverage budget (needed: irreflexive second domain, acyclic second
 _tested_ domain, symmetric first instance anywhere). Three will be
 authored; which three is an open decision below.
@@ -198,7 +198,7 @@ split reassignment as its own PR once all three exist.
 ## Non-goals
 
 - No re-authoring of any existing transcript.
-- No rare-tier ring types in eval transcripts (ADR 0002 sends those
+- No rare-tier ring types in eval transcripts (ADR `constraint-coverage-policy` sends those
   to the gym exercise).
 - No new difficulty metadata in `suite.yaml` or the case schema; the
   device declaration is a case-file header comment, reviewed as

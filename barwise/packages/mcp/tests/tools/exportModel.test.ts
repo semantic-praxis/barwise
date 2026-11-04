@@ -13,9 +13,14 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { executeExportModel } from "../../src/tools/exportModel.js";
+import { usePrivateCwd } from "../workspace/privateCwd.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const fixtures = resolve(__dirname, "../fixtures");
+
+// Exports spill beside their source: an inline one under the cwd, a file one
+// next to the file. Both are private to each test.
+const ws = usePrivateCwd();
 
 const _serializer = new OrmYamlSerializer();
 
@@ -60,11 +65,6 @@ model:
         - type: internal_uniqueness
           roles: [r-order-placed-by]
 `;
-
-  // Inline-source exports spill into a cache dir under the cwd.
-  afterEach(() => {
-    rmSync(join(process.cwd(), ".barwise"), { recursive: true, force: true });
-  });
 
   describe("DDL format", () => {
     it("produces DDL output inline", () => {
@@ -208,26 +208,22 @@ model:
   });
 
   describe("project source", () => {
-    const project = `${fixtures}/project/project.orm-project.yaml`;
-
-    afterEach(() => {
-      rmSync(join(fixtures, "project", ".barwise"), { recursive: true, force: true });
-    });
+    const project = () => join(ws.fixture("project"), "project.orm-project.yaml");
 
     it("exports the chosen domain", () => {
-      const result = executeExportModel(project, "ddl", undefined, undefined, "crm");
+      const result = executeExportModel(project(), "ddl", undefined, undefined, "crm");
       expect(readResult(result)).toContain("CREATE TABLE");
     });
 
     it("requires a domain to disambiguate a multi-domain project", () => {
-      const result = executeExportModel(project, "ddl");
+      const result = executeExportModel(project(), "ddl");
       const parsed = JSON.parse(result.content[0]!.text);
       expect(parsed.error).toContain("domain");
       expect(parsed.error).toContain("crm, billing");
     });
 
     it("reports an error for an unknown domain", () => {
-      const result = executeExportModel(project, "ddl", undefined, undefined, "ghost");
+      const result = executeExportModel(project(), "ddl", undefined, undefined, "ghost");
       const parsed = JSON.parse(result.content[0]!.text);
       expect(parsed.error).toContain("crm, billing");
     });
@@ -281,5 +277,75 @@ describe("the project's identifier strategy (identifier-strategy-in-exports.spec
       executeExportModel(join(dir, "crm.orm.yaml"), "ddl", { includeExamples: false }),
     );
     expect(ddl).toContain("customer_id TEXT NOT NULL");
+  });
+});
+
+describe("export_model reports what the format could not express (barwise-wc0)", () => {
+  // DDL has no clause for an irreflexive ring, so the router spills it.
+  const ringModel = `
+orm_version: "1.0"
+model:
+  name: Ring
+  object_types:
+    - { id: ot-person, name: Person, kind: entity, reference_mode: person_id }
+  fact_types:
+    - id: ft-parent
+      name: Person is parent of Person
+      roles:
+        - { id: r-parent, player: ot-person, role_name: is parent of }
+        - { id: r-child, player: ot-person, role_name: is child of }
+      readings: ["{0} is parent of {1}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-parent, r-child] }
+        - { type: ring, role_1: r-parent, role_2: r-child, ring_type: irreflexive }
+`;
+  const RING = "No Person is parent of that same Person.";
+
+  afterEach(() => {
+    delete process.env.BARWISE_MCP_INLINE_LIMIT;
+  });
+
+  it("returns the report as a second block, with pseudocode and example", () => {
+    const result = executeExportModel(ringModel, "ddl");
+    expect(result.content).toHaveLength(2);
+    expect(result.content[0]!.text).toContain("CREATE TABLE person_is_parent_of_person");
+    const report = result.content[1]!.text;
+    expect(report).toMatch(/^1 constraint\(s\) the ddl format could not express:/);
+    expect(report).toContain(`- ${RING}`);
+    expect(report).toMatch(/ {2}Pseudocode: \S/);
+    expect(report).toMatch(/ {2}Example: \S/);
+  });
+
+  it("returns one block when every constraint was expressed", () => {
+    const plain = ringModel.replace(/\n {8}- \{ type: ring.*\n/, "\n");
+    expect(plain).not.toContain("ring");
+    expect(executeExportModel(plain, "ddl").content).toHaveLength(1);
+  });
+
+  it("names the project domain the report came from", () => {
+    // The domain is the one input the CLI and this tool both pass to the
+    // shared formatter; dropping it here would leave no surface test red.
+    writeFileSync(join(ws.dir(), "family.orm.yaml"), ringModel);
+    const manifest = join(ws.dir(), "p.orm-project.yaml");
+    writeFileSync(
+      manifest,
+      'project:\n  name: P\n  domains:\n    - path: "./family.orm.yaml"\n      context: "family"\n',
+    );
+    const result = executeExportModel(manifest, "ddl", undefined, undefined, "family");
+    expect(result.content[1]!.text).toMatch(/could not express \(domain family\):/);
+  });
+
+  it("bounds the report on its own, and never writes it to outputPath", () => {
+    process.env.BARWISE_MCP_INLINE_LIMIT = "50";
+    const outputPath = join(ws.dir(), "out.sql");
+    const result = executeExportModel(ringModel, "ddl", undefined, outputPath);
+    expect(result.content).toHaveLength(2);
+    expect(result.content[0]!.text).toContain(`Full content written to: ${outputPath}`);
+    expect(readFileSync(outputPath, "utf8")).toContain("CREATE TABLE");
+    const report = result.content[1]!.text;
+    expect(report).toContain("Full content written to:");
+    expect(report).not.toContain(outputPath);
+    // The preview still names the ring.
+    expect(report).toContain(RING);
   });
 });

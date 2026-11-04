@@ -1,0 +1,9 @@
+orm_version: "3.0"
+model:
+  name: Malformed
+  object_types:
+    - id: ot-colour
+      name: Colour
+      kind: value
+      value_constraint:
+        values: []

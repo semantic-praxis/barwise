@@ -1,6 +1,13 @@
 import type { Complete } from "../util/complete.js";
-import type { Constraint } from "./Constraint.js";
-import { generateId } from "./id.js";
+import {
+  type Constraint,
+  type InternalConstraint,
+  type InternalUniquenessConstraint,
+  isExternalConstraint,
+  isInternalConstraint,
+} from "./Constraint.js";
+import type { ConstraintAdmission } from "./constraintAdmission.js";
+import { roleIdBase, suffixed } from "./idRules.js";
 import { ModelElement } from "./ModelElement.js";
 import { type ReadingOrder, validateReadingTemplate } from "./ReadingOrder.js";
 import { Role, type RoleConfig } from "./Role.js";
@@ -22,7 +29,7 @@ export type DerivationStorage = "derive_on_request" | "derived_and_stored";
 /**
  * A derivation rule: how a derived fact type's (or subtype's) population is
  * defined. In v1 the rule is informal -- opaque text carried verbatim and
- * verbalized, never parsed or executed by core (ADR-0001 filter 3). The
+ * verbalized, never parsed or executed by core (ADR `metamodel-evolution-policy` filter 3). The
  * `isFormal` flag is reserved for a future formal grammar; it is absent or
  * false in v1.
  */
@@ -45,7 +52,11 @@ export interface FactTypeConfig {
   readonly id?: string;
   readonly roles: readonly RoleConfig[];
   readonly readings: readonly string[];
-  readonly constraints?: readonly Constraint[];
+  /**
+   * The fact type's own constraints. One across fact types lives in the
+   * model: add it with `OrmModel.addConstraint` (orm-format-3 WS3c).
+   */
+  readonly constraints?: readonly InternalConstraint[];
   /** Natural-language definition. */
   readonly definition?: string;
   /** Free-text note: informal commentary distinct from `definition`. */
@@ -69,7 +80,8 @@ export interface FactTypeConfig {
 export class FactType extends ModelElement {
   private readonly _roles: Role[];
   private readonly _readings: ReadingOrder[];
-  private readonly _constraints: Constraint[];
+  private readonly _constraints: InternalConstraint[];
+  private _admission: ConstraintAdmission | undefined;
   private _definition: string | undefined;
   private _note: string | undefined;
   private _derivation: DerivationRule | undefined;
@@ -89,7 +101,18 @@ export class FactType extends ModelElement {
       );
     }
 
-    this._roles = config.roles.map((rc) => new Role(rc));
+    // A role given no id takes the rule's (`idRules.ts`), suffixed past
+    // its siblings. Outside a model a repeated role name is suffixed rather
+    // than refused, as a migration's is: refusing it is the model's rule
+    // for new authoring (decision 5), and a fact type built on its own is
+    // not authoring into a model.
+    const taken = new Set(config.roles.flatMap((rc) => (rc.id !== undefined ? [rc.id] : [])));
+    this._roles = config.roles.map((rc) => {
+      if (rc.id !== undefined) return new Role(rc);
+      const id = suffixed(roleIdBase(this.id, rc.name), (candidate) => !taken.has(candidate));
+      taken.add(id);
+      return new Role({ ...rc, id });
+    });
 
     // Validate reading templates against role count.
     const errors: string[] = [];
@@ -105,10 +128,8 @@ export class FactType extends ModelElement {
     }
 
     this._readings = config.readings.map((template) => ({ template }));
-    // Assign IDs to constraints that don't have them (for traceability).
-    this._constraints = (config.constraints ?? []).map((c) =>
-      c.id ? c : { ...c, id: generateId() }
-    );
+    this._constraints = [];
+    for (const c of config.constraints ?? []) this.addConstraint(c);
     this._definition = config.definition;
     this._note = config.note;
     this._derivation = config.derivation;
@@ -124,8 +145,13 @@ export class FactType extends ModelElement {
     return this._readings;
   }
 
-  /** The constraints on this fact type. */
-  get constraints(): readonly Constraint[] {
+  /**
+   * The constraints that live in this fact type: the internal kinds, whose
+   * roles are all its own. One across fact types lives in the model
+   * (`OrmModel.constraints`), whichever fact type a 2.0 file nests it
+   * under (orm-format-3 WS3c).
+   */
+  get internalConstraints(): readonly InternalConstraint[] {
     return this._constraints;
   }
 
@@ -155,6 +181,28 @@ export class FactType extends ModelElement {
     return this._derivation;
   }
 
+  /**
+   * The model that holds this fact type, as the narrow interface it admits
+   * constraints through; none until a model adds it. Called by
+   * `OrmModel.addFactType` once the fact type is stored, before its own
+   * constraints are added, so each is admitted and named; with an admission only the model holds, so no other caller can reach
+   * the model's id index through a fact type.
+   */
+  joinModel(admission: ConstraintAdmission): void {
+    if (this._admission !== undefined) {
+      throw new Error(`Fact type "${this.name}" is already in a model.`);
+    }
+    this._admission = admission;
+  }
+
+  /**
+   * The model removed this fact type, so a constraint added to it from
+   * now on is the fact type's alone and enters no model's index.
+   */
+  leaveModel(admission: ConstraintAdmission): void {
+    if (this._admission === admission) this._admission = undefined;
+  }
+
   /** Find a role by its id. Returns undefined if not found. */
   getRoleById(roleId: string): Role | undefined {
     return this._roles.find((r) => r.id === roleId);
@@ -165,15 +213,77 @@ export class FactType extends ModelElement {
     return this._roles.some((r) => r.id === roleId);
   }
 
-  /** Add a constraint to this fact type. */
-  addConstraint(constraint: Constraint): void {
-    this._constraints.push(constraint);
+  /**
+   * The uniqueness constraint spanning exactly these roles, in any order:
+   * how a caller that added one without an id finds it again, to name it as
+   * a preferred identifier, without depending on the order it was listed in.
+   */
+  uniquenessOver(roleIds: readonly string[]): InternalUniquenessConstraint | undefined {
+    const want = [...roleIds].sort().join("\u0000");
+    return this._constraints.find((c): c is InternalUniquenessConstraint =>
+      c.type === "internal_uniqueness" && [...c.roleIds].sort().join("\u0000") === want
+    );
+  }
+
+  /**
+   * Add a constraint to this fact type. In a model, one given no id takes
+   * its minted name (iri-identity, decision 17). Outside a model nothing
+   * names it, and it keeps the id it was given or none (6b-4b): no random
+   * id remains to give it, and a constraint a model cannot name has none
+   * either (decision 19).
+   *
+   * A constraint across fact types lives in the model
+   * (`OrmModel.addConstraint`). The type says so; the check is for a
+   * value whose type was asserted, such as a parsed file, which would
+   * otherwise be stored where no reader of the model's constraints looks.
+   *
+   * Returns the constraint as stored, carrying the id the model gave it, as
+   * `OrmModel.addConstraint` does: a caller that needs the id right away
+   * -- a preferred identifier set just after the add -- reads it here. It
+   * comes back with no id outside a model, and in one when its sentence
+   * cannot be minted (decision 19), so such a caller checks.
+   */
+  addConstraint(constraint: InternalConstraint): InternalConstraint {
+    const c = checkInternalConstraint(constraint, this.name);
+    // In a model, the model names it and enters its id in the model's
+    // index; standalone, it keeps the id it was given, or none, as a
+    // constraint a model cannot name has none (decision 19).
+    const stored = this._admission?.admitConstraint(c, this.id) ?? c;
+    this._constraints.push(stored);
+    return stored;
   }
 
   /** Get all role ids that reference a given object type (by player id). */
   rolesForPlayer(playerId: string): readonly Role[] {
     return this._roles.filter((r) => r.playerId === playerId);
   }
+}
+
+/**
+ * Refuse what a fact type cannot hold: a constraint across fact types,
+ * which lives in the model, or a kind that is no constraint. The check is
+ * for a value whose type was asserted, such as a parsed file. Exported so
+ * `OrmModel.addFactType` refuses a config before storing anything.
+ */
+export function checkInternalConstraint(
+  constraint: InternalConstraint,
+  factTypeName: string,
+): InternalConstraint {
+  const c = constraint as Constraint;
+  if (isExternalConstraint(c)) {
+    throw new Error(
+      `A ${c.type} constraint spans fact types, so it lives in the model, `
+        + `not in fact type "${factTypeName}": add it with OrmModel.addConstraint.`,
+    );
+  }
+  if (!isInternalConstraint(c)) {
+    throw new Error(
+      `Fact type "${factTypeName}" has no constraint kind "${
+        String((constraint as { type?: unknown; }).type)
+      }".`,
+    );
+  }
+  return c;
 }
 
 /**
@@ -197,7 +307,7 @@ export function toFactTypeConfig(ft: FactType): FactTypeConfig {
       return role;
     }),
     readings: ft.readings.map((r) => r.template),
-    constraints: ft.constraints,
+    constraints: ft.internalConstraints,
     definition: ft.definition,
     note: ft.note,
     derivation: ft.derivation,

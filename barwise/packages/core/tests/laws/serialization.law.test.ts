@@ -37,6 +37,7 @@ import { hashModel } from "../../src/lineage/manifest.js";
 import { CONSTRAINT_TYPES } from "../../src/model/Constraint.js";
 import { toFactTypeConfig } from "../../src/model/FactType.js";
 import type { OrmModel } from "../../src/model/OrmModel.js";
+import { canonicalJson } from "../../src/serialization/derivedId.js";
 import { OrmYamlSerializer } from "../../src/serialization/OrmYamlSerializer.js";
 import { structuralRules } from "../../src/validation/rules/structural.js";
 import { arbOrmModel, RUNS, SEED } from "../arbitraries/model.js";
@@ -95,6 +96,12 @@ describe("law: serialization is lossless", () => {
 
         expect(objectTypeProjections(restored)).toEqual(objectTypeProjections(model));
         expect(factTypeProjections(restored)).toEqual(factTypeProjections(model));
+        // The constraints across fact types, which no fact type's projection
+        // holds since the model stores them (orm-format-3 WS3c). By id: the
+        // 2.0 save groups them under their first holders, so the order can
+        // change and the content may not.
+        const byId = (m: OrmModel) => m.constraints.map((c) => canonicalJson(c)).sort();
+        expect(byId(restored)).toEqual(byId(model));
       }),
       { seed: SEED, numRuns: RUNS },
     );
@@ -162,9 +169,7 @@ describe("coverage: the generator reaches the shapes the recorded defects lived 
   it("produces every constraint kind the metamodel admits", () => {
     const seen = new Set<string>();
     for (const model of models) {
-      for (const ft of model.factTypes) {
-        for (const constraint of ft.constraints) seen.add(constraint.type);
-      }
+      for (const [constraint] of model.everyConstraint()) seen.add(constraint.type);
     }
     // Compared against the union's own runtime list rather than a
     // literal, so a constraint kind added to the metamodel fails here

@@ -1,9 +1,4 @@
-import type {
-  FactInstance,
-  FactInstanceConfig,
-  Population,
-  PopulationConfig,
-} from "../../model/Population.js";
+import type { FactInstance, Population } from "../../model/Population.js";
 
 export interface OrmYamlFactInstance {
   id: string;
@@ -41,25 +36,4 @@ export function serializePopulation(pop: Population): OrmYamlPopulation {
     result.sample = true;
   }
   return result;
-}
-
-/**
- * Translate a population's header fields. The instances are added
- * separately (via {@link deserializeFactInstance}) so the orchestrator
- * keeps the model-mutation order.
- */
-export function deserializePopulation(popDoc: OrmYamlPopulation): PopulationConfig {
-  return {
-    id: popDoc.id,
-    factTypeId: popDoc.fact_type,
-    description: popDoc.description,
-    ...(popDoc.sample !== undefined ? { sample: popDoc.sample } : {}),
-  };
-}
-
-export function deserializeFactInstance(instDoc: OrmYamlFactInstance): FactInstanceConfig {
-  return {
-    id: instDoc.id,
-    roleValues: instDoc.role_values,
-  };
 }

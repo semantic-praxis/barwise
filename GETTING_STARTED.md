@@ -73,6 +73,7 @@ table, or follow your surface's guide for the details.
 | Get modeling advice (LLM)          | `barwise review`                                   | `review_model`                      | `#barwiseReview`                                             |
 | Compare two versions               | `barwise diff`                                     | `diff_models`                       | `#barwiseDiff`                                               |
 | Fold one model into another        | `barwise merge`                                    | `merge_models`                      | `#barwiseMerge`                                              |
+| Rename an element                  | `barwise rename`                                   | `rename_element`                    | `#barwiseRename`                                             |
 | Show a model's change history      | `barwise history`                                  | none                                | none                                                         |
 | Find stale or affected artifacts   | `barwise lineage status`, `barwise lineage impact` | `lineage_status`, `impact_analysis` | `#barwiseLineage`, `#barwiseImpact`                          |
 | Split a large model into a project | `barwise project split`                            | `split_model`                       | `#barwiseSplit`                                              |

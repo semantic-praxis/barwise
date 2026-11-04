@@ -1,0 +1,360 @@
+# Document.avsc
+{
+  "type": "record",
+  "name": "Document",
+  "fields": [
+    {
+      "name": "document_id",
+      "type": {
+        "type": "string",
+        "logicalType": "uuid"
+      },
+      "doc": "Primary key"
+    },
+    {
+      "name": "source_system",
+      "type": [
+        "null",
+        "string"
+      ],
+      "doc": "[NOTE(barwise): Value constraint available: ['customer-support', 'lending', 'health-intake', 'survey']. Consider adding an accepted_values test.]"
+    },
+    {
+      "name": "received_timestamp",
+      "type": [
+        "null",
+        {
+          "type": "long",
+          "logicalType": "timestamp-millis"
+        }
+      ]
+    },
+    {
+      "name": "raw_text",
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    {
+      "name": "document_status",
+      "type": [
+        "null",
+        "string"
+      ],
+      "doc": "[NOTE(barwise): Value constraint available: ['queued', 'scanned', 'reviewed', 'redacted', 'failed', 'on-hold']. Consider adding an accepted_values test.]"
+    },
+    {
+      "name": "redacted_text",
+      "type": "string"
+    }
+  ],
+  "doc": "[NOTE(barwise): Definition available from ORM model: \"An incoming document submitted from a source system that undergoes PII scanni...\"]"
+}
+
+---
+
+# Finding.avsc
+{
+  "type": "record",
+  "name": "Finding",
+  "fields": [
+    {
+      "name": "_ambiguous_",
+      "type": "string",
+      "doc": "Primary key. The column \"(ambiguous)\". [TODO(barwise): No column description. Add a definition to the value type.] [TODO(barwise): Data type was not declared; exported as TEXT. Add a data type to the value type.]"
+    },
+    {
+      "name": "start_position",
+      "type": "long"
+    },
+    {
+      "name": "end_position",
+      "type": "long"
+    },
+    {
+      "name": "piicategory",
+      "type": [
+        "null",
+        "string"
+      ],
+      "doc": "[NOTE(barwise): Value constraint available: ['full-name', 'email-address', 'phone-number', 'date-of-birth', 'social-security-number', 'credit-card-number', 'mailing-address', 'ip-address', 'passport-number', 'drivers-license-number']. Consider adding an accepted_values test.]"
+    },
+    {
+      "name": "confidence_score",
+      "type": [
+        "null",
+        "double"
+      ]
+    }
+  ],
+  "doc": "[NOTE(barwise): Definition available from ORM model: \"A detected PII occurrence within a specific document and scan version, identi...\"]"
+}
+
+---
+
+# Reviewer.avsc
+{
+  "type": "record",
+  "name": "Reviewer",
+  "fields": [
+    {
+      "name": "employee_id",
+      "type": "string",
+      "doc": "Primary key"
+    },
+    {
+      "name": "has_employee_id_employee_id",
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    {
+      "name": "reviewer_name",
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    {
+      "name": "clearance_level",
+      "type": [
+        "null",
+        "string"
+      ],
+      "doc": "[NOTE(barwise): Value constraint available: ['standard', 'elevated', 'restricted']. Consider adding an accepted_values test.]"
+    }
+  ],
+  "doc": "[NOTE(barwise): Definition available from ORM model: \"An employee who reviews findings in the compliance department.\"]"
+}
+
+---
+
+# ReviewDecision.avsc
+{
+  "type": "record",
+  "name": "ReviewDecision",
+  "fields": [
+    {
+      "name": "_ambiguous_",
+      "type": "string",
+      "doc": "Primary key. The column \"(ambiguous)\". [TODO(barwise): No column description. Add a definition to the value type.] [TODO(barwise): Data type was not declared; exported as TEXT. Add a data type to the value type.]"
+    }
+  ],
+  "doc": "[NOTE(barwise): Definition available from ORM model: \"A decision made by a reviewer on a single finding, recording the decision typ...\"]"
+}
+
+---
+
+# AuditEntry.avsc
+{
+  "type": "record",
+  "name": "AuditEntry",
+  "fields": [
+    {
+      "name": "audit_id",
+      "type": "string",
+      "doc": "Primary key [TODO(barwise): No column description. Add a definition to the value type.] [TODO(barwise): Data type was not declared; exported as TEXT. Add a data type to the value type.]"
+    },
+    {
+      "name": "action_type",
+      "type": [
+        "null",
+        "string"
+      ],
+      "doc": "[NOTE(barwise): Value constraint available: ['scan-initiated', 'scan-completed', 'review-assigned', 'review-completed', 'redaction-applied', 'document-released', 'status-changed']. Consider adding an accepted_values test.]"
+    }
+  ],
+  "doc": "[NOTE(barwise): Definition available from ORM model: \"A logged action on a document capturing who performed it, when, and details.\"]"
+}
+
+---
+
+# Scan.avsc
+{
+  "type": "record",
+  "name": "Scan",
+  "fields": [
+    {
+      "name": "scan_version",
+      "type": "string",
+      "doc": "Primary key [TODO(barwise): No column description. Add a definition to the value type.] [TODO(barwise): Data type was not declared; exported as TEXT. Add a data type to the value type.]"
+    },
+    {
+      "name": "model_version",
+      "type": "string"
+    }
+  ],
+  "doc": "[NOTE(barwise): Definition available from ORM model: \"A scan operation run over a document using a model version that produces find...\"]"
+}
+
+---
+
+# Release.avsc
+{
+  "type": "record",
+  "name": "Release",
+  "fields": [
+    {
+      "name": "document_id",
+      "type": {
+        "type": "string",
+        "logicalType": "uuid"
+      },
+      "doc": "Primary key [NOTE(barwise): Value constraint available: ['analytics-warehouse', 'customer-portal', 'regulatory-filing', 'partner-api']. Consider adding an accepted_values test.]"
+    },
+    {
+      "name": "downstream_system",
+      "type": "string",
+      "doc": "Primary key [NOTE(barwise): Value constraint available: ['analytics-warehouse', 'customer-portal', 'regulatory-filing', 'partner-api']. Consider adding an accepted_values test.]"
+    },
+    {
+      "name": "release_timestamp",
+      "type": {
+        "type": "long",
+        "logicalType": "timestamp-millis"
+      }
+    },
+    {
+      "name": "redacted_content_hash",
+      "type": [
+        "null",
+        "string"
+      ]
+    }
+  ],
+  "doc": "[NOTE(barwise): Definition available from ORM model: \"A record that a redacted document was released to a downstream system, identi...\"] [NOTE(barwise): Composite primary key (document_id, downstream_system): unique as a combination.]"
+}
+
+---
+
+# DocumentHasScan.avsc
+{
+  "type": "record",
+  "name": "DocumentHasScan",
+  "fields": [
+    {
+      "name": "document_id",
+      "type": {
+        "type": "string",
+        "logicalType": "uuid"
+      },
+      "doc": "Primary key"
+    },
+    {
+      "name": "scan_version",
+      "type": "string",
+      "doc": "Primary key [TODO(barwise): No column description. Add a definition to the value type.] [TODO(barwise): Data type was not declared; exported as TEXT. Add a data type to the value type.]"
+    }
+  ],
+  "doc": "[NOTE(barwise): Composite primary key (document_id, scan_version): unique as a combination.]"
+}
+
+---
+
+# ScanProducedFinding.avsc
+{
+  "type": "record",
+  "name": "ScanProducedFinding",
+  "fields": [
+    {
+      "name": "scan_version",
+      "type": "string",
+      "doc": "Primary key [TODO(barwise): No column description. Add a definition to the value type.] [TODO(barwise): Data type was not declared; exported as TEXT. Add a data type to the value type.]"
+    },
+    {
+      "name": "_ambiguous_",
+      "type": "string",
+      "doc": "Primary key. The column \"(ambiguous)\". [TODO(barwise): No column description. Add a definition to the value type.] [TODO(barwise): Data type was not declared; exported as TEXT. Add a data type to the value type.]"
+    }
+  ],
+  "doc": "[NOTE(barwise): Composite primary key (scan_version, (ambiguous)): unique as a combination.]"
+}
+
+---
+
+# FindingReviewedByReviewer.avsc
+{
+  "type": "record",
+  "name": "FindingReviewedByReviewer",
+  "fields": [
+    {
+      "name": "_ambiguous_",
+      "type": "string",
+      "doc": "Primary key. The column \"(ambiguous)\". [TODO(barwise): No column description. Add a definition to the value type.] [TODO(barwise): Data type was not declared; exported as TEXT. Add a data type to the value type.]"
+    },
+    {
+      "name": "employee_id",
+      "type": "string",
+      "doc": "Primary key"
+    }
+  ],
+  "doc": "[NOTE(barwise): Composite primary key ((ambiguous), employee_id): unique as a combination.]"
+}
+
+---
+
+# ReviewDecisionIsDecisionOfFinding.avsc
+{
+  "type": "record",
+  "name": "ReviewDecisionIsDecisionOfFinding",
+  "fields": [
+    {
+      "name": "_ambiguous_",
+      "type": "string",
+      "doc": "Primary key. The column \"(ambiguous)\". [TODO(barwise): No column description. Add a definition to the value type.] [TODO(barwise): Data type was not declared; exported as TEXT. Add a data type to the value type.]"
+    },
+    {
+      "name": "has_decision_about__ambiguous_",
+      "type": "string",
+      "doc": "Primary key. The column \"has_decision_about_(ambiguous)\". [TODO(barwise): No column description. Add a definition to the value type.] [TODO(barwise): Data type was not declared; exported as TEXT. Add a data type to the value type.]"
+    }
+  ],
+  "doc": "[NOTE(barwise): Composite primary key ((ambiguous), has_decision_about_(ambiguous)): unique as a combination.]"
+}
+
+---
+
+# AuditEntryAboutDocument.avsc
+{
+  "type": "record",
+  "name": "AuditEntryAboutDocument",
+  "fields": [
+    {
+      "name": "audit_id",
+      "type": "string",
+      "doc": "Primary key [TODO(barwise): No column description. Add a definition to the value type.] [TODO(barwise): Data type was not declared; exported as TEXT. Add a data type to the value type.]"
+    },
+    {
+      "name": "document_id",
+      "type": {
+        "type": "string",
+        "logicalType": "uuid"
+      },
+      "doc": "Primary key"
+    }
+  ],
+  "doc": "[NOTE(barwise): Composite primary key (audit_id, document_id): unique as a combination.]"
+}
+
+---
+
+# AuditEntryPerformedByReviewer.avsc
+{
+  "type": "record",
+  "name": "AuditEntryPerformedByReviewer",
+  "fields": [
+    {
+      "name": "audit_id",
+      "type": "string",
+      "doc": "Primary key [TODO(barwise): No column description. Add a definition to the value type.] [TODO(barwise): Data type was not declared; exported as TEXT. Add a data type to the value type.]"
+    },
+    {
+      "name": "employee_id",
+      "type": "string",
+      "doc": "Primary key"
+    }
+  ],
+  "doc": "[NOTE(barwise): Composite primary key (audit_id, employee_id): unique as a combination.]"
+}

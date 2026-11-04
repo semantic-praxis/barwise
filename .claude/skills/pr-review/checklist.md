@@ -2,9 +2,12 @@
 
 Everything `npm run ci:local` runs is excluded here by construction;
 `.github/workflows/ci.yml` owns that list and CI will report it. What
-remains is judgment, grouped by what the diff touches. Run the groups
-whose trigger is present, skip the rest, and say in the review which
-groups ran. Each item is a test to apply, followed by the authority it
+remains is judgment, grouped by what the diff touches. Which groups
+apply is not chosen by hand: `npm run pr:risk -- --base
+origin/<the PR's base branch>` lists the groups the
+diff triggers, with their files, and the groups no path can detect,
+which apply to every PR (`pr-review` section 3). Run those, and say in
+the review which ran. Each item is a test to apply, followed by the authority it
 comes from. This file is the single owner of these items: the
 `pr-review` skill runs it and the `pr-creation` skill treats it as the
 output specification for the PR body (spec:
@@ -12,6 +15,11 @@ output specification for the PR body (spec:
 
 ## Every PR
 
+- The failure modes in the root `REVIEW.md` ("Always check") were run.
+  That file owns them because the Claude Code Review service reads it
+  and not this one; they are the defect classes reviews here found most
+  often between 2026-09-23 and 2026-10-23; four of the eight appear
+  nowhere below and the rest only in part. Authority: `docs/specs/review-md.spec.md`.
 - The spec workstream is named, and the spec's `Status` header says
   what this PR ships. `audit:specs --check` guards only the claim of
   no implementation (barwise-912). Authority: `spec-writer` skill.
@@ -326,6 +334,20 @@ now holds, guards, or learns that they did not have to.
   spec's `joinSegments` helper was invented in a sketch, never built,
   and carried as fact until re-measured. Authority:
   `spec-writer/sensemaking.md`, Forward sections and Tripwires.
+
+## When an ADR changed
+
+- The PR body says what the decision was, what it is now, and why: an
+  ADR is edited in place, so the PR is the only record of the change,
+  and `git log -p` on the file leads a later reader there. Authority:
+  `docs/specs/architecture-index.spec.md`, "History lives in git and
+  the PR".
+- No spec restates the decision; a spec that settled it points to the
+  ADR from its resolved heading. Two statements of one rule drift.
+  Authority: the same spec, "An ADR and its spec divide the work".
+- `Date:` moved if the decision changed. A script cannot tell a changed
+  decision from a reflow, so this is the reviewer's call. Authority:
+  the same spec, "The format".
 
 ## When Python was touched
 

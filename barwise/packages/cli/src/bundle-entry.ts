@@ -7,6 +7,10 @@
  * so `import.meta` never reaches the CJS bundle.
  */
 
-import { createProgram } from "./cli.js";
+import { commandNameIn, createProgram } from "./cli.js";
 
-createProgram(process.env.BARWISE_CLI_VERSION ?? "0.0.0-dev").parse();
+// A CJS bundle has no top-level await, hence the promise chain.
+void createProgram(
+  process.env.BARWISE_CLI_VERSION ?? "0.0.0-dev",
+  commandNameIn(process.argv.slice(2)),
+).then((program) => program.parse());

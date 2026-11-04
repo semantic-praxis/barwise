@@ -6,6 +6,7 @@ import { OrmModel } from "@barwise/core";
 import { describe, expect, it } from "vitest";
 import { ModelBuilder } from "../../../core/tests/helpers/ModelBuilder.js";
 import { buildModelSummary } from "../../src/session/modelSummary.js";
+import { roomsFile } from "../fixtures/rooms.js";
 
 function orderModel() {
   return new ModelBuilder("Orders")
@@ -59,6 +60,22 @@ describe("buildModelSummary", () => {
       true,
     );
     expect(places.readings.every((r) => !r.includes("{0}"))).toBe(true);
+  });
+
+  it("prints a hyphen-bound word before its player, without the hyphen", () => {
+    // Through core's expandReading rather than a private copy of it
+    // (reading-hyphen-binding.spec.md).
+    const model = new OrmModel({ name: "Test" });
+    model.addObjectType({ id: "l", name: "Listing", kind: "entity", referenceMode: "id" });
+    model.addObjectType({ id: "c", name: "Currency", kind: "entity", referenceMode: "code" });
+    model.addFactType({
+      id: "ft",
+      name: "Listing has sale Currency",
+      roles: [{ name: "has", playerId: "l" }, { name: "is of", playerId: "c" }],
+      readings: ["{0} has sale- {1}"],
+    });
+    const ft = buildModelSummary(model).factTypes.find((f) => f.id === "ft")!;
+    expect(ft.readings).toEqual(["Listing has sale Currency"]);
   });
 
   it("summarizes subtype links with resolved names", () => {
@@ -139,5 +156,21 @@ describe("buildModelSummary", () => {
     expect(places.roles[1]!.playerName).toBe("missing-order-type");
     expect(s.subtypes[0]!.subtypeName).toBe("missing-subtype");
     expect(s.subtypes[0]!.supertypeName).toBe("missing-supertype");
+  });
+});
+
+describe("model summary across fact types", () => {
+  it("lists the key under each fact type it spans, whichever fact type nests it", () => {
+    for (const host of ["ft-in", "ft-nr", "ft-id"] as const) {
+      const summary = buildModelSummary(roomsFile(host));
+      const byFactType = Object.fromEntries(
+        summary.factTypes.map((ft) => [ft.id, ft.constraints.map((c) => c.id)]),
+      );
+      expect(byFactType, host).toEqual({
+        "ft-id": ["c-pref"],
+        "ft-in": ["c-key"],
+        "ft-nr": ["c-key"],
+      });
+    }
   });
 });

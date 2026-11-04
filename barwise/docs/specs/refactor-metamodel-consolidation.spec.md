@@ -5,7 +5,7 @@ Created: 2026-06-18
 Last-updated: 2026-06-18
 Tracking: barwise-jtl (consolidation epic),
 REPO_REVIEW-2026-06-16.md (F1 god files, F2 core barrel, F4 minors),
-docs/adr/0001-metamodel-evolution-policy.md, barwise-5t9 (+ children),
+docs/adr/metamodel-evolution-policy.md, barwise-5t9 (+ children),
 docs/specs/archive/god-file-decomposition.spec.md,
 docs/specs/archive/diagram-presentation-contract.spec.md,
 docs/specs/norma-export.spec.md
@@ -15,7 +15,7 @@ docs/specs/norma-export.spec.md
 Two threads edit the codebase concurrently -- an architecture/refactor
 thread (this one, working the REPO_REVIEW god-file and barrel findings)
 and a metamodel-evolution thread (adding ORM 2 constructs from the
-barwise-5t9 menu under ADR-0001). Orthogonality and composability are the
+barwise-5t9 menu under ADR `metamodel-evolution-policy`). Orthogonality and composability are the
 primary pillars, but they govern the _code's_ structure; this spec
 applies the same discipline to the _work_, so the two threads do not
 double-edit the same files and force each other into repeated rebases.
@@ -63,7 +63,7 @@ its own spec (`god-file-decomposition.spec.md`,
 `diagram-presentation-contract.spec.md`) and ships as its own PR; this
 spec only orders them against the metamodel queue. The metamodel
 constructs are out of scope entirely -- they are the other thread's, under
-ADR-0001.
+ADR `metamodel-evolution-policy`.
 
 ## Inventory
 
@@ -120,7 +120,7 @@ Lane C -- already decomposed; notify, do not block:
 ### 1. Publish the agreement and open the Lane A work
 
 This spec, plus bd issues for every lane item linked to `barwise-5t9` and
-ADR-0001, so both threads read one tracker. Lane A issues are marked ready
+ADR `metamodel-evolution-policy`, so both threads read one tracker. Lane A issues are marked ready
 immediately; the `DiagramPanel` -> `DiagramSession` refactor
 (`diagram-presentation-contract.spec.md`) starts first as the top hotspot.
 No core file touched, so it cannot collide with the metamodel queue.
@@ -185,7 +185,7 @@ significant touch -- flagged below.
   when 5t9.10 (Tier 3) lands rather than being recut. This couples a
   refactor decision to a metamodel fork, so both threads should agree the
   boundary names before F2 starts.
-- **Spec vs ADR for this agreement (resolved: spec).** ADR-0001 already
+- **Spec vs ADR for this agreement (resolved: spec).** ADR `metamodel-evolution-policy` already
   holds the standing metamodel-evolution _policy_; this is a point-in-time
   _sequencing plan_ that changes as lanes drain, so it is a living spec
   with `Last-updated`, not a new ADR.
@@ -198,7 +198,7 @@ significant touch -- flagged below.
   silent logic clash, because the refactors change structure and the
   metamodel edits add fields -- disjoint hunks that only collide on
   position.
-- Every refactor here preserves the ADR-0001 invariants and is guarded
+- Every refactor here preserves the ADR `metamodel-evolution-policy` invariants and is guarded
   accordingly: determinism in core (`check-core-purity`), the
   discriminated-union + exhaustive type-guard dispatch (a `never` default
   keeps an unhandled new member a compile error), lossless round-trip
@@ -212,7 +212,7 @@ significant touch -- flagged below.
 ## Non-goals
 
 - No metamodel capability is added or changed here; the barwise-5t9
-  constructs are the other thread's, under ADR-0001.
+  constructs are the other thread's, under ADR `metamodel-evolution-policy`.
 - No refactor is _specified_ here -- each keeps its own spec. This
   document only orders them.
 - No change to the FormatDescriptor registry beyond the single

@@ -31,7 +31,7 @@ describe("MCP server stdio spawn", () => {
     await client?.close();
   });
 
-  it("answers the handshake and lists every registered tool", async () => {
+  it("answers the handshake and lists every registered tool [adr:surface-capability-parity#pinned-tool-lists]", async () => {
     // The complete list, not a sample: with four names sampled, the
     // whole suite stayed green while `review_model` and `merge_models`
     // were unregistered (the 2026-08-25 assertion audit ran exactly
@@ -55,6 +55,7 @@ describe("MCP server stdio spawn", () => {
       "lineage_status",
       "merge_models",
       "query_model",
+      "rename_element",
       "review_model",
       "split_model",
       "validate_model",
@@ -81,24 +82,25 @@ describe("MCP server stdio spawn", () => {
     expect(JSON.parse(text)).toMatchObject({ valid: true });
   });
 
-  it("mints UUIDv7 ids, so the entry point installed the generator", async () => {
-    // The generator is tested in core with a fake clock; this is the
-    // wiring core cannot see. Without the install line in src/index.ts
-    // the import still succeeds, with v4 ids
-    // (docs/specs/uuid7-generator-factory.spec.md).
+  it("imports with the ids the model gives, and no generated id", async () => {
+    // The entry point installs no id generator: 6b-4b retired it, and every
+    // element id is one the model gives from its name or its sentence
+    // (iri-identity decision 13). The spawned server is the wiring.
     const result = await client.callTool({
       name: "import_model",
       arguments: {
-        source: "CREATE TABLE customers (customer_id INTEGER PRIMARY KEY, name TEXT);",
-        format: "ddl",
+        source:
+          "version: 0.2.0.dev0\nname: T\nontology:\n  - { concept: Customer, type: EntityType }\n",
+        format: "ossie",
       },
     });
     const text = (result.content as Array<{ type: string; text: string; }>)[0]!.text;
     const ids = [...text.matchAll(/^\s*(?:- )?id: (\S+)$/gm)].map((m) => m[1]!);
-    expect(ids.length).toBeGreaterThan(0);
-    for (const id of ids) {
-      expect(id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
-    }
+    expect(ids).toContain("Customer");
+    const uuids = ids.filter((id) =>
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(id)
+    );
+    expect(uuids).toEqual([]);
   });
 
   it("lists resources", async () => {

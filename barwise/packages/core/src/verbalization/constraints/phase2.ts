@@ -3,10 +3,11 @@
  * exclusive-or, subset, equality, ring, and frequency.
  */
 import type { RingType } from "../../model/Constraint.js";
+import type { ConstraintModel } from "../../model/constraintModel.js";
 import type { FactType } from "../../model/FactType.js";
-import type { OrmModel } from "../../model/OrmModel.js";
-import { expandReading } from "../../model/ReadingOrder.js";
+import { expandReading, leadOf, splitReading, textOf } from "../../model/ReadingOrder.js";
 import type { JoinOperand, RolePath } from "../../model/RolePath.js";
+import { subtypeOperands } from "../../model/subtypeOperands.js";
 import { assertNever } from "../../util/assertNever.js";
 import {
   buildVerbalization,
@@ -16,15 +17,26 @@ import {
   type Verbalization,
   type VerbalizationSegment,
 } from "../Verbalization.js";
-import { extractPredicate, localRole, resolveCommonPlayer } from "./sentence.js";
+import {
+  eachReading,
+  forEachReading,
+  leadSegs,
+  localRole,
+  openingReading,
+  quantifiedReading,
+  resolveCommonPlayer,
+  ringClause,
+  ringReading,
+  rolePlayer,
+} from "./sentence.js";
 
 export function verbalizeDisjunctiveMandatory(
   roleIds: readonly string[],
-  factType: FactType,
-  model: OrmModel,
+  sourceId: string,
+  model: ConstraintModel,
 ): Verbalization {
   const segments: VerbalizationSegment[] = [kwSeg("Each ")];
-  const commonPlayer = resolveCommonPlayer(roleIds, factType, model);
+  const commonPlayer = resolveCommonPlayer(roleIds, model);
   segments.push(refSeg(commonPlayer.name, commonPlayer.id));
 
   for (let i = 0; i < roleIds.length; i++) {
@@ -39,7 +51,54 @@ export function verbalizeDisjunctiveMandatory(
   }
 
   segments.push(textSeg("."));
-  return buildVerbalization(factType.id, "constraint", segments);
+  return buildVerbalization(sourceId, "constraint", segments);
+}
+
+/**
+ * How many of its subtypes each kind lets an instance of the supertype be,
+ * as the verbalization and the ConstraintSpec pseudocode both say it.
+ */
+export const SUBTYPE_QUANTITY = {
+  exclusion: "at most one",
+  disjunctive_mandatory: "at least one",
+  exclusive_or: "exactly one",
+} as const;
+
+/**
+ * A constraint over a supertype's subtypes (orm-format-3, Open decision 2):
+ * "Each Person is at most one of: Male, Female." for an exclusion, "at
+ * least one of" for a disjunctive mandatory (totality) and "exactly one
+ * of" for an exclusive-or (a partition). With one subtype, "Each Person
+ * is a Male." The supertype is the first subtype fact's; a subtype fact
+ * that resolves to nothing is shown by its id.
+ */
+export function verbalizeSubtypeConstraint(
+  kind: "exclusion" | "disjunctive_mandatory" | "exclusive_or",
+  subtypeFactIds: readonly string[],
+  sourceId: string,
+  model: ConstraintModel,
+): Verbalization {
+  const { supertypeId, subtypeIds } = subtypeOperands(subtypeFactIds, model);
+  const supertype = supertypeId === undefined ? undefined : model.getObjectType(supertypeId);
+  const segments: VerbalizationSegment[] = [kwSeg("Each ")];
+  segments.push(
+    supertype ? refSeg(supertype.name, supertype.id) : textSeg("instance of the supertype"),
+  );
+  const subtypes = subtypeIds.map((id, i) => {
+    const sub = id === undefined ? undefined : model.getObjectType(id);
+    return sub ? refSeg(sub.name, sub.id) : textSeg(subtypeFactIds[i]!);
+  });
+  if (kind === "disjunctive_mandatory" && subtypes.length === 1) {
+    segments.push(kwSeg(" is a "), subtypes[0]!, textSeg("."));
+    return buildVerbalization(sourceId, "constraint", segments);
+  }
+  segments.push(kwSeg(` is ${SUBTYPE_QUANTITY[kind]} of: `));
+  subtypes.forEach((seg, i) => {
+    if (i > 0) segments.push(textSeg(", "));
+    segments.push(seg);
+  });
+  segments.push(textSeg("."));
+  return buildVerbalization(sourceId, "constraint", segments);
 }
 
 /**
@@ -47,11 +106,11 @@ export function verbalizeDisjunctiveMandatory(
  */
 export function verbalizeExclusion(
   roleIds: readonly string[],
-  factType: FactType,
-  model: OrmModel,
+  sourceId: string,
+  model: ConstraintModel,
 ): Verbalization {
   const segments: VerbalizationSegment[] = [kwSeg("No ")];
-  const commonPlayer = resolveCommonPlayer(roleIds, factType, model);
+  const commonPlayer = resolveCommonPlayer(roleIds, model);
   segments.push(refSeg(commonPlayer.name, commonPlayer.id));
   segments.push(textSeg(" both "));
 
@@ -65,7 +124,7 @@ export function verbalizeExclusion(
   }
 
   segments.push(textSeg("."));
-  return buildVerbalization(factType.id, "constraint", segments);
+  return buildVerbalization(sourceId, "constraint", segments);
 }
 
 /**
@@ -73,11 +132,11 @@ export function verbalizeExclusion(
  */
 export function verbalizeExclusiveOr(
   roleIds: readonly string[],
-  factType: FactType,
-  model: OrmModel,
+  sourceId: string,
+  model: ConstraintModel,
 ): Verbalization {
   const segments: VerbalizationSegment[] = [kwSeg("Each ")];
-  const commonPlayer = resolveCommonPlayer(roleIds, factType, model);
+  const commonPlayer = resolveCommonPlayer(roleIds, model);
   segments.push(refSeg(commonPlayer.name, commonPlayer.id));
   segments.push(textSeg(" either "));
 
@@ -92,7 +151,7 @@ export function verbalizeExclusiveOr(
 
   segments.push(kwSeg(" but not both"));
   segments.push(textSeg("."));
-  return buildVerbalization(factType.id, "constraint", segments);
+  return buildVerbalization(sourceId, "constraint", segments);
 }
 
 /**
@@ -101,13 +160,14 @@ export function verbalizeExclusiveOr(
 export function verbalizeSubset(
   subsetRoleIds: readonly string[],
   supersetRoleIds: readonly string[],
-  factType: FactType,
-  model: OrmModel,
+  sourceId: string,
+  model: ConstraintModel,
 ): Verbalization {
+  const owner = soleFactType(model, [...subsetRoleIds, ...supersetRoleIds]);
   const segments: VerbalizationSegment[] = [kwSeg("If ")];
 
   for (let i = 0; i < subsetRoleIds.length; i++) {
-    const label = spanningRoleLabel(model, factType, subsetRoleIds[i]!);
+    const label = spanningRoleLabel(model, owner, subsetRoleIds[i]!);
     if (i > 0) segments.push(textSeg(" "));
     segments.push(refSeg(label.text, label.elementId));
   }
@@ -115,13 +175,13 @@ export function verbalizeSubset(
   segments.push(kwSeg(" then "));
 
   for (let i = 0; i < supersetRoleIds.length; i++) {
-    const label = spanningRoleLabel(model, factType, supersetRoleIds[i]!);
+    const label = spanningRoleLabel(model, owner, supersetRoleIds[i]!);
     if (i > 0) segments.push(textSeg(" "));
     segments.push(refSeg(label.text, label.elementId));
   }
 
   segments.push(textSeg("."));
-  return buildVerbalization(factType.id, "constraint", segments);
+  return buildVerbalization(sourceId, "constraint", segments);
 }
 
 /**
@@ -130,13 +190,14 @@ export function verbalizeSubset(
 export function verbalizeEquality(
   roleIds1: readonly string[],
   roleIds2: readonly string[],
-  factType: FactType,
-  model: OrmModel,
+  sourceId: string,
+  model: ConstraintModel,
 ): Verbalization {
+  const owner = soleFactType(model, [...roleIds1, ...roleIds2]);
   const segments: VerbalizationSegment[] = [];
 
   for (let i = 0; i < roleIds1.length; i++) {
-    const label = spanningRoleLabel(model, factType, roleIds1[i]!);
+    const label = spanningRoleLabel(model, owner, roleIds1[i]!);
     if (i > 0) segments.push(textSeg(" "));
     segments.push(refSeg(label.text, label.elementId));
   }
@@ -144,13 +205,13 @@ export function verbalizeEquality(
   segments.push(kwSeg(" if and only if "));
 
   for (let i = 0; i < roleIds2.length; i++) {
-    const label = spanningRoleLabel(model, factType, roleIds2[i]!);
+    const label = spanningRoleLabel(model, owner, roleIds2[i]!);
     if (i > 0) segments.push(textSeg(" "));
     segments.push(refSeg(label.text, label.elementId));
   }
 
   segments.push(textSeg("."));
-  return buildVerbalization(factType.id, "constraint", segments);
+  return buildVerbalization(sourceId, "constraint", segments);
 }
 
 /**
@@ -165,7 +226,7 @@ export function verbalizeRing(
   roleId2: string,
   ringType: RingType,
   factType: FactType,
-  model: OrmModel,
+  model: ConstraintModel,
 ): Verbalization {
   const role1 = localRole(factType, roleId1);
   const ot = model.getObjectType(role1.playerId);
@@ -176,17 +237,20 @@ export function verbalizeRing(
   const name3 = refSeg(typeName + "3", typeId);
   const same = refSeg(typeName, typeId);
 
-  const predicate = factType.arity === 2
-    ? extractPredicate(factType, 0, 1)
-    : "...";
+  // The whole reading after the subject, each lead before the name in its
+  // own role slot (reading-hyphen-binding.spec.md).
+  const reading = ringReading(factType, 0, 1);
+  const clause = (
+    subject: VerbalizationSegment,
+    object: VerbalizationSegment,
+    options: { readonly negated?: boolean; readonly determiner?: string; } = {},
+  ): VerbalizationSegment[] => ringClause(reading, subject, object, options);
 
   switch (ringType) {
     case "irreflexive": {
       const segments: VerbalizationSegment[] = [
         kwSeg("No "),
-        same,
-        textSeg(" " + predicate + " that same "),
-        same,
+        ...clause(same, same, { determiner: "that same " }),
         textSeg("."),
       ];
       return buildVerbalization(factType.id, "constraint", segments);
@@ -194,13 +258,9 @@ export function verbalizeRing(
     case "asymmetric": {
       const segments: VerbalizationSegment[] = [
         kwSeg("If "),
-        name1,
-        textSeg(" " + predicate + " "),
-        name2,
+        ...clause(name1, name2),
         kwSeg(" then "),
-        name2,
-        textSeg(" does not " + predicate + " "),
-        name1,
+        ...clause(name2, name1, { negated: true }),
         textSeg("."),
       ];
       return buildVerbalization(factType.id, "constraint", segments);
@@ -208,13 +268,9 @@ export function verbalizeRing(
     case "antisymmetric": {
       const segments: VerbalizationSegment[] = [
         kwSeg("If "),
-        name1,
-        textSeg(" " + predicate + " "),
-        name2,
+        ...clause(name1, name2),
         kwSeg(" and "),
-        name2,
-        textSeg(" " + predicate + " "),
-        name1,
+        ...clause(name2, name1),
         kwSeg(" then "),
         name1,
         textSeg(" is the same " + typeName + " as "),
@@ -226,13 +282,9 @@ export function verbalizeRing(
     case "symmetric": {
       const segments: VerbalizationSegment[] = [
         kwSeg("If "),
-        name1,
-        textSeg(" " + predicate + " "),
-        name2,
+        ...clause(name1, name2),
         kwSeg(" then "),
-        name2,
-        textSeg(" " + predicate + " "),
-        name1,
+        ...clause(name2, name1),
         textSeg("."),
       ];
       return buildVerbalization(factType.id, "constraint", segments);
@@ -240,17 +292,11 @@ export function verbalizeRing(
     case "transitive": {
       const segments: VerbalizationSegment[] = [
         kwSeg("If "),
-        name1,
-        textSeg(" " + predicate + " "),
-        name2,
+        ...clause(name1, name2),
         kwSeg(" and "),
-        name2,
-        textSeg(" " + predicate + " "),
-        name3,
+        ...clause(name2, name3),
         kwSeg(" then "),
-        name1,
-        textSeg(" " + predicate + " "),
-        name3,
+        ...clause(name1, name3),
         textSeg("."),
       ];
       return buildVerbalization(factType.id, "constraint", segments);
@@ -258,17 +304,11 @@ export function verbalizeRing(
     case "intransitive": {
       const segments: VerbalizationSegment[] = [
         kwSeg("If "),
-        name1,
-        textSeg(" " + predicate + " "),
-        name2,
+        ...clause(name1, name2),
         kwSeg(" and "),
-        name2,
-        textSeg(" " + predicate + " "),
-        name3,
+        ...clause(name2, name3),
         kwSeg(" then "),
-        name1,
-        textSeg(" does not " + predicate + " "),
-        name3,
+        ...clause(name1, name3, { negated: true }),
         textSeg("."),
       ];
       return buildVerbalization(factType.id, "constraint", segments);
@@ -276,9 +316,7 @@ export function verbalizeRing(
     case "acyclic": {
       const segments: VerbalizationSegment[] = [
         kwSeg("No "),
-        same,
-        textSeg(" " + predicate + " that same "),
-        same,
+        ...clause(same, same, { determiner: "that same " }),
         textSeg(", directly or through a chain of such relationships."),
       ];
       return buildVerbalization(factType.id, "constraint", segments);
@@ -286,9 +324,7 @@ export function verbalizeRing(
     case "purely_reflexive": {
       const segments: VerbalizationSegment[] = [
         kwSeg("If "),
-        name1,
-        textSeg(" " + predicate + " "),
-        name2,
+        ...clause(name1, name2),
         kwSeg(" then "),
         name1,
         textSeg(" is the same " + typeName + " as "),
@@ -303,14 +339,19 @@ export function verbalizeRing(
 }
 
 /**
- * "Each {Subject} {pred} at least {min} and at most {max} {Object}."
+ * "Each {Subject} that <reading, with some {Object}> <reading, with
+ * <count> instances of {Object}>.", or "For each {Subject}, if <reading>,
+ * then that holds for <count> instances of {Object}." when no reading names
+ * the subject first: conditional, as a frequency constrains only the
+ * instances that play the role (binary-constraint-sentences.spec.md,
+ * barwise-zx2).
  */
 export function verbalizeFrequency(
   roleIds: readonly string[],
   min: number,
   max: number | "unbounded",
   factType: FactType,
-  model: OrmModel,
+  model: ConstraintModel,
 ): Verbalization {
   if (roleIds.length !== 1) {
     return verbalizeMultiRoleFrequency(roleIds, min, max, factType, model);
@@ -325,33 +366,28 @@ export function verbalizeFrequency(
   const roleIdx = factType.roles.findIndex((r) => r.id === roleId);
   const otherIdx = roleIdx === 0 ? 1 : 0;
 
-  const subjectRole = factType.roles[roleIdx]!;
-  const objectRole = factType.roles[otherIdx]!;
-  const subjectType = model.getObjectType(subjectRole.playerId);
-  const objectType = model.getObjectType(objectRole.playerId);
-  const subjectName = subjectType?.name ?? subjectRole.name;
-  const objectName = objectType?.name ?? objectRole.name;
+  // "instances of" counts without a plural the model does not hold; the
+  // noun agrees with the last number ("at least 1 instance of").
+  const bound = max === "unbounded"
+    ? `at least ${min}`
+    : min === max
+    ? `exactly ${min}`
+    : `at least ${min} and at most ${max}`;
+  const count = `${bound} ${/\b1$/.test(bound) ? "instance" : "instances"} of `;
 
-  const predicate = extractPredicate(factType, roleIdx, otherIdx);
-
-  const segments: VerbalizationSegment[] = [
-    kwSeg("Each "),
-    refSeg(subjectName, subjectRole.playerId),
-    textSeg(" " + predicate + " "),
-  ];
-
-  if (max === "unbounded") {
-    segments.push(kwSeg(`at least ${min} `));
-  } else if (min === max) {
-    segments.push(kwSeg(`exactly ${min} `));
-  } else {
-    segments.push(kwSeg(`at least ${min} and at most ${max} `));
-  }
-
-  segments.push(refSeg(objectName, objectRole.playerId));
-  segments.push(textSeg("."));
-
-  return buildVerbalization(factType.id, "constraint", segments);
+  // "Each X that <reading> some Y <reading> <count> Y": the frequency
+  // restricts only the X that play the role, so it does not say each X does.
+  const each = eachReading(model, factType, roleIdx, (rest) => [
+    kwSeg("that "),
+    ...quantifiedReading(model, factType, rest, roleIdx),
+    textSeg(" "),
+    ...quantifiedReading(model, factType, rest, roleIdx, count),
+  ]);
+  return buildVerbalization(
+    factType.id,
+    "constraint",
+    each ?? forEachReading(model, factType, roleIdx, "some ", { other: otherIdx, count }),
+  );
 }
 
 export function verbalizeGenericFrequency(
@@ -359,7 +395,7 @@ export function verbalizeGenericFrequency(
   min: number,
   max: number | "unbounded",
   factType: FactType,
-  model: OrmModel,
+  model: ConstraintModel,
 ): Verbalization {
   const role = localRole(factType, roleId);
   const ot = model.getObjectType(role.playerId);
@@ -397,7 +433,7 @@ function verbalizeMultiRoleFrequency(
   min: number,
   max: number | "unbounded",
   factType: FactType,
-  model: OrmModel,
+  model: ConstraintModel,
 ): Verbalization {
   const names = roleIds.map((rid) => {
     const role = localRole(factType, rid);
@@ -436,7 +472,7 @@ export function verbalizeValueComparison(
   roleId2: string,
   operator: string,
   factType: FactType,
-  model: OrmModel,
+  model: ConstraintModel,
 ): Verbalization {
   const role1 = localRole(factType, roleId1);
   const role2 = localRole(factType, roleId2);
@@ -466,15 +502,21 @@ export function cardinalityQuantifier(min: number, max: number | "unbounded"): s
   return `at least ${min} and at most ${max}`;
 }
 
-/** The predicate text of a unary reading ("{0} is active" -> "is active"). */
-function unaryPredicate(factType: FactType): string {
-  const t = factType.readings[0]?.template ?? "";
-  const p = t.indexOf("{0}");
-  if (p >= 0) {
-    const after = t.slice(p + "{0}".length).trim();
-    if (after) return after;
+/**
+ * The predicate text of a unary reading ("{0} is active" -> "is active"),
+ * and the words hyphen-bound to its player ("late- {0} arrives" -> lead
+ * "late"); the fallback text has neither placeholder nor lead
+ * (reading-hyphen-binding.spec.md).
+ */
+function unaryPredicate(factType: FactType): { readonly text: string; readonly lead: string; } {
+  const parts = splitReading(factType.readings[0]?.template ?? "").parts;
+  const at = parts.findIndex((p) => p.kind === "role" && p.index === 0);
+  const lead = leadOf(parts[at]);
+  if (at >= 0) {
+    const after = textOf(parts.slice(at + 1)).trim();
+    if (after) return { text: after, lead };
   }
-  return t.replace(/\{\d+\}/g, "").trim() || factType.name;
+  return { text: textOf(parts).trim() || factType.name, lead };
 }
 
 /**
@@ -487,7 +529,7 @@ export function verbalizeCardinality(
   min: number,
   max: number | "unbounded",
   factType: FactType,
-  model: OrmModel,
+  model: ConstraintModel,
 ): Verbalization {
   const role = localRole(factType, roleId);
   const ot = model.getObjectType(role.playerId);
@@ -496,8 +538,9 @@ export function verbalizeCardinality(
   const quantifier = cardinalityQuantifier(min, max);
 
   return buildVerbalization(factType.id, "constraint", [
-    textSeg(`The '${predicate}' role is played by `),
+    textSeg(`The '${predicate.text}' role is played by `),
     kwSeg(`${quantifier} `),
+    ...leadSegs(predicate.lead),
     refSeg(typeName, role.playerId),
     textSeg(" instances."),
   ]);
@@ -526,7 +569,8 @@ export function verbalizeObjectCardinality(
 // Join constraints (role-path operands)
 // ---------------------------------------------------------------------------
 
-const objName = (model: OrmModel, otId: string): string => model.getObjectType(otId)?.name ?? otId;
+const objName = (model: ConstraintModel, otId: string): string =>
+  model.getObjectType(otId)?.name ?? otId;
 
 /**
  * How a spanning constraint names one of its roles.
@@ -544,8 +588,8 @@ const objName = (model: OrmModel, otId: string): string => model.getObjectType(o
  * `spanningArm` below (barwise-1003).
  */
 function spanningRoleLabel(
-  model: OrmModel,
-  owner: FactType,
+  model: ConstraintModel,
+  owner: FactType | undefined,
   roleId: string,
 ): { text: string; elementId: string; } {
   const role = model.findRole(roleId);
@@ -554,7 +598,7 @@ function spanningRoleLabel(
   if (!role) return { text: roleId, elementId: roleId };
 
   const name = model.getObjectType(role.playerId)?.name ?? role.name;
-  if (owner.getRoleById(roleId)) return { text: name, elementId: role.playerId };
+  if (owner?.getRoleById(roleId)) return { text: name, elementId: role.playerId };
 
   const home = factTypeOfRole(model, roleId);
   return {
@@ -581,50 +625,40 @@ function spanningRoleLabel(
  * foreign to the owner fact type by design (barwise-884); a role in NO
  * fact type is a dangling reference, and the id is all there is to say.
  */
-function spanningArm(model: OrmModel, roleId: string): VerbalizationSegment[] {
+function spanningArm(model: ConstraintModel, roleId: string): VerbalizationSegment[] {
   const home = factTypeOfRole(model, roleId);
   const role = home?.getRoleById(roleId);
   if (!home || !role) return [textSeg(roleId + " some "), refSeg(roleId, roleId)];
 
-  const playerRef = (index: number): VerbalizationSegment => {
-    const other = home.roles[index];
-    if (!other) return textSeg(`{${index}}`);
-    const name = model.getObjectType(other.playerId)?.name ?? other.name;
-    return refSeg(name, other.playerId);
-  };
-
-  const lead = `{${home.roles.indexOf(role)}}`;
-  const reading = home.readings.find((r) => r.template.trimStart().startsWith(lead));
-  if (reading) {
-    const rest = reading.template.trimStart().slice(lead.length).trimStart();
-    const segments: VerbalizationSegment[] = [];
-    // Odd indices are placeholder numbers, even ones the text between.
-    // `validateReadingTemplate` accepts a placeholder written flush
-    // against a word ("works on{1}in"), so the space the reading left out
-    // is supplied here rather than rendering "works onsome Projectin".
-    const parts = rest.split(/\{(\d+)\}/);
-    parts.forEach((part, i) => {
-      if (i % 2 === 1) {
-        segments.push(textSeg("some "), playerRef(Number(part)));
-        return;
-      }
-      let text = part;
-      if (i > 0 && /^\w/.test(text)) text = " " + text;
-      if (i < parts.length - 1 && text && !/\s$/.test(text)) text += " ";
-      if (text) segments.push(textSeg(text));
-    });
-    return segments;
-  }
+  // The opening placeholder's lead is omitted because the caller prints
+  // the shared subject once (reading-hyphen-binding.spec.md).
+  const own = home.roles.indexOf(role);
+  const opening = openingReading(home, own);
+  if (opening) return quantifiedReading(model, home, opening.rest, own);
 
   const segments: VerbalizationSegment[] = [textSeg(role.name)];
   home.roles.forEach((other, index) => {
-    if (other !== role) segments.push(textSeg(" some "), playerRef(index));
+    if (other !== role) segments.push(textSeg(" some "), rolePlayer(model, home, index));
   });
   return segments;
 }
 
+/**
+ * The one fact type holding every role a constraint names, if there is one.
+ * A subset or equality whose roles all sit in one fact type labels them by
+ * player alone, as it did when that fact type hosted it; one whose roles
+ * span fact types names each role's fact type, since no fact type is the
+ * constraint's own (orm-format-3, placement by kind).
+ */
+function soleFactType(model: ConstraintModel, roleIds: readonly string[]): FactType | undefined {
+  // A dangling role holds no fact type, and says nothing about whether the
+  // others share one.
+  const holding = model.factTypesHolding(roleIds);
+  return holding.length === 1 ? holding[0] : undefined;
+}
+
 /** The fact type owning a role id, scanning the whole model. */
-function factTypeOfRole(model: OrmModel, roleId: string): FactType | undefined {
+function factTypeOfRole(model: ConstraintModel, roleId: string): FactType | undefined {
   for (const ft of model.factTypes) {
     if (ft.getRoleById(roleId)) return ft;
   }
@@ -632,7 +666,7 @@ function factTypeOfRole(model: OrmModel, roleId: string): FactType | undefined {
 }
 
 /** The object type id at path node `index` (0 = root, k = after step k). */
-function pathNodeTypeId(path: RolePath, model: OrmModel, index: number): string {
+function pathNodeTypeId(path: RolePath, model: ConstraintModel, index: number): string {
   if (index <= 0) return path.root;
   const step = path.steps[index - 1];
   if (!step) return path.root;
@@ -641,7 +675,7 @@ function pathNodeTypeId(path: RolePath, model: OrmModel, index: number): string 
 }
 
 /** A readable chain of each hop's fact-type reading, e.g. "Person was born in Country". */
-function pathChain(path: RolePath, model: OrmModel): string {
+function pathChain(path: RolePath, model: ConstraintModel): string {
   if (path.steps.length === 0) return objName(model, path.root);
   const hops = path.steps.map((step) => {
     const ft = factTypeOfRole(model, step.entry);
@@ -653,7 +687,7 @@ function pathChain(path: RolePath, model: OrmModel): string {
 }
 
 /** The projected column object-type names of an operand, e.g. "Person, Country". */
-function tupleDesc(operand: JoinOperand, model: OrmModel): string {
+function tupleDesc(operand: JoinOperand, model: ConstraintModel): string {
   return operand.projection
     .map((i) => objName(model, pathNodeTypeId(operand.path, model, i)))
     .join(", ");
@@ -666,10 +700,10 @@ function tupleDesc(operand: JoinOperand, model: OrmModel): string {
 export function verbalizeJoinSubset(
   subset: JoinOperand,
   superset: JoinOperand,
-  factType: FactType,
-  model: OrmModel,
+  sourceId: string,
+  model: ConstraintModel,
 ): Verbalization {
-  return buildVerbalization(factType.id, "constraint", [
+  return buildVerbalization(sourceId, "constraint", [
     kwSeg("For each "),
     refSeg(objName(model, subset.path.root), subset.path.root),
     textSeg(
@@ -685,13 +719,13 @@ export function verbalizeJoinSubset(
  */
 export function verbalizeJoinEquality(
   operands: readonly JoinOperand[],
-  factType: FactType,
-  model: OrmModel,
+  sourceId: string,
+  model: ConstraintModel,
 ): Verbalization {
   const first = operands[0];
   const chains = operands.map((o) => `"${pathChain(o.path, model)}"`).join(" and ");
   const desc = first ? tupleDesc(first, model) : "tuple";
-  return buildVerbalization(factType.id, "constraint", [
+  return buildVerbalization(sourceId, "constraint", [
     kwSeg("For each "),
     refSeg(first ? objName(model, first.path.root) : "object", first?.path.root ?? ""),
     textSeg(`, ${chains} project the same [${desc}].`),
@@ -704,13 +738,13 @@ export function verbalizeJoinEquality(
  */
 export function verbalizeJoinExclusion(
   operands: readonly JoinOperand[],
-  factType: FactType,
-  model: OrmModel,
+  sourceId: string,
+  model: ConstraintModel,
 ): Verbalization {
   const first = operands[0];
   const chains = operands.map((o) => `"${pathChain(o.path, model)}"`).join(" and ");
   const desc = first ? tupleDesc(first, model) : "tuple";
-  return buildVerbalization(factType.id, "constraint", [
+  return buildVerbalization(sourceId, "constraint", [
     kwSeg("For each "),
     refSeg(first ? objName(model, first.path.root) : "object", first?.path.root ?? ""),
     textSeg(`, ${chains} share no [${desc}].`),
@@ -718,7 +752,121 @@ export function verbalizeJoinExclusion(
 }
 
 /**
- * Find a role by id model-wide: the owner fact type first, then any
- * other fact type. External uniqueness names roles across fact types,
- * so the owner-only `getRoleById` is not enough.
+ * A ring property of the relation a join path projects
+ * (`docs/specs/join-ring-constraint.spec.md`). The relation has no single
+ * reading to borrow a predicate from, so the sentence names the path and
+ * says it "relates" one end to the other, in the shape `verbalizeRing`
+ * gives each ring type.
  */
+export function verbalizeJoinRing(
+  operand: JoinOperand,
+  ringType: RingType,
+  sourceId: string,
+  model: ConstraintModel,
+): Verbalization {
+  const typeId = pathNodeTypeId(operand.path, model, operand.projection[0] ?? 0);
+  const typeName = objName(model, typeId);
+  const name1 = refSeg(typeName + "1", typeId);
+  const name2 = refSeg(typeName + "2", typeId);
+  const name3 = refSeg(typeName + "3", typeId);
+  const same = refSeg(typeName, typeId);
+  const by = `"${pathChain(operand.path, model)}"`;
+  const relates = (a: VerbalizationSegment, b: VerbalizationSegment, verb = "relates") => [
+    textSeg(`${verb} `),
+    a,
+    textSeg(" to "),
+    b,
+  ];
+  const isSame = [name1, textSeg(` is the same ${typeName} as `), name2, textSeg(".")];
+  const build = (segments: VerbalizationSegment[]) =>
+    buildVerbalization(sourceId, "constraint", segments);
+
+  switch (ringType) {
+    case "irreflexive":
+      return build([
+        kwSeg("No "),
+        same,
+        textSeg(" is related to that same "),
+        same,
+        textSeg(` by ${by}.`),
+      ]);
+    case "acyclic":
+      return build([
+        kwSeg("No "),
+        same,
+        textSeg(" is related to that same "),
+        same,
+        textSeg(` by ${by}, directly or through a chain of such relationships.`),
+      ]);
+    case "asymmetric":
+      return build([
+        kwSeg("If "),
+        textSeg(`${by} `),
+        ...relates(name1, name2),
+        kwSeg(" then "),
+        textSeg("it "),
+        ...relates(name2, name1, "does not relate"),
+        textSeg("."),
+      ]);
+    case "symmetric":
+      return build([
+        kwSeg("If "),
+        textSeg(`${by} `),
+        ...relates(name1, name2),
+        kwSeg(" then "),
+        textSeg("it "),
+        ...relates(name2, name1, "relates"),
+        textSeg("."),
+      ]);
+    case "antisymmetric":
+      return build([
+        kwSeg("If "),
+        textSeg(`${by} `),
+        ...relates(name1, name2),
+        kwSeg(" and "),
+        name2,
+        textSeg(" to "),
+        name1,
+        kwSeg(" then "),
+        ...isSame,
+      ]);
+    case "transitive":
+      return build([
+        kwSeg("If "),
+        textSeg(`${by} `),
+        ...relates(name1, name2),
+        kwSeg(" and "),
+        name2,
+        textSeg(" to "),
+        name3,
+        kwSeg(" then "),
+        textSeg("it "),
+        ...relates(name1, name3),
+        textSeg("."),
+      ]);
+    case "intransitive":
+      return build([
+        kwSeg("If "),
+        textSeg(`${by} `),
+        ...relates(name1, name2),
+        kwSeg(" and "),
+        name2,
+        textSeg(" to "),
+        name3,
+        kwSeg(" then "),
+        textSeg("it "),
+        ...relates(name1, name3, "does not relate"),
+        textSeg("."),
+      ]);
+    case "purely_reflexive":
+      return build([
+        kwSeg("If "),
+        textSeg(`${by} `),
+        ...relates(name1, name2),
+        kwSeg(" then "),
+        ...isSame,
+      ]);
+    default:
+      return assertNever(ringType);
+  }
+}

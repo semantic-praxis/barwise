@@ -3,7 +3,7 @@
  */
 
 import { type Diagnostic, OrmYamlSerializer } from "@barwise/core";
-import { diffModels, mergeAndValidate } from "@barwise/core/diff";
+import { diffModels, MERGE_DIFF_OPTIONS, mergeAndValidate } from "@barwise/core/diff";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { writeFileSync } from "node:fs";
 import { resolveSource, type SourceInput, sourcePath } from "../workspace/resolve.js";
@@ -48,7 +48,7 @@ export function executeMerge(
   const incomingModel = resolveSource(incoming, { lenient: true });
 
   // Compute diff and accept additions/modifications, reject removals.
-  const diff = diffModels(baseModel, incomingModel);
+  const diff = diffModels(baseModel, incomingModel, MERGE_DIFF_OPTIONS);
 
   if (!diff.hasChanges) {
     return {
@@ -83,7 +83,7 @@ export function executeMerge(
   const mergeResult = mergeAndValidate(
     baseModel,
     incomingModel,
-    diff.deltas,
+    diff,
     accepted,
   );
 

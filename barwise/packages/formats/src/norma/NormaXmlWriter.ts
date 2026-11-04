@@ -24,19 +24,27 @@ import {
   type CardinalityConstraint,
   type ConceptualDataTypeName,
   type Constraint,
+  constraintRef,
   type DiagramLayout,
   type FactType,
+  isOverSubtypes,
   type JoinOperand,
+  objectificationRef,
   type ObjectType,
   type OrmModel,
+  type PreferredIdentifiers,
+  preferredIdentifiers,
   pureObjectifyingEntityIds,
   type Role,
+  type RoleOrSubtypeOperand,
+  subtypeFactIdsOf,
+  subtypeFactRef,
   type ValueComparisonOperator,
   type ValueRange,
   type ValueType,
   viewMembership,
 } from "@barwise/core";
-import { asNormaId, derivedNormaId, type NormaId, toNormaId } from "./normaId.js";
+import { asNormaId, cardinalityId, derivedNormaId, type NormaId, toNormaId } from "./normaId.js";
 import type {
   NormaCardinality,
   NormaConstraint,
@@ -69,9 +77,12 @@ export function writeOrmToNorma(model: OrmModel): NormaDocument {
   // object-type ids so the entity loop can skip them.
   const objectifiedObjectTypeIds = new Set<string>();
   const objectifiedByObjectType = new Map<string, string>(); // objectTypeId -> factTypeId
+  // objectTypeId -> the link's own id, written on NestedPredicate.
+  const objectificationIdByObjectType = new Map<string, string>();
   for (const oft of model.objectifiedFactTypes) {
     objectifiedObjectTypeIds.add(oft.objectTypeId);
     objectifiedByObjectType.set(oft.objectTypeId, oft.factTypeId);
+    objectificationIdByObjectType.set(oft.objectTypeId, objectificationRef(oft));
   }
 
   // Index roles played by each object type (across all fact types) so each
@@ -80,7 +91,8 @@ export function writeOrmToNorma(model: OrmModel): NormaDocument {
 
   // Sample populations: the NORMA instance graph, including any
   // reference-scheme expansions synthesized for populated entities.
-  const popGraph = buildPopulationGraph(model);
+  const identifiers = preferredIdentifiers(model);
+  const popGraph = buildPopulationGraph(model, identifiers);
 
   const entityTypes: NormaEntityType[] = [];
   const valueTypes: NormaValueType[] = [];
@@ -88,7 +100,10 @@ export function writeOrmToNorma(model: OrmModel): NormaDocument {
 
   // Map a uniqueness constraint to the entity it preferentially identifies,
   // so the entity can carry a PreferredIdentifier link.
-  const preferredIdByEntity = collectPreferredIdentifiers(model);
+  const preferredIdByEntity = collectPreferredIdentifiers(identifiers);
+  // Each uniqueness written IsPreferred is the one an entity's
+  // PreferredIdentifier names, so the two cannot disagree.
+  const preferred = new Set(identifiers.byConstraint.keys());
 
   for (const ot of model.objectTypes) {
     const refs = playedRoles.get(ot.id) ?? [];
@@ -105,6 +120,7 @@ export function writeOrmToNorma(model: OrmModel): NormaDocument {
         id: toNormaId(ot.id),
         name: ot.name,
         nestedFactTypeRef: toNormaId(factTypeId),
+        nestedPredicateId: toNormaId(objectificationIdByObjectType.get(ot.id)!),
         referenceMode: ot.referenceMode,
         preferredIdentifier: preferredIdByEntity.get(ot.id),
         playedRoleRefs: refs,
@@ -137,8 +153,23 @@ export function writeOrmToNorma(model: OrmModel): NormaDocument {
   const seenConstraintIds = new Set<string>();
 
   for (const ft of model.factTypes) {
-    const { norma } = writeFactType(ft, constraints, seenConstraintIds, popGraph);
+    const { norma } = writeFactType(model, ft, constraints, seenConstraintIds, popGraph, preferred);
     factTypes.push(norma);
+  }
+  // Constraints across fact types are top-level only, written once each
+  // after every fact type's own, whichever fact type a 2.0 file nested
+  // them under (orm-format-3, Open decision 9).
+  for (const c of model.constraints) {
+    // A constraint over subtypes is written with the subtype facts, over
+    // their supertype meta-roles (`writeSubtypeFacts`).
+    if (isOverSubtypes(c)) continue;
+    writeTopLevel(
+      c,
+      toNormaId(constraintId(c)),
+      constraints,
+      seenConstraintIds,
+      preferred,
+    );
   }
 
   // Synthesized reference-scheme expansions for populated entities: the
@@ -218,29 +249,18 @@ function collectPlayedRoles(model: OrmModel): Map<string, NormaId[]> {
 
 /**
  * Map each entity (or objectified entity) id to the NORMA id of the
- * uniqueness constraint that is its preferred identifier, if any.
- *
- * The preferred internal uniqueness constraint sits on the role played by
- * the injected reference value type; the entity is the player of the OTHER
- * role in that same fact type.
+ * uniqueness constraint that is its preferred identifier, if any: core's
+ * `preferredIdentifiers`, the one rule every reader uses (orm-format-3
+ * WS4a), which is NORMA's own reading of a reference scheme.
  */
-function collectPreferredIdentifiers(model: OrmModel): Map<string, string> {
-  const result = new Map<string, string>();
-  for (const ft of model.factTypes) {
-    for (const c of ft.constraints) {
-      if (c.type !== "internal_uniqueness" || !c.isPreferred) continue;
-      const constrainedRoleIds = new Set(c.roleIds);
-      // The identified entity plays the role(s) NOT in the uniqueness set.
-      for (const role of ft.roles) {
-        if (constrainedRoleIds.has(role.id)) continue;
-        const player = model.getObjectType(role.playerId);
-        if (player && player.kind === "entity" && c.id) {
-          result.set(player.id, toNormaId(c.id));
-        }
-      }
-    }
+function collectPreferredIdentifiers(
+  identifiers: PreferredIdentifiers,
+): Map<string, string> {
+  const ids = new Map<string, string>();
+  for (const [entityId, at] of identifiers.byEntity) {
+    ids.set(entityId, toNormaId(constraintId(at.constraint)));
   }
-  return result;
+  return ids;
 }
 
 // `ValueType`, not `ObjectType`: the one call site is inside a
@@ -281,12 +301,14 @@ function toInlineValueConstraint(
 // ---------------------------------------------------------------------------
 
 function writeFactType(
+  model: OrmModel,
   ft: FactType,
   constraints: NormaConstraint[],
   seen: Set<string>,
   popGraph: PopulationGraph,
+  preferred: ReadonlySet<string>,
 ): { norma: NormaFactType; internalRefs: string[]; } {
-  const roles: NormaRole[] = ft.roles.map((role) => writeRole(ft, role, popGraph));
+  const roles: NormaRole[] = ft.roles.map((role) => writeRole(model, ft, role, popGraph));
   const factInstances = popGraph.factInstancesByFact.get(toNormaId(ft.id));
   const readingOrders: NormaReadingOrder[] = ft.readings.map((reading, i) => ({
     id: derivedNormaId(toNormaId(ft.id), `_ro${i}`),
@@ -295,55 +317,23 @@ function writeFactType(
   }));
 
   const internalRefs: NormaId[] = [];
-  ft.constraints.forEach((c, i) => {
-    // Constraints attached through the FactType constructor carry an id;
-    // those attached later by the importer (external uniqueness, role-level
-    // value constraints) do not. Derive a deterministic, collision-free id
-    // from the fact type id and the constraint's position so every emitted
-    // constraint has a unique id token.
-    const fallbackId = derivedNormaId(toNormaId(ft.id), `_c${i}`);
-    if (c.type === "exclusive_or") {
-      // NORMA has no single xor element: the native encoding is an
-      // exclusion + disjunctive mandatory pair joined by mutual coupler
-      // refs. Both halves are multi-fact, so neither is internal.
-      const exclusionId = c.id ? toNormaId(c.id) : fallbackId;
-      const mandatoryId = derivedNormaId(exclusionId, "_xormand");
-      if (seen.has(exclusionId)) return;
-      seen.add(exclusionId);
-      seen.add(mandatoryId);
-      const modality = c.modality === "deontic" ? ({ modality: "deontic" } as const) : {};
-      constraints.push({
-        type: "exclusion",
-        id: exclusionId,
-        name: "",
-        ...modality,
-        roleSequences: c.roleIds.map((r) => [toNormaId(r)]),
-        exclusiveOrMandatoryRef: mandatoryId,
-      });
-      constraints.push({
-        type: "mandatory",
-        id: mandatoryId,
-        name: "",
-        ...modality,
-        isSimple: false,
-        isImplied: false,
-        roleRefs: c.roleIds.map(toNormaId),
-        exclusiveOrExclusionRef: exclusionId,
-      });
-      return;
-    }
-    const written = writeConstraint(c, fallbackId);
-    if (!written) return;
-    if (!seen.has(written.id)) {
-      seen.add(written.id);
-      constraints.push(written);
-    }
+  for (const c of ft.internalConstraints) {
+    // Carried on the role (writeRole), which writes it under its own id;
+    // never a top-level constraint, so it has no place in this loop.
+    if (c.type === "cardinality") continue;
+    const written = writeTopLevel(
+      c,
+      toNormaId(constraintId(c)),
+      constraints,
+      seen,
+      preferred,
+    );
     // Internal (single-fact) constraints are referenced from the fact's
-    // InternalConstraints; multi-fact constraints are top-level only.
-    if (isInternalConstraint(c)) {
-      internalRefs.push(written.id);
+    // InternalConstraints; the rest of its kinds are top-level only.
+    if (written !== undefined && listedInInternalConstraints(c)) {
+      internalRefs.push(written);
     }
-  });
+  }
 
   return {
     norma: {
@@ -361,17 +351,76 @@ function writeFactType(
   };
 }
 
-function writeRole(ft: FactType, role: Role, popGraph: PopulationGraph): NormaRole {
-  const isMandatory = ft.constraints.some(
+/**
+ * Append `c` to the document's top-level constraints under `ownId`, and
+ * return the id written (for an exclusive-or, its exclusion half's), or
+ * undefined when nothing was: an unwritable kind, or a repeated id, which
+ * is dropped whole so no InternalConstraints entry may name it a second
+ * time either.
+ */
+function writeTopLevel(
+  c: Constraint,
+  ownId: NormaId,
+  constraints: NormaConstraint[],
+  seen: Set<string>,
+  preferred: ReadonlySet<string>,
+): NormaId | undefined {
+  if (c.type === "exclusive_or") {
+    // NORMA has no single xor element: the native encoding is an
+    // exclusion + disjunctive mandatory pair joined by mutual coupler
+    // refs. Both halves are multi-fact, so neither is internal.
+    const mandatoryId = derivedNormaId(ownId, "_xormand");
+    // Either half's id already written makes this a repeat, dropped whole.
+    if (seen.has(ownId) || seen.has(mandatoryId)) return undefined;
+    seen.add(ownId);
+    seen.add(mandatoryId);
+    const modality = c.modality === "deontic" ? ({ modality: "deontic" } as const) : {};
+    constraints.push({
+      type: "exclusion",
+      id: ownId,
+      name: "",
+      ...modality,
+      roleSequences: operandRoles(c).map((r) => [toNormaId(r)]),
+      exclusiveOrMandatoryRef: mandatoryId,
+    });
+    constraints.push({
+      type: "mandatory",
+      id: mandatoryId,
+      name: "",
+      ...modality,
+      isSimple: false,
+      isImplied: false,
+      roleRefs: operandRoles(c).map(toNormaId),
+      exclusiveOrExclusionRef: ownId,
+    });
+    return ownId;
+  }
+  const written = writeConstraint(c, ownId, preferred);
+  if (!written || seen.has(written.id)) return undefined;
+  seen.add(written.id);
+  constraints.push(written);
+  return written.id;
+}
+
+function writeRole(
+  model: OrmModel,
+  ft: FactType,
+  role: Role,
+  popGraph: PopulationGraph,
+): NormaRole {
+  const isMandatory = ft.internalConstraints.some(
     (c) => c.type === "mandatory" && c.roleId === role.id,
   );
-  const card = ft.constraints.find(
+  const card = ft.internalConstraints.find(
     (c): c is CardinalityConstraint => c.type === "cardinality" && c.roleId === role.id,
   );
   const roleInstances = popGraph.roleDeclsByRole.get(toNormaId(role.id));
   return {
     id: toNormaId(role.id),
-    name: role.name,
+    // A role named as its player is how the importer names one NORMA left
+    // unnamed (iri-identity 6c), so it is written unnamed again: NORMA shows
+    // it by its player all the same, and a round trip leaves Name="" as is.
+    name: role.name === model.getObjectType(role.playerId)?.name ? "" : role.name,
     playerRef: toNormaId(role.playerId),
     isMandatory,
     multiplicity: "Unspecified",
@@ -379,7 +428,7 @@ function writeRole(ft: FactType, role: Role, popGraph: PopulationGraph): NormaRo
     ...(card
       ? {
         cardinality: {
-          id: card.id ? toNormaId(card.id) : derivedNormaId(toNormaId(role.id), "_card"),
+          id: toNormaId(constraintId(card)),
           ranges: [{ from: card.min, ...(card.max !== "unbounded" ? { to: card.max } : {}) }],
           ...(card.modality === "deontic" ? { modality: "deontic" as const } : {}),
         },
@@ -389,13 +438,16 @@ function writeRole(ft: FactType, role: Role, popGraph: PopulationGraph): NormaRo
 }
 
 /**
- * A constraint is "internal" (lives in a fact's InternalConstraints and is
- * derived from a single fact type) when it is internal uniqueness, simple
- * mandatory, single-role frequency, a role-level value constraint, or a ring.
- * External uniqueness and the set-comparison/partition constraints span fact
- * types and are emitted only at the top level.
+ * Whether NORMA lists a constraint in its fact's InternalConstraints:
+ * internal uniqueness, simple mandatory, single-role frequency, a
+ * role-level value constraint, or a ring. External uniqueness and the
+ * set-comparison/partition constraints span fact types and are emitted only
+ * at the top level. This is NORMA's list, not barwise's placement rule
+ * (core's `isInternalConstraint`): NORMA writes a value comparison at the
+ * top level although barwise keeps it in its fact type, and carries
+ * cardinality on the role.
  */
-function isInternalConstraint(c: Constraint): boolean {
+function listedInInternalConstraints(c: Constraint): boolean {
   switch (c.type) {
     case "internal_uniqueness":
     case "mandatory":
@@ -412,8 +464,24 @@ function isInternalConstraint(c: Constraint): boolean {
 // Constraints
 // ---------------------------------------------------------------------------
 
-function writeConstraint(c: Constraint, fallbackId: NormaId): NormaConstraint | undefined {
-  const id = c.id ? toNormaId(c.id) : fallbackId;
+/**
+ * A constraint's id. Since format 4.0 the model leaves a constraint whose
+ * sentence cannot be minted unnamed (iri-identity decision 19), and NORMA
+ * states every constraint's id, so such a constraint takes one built from
+ * the hash `constraintRef` gives what it states: the same on every export,
+ * unlike the positional `<ft>_c<i>` id the writer once fell back to, which
+ * moved when a constraint was inserted before it, and an NCName, which
+ * `constraintRef` itself is not.
+ */
+function constraintId(c: Constraint): string {
+  return c.id ?? `unnamed_${c.type}_${constraintRef(c).split("#").pop()}`;
+}
+
+function writeConstraint(
+  c: Constraint,
+  id: NormaId,
+  preferred: ReadonlySet<string>,
+): NormaConstraint | undefined {
   const modality = c.modality === "deontic" ? ({ modality: "deontic" } as const) : {};
   switch (c.type) {
     case "internal_uniqueness":
@@ -423,7 +491,7 @@ function writeConstraint(c: Constraint, fallbackId: NormaId): NormaConstraint | 
         name: "",
         ...modality,
         isInternal: true,
-        isPreferred: c.isPreferred ?? false,
+        isPreferred: c.id !== undefined && preferred.has(c.id),
         roleRefs: c.roleIds.map(toNormaId),
       };
     case "external_uniqueness":
@@ -433,7 +501,7 @@ function writeConstraint(c: Constraint, fallbackId: NormaId): NormaConstraint | 
         name: "",
         ...modality,
         isInternal: false,
-        isPreferred: false,
+        isPreferred: c.id !== undefined && preferred.has(c.id),
         roleRefs: c.roleIds.map(toNormaId),
       };
     case "mandatory":
@@ -454,7 +522,7 @@ function writeConstraint(c: Constraint, fallbackId: NormaId): NormaConstraint | 
         ...modality,
         isSimple: false,
         isImplied: false,
-        roleRefs: c.roleIds.map(toNormaId),
+        roleRefs: operandRoles(c).map(toNormaId),
       };
     case "frequency":
       return {
@@ -499,7 +567,7 @@ function writeConstraint(c: Constraint, fallbackId: NormaId): NormaConstraint | 
         id,
         name: "",
         ...modality,
-        roleSequences: c.roleIds.map((r) => [toNormaId(r)]),
+        roleSequences: operandRoles(c).map((r) => [toNormaId(r)]),
       };
     case "exclusive_or":
       // Emitted by writeFactType as NORMA's coupled exclusion +
@@ -544,6 +612,23 @@ function writeConstraint(c: Constraint, fallbackId: NormaId): NormaConstraint | 
         operator: valueComparisonOperatorToNorma[c.operator],
         roleRefs: [toNormaId(c.roleId1), toNormaId(c.roleId2)],
       };
+    case "join_ring": {
+      // A ring whose one role sequence carries the path, as NORMA's
+      // RingConstraintType (SetConstraintWithJoinType) states it. Not listed
+      // in any fact's InternalConstraints; the importer's ring pass reads it.
+      const roleRefs = joinOperandRoleRefs(c.operand);
+      const joinPath = writeJoinPath(c.operand, derivedNormaId(id, "_jp0"));
+      if (!roleRefs || !joinPath) return undefined;
+      return {
+        type: "ring",
+        id,
+        name: "",
+        ...modality,
+        ringType: c.ringType,
+        roleRefs,
+        joinPath,
+      };
+    }
     case "join_equality":
     case "join_exclusion": {
       const roleSequences: string[][] = [];
@@ -656,21 +741,27 @@ function writeJoinPath(o: JoinOperand, id: NormaId): NormaJoinPath | undefined {
 // Subtype facts
 // ---------------------------------------------------------------------------
 
+/**
+ * The roles of a constraint that can instead constrain subtypes. One over
+ * subtypes never reaches the role writers -- `writeSubtypeFacts` writes it
+ * -- so reaching here with one is a defect, reported rather than written as
+ * a constraint over no roles.
+ */
+function operandRoles(c: RoleOrSubtypeOperand): readonly string[] {
+  if (c.roleIds) return c.roleIds;
+  throw new Error("A constraint over subtypes is written with its subtype facts.");
+}
+
 function writeSubtypeFacts(
   model: OrmModel,
   out: NormaSubtypeFact[],
   constraints: NormaConstraint[],
 ): void {
-  // Group subtype facts by supertype so exclusive/exhaustive partitions can
-  // be re-expressed as exclusion / disjunctive-mandatory constraints over the
-  // supertype meta-roles.
-  const bySupertype = new Map<
-    string,
-    { supertypeRoleIds: string[]; isExclusive: boolean; isExhaustive: boolean; }
-  >();
-
+  // Each subtype fact's supertype meta-role, which NORMA's partition
+  // constraints are written over.
+  const metaRole = new Map<string, { roleId: string; supertypeId: string; }>();
   for (const sf of model.subtypeFacts) {
-    const id = toNormaId(sf.id);
+    const id = toNormaId(subtypeFactRef(sf));
     const subtypeRoleId = derivedNormaId(id, "_sub");
     const supertypeRoleId = derivedNormaId(id, "_super");
     out.push({
@@ -681,36 +772,53 @@ function writeSubtypeFacts(
       supertypePlayerRef: toNormaId(sf.supertypeId),
       providesIdentification: sf.providesIdentification,
     });
-
-    const group = bySupertype.get(sf.supertypeId) ?? {
-      supertypeRoleIds: [],
-      isExclusive: false,
-      isExhaustive: false,
-    };
-    group.supertypeRoleIds.push(supertypeRoleId);
-    group.isExclusive = group.isExclusive || sf.isExclusive;
-    group.isExhaustive = group.isExhaustive || sf.isExhaustive;
-    bySupertype.set(sf.supertypeId, group);
+    metaRole.set(subtypeFactRef(sf), { roleId: supertypeRoleId, supertypeId: sf.supertypeId });
   }
 
-  for (const [supertypeId, group] of bySupertype) {
-    if (group.supertypeRoleIds.length < 2) continue;
-    if (group.isExclusive) {
+  // Each constraint over subtypes, over the meta-roles of the subtype facts
+  // it names and no others: an exclusive-or as an exclusion and a
+  // disjunctive mandatory, as NORMA states a partition. A group of one is
+  // not written: NORMA reads a mandatory over one role as a simple one, and
+  // an exclusion over one states nothing. "Each Person is an Employee" is
+  // therefore lost on export (barwise-yx8). Each id is derived from its
+  // kind and supertype, so one model exports it the same every time; a
+  // second constraint of one kind over one supertype takes its own id.
+  const used = new Set<string>();
+  const idFor = (kind: "excl" | "exh", supertypeId: string, c: Constraint) => {
+    const byGroup = toNormaId(`subtype_${kind}_${supertypeId}`);
+    const chosen = used.has(byGroup)
+      ? toNormaId(`subtype_${kind}_${constraintId(c)}`)
+      : byGroup;
+    used.add(chosen);
+    return chosen;
+  };
+  for (const c of model.constraints) {
+    const named = subtypeFactIdsOf(c).flatMap((id) => metaRole.get(id) ?? []);
+    if (named.length < 2) continue;
+    const supertypeId = named[0]!.supertypeId;
+    // One over two supertypes, which validation reports, is no partition
+    // NORMA can read; it is not written.
+    if (named.some((m) => m.supertypeId !== supertypeId)) continue;
+    const roles = named.map((m) => m.roleId);
+    const modality = c.modality === "deontic" ? ({ modality: "deontic" } as const) : {};
+    if (c.type === "exclusion" || c.type === "exclusive_or") {
       constraints.push({
         type: "exclusion",
-        id: toNormaId(`subtype_excl_${supertypeId}`),
+        id: idFor("excl", supertypeId, c),
         name: "",
-        roleSequences: group.supertypeRoleIds.map((r) => [r]),
+        ...modality,
+        roleSequences: roles.map((r) => [r]),
       });
     }
-    if (group.isExhaustive) {
+    if (c.type === "disjunctive_mandatory" || c.type === "exclusive_or") {
       constraints.push({
         type: "mandatory",
-        id: toNormaId(`subtype_exh_${supertypeId}`),
+        id: idFor("exh", supertypeId, c),
         name: "",
+        ...modality,
         isSimple: false,
         isImplied: false,
-        roleRefs: group.supertypeRoleIds.map(asNormaId),
+        roleRefs: roles.map(asNormaId),
       });
     }
   }
@@ -743,13 +851,12 @@ const conceptualToNormaKind: Record<ConceptualDataTypeName, string> = {
   other: "variable_length_text",
 };
 
-/** Stable DataType element id for a conceptual type. */
 /** Object-type population cardinality -> NORMA CardinalityRestriction. */
 function writeCardinality(ot: ObjectType): NormaCardinality | undefined {
   const c = ot.cardinality;
   if (!c) return undefined;
   return {
-    id: derivedNormaId(toNormaId(ot.id), "_card"),
+    id: cardinalityId(toNormaId(ot.id)),
     ranges: [{ from: c.min, ...(c.max !== "unbounded" ? { to: c.max } : {}) }],
   };
 }
@@ -937,8 +1044,12 @@ function writeDiagrams(model: OrmModel): NormaDiagram[] {
   });
 }
 
+/**
+ * Not a model id, so not through `toNormaId`: a token in NORMA space that
+ * `collectDataTypes` reads the kind back out of. Every kind is an NCName.
+ */
 function dataTypeIdFor(name: ConceptualDataTypeName): NormaId {
-  return toNormaId(`dt_${conceptualToNormaKind[name]}`);
+  return asNormaId(`_dt_${conceptualToNormaKind[name]}`);
 }
 
 /** Collect the distinct DataType definitions referenced by value types. */

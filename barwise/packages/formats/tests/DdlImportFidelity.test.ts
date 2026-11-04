@@ -8,7 +8,7 @@
  * into nullable and adding `UNIQUE` to every column on re-export. These
  * assert the role, by its player.
  */
-import type { Constraint, FactType, OrmModel } from "@barwise/core";
+import { type Constraint, type FactType, type OrmModel, preferredIdentifiers } from "@barwise/core";
 import { describe, expect, it } from "vitest";
 import { DdlImportFormat } from "../src/ddl/DdlImportFormat.js";
 
@@ -26,10 +26,11 @@ function constraintsByPlayer(model: OrmModel, ft: FactType): string[] {
     const role = ft.roles.find((r) => r.id === roleId)!;
     return model.getObjectType(role.playerId)!.name;
   };
-  return ft.constraints.map((c: Constraint) => {
+  const preferred = new Set(preferredIdentifiers(model).byConstraint.keys());
+  return model.constraintsTouching(ft.id).map((c: Constraint) => {
     if (c.type === "mandatory") return `mandatory:${player(c.roleId)}`;
     if (c.type === "internal_uniqueness") {
-      return `unique:${c.roleIds.map(player).join(",")}${c.isPreferred ? ":preferred" : ""}`;
+      return `unique:${c.roleIds.map(player).join(",")}${preferred.has(c.id!) ? ":preferred" : ""}`;
     }
     return c.type;
   }).sort();
@@ -115,10 +116,10 @@ describe("a single-column key becomes a typed identifier (R4)", () => {
   });
 
   it("imports a composite key over plain columns as mandatory attributes and an external uniqueness", () => {
-    // It used to warn and drop both columns (barwise-1077). The entity still
-    // gets an invented key, because an external uniqueness cannot yet be
-    // its preferred identifier, and the warning says so (barwise-ezn;
-    // ddl-round-trip-fixed-point.spec.md, R7).
+    // It used to warn and drop both columns (barwise-1077). The external
+    // uniqueness is the entity's preferred identifier, as a one-column key's
+    // uniqueness is (annotation-preferred-identifier.spec.md); it used to be
+    // left unpreferred beside an invented reference mode (barwise-ezn).
     const { model, warnings } = importer.parse(`
       CREATE TABLE enrollment (
         student_id INTEGER NOT NULL,
@@ -132,11 +133,16 @@ describe("a single-column key becomes a typed identifier (R4)", () => {
       "mandatory:Enrollment",
       "unique:Enrollment",
     ]);
+    // The external uniqueness spans both fact types, so it touches both; it
+    // is one constraint in the model, not one per fact type.
     expect(constraintsByPlayer(model, factType(model, "Enrollment has CourseId"))).toEqual([
+      "external_uniqueness",
       "mandatory:Enrollment",
       "unique:Enrollment",
     ]);
-    const external = student.constraints.find((c) => c.type === "external_uniqueness");
+    const external = model.constraintsTouching(student.id).find((c) =>
+      c.type === "external_uniqueness"
+    );
     expect(
       external && "roleIds" in external
         ? external.roleIds.map((id) =>
@@ -144,10 +150,11 @@ describe("a single-column key becomes a typed identifier (R4)", () => {
         ).map((id) => model.getObjectType(id!)?.name)
         : [],
     ).toEqual(["StudentId", "CourseId"]);
+    const enrollment = model.getObjectTypeByName("Enrollment")!;
+    expect(model.preferredIdentifierOf(enrollment.id)).toBe(external?.id);
     expect(warnings).toEqual([
       `Table "enrollment": composite PRIMARY KEY (student_id, course_id) is imported as an external `
-      + `uniqueness over its columns; the entity is identified by "enrollment_id", since an external `
-      + `uniqueness cannot yet be preferred (barwise-ezn).`,
+      + `uniqueness over its columns, the entity's preferred identifier.`,
     ]);
   });
 });
@@ -243,8 +250,10 @@ describe("column types: several words, length and scale, trailing clauses (R2, R
       "unique:V",
     ]);
     expect(constraintsByPlayer(result.model, factType(result.model, "V has B"))).toEqual([
+      "external_uniqueness",
       "unique:V",
     ]);
+    expect(result.model.constraints.map((c) => c.type)).toEqual(["external_uniqueness"]);
     expect(result.warnings).toEqual([]);
   });
 

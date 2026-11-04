@@ -51,7 +51,7 @@ describe("subtype structural rules", () => {
       subtypeId: employee.id,
       supertypeId: "nonexistent-id",
     });
-    (model as any)._subtypeFacts.set(badSf.id, badSf);
+    (model as any)._subtypeFacts.set(badSf);
 
     // The check moved into `graphOf`; the diagnostic id did not move
     // with it, because that id is what a consumer reads.
@@ -74,7 +74,7 @@ describe("subtype structural rules", () => {
       subtypeId: "nonexistent-id",
       supertypeId: person.id,
     });
-    (model as any)._subtypeFacts.set(badSf.id, badSf);
+    (model as any)._subtypeFacts.set(badSf);
 
     const diags = unresolvedDiagnostics(model);
     const subtypeDiags = diags.filter((d) => d.ruleId === "structural/subtype-dangling-subtype");
@@ -96,7 +96,7 @@ describe("subtype structural rules", () => {
       subtypeId: name.id,
       supertypeId: person.id,
     });
-    (model as any)._subtypeFacts.set(badSf.id, badSf);
+    (model as any)._subtypeFacts.set(badSf);
 
     const diags = structuralRules(model, graphFor(model));
     const notEntityDiags = diags.filter(
@@ -120,7 +120,7 @@ describe("subtype structural rules", () => {
       subtypeId: employee.id,
       supertypeId: rating.id,
     });
-    (model as any)._subtypeFacts.set(badSf.id, badSf);
+    (model as any)._subtypeFacts.set(badSf);
 
     const diags = structuralRules(model, graphFor(model));
     const notEntityDiags = diags.filter(
@@ -144,7 +144,7 @@ describe("subtype structural rules", () => {
       subtypeId: c.id,
       supertypeId: a.id,
     });
-    (model as any)._subtypeFacts.set(cycleSf.id, cycleSf);
+    (model as any)._subtypeFacts.set(cycleSf);
 
     const diags = structuralWellFormedness(model);
     const cycleDiags = diags.filter(

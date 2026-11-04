@@ -463,4 +463,37 @@ describe("Avro renderer", () => {
       expect(json).toContain("  ");
     });
   });
+
+  describe("field names are valid Avro names (barwise-9g3)", () => {
+    function fields(columns: string[], key: string[]) {
+      const column = (name: string) => ({
+        name,
+        dataType: "TEXT",
+        dataTypeDefaulted: false,
+        nullable: false,
+      });
+      return renderAvro({
+        sourceModelId: "test",
+        tables: [{
+          name: "finding",
+          columns: columns.map(column),
+          primaryKey: { columnNames: key },
+          foreignKeys: [],
+          sourceElementId: "ot-finding",
+        }],
+      }).schemas[0]!.fields.map((f) => [f.name, f.doc]);
+    }
+
+    it("renames a column Avro refuses, and says which column it is", () => {
+      expect(fields(["(ambiguous)", "1st", "note"], ["(ambiguous)"])).toEqual([
+        ["_ambiguous_", 'Primary key. The column "(ambiguous)".'],
+        ["_1st", 'The column "1st".'],
+        ["note", undefined],
+      ]);
+    });
+
+    it("never takes a name another column holds", () => {
+      expect(fields(["a(b", "a_b"], []).map(([n]) => n)).toEqual(["a_b_2", "a_b"]);
+    });
+  });
 });

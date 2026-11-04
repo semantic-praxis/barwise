@@ -1,0 +1,30 @@
+orm_version: "3.0"
+model:
+  name: Malformed
+  object_types:
+    - id: ot-person
+      name: Person
+      kind: entity
+      reference_mode: person_id
+    - id: ot-age
+      name: Age
+      kind: value
+      data_type:
+        name: integer
+  fact_types:
+    - id: ft-fee-has-age
+      name: Fee has Age
+      roles:
+        - id: r-fee-person
+          player: ot-person
+          role_name: has
+        - id: r-fee-age
+          player: ot-age
+          role_name: is of
+      readings:
+        - "{0} has {1}"
+      constraints:
+        - id: c-value-constraint-empty-values
+          type: value_constraint
+          role: r-fee-age
+          values: []

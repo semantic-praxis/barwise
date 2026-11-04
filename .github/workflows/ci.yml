@@ -35,6 +35,18 @@ jobs:
         with:
           fetch-depth: 0
 
+      # The base commit this run tests the pull request against. Checkout
+      # gives GitHub's synthetic merge of the pull request into its base,
+      # and that merge's first parent is the base tip it merged with. The
+      # event's pull_request.base.sha is not: it can name an earlier tip, so
+      # after main moved, base..HEAD held main's own new commits, and the
+      # tracker and plan-review gates read them as this pull request's
+      # (PR #852, twice in an hour).
+      - name: Base of the merge under test
+        id: base
+        if: github.event_name == 'pull_request'
+        run: echo "sha=$(git rev-parse HEAD^1)" >> "$GITHUB_OUTPUT"
+
       # A pull request that touches only Markdown or beads tracker data
       # (.beads/, e.g. issues.jsonl) still needs its prose formatting
       # checked (dprint covers .md; it ignores .jsonl), but not build,
@@ -52,7 +64,7 @@ jobs:
         # `ci:local` imports, so the local runner skips exactly what this
         # job skips (barwise-954). This step runs before setup-node, on the
         # runner's own Node, which is why that file imports builtins only.
-        run: node scripts/lib/changed-class.mjs '${{ github.event.pull_request.base.sha }}' >> "$GITHUB_OUTPUT"
+        run: node scripts/lib/changed-class.mjs '${{ steps.base.outputs.sha }}' >> "$GITHUB_OUTPUT"
 
       - uses: actions/setup-node@v7
         with:
@@ -134,7 +146,7 @@ jobs:
       - run: npm run check:tracker-closes
         if: github.event_name == 'pull_request'
         env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          BASE_SHA: ${{ steps.base.outputs.sha }}
 
       # Every path and `node <path>` an instruction file cites resolves to a
       # tracked file. The 2026-10-04 prompt audit found 26 stale references
@@ -143,6 +155,13 @@ jobs:
       # skipped docs-only changes would skip exactly the changes it is for
       # (docs/specs/instruction-reference-check.spec.md).
       - run: npm run check:instruction-refs
+
+      # The package graph has one authority, INTENDED in scripts/lib/intended.cjs;
+      # the root CLAUDE.md graph and each package.json runtime dependencies must
+      # agree with it. No docs-only guard: the CLAUDE.md graph is Markdown, and
+      # a guard would skip the very change that makes it drift
+      # (docs/specs/architecture-index.spec.md, WS1).
+      - run: npm run check:architecture
 
       # Fast, source-only static gates next (none need the build), so a lint
       # or architecture violation fails in seconds rather than after the
@@ -165,13 +184,40 @@ jobs:
       - run: npm run check:parity
 
       # review-tiers.json is a declared copy of the trigger headings in
-      # .claude/skills/pr-review/checklist.md. This fails BOTH ways: a new
+      # .claude/skills/pr-review/checklist.md and of REVIEW.md's "Always
+      # check" titles. This fails BOTH ways for each: a new
       # heading with no row is a trigger the classifier would silently
       # never fire on, and a row naming a deleted heading is a tier
       # decision applying to nothing. Exit 2 when either input cannot be
       # read, because "every row is stale" is what an unreadable checklist
       # would otherwise look like.
       - run: npm run check:review-tiers
+      # A spec's Touches: header is its declared plan. An unmarked entry
+      # that names nothing tracked is a plan that rotted, the way a
+      # review-tiers glob routed nothing for five weeks (barwise-fs0).
+      # A spec new since a fixed cutoff commit must also declare a tracked
+      # path, or it is outside check:plan-review entirely
+      # (touches-required.spec.md). The cutoff is fixed, so no base is
+      # passed and a spec that reaches main by any route is checked on
+      # every later run; it needs the cutoff commit, which the
+      # `fetch-depth: 0` checkout provides (exit 2 without it).
+      - run: npm run check:spec-touches
+      # A spec's plan is reviewed (/code-review, /pr-review) before its
+      # implementation is committed, recorded as `Plan-reviewed: <commit>`
+      # in its header (plan-scope-check.spec.md, WS6). Wired like
+      # check:tracker-closes, for the same reason: the question is about
+      # what a pull request adds over its base, and a push to main has no
+      # base to compare against, so pull requests only, with the base
+      # commit passed in; ci-local runs it against
+      # `git merge-base origin/main HEAD`. No docs-only guard: a
+      # workstream whose Touches: is all skills and Markdown is
+      # implementation the rule covers. It reads ancestry, which the
+      # `fetch-depth: 0` checkout above makes answerable; a shallow clone
+      # refuses (exit 2).
+      - run: npm run check:plan-review
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_SHA: ${{ steps.base.outputs.sha }}
 
       # A NUL byte makes git classify a source file as binary: no diff, no
       # blame, no review, and a patch taken from it loses changes silently.
@@ -179,6 +225,13 @@ jobs:
       # delimiter, one of them never diffable in its history. dprint, tsc,
       # eslint and oxlint all accept NUL, so nothing else catches it.
       - run: npm run check:no-nul
+
+      # One owner lists untracked files: uncommittedPaths in
+      # scripts/lib/changed-class.mjs. Each hand-written copy has shipped
+      # its own defect -- the cwd's siblings missed, a newline-bearing path
+      # split in two (PR #602), untracked files left out entirely (PR #641)
+      # (docs/specs/pushed-tree-verification.spec.md).
+      - run: npm run check:git-listing
 
       # npm ci installs what the lockfile says without checking it against
       # each package.json. Dependabot PR #542 declared vitest ^5.0.1 while
@@ -443,6 +496,14 @@ jobs:
         if: steps.changes.outputs.docs_only != 'true'
 
       - run: npm run test:coverage
+        if: steps.changes.outputs.docs_only != 'true'
+
+      # Each decision an ADR declares as tested has a test carrying its tag
+      # that ran and passed above: read from the reports test:scripts,
+      # test:trial and test:coverage wrote in this job, never from source
+      # (docs/specs/executable-adrs.spec.md, WS2). Same guard as the tests
+      # it reads; an ADR change is not docs-only (changed-class.mjs).
+      - run: npm run check:adr-tests
         if: steps.changes.outputs.docs_only != 'true'
 
       - run: npm run validate:examples

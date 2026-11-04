@@ -143,16 +143,8 @@ export function trackedFiles() {
  * @param {string} args.suffix Only files ending in this count as input.
  * @param {string} args.gate Name used in the refusal message.
  */
-export function refuseUntrackedInput({ pathspec, suffix, gate }) {
-  const untracked = execFileSync(
-    "git",
-    ["status", "--porcelain", "--untracked-files=all", "--", pathspec],
-    { cwd: REPO_ROOT, encoding: "utf8" },
-  )
-    .split("\n")
-    .filter((l) => l.startsWith("?? ") && l.endsWith(suffix))
-    .map((l) => l.slice(3));
-
+export function refuseUntrackedInput({ pathspec, suffix, include, gate }) {
+  const untracked = untrackedInputs({ pathspec, suffix, include });
   if (untracked.length === 0) return;
 
   process.stderr.write(
@@ -162,4 +154,53 @@ export function refuseUntrackedInput({ pathspec, suffix, gate }) {
       + `  rows and --check would pass here and fail in CI. \`git add\` them first.\n`,
   );
   process.exit(2);
+}
+
+/**
+ * Untracked files under `pathspec` ending in `suffix`, root-relative.
+ *
+ * The one listing both the refusal above and the notice below read, so a
+ * writer that refuses and a checker that notes cannot disagree about which
+ * files they mean.
+ *
+ * @param {object} args
+ * @param {string} args.pathspec Root-relative directory to inspect.
+ * @param {string} args.suffix Only files ending in this count as input.
+ * @param {(path: string) => boolean} [args.include] The caller's own corpus
+ *   rule, applied to each root-relative path. Without it, an untracked file
+ *   the gate would skip even once tracked -- an archived spec -- would be
+ *   named as unchecked, or refused, for no reason (Copilot, PR #646).
+ * @returns {string[]}
+ */
+export function untrackedInputs({ pathspec, suffix, include = () => true }) {
+  return execFileSync(
+    "git",
+    ["status", "--porcelain", "--untracked-files=all", "--", pathspec],
+    { cwd: REPO_ROOT, encoding: "utf8" },
+  )
+    .split("\n")
+    .filter((l) => l.startsWith("?? ") && l.endsWith(suffix))
+    .map((l) => l.slice(3))
+    .filter(include);
+}
+
+/**
+ * Name the input files a CHECK could not see, beside its verdict.
+ *
+ * A check's corpus is the tracked tree by definition, so it neither refuses
+ * nor changes its exit code here. But an OK printed while a spec is being
+ * written reads as covering that spec, and it never read it: audit-corrections
+ * printed "baseline matches, 116 record(s) in 133 spec(s)" over a corpus of
+ * 134, and failed only once the spec was committed (barwise-qch). Naming the
+ * files keeps the OK honest about its reach.
+ *
+ * @param {object} args
+ * @param {string} args.pathspec Root-relative directory to inspect.
+ * @param {string} args.suffix Only files ending in this count as input.
+ * @param {string} args.gate Name used in the notice.
+ */
+export function noteUntrackedInput({ pathspec, suffix, include, gate }) {
+  for (const file of untrackedInputs({ pathspec, suffix, include })) {
+    console.log(`${gate}: unchecked (untracked): ${file}`);
+  }
 }

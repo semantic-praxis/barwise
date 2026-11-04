@@ -49,7 +49,23 @@ import { execFileSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { mergeBaselineRows, mergeSummary, readExistingRows } from "./lib/baseline-merge.mjs";
-import { refuseUntrackedInput, REPO_ROOT, trackedFiles } from "./lib/tracked.mjs";
+import {
+  CLAIMS_NOTHING_BUILT,
+  CODE,
+  entryPaths,
+  header,
+  HUB,
+  inSpecCorpus,
+  isWiring,
+  namedPaths,
+  touches,
+} from "./lib/spec-reader.mjs";
+import {
+  noteUntrackedInput,
+  refuseUntrackedInput,
+  REPO_ROOT,
+  trackedFiles,
+} from "./lib/tracked.mjs";
 
 /**
  * `--at <commit>` runs the same audit against a historical tree. It is
@@ -66,41 +82,8 @@ const AT = atIndex === -1 ? undefined : process.argv[atIndex + 1];
 const SPEC_DIR = "barwise/docs/specs/";
 const BASELINE = resolve(REPO_ROOT, "barwise/spec-status-baseline.json");
 
-/**
- * The shape of Status that claims nothing exists yet.
- *
- * Two alternatives, because the same claim appears in two positions. The
- * anchored one is the common case (`Draft ...`, `Proposed ...`). The
- * unanchored phrase catches it mid-line: `conformance-property.spec.md`
- * reads "Accepted (all decisions resolved 2026-08-25; both workstreams
- * open -- design only, no implementation in this PR)", which asserts
- * exactly what an anchored `Draft` does and escaped this gate purely on
- * where its author put it.
- *
- * This is NOT the widening to partial specs that barwise-912 warns
- * against. That would mean inferring from "workstreams 1 and 2
- * implemented" which ones actually shipped, which no header can settle.
- * This is the identical claim -- nothing was built -- matched wherever
- * it sits. "No workstream implemented" is the same claim in the words
- * two specs used on 2026-09-06, and both sat outside the gate for a
- * whole workstream of commits until the first PR to land one noticed
- * (#426, session review); the gate test plants that exact phrasing.
- */
-const CLAIMS_NOTHING_BUILT =
-  /^\s*(draft|proposed|design only)\b|\bno (implementation|workstreams? implemented)\b/i;
-
-const CODE = /\.(ts|tsx|mjs|cjs|js|json|ya?ml|py|sh)$/;
-
 /** A Status that claims some workstreams landed and others did not. */
 const TERMINAL = /^\s*(implemented|complete|shipped)\b/i;
-
-/**
- * A package barrel is touched by every change to its package, so a spec
- * naming one fires on work that has nothing to do with it. Measured:
- * `core/src/index.ts` alone accounted for every false signal in the
- * prototype sweep. Excluding barrels is what keeps this a signal.
- */
-const HUB = /(^|\/)(index|registration)\.ts$/;
 
 function git(...args) {
   return execFileSync("git", args, { cwd: REPO_ROOT, encoding: "utf8" }).trim();
@@ -153,57 +136,58 @@ function exists(path) {
   }
 }
 
-/** Every tracked spec path, in the working tree or at `--at`. */
-function specFiles() {
-  const files = AT === undefined
+/** Every tracked path, in the working tree or at `--at`; read once. */
+let listing;
+function allFiles() {
+  listing ??= AT === undefined
     ? trackedFiles()
     : git("ls-tree", "-r", "--name-only", AT).split("\n");
-  return files.filter((f) =>
-    f.startsWith(SPEC_DIR) && f.endsWith(".spec.md") && !f.includes("/archive/")
-  );
+  return listing;
 }
+
+/** Every tracked spec path, in the working tree or at `--at`. */
+function specFiles() {
+  return allFiles().filter(IN_CORPUS);
+}
+
+/**
+ * What this audit reads: specs, archived ones excepted. One rule for the
+ * corpus and for the untracked files it reports or refuses, shared with
+ * check:spec-touches through the reader.
+ */
+const IN_CORPUS = inSpecCorpus;
 
 const readSpec = (file) =>
   AT === undefined ? readFileSync(resolve(REPO_ROOT, file), "utf8") : git("show", `${AT}:${file}`);
 
 /**
- * Repo paths a spec names in backticks. Specs write them relative to
- * `barwise/`, to `barwise/packages/`, or from the repo root, so each
- * candidate is tried against all three and kept only if git knows it.
+ * Commits in `found` that `recorded` does not contain. By prefix, because
+ * both are abbreviations and git lengthens them as a repository grows, so
+ * the same commit can be recorded in 8 characters and found in 9.
  */
-function namedPaths(text) {
-  const out = new Set();
-  for (const m of text.matchAll(/`([^`\s]+\/[^`\s]+)`/g)) {
-    const raw = m[1].replace(/[.,;:)]+$/, "");
-    if (!CODE.test(raw) || HUB.test(raw)) continue;
-    for (const cand of [raw, `barwise/${raw}`, `barwise/packages/${raw}`]) {
-      if (exists(cand)) {
-        out.add(cand);
-        break;
-      }
-    }
-  }
-  return [...out];
+function unseenCommits(found, recorded = []) {
+  return found.filter((c) => !recorded.some((r) => c.startsWith(r) || r.startsWith(c)));
 }
 
 /**
- * A header value, which may run over several lines. `Tracking:` usually
- * does -- it mixes issue ids, sibling specs and review documents across
- * a paragraph -- and reading only its first line silently loses the ids
- * on the rest. That is not hypothetical: it dropped `norma-export`'s
- * three issues and one of `mandatory-existence-witness`'s two, which
- * moved both specs into the wrong survey class. A value ends at the next
- * header field or the first blank line.
+ * The paths whose commits say a spec was implemented. A `Touches:` header
+ * is the spec's own declaration and replaces inference: a path cited as
+ * context (`ci.yml`, a gate's test) is no longer read as the subject
+ * (plan-scope-check.spec.md). From it the audit drops shared wiring,
+ * non-code files and barrels, as it always has for inferred paths. A
+ * directory or pattern entry is expanded to the tracked files it covers,
+ * and those are filtered the same way, by the same matcher
+ * check:spec-touches validates it with, so the two read one language.
+ * Without the header, the paths the spec names, as before.
  */
-function header(text, field) {
-  const m = new RegExp(
-    // `$` is NOT the terminator: under the `m` flag it matches at every
-    // line end, so the lookahead fires immediately and the value is
-    // truncated to its first line. `(?![\\s\\S])` is end of input.
-    `^${field}:[ \\t]*([\\s\\S]*?)(?=\\n[A-Z][A-Za-z-]*:[ \\t]|\\n[ \\t]*\\n|(?![\\s\\S]))`,
-    "m",
-  ).exec(text);
-  return m ? m[1].trim() : undefined;
+function subjectPaths(text) {
+  const declared = touches(text);
+  // An empty header is check:spec-touches' finding; here it falls back to
+  // inference rather than leaving the spec with no subject at all.
+  if (declared === undefined || declared.length === 0) return namedPaths(text, exists);
+  return declared
+    .flatMap((e) => entryPaths(e.path, allFiles()))
+    .filter((p) => !isWiring(p) && CODE.test(p) && !HUB.test(p));
 }
 
 /** Specs claiming nothing is built, with the commits that say otherwise. */
@@ -215,7 +199,7 @@ function findings() {
     const status = header(text, "Status");
     if (status === undefined || !CLAIMS_NOTHING_BUILT.test(status)) continue;
 
-    const paths = namedPaths(text);
+    const paths = subjectPaths(text);
     if (paths.length === 0) continue;
     const specCommit = git("log", "-1", "--format=%H", head, "--", file);
     if (!specCommit) continue; // never committed; nothing to be stale against
@@ -348,6 +332,7 @@ if (!check) {
   refuseUntrackedInput({
     pathspec: "barwise/docs/specs",
     suffix: ".spec.md",
+    include: IN_CORPUS,
     gate: "audit-spec-status",
   });
 
@@ -358,11 +343,33 @@ if (!check) {
   // Merged, not regenerated: the `note` is why a stale-looking header is
   // actually right, and rebuilding from the detector alone stamped the
   // placeholder over all six of them (barwise-1026).
+  const existing = readExistingRows(BASELINE, "specs");
   const { rows: specs, ...counts } = mergeBaselineRows({
     fresh,
-    existing: readExistingRows(BASELINE, "specs"),
+    existing,
     preserve: { note: "TODO: classify" },
   });
+  // A verdict covers the commits it was written against, not ones that
+  // landed since. Refreshing the list under the old note made four verdicts
+  // read as covering commits nobody had looked at (barwise-qs8), so a row
+  // that gains commits gets its note reopened, and --check stays red until
+  // a person re-reads them and removes the TODO.
+  // A row already reopened gains any newer commits in its TODO, so the
+  // person who clears it re-reads everything the row will then claim.
+  const REOPENED = /^TODO: re-read -- (.*?) landed since this verdict\. Previous note: ([\s\S]*)$/;
+  const reopened = [];
+  for (const [id, row] of Object.entries(specs)) {
+    const prior = existing[id];
+    if (!prior?.note || prior.note.startsWith("TODO: classify")) continue;
+    const added = unseenCommits(row.commits, prior.commits);
+    if (added.length === 0) continue;
+    const open = REOPENED.exec(prior.note);
+    const listed = open ? open[1].split(", ") : [];
+    const verdict = open ? open[2] : prior.note;
+    row.note = `TODO: re-read -- ${[...listed, ...added].join(", ")} landed since this verdict. `
+      + `Previous note: ${verdict}`;
+    reopened.push(`${id}: ${added.join(", ")}`);
+  }
 
   const baseline = {
     $comment: "Specs whose Status claims no implementation while commits have landed on "
@@ -377,12 +384,30 @@ if (!check) {
       + ` -- ${mergeSummary(counts)}`,
   );
   for (const id of counts.dropped) console.log(`  dropped (no longer stale): ${id}`);
+  // Said here, not left for --check to find: a reopen rewrites a note.
+  for (const r of reopened) console.log(`  reopened (re-read before --check passes): ${r}`);
   process.exit(0);
 }
+
+// --check from here. Its corpus is the tracked tree; name the specs it did
+// not read, so an OK while one is being written does not claim to cover it.
+noteUntrackedInput({
+  pathspec: "barwise/docs/specs",
+  suffix: ".spec.md",
+  include: IN_CORPUS,
+  gate: "audit-spec-status",
+});
 
 const baseline = JSON.parse(readFileSync(BASELINE, "utf8")).specs;
 const failures = [];
 const seen = new Set();
+// Reported, never failed on. A commit that touches a file a Draft spec
+// names is a shadow of implementation, not the thing: failing on it made
+// every change to a named file red (merge commits included, which no
+// baseline can record) until a note was rewritten. The hole barwise-qs8
+// found -- a refresh crediting a verdict with commits nobody read -- is
+// closed on the write side instead: --write reopens the note.
+const unreviewed = [];
 
 for (const f of found) {
   seen.add(f.id);
@@ -396,7 +421,14 @@ for (const f of found) {
         + `spec-status-baseline.json saying why it is still right.`,
     );
   } else if (!row.note || row.note.startsWith("TODO")) {
-    failures.push(`UNCLASSIFIED: ${f.id} -- its baseline row has no note.`);
+    failures.push(
+      row.note?.startsWith("TODO: re-read")
+        ? `UNCLASSIFIED: ${f.id} -- reopened: ${row.note.split(" Previous note:")[0]}`
+        : `UNCLASSIFIED: ${f.id} -- its baseline row has no note.`,
+    );
+  } else {
+    const added = unseenCommits(f.commits, row.commits);
+    if (added.length > 0) unreviewed.push(`${f.id}: ${added.join(", ")}`);
   }
 }
 for (const id of Object.keys(baseline)) {
@@ -417,3 +449,10 @@ if (failures.length > 0) {
 console.log(
   `audit-spec-status --check: ${found.length} spec(s) claiming no implementation, all classified. OK`,
 );
+if (unreviewed.length > 0) {
+  console.log(
+    `  ${unreviewed.length} verdict(s) predate commits that touched what their spec names; `
+      + "`--write` records them and reopens the note for a re-read:",
+  );
+  for (const u of unreviewed) console.log(`    ${u}`);
+}

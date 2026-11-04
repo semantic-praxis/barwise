@@ -17,11 +17,13 @@ import { isScopedView } from "../../src/model/DiagramLayout.js";
 import { FactType } from "../../src/model/FactType.js";
 import { createObjectType } from "../../src/model/ObjectType.js";
 import { OrmModel } from "../../src/model/OrmModel.js";
+import { OrmYamlSerializer } from "../../src/serialization/OrmYamlSerializer.js";
 import {
   structuralRules,
   structuralWellFormedness,
 } from "../../src/validation/rules/structural.js";
 import { graphFor, unresolvedDiagnostics } from "../helpers/graphFor.js";
+import { injectFactType } from "../helpers/injectFactType.js";
 import { ModelBuilder } from "../helpers/ModelBuilder.js";
 
 describe("structuralRules", () => {
@@ -65,24 +67,20 @@ describe("structuralRules", () => {
     });
 
     it("detects a role referencing a nonexistent object type", () => {
-      // FactType does not validate playerIds -- it just stores them.
-      // We create a fact type with a bogus playerId and inject it
-      // into the model to trigger the structural rule.
-      const ot = createObjectType({ name: "Customer", kind: "entity", referenceMode: "cid" });
-      const ft = new FactType({
-        name: "Customer places Order",
-        roles: [
-          { name: "places", playerId: ot.id },
-          { name: "is placed by", playerId: "nonexistent-ot-id" },
-        ],
-        readings: ["{0} places {1}"],
-      });
-
       const model = new OrmModel({ name: "Test" });
-      model.addObjectType({ id: ot.id, name: "Customer", kind: "entity", referenceMode: "cid" });
-      // Bypass addFactType validation by injecting directly.
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (model as any)._factTypes.set(ft.id, ft);
+      const ot = model.addObjectType({ name: "Customer", kind: "entity", referenceMode: "cid" });
+      // The player check is skipped, as a lenient load skips it.
+      model.addFactType(
+        {
+          name: "Customer places Order",
+          roles: [
+            { name: "places", playerId: ot.id },
+            { name: "is placed by", playerId: "nonexistent-ot-id" },
+          ],
+          readings: ["{0} places {1}"],
+        },
+        { skipPlayerValidation: true },
+      );
 
       // The check moved into `graphOf`; the diagnostic id did not move
       // with it, because that id is what a consumer reads.
@@ -110,14 +108,25 @@ describe("structuralRules", () => {
 
     it("detects duplicate object type names", () => {
       // OrmModel.addObjectType prevents duplicates, so we inject directly.
-      const ot1 = createObjectType({ name: "Customer", kind: "entity", referenceMode: "cid1" });
-      const ot2 = createObjectType({ name: "Customer", kind: "entity", referenceMode: "cid2" });
+      // Two ids, as two random ones were: a name gives one id now.
+      const ot1 = createObjectType({
+        id: "c1",
+        name: "Customer",
+        kind: "entity",
+        referenceMode: "cid1",
+      });
+      const ot2 = createObjectType({
+        id: "c2",
+        name: "Customer",
+        kind: "entity",
+        referenceMode: "cid2",
+      });
 
       const model = new OrmModel({ name: "Test" });
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (model as any)._objectTypes.set(ot1.id, ot1);
+      (model as any)._objectTypes.set(ot1);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (model as any)._objectTypes.set(ot2.id, ot2);
+      (model as any)._objectTypes.set(ot2);
 
       const diagnostics = structuralWellFormedness(model);
       const dupes = diagnostics.filter(
@@ -130,11 +139,13 @@ describe("structuralRules", () => {
     it("detects duplicate fact type names", () => {
       const ot = createObjectType({ name: "Customer", kind: "entity", referenceMode: "cid" });
       const ft1 = new FactType({
+        id: "f1",
         name: "Customer exists",
         roles: [{ name: "exists", playerId: ot.id }],
         readings: ["{0} exists"],
       });
       const ft2 = new FactType({
+        id: "f2",
         name: "Customer exists",
         roles: [{ name: "exists", playerId: ot.id }],
         readings: ["{0} exists"],
@@ -142,11 +153,10 @@ describe("structuralRules", () => {
 
       const model = new OrmModel({ name: "Test" });
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (model as any)._objectTypes.set(ot.id, ot);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (model as any)._factTypes.set(ft1.id, ft1);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (model as any)._factTypes.set(ft2.id, ft2);
+      (model as any)._objectTypes.set(ot);
+      // addFactType refuses a second name, so these go in past it.
+      injectFactType(model, ft1);
+      injectFactType(model, ft2);
 
       const diagnostics = structuralWellFormedness(model);
       const dupes = diagnostics.filter(
@@ -370,7 +380,7 @@ describe("structural/diagram-dangling-reference", () => {
     const m = model();
     m.addDiagramLayout({
       name: "V",
-      elements: ["Customer"],
+      elements: ["ot-missing"],
       positions: { "ot-gone": { x: 0, y: 0 } },
       orientations: { "ft-gone": "vertical" },
     });
@@ -379,7 +389,7 @@ describe("structural/diagram-dangling-reference", () => {
       [
         "warning",
         "V",
-        'Diagram "V" lists "Customer" in elements, but no object type has that id.',
+        'Diagram "V" lists "ot-missing" in elements, but no object type has that id.',
       ],
       [
         "warning",
@@ -439,6 +449,143 @@ describe("structural/diagram-empty-view and isScopedView", () => {
     );
     expect(empty.map((d) => [d.severity, d.elementId, d.message])).toEqual([
       ["info", "Empty", 'Diagram "Empty" lists no elements, so it draws an empty canvas.'],
+    ]);
+  });
+});
+
+describe("format 4.0 local names (iri-identity.spec.md WS2)", () => {
+  const ids = (model: OrmModel, rule: string) =>
+    structuralWellFormedness(model).filter((d) => d.ruleId === rule);
+
+  it("warns when an object type and a fact type hold one id, as a model built in code may", () => {
+    // A 4.0 load refuses this; a model that admits a repeat across kinds
+    // (3.x semantics, built in code) is the one place it can arise.
+    const model = new OrmModel({ name: "Test" });
+    model.addObjectType({
+      id: "Order_Line",
+      name: "Order Line",
+      kind: "entity",
+      referenceMode: "nr",
+    });
+    model.addObjectType({ id: "Order", name: "Order", kind: "entity", referenceMode: "nr" });
+    model.addFactType({
+      id: "Order_Line",
+      name: "Order_Line",
+      roles: [{ id: "Order_Line.has", name: "has", playerId: "Order" }],
+      readings: ["{0} has"],
+    });
+    const found = ids(model, "structural/local-name-collision");
+    expect(found.map((d) => [d.severity, d.message])).toEqual([[
+      "warning",
+      'The fact type "Order_Line" and the object type "Order Line" both hold the id "Order_Line"; in format 4.0 an id names one element. Give one of them another id.',
+    ]]);
+  });
+
+  it("leaves an exact repeat within one kind to duplicate-object-type-name", () => {
+    const model = new OrmModel({ name: "Test" });
+    const a = createObjectType({ id: "c1", name: "Customer", kind: "entity", referenceMode: "nr" });
+    const b = createObjectType({ id: "c2", name: "Customer", kind: "entity", referenceMode: "nr" });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (model as any)._objectTypes.set(a);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (model as any)._objectTypes.set(b);
+    expect(ids(model, "structural/local-name-collision")).toEqual([]);
+    expect(ids(model, "structural/duplicate-object-type-name")).toHaveLength(1);
+  });
+
+  it("warns when two roles of one fact type share a role name, naming the id", () => {
+    const model = new ModelBuilder("Test")
+      .withEntityType("Person", { referenceMode: "nr" })
+      .withBinaryFactType("Person knows Person", {
+        role1: { player: "Person", name: "knows" },
+        role2: { player: "Person", name: "knows" },
+      })
+      .build();
+    const found = ids(model, "structural/duplicate-role-name");
+    // Said once: id-not-from-name leaves a repeated role name to this rule.
+    expect(ids(model, "structural/id-not-from-name").filter((d) => d.elementId.includes(".")))
+      .toEqual([]);
+    // The id is built from the fact type's id, not its name's local name.
+    const ftId = model.getFactTypeByName("Person knows Person")!.id;
+    expect(found.map((d) => [d.severity, d.message])).toEqual([[
+      "warning",
+      `Fact type "Person knows Person" has roles "knows", "knows" whose name gives each the id "${ftId}.knows"; in format 4.0 all but the first hold a suffixed id, and new authoring refuses the repeat. Give each a different role name.`,
+    ]]);
+  });
+
+  it("reports, as information, a name whose id is encoded", () => {
+    const model = new ModelBuilder("Test").withEntityType("v1.2 Order", { referenceMode: "nr" })
+      .build();
+    expect(ids(model, "structural/encoded-local-name").map((d) => [d.severity, d.message])).toEqual(
+      [[
+        "info",
+        'The object type "v1.2 Order" will take the id "v1%2E2_Order" in format 4.0, with its reserved or unsafe characters percent-encoded.',
+      ]],
+    );
+  });
+
+  it("says nothing about a model whose names map cleanly", () => {
+    const model = new ModelBuilder("Test")
+      .withEntityType("Customer", { referenceMode: "nr" })
+      .withEntityType("Order", { referenceMode: "nr" })
+      .withBinaryFactType("Customer places Order", {
+        role1: { player: "Customer", name: "places" },
+        role2: { player: "Order", name: "is placed by" },
+      })
+      .build();
+    const rules = [
+      "structural/local-name-collision",
+      "structural/duplicate-role-name",
+      "structural/encoded-local-name",
+    ];
+    expect(structuralWellFormedness(model).filter((d) => rules.includes(d.ruleId))).toEqual([]);
+  });
+
+  it("does not call two names with one local name a collision once their ids differ", () => {
+    // The replay gives the second its suffixed id, which id-not-from-name
+    // reports; the 22 corpus pairs and NORMA imports stop warning here.
+    const model = new OrmYamlSerializer().deserialize(`orm_version: "3.0"
+model:
+  name: Test
+  object_types:
+    - { id: u1, name: Order Line, kind: entity, reference_mode: nr }
+    - { id: u2, name: Order_Line, kind: entity, reference_mode: nr }
+`);
+    expect(ids(model, "structural/local-name-collision")).toEqual([]);
+    expect(ids(model, "structural/id-not-from-name").map((d) => d.elementId)).toEqual([
+      "Order_Line_2",
+    ]);
+  });
+
+  it("reports a role whose id a population holds", () => {
+    const model = new OrmModel({ name: "Test" });
+    model.addObjectType({ id: "City", name: "City", kind: "entity", referenceMode: "name" });
+    model.addFactType({
+      id: "City_has_Count",
+      name: "City has Count",
+      roles: [
+        { id: "City_has_Count.has", name: "has", playerId: "City" },
+        { id: "City_has_Count.population", name: "population", playerId: "City" },
+      ],
+      readings: ["{0} has {1}"],
+    });
+    model.addPopulation({ id: "City_has_Count.population", factTypeId: "City_has_Count" });
+    expect(ids(model, "structural/local-name-collision").map((d) => d.message)).toEqual([
+      'Fact type "City has Count" has a role and a population that both hold the id "City_has_Count.population"; in format 4.0 an id names one element. Rename the role.',
+    ]);
+  });
+
+  it("reports an encoded role name with its role id", () => {
+    const model = new ModelBuilder("Test")
+      .withEntityType("Person", { referenceMode: "nr" })
+      .withValueType("Alias", { dataType: { name: "text" } })
+      .withBinaryFactType("Person has Alias", {
+        role1: { player: "Person", name: "is a.k.a." },
+        role2: { player: "Alias", name: "is of" },
+      })
+      .build();
+    expect(ids(model, "structural/encoded-local-name").map((d) => d.message)).toEqual([
+      'The role "is a.k.a." will take the id "Person_has_Alias.is_a%2Ek%2Ea%2E" in format 4.0, with its reserved or unsafe characters percent-encoded.',
     ]);
   });
 });

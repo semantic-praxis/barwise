@@ -28,7 +28,7 @@ import {
  * player-named token the range forbids (barwise-959).
  */
 function roleValueDomain(roleId: string, factType: FactType): ValueDomain | undefined {
-  for (const c of factType.constraints) {
+  for (const c of factType.internalConstraints) {
     if (isValueConstraint(c) && c.roleId === roleId) return c;
   }
   return undefined;

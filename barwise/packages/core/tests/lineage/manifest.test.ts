@@ -16,7 +16,7 @@ import { ModelBuilder } from "../helpers/ModelBuilder.js";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const sampleManifest: LineageManifest = {
-  version: 1,
+  version: 2,
   sourceModel: "test.orm.yaml",
   sourceModelHash: "abc123",
   exports: [
@@ -46,7 +46,7 @@ describe("Lineage Manifest", () => {
 
     it("serializes the expected fields", () => {
       const yaml = serializeManifest(sampleManifest);
-      expect(yaml).toContain("version: 1");
+      expect(yaml).toContain("version: 2");
       expect(yaml).toContain("sourceModel: test.orm.yaml");
       expect(yaml).toContain("sourceModelHash: abc123");
       expect(yaml).toContain("artifact: schema.sql");
@@ -67,7 +67,7 @@ describe("Lineage Manifest", () => {
 
       const manifest = updateManifest(entry);
 
-      expect(manifest.version).toBe(1);
+      expect(manifest.version).toBe(2);
       expect(manifest.exports).toHaveLength(1);
       expect(manifest.exports[0]).toEqual(entry);
       expect(manifest.sourceModelHash).toBe("abc123");
@@ -75,7 +75,7 @@ describe("Lineage Manifest", () => {
 
     it("appends a new entry to an existing manifest", () => {
       const initial: LineageManifest = {
-        version: 1,
+        version: 2,
         sourceModel: "test.orm.yaml",
         sourceModelHash: "abc123",
         exports: [
@@ -107,7 +107,7 @@ describe("Lineage Manifest", () => {
 
     it("replaces an existing entry when the artifact path matches", () => {
       const initial: LineageManifest = {
-        version: 1,
+        version: 2,
         sourceModel: "test.orm.yaml",
         sourceModelHash: "abc123",
         exports: [
@@ -145,10 +145,11 @@ describe("Lineage Manifest", () => {
     const EXAMPLE = resolve(__dirname, "../../../../examples/models/learning-design.orm.yaml");
 
     it("hashes two independent loads of the same file identically (barwise-923)", () => {
-      // Every id-less constraint is minted a fresh UUID on load, so two
-      // loads serialize differently on every constraint `id:` line and
-      // hashed differently -- which made `barwise lineage status` report
-      // every export stale on every run for any model like this one.
+      // Before orm-format-3 WS2 every id-less constraint was minted a fresh
+      // UUID on load, so two loads hashed differently -- which made
+      // `barwise lineage status` report every export stale on every run
+      // for any model like this one. Ids are derived now, and hashModel
+      // still canonicalizes them; either alone keeps this passing.
       const text = readFileSync(EXAMPLE, "utf8");
       const serializer = new OrmYamlSerializer();
       const first = serializer.deserialize(text);

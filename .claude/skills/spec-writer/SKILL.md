@@ -78,7 +78,11 @@ alongside this file.
 6. **Surface open decisions.** End with the choices that are genuinely
    the reviewer's call (package scope, where shared I/O lives,
    API shape). Recommend a default; do not silently decide. These are
-   ADR-shaped -- state the options and the trade-off.
+   ADR-shaped -- state the options and the trade-off. When a resolved
+   decision sets a rule other work must follow, record it as an ADR from
+   `template.adr.md` beside this file and point the resolved heading at
+   it rather than restating it; a local choice stays in the spec
+   (`docs/specs/architecture-index.spec.md`).
 7. **Edit, then run an articulation pass.** Run the edit passes in
    `editing.md` (scanning `llm-tics.md` during the voice pass), then
    invoke the `articulation` skill in critique mode over the draft --
@@ -90,8 +94,25 @@ alongside this file.
    missing, so return to grounding (step 1) or move the undecided item
    into Open decisions -- do not polish through it. The review runs
    in-conversation; commit the fixes, never the review.
-8. **Clear the gate, then land.** Run the pre-push gate below, land the
-   spec for review, then implement in separate PRs. Before implementing
+8. **Clear the gate, review the plan, then implement.** Run the pre-push
+   gate below and commit the spec. Before any implementation commit, run
+   `/code-review` and `/pr-review` on the spec at that commit and act on
+   what they find; then add `Plan-reviewed: <commit> (code-review,
+   pr-review)` to its header, naming the head the reviews read, and
+   commit that line on its own. A plan edited after the review needs
+   the review again: the line vouches for the spec's body as it stood at
+   that commit. `npm run check:plan-review` (a CI gate on pull requests)
+   fails a PR that names the spec and changes a path in its `Touches:`
+   while the spec is new in the PR or its Status at the base claims
+   nothing is built, unless the line names a commit that precedes every
+   such change and whose body matches the plan the implementation
+   started from (`docs/specs/plan-scope-check.spec.md`).
+   `npm run check:spec-touches` fails a spec without a `Touches:` entry
+   naming a tracked path outside `barwise/docs/specs/`, unless its file
+   name was already under `barwise/docs/specs/` at the rule's cutoff
+   commit (`docs/specs/touches-required.spec.md`).
+   The spec may land alone or with its first workstream; either way the
+   review commit comes first. Before implementing
    each workstream, ground it again and verify or correct the
    conclusions drafted ahead of time; revise the spec if the scope
    differs from the brief. Re-ground the claims that promise _no_ work
@@ -185,8 +206,24 @@ reverse.
   landed as a deletion the draft never considered
   (`tracker-quick-wins.spec.md`, WS2). Before an Inventory row says
   "change X", ask what would make X run, and whether anything can.
+- **Criteria can all be met at once**: when a spec fixes decision
+  criteria or gates in advance, walk the outcome where everything goes
+  as intended and check it passes every gate. `effect-comparison.spec.md`
+  shipped a gate of "no user-visible change" beside a required change to
+  malformed-input errors, so no finished arm could have been eligible;
+  review, not the draft's own passes, caught it.
+- **Every threshold says why that number**: a limit in a criterion
+  names the outcome it protects and why the value sits where it does --
+  root `CLAUDE.md`'s "stated relation to an outcome". The same spec
+  first gated startup at "no more than 10% slower", a number tied to
+  nothing a user experiences; the user's question replaced it with 1
+  second, where a wait starts to break a train of thought.
 - **Header block is current** -- `Status`, `Created`, `Last-updated`
-  (bumped if this push revises an existing spec), `Tracking`.
+  (bumped if this push revises an existing spec), `Tracking`, and
+  `Touches:`, required on a new spec, with at least one entry naming a
+  tracked path outside `barwise/docs/specs/` (`check:spec-touches`): the paths the plan changes, `+` for
+  a file it creates and `-` for one it deletes (`template.spec.md`;
+  `check:spec-touches` keeps it live).
 - **Parity check**: if the design introduces a copy that must agree
   with other code -- a parallel implementation, a re-listed union, a
   derived file, a table restating code facts -- the spec names its

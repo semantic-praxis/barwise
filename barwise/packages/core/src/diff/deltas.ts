@@ -1,6 +1,7 @@
 /**
  * Delta and result types produced by the model diff engine.
  */
+import type { ExternalConstraint } from "../model/Constraint.js";
 import type { Definition } from "../model/Definition.js";
 import type { FactType } from "../model/FactType.js";
 import type { ObjectifiedFactType } from "../model/ObjectifiedFactType.js";
@@ -8,6 +9,7 @@ import type { ObjectType } from "../model/ObjectType.js";
 import type { Population } from "../model/Population.js";
 import type { SubtypeFact } from "../model/SubtypeFact.js";
 import type { ChangeDescription } from "./changeDescription.js";
+import type { ElementMatching, PairedBy } from "./identity.js";
 
 export type DeltaKind = "added" | "removed" | "modified" | "unchanged";
 
@@ -23,7 +25,8 @@ export type BreakingLevel = "safe" | "caution" | "breaking";
 interface DeltaCommon {
   readonly kind: DeltaKind;
   /**
-   * What changed, as data (empty for add/remove).
+   * What changed, as data: empty for an element added or removed; one
+   * change for every model header delta, added and removed included.
    *
    * This is the authority; `changeDescriptions` is rendered from it.
    * Breaking-level classification reads these variants, so a change the
@@ -47,6 +50,8 @@ interface DeltaCommon {
 export interface ObjectTypeDelta extends DeltaCommon {
   readonly elementType: "object_type";
   readonly name: string;
+  /** How the two sides were paired; present when both are. */
+  readonly pairedBy?: PairedBy;
   /** Present for modified, removed, unchanged. */
   readonly existing?: ObjectType;
   /** Present for added, modified, unchanged. */
@@ -56,9 +61,29 @@ export interface ObjectTypeDelta extends DeltaCommon {
 export interface FactTypeDelta extends DeltaCommon {
   readonly elementType: "fact_type";
   readonly name: string;
+  /** How the two sides were paired; present when both are. */
+  readonly pairedBy?: PairedBy;
   readonly existing?: FactType;
   readonly incoming?: FactType;
 }
+
+/**
+ * One part of the model's own header: the `namespace` its element IRIs
+ * start with, or one alias its `imports` bind (iri-identity WS6, 6b-3c).
+ * Neither changes an id or a pairing, so diff has no other place to show an
+ * edit to them; `iriOf`'s answers are what move. One delta per part, so
+ * that adding, rebinding and removing are told apart as for any element.
+ */
+export interface ModelHeaderDelta extends Omit<DeltaCommon, "changes"> {
+  readonly elementType: "model_header";
+  /** `namespace`, or `import <alias>`: what the delta is about. */
+  readonly name: string;
+  /** The one part that changed, so a reader need not guard for none. */
+  readonly changes: readonly [HeaderChange];
+}
+
+/** The change a model header delta carries. */
+export type HeaderChange = Extract<ChangeDescription, { change: "namespace" | "importBinding"; }>;
 
 export interface DefinitionDelta extends DeltaCommon {
   readonly elementType: "definition";
@@ -143,13 +168,42 @@ export interface PopulationDelta extends DeltaCommon {
   readonly incoming?: Population;
 }
 
+/**
+ * A constraint across fact types (orm-format-3 WS3c). It lives in the
+ * model, not in any fact type, so it has a delta of its own: before the
+ * move it was a change to whichever fact type a 2.0 file nested it under,
+ * and a constraint whose host differed between the two sides read as
+ * removed from one fact type and added to another.
+ *
+ * It has no name, so it is named by its kind and the fact types it spans.
+ */
+export interface ConstraintDelta extends DeltaCommon {
+  readonly elementType: "constraint";
+  readonly constraintType: ExternalConstraint["type"];
+  /**
+   * The names of the fact types it spans, in model order, as validation and
+   * verbalization name them, from the incoming side when it has one, and
+   * from the other side when its own holds none of its roles.
+   */
+  readonly factTypes: readonly string[];
+  /**
+   * Its roles in its own order, each as "fact type (role)", or the raw id
+   * of one no fact type holds, from the same side as `factTypes`.
+   */
+  readonly roles: readonly string[];
+  readonly existing?: ExternalConstraint;
+  readonly incoming?: ExternalConstraint;
+}
+
 export type ModelDelta =
+  | ModelHeaderDelta
   | ObjectTypeDelta
   | FactTypeDelta
   | DefinitionDelta
   | SubtypeFactDelta
   | ObjectifiedFactTypeDelta
-  | PopulationDelta;
+  | PopulationDelta
+  | ConstraintDelta;
 
 /**
  * Which kind of element a delta is about.
@@ -179,12 +233,14 @@ export type ElementType = ModelDelta["elementType"];
  * The same shape as `CHANGE_LEVEL` next door, for the same reason.
  */
 const ELEMENT_LABEL = {
+  model_header: "Model header",
   object_type: "Object type",
   fact_type: "Fact type",
   definition: "Definition",
   subtype_fact: "Subtype fact",
   objectified_fact_type: "Objectification",
   population: "Population",
+  constraint: "Constraint",
 } as const satisfies Record<ElementType, string>;
 
 /** Every element kind a delta can be about. Derived from the label table. */
@@ -228,6 +284,7 @@ export function elementName(delta: ModelDelta): string {
   switch (delta.elementType) {
     case "definition":
       return delta.term;
+    case "model_header":
     case "object_type":
     case "fact_type":
       return delta.name;
@@ -241,6 +298,15 @@ export function elementName(delta: ModelDelta): string {
       return `${delta.subtype.name} is a subtype of ${delta.supertype.name}`;
     case "objectified_fact_type":
       return `${delta.objectType.name} objectifies ${delta.factType.name}`;
+    // Its kind and its roles, each by its fact type and role name, in the
+    // constraint's own order: two constraints of one kind over the same
+    // fact types differ in their roles, or the review panel would offer two
+    // identical checkboxes, as it did for populations.
+    case "constraint": {
+      const shown = delta.incoming ?? delta.existing;
+      const modality = shown?.modality === "deontic" ? " (deontic)" : "";
+      return `${delta.constraintType.replace(/_/g, " ")}${modality} over ${delta.roles.join(", ")}`;
+    }
     // The flag is part of the identity, so it belongs in the name. The
     // description is NOT part of the identity -- it is prose, and keying
     // on it would turn a rewording into a delete plus an insert -- but
@@ -265,6 +331,12 @@ export interface DeltaJson {
   readonly breakingLevel: BreakingLevel;
   readonly changes: readonly ChangeDescription[];
   readonly changeDescriptions: readonly string[];
+  /**
+   * Present only when an object type or fact type was paired by content
+   * or by a declared rename, which is what a reader needs told; a pair by
+   * id or name is the ordinary case and carries nothing.
+   */
+  readonly pairedBy?: RenamePairing;
 }
 
 /**
@@ -286,7 +358,55 @@ export function deltaToJson(delta: ModelDelta): DeltaJson {
     breakingLevel: delta.breakingLevel,
     changes: delta.changes,
     changeDescriptions: delta.changeDescriptions,
+    ...pairedByJson(delta),
   };
+}
+
+function pairedByJson(delta: ModelDelta): { readonly pairedBy?: RenamePairing; } {
+  const pairedBy = renamePairing(delta);
+  return pairedBy ? { pairedBy } : {};
+}
+
+/**
+ * The line a text surface prints under a delta paired as a rename, or
+ * undefined for an ordinary pair. One wording for `barwise diff` and
+ * `barwise history`, which render deltas separately.
+ */
+export function pairingNote(delta: ModelDelta): string | undefined {
+  const pairing = renamePairing(delta);
+  switch (pairing) {
+    case "recognized":
+      // "Possible": two elements of one shape pair the same way (decision 8).
+      return "Possibly a rename: paired by what it says, not by its id or name.";
+    case "declared":
+      return "Paired as a declared rename.";
+    case undefined:
+      return undefined;
+    default: {
+      // A pairing added to `PairedBy` must say what its note is: merge
+      // already refuses it and the JSON shows it, so a silent text line
+      // here would be the one surface that hides it.
+      const unhandled: never = pairing;
+      throw new Error(`pairingNote: no note for pairing "${String(unhandled)}".`);
+    }
+  }
+}
+
+/** A pairing that is not evidence two elements are one: anything but id or name. */
+export type RenamePairing = Exclude<PairedBy, "id" | "name">;
+
+/**
+ * How the delta pairs an object type or fact type when that is by anything
+ * other than its id or name, else undefined. An allowlist of the evidence,
+ * not a list of the rest, so a pairing added to `PairedBy` later is a
+ * rename pairing -- shown to the reader and refused by merge -- until
+ * someone decides otherwise. The one reading every surface and merge's
+ * refusal use, so they cannot disagree about which deltas these are.
+ */
+export function renamePairing(delta: ModelDelta): RenamePairing | undefined {
+  if (delta.elementType !== "object_type" && delta.elementType !== "fact_type") return undefined;
+  const by = delta.pairedBy;
+  return by === undefined || by === "id" || by === "name" ? undefined : by;
 }
 
 /**
@@ -337,6 +457,19 @@ export interface SynonymCandidate {
 export interface ModelDiffResult {
   readonly deltas: readonly ModelDelta[];
   readonly hasChanges: boolean;
+  /**
+   * The matching the diff ran with, so a merge can refuse a diff whose ids
+   * said nothing (`"content"`): its object types and fact types paired by
+   * name alone, which is not evidence two elements are one.
+   */
+  readonly matching: ElementMatching;
+  /**
+   * Whether the diff paired by content (`DiffOptions.recognizeRenames`).
+   * A merge refuses a diff that did, whether or not it found a pair: a
+   * merge path that forgot to turn it off then fails on every input, not
+   * only on one that holds two elements of one shape.
+   */
+  readonly recognizeRenames: boolean;
   /** Potential synonym pairs detected from removed + added elements. */
   readonly synonymCandidates: readonly SynonymCandidate[];
 }

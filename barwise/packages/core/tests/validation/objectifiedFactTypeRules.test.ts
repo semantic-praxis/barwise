@@ -60,7 +60,7 @@ describe("objectified fact type structural rules", () => {
       factTypeId: "nonexistent-ft",
       objectTypeId: marriage.id,
     });
-    (model as any)._objectifiedFactTypes.set(badOft.id, badOft);
+    (model as any)._objectifiedFactTypes.set(badOft);
 
     // The check moved into `graphOf`; the diagnostic id did not move
     // with it, because that id is what a consumer reads.
@@ -93,7 +93,7 @@ describe("objectified fact type structural rules", () => {
       factTypeId: ft.id,
       objectTypeId: "nonexistent-ot",
     });
-    (model as any)._objectifiedFactTypes.set(badOft.id, badOft);
+    (model as any)._objectifiedFactTypes.set(badOft);
 
     const diags = unresolvedDiagnostics(model);
     const danglingDiags = diags.filter(
@@ -125,7 +125,7 @@ describe("objectified fact type structural rules", () => {
       factTypeId: ft.id,
       objectTypeId: date.id,
     });
-    (model as any)._objectifiedFactTypes.set(badOft.id, badOft);
+    (model as any)._objectifiedFactTypes.set(badOft);
 
     const diags = structuralRules(model, graphFor(model));
     const notEntityDiags = diags.filter(
@@ -170,7 +170,7 @@ describe("objectified fact type structural rules", () => {
       factTypeId: ft.id,
       objectTypeId: union.id,
     });
-    (model as any)._objectifiedFactTypes.set(dupOft.id, dupOft);
+    (model as any)._objectifiedFactTypes.set(dupOft);
 
     const diags = structuralRules(model, graphFor(model));
     const dupDiags = diags.filter(
@@ -217,7 +217,7 @@ describe("objectified fact type structural rules", () => {
       factTypeId: ft2.id,
       objectTypeId: marriage.id,
     });
-    (model as any)._objectifiedFactTypes.set(dupOft.id, dupOft);
+    (model as any)._objectifiedFactTypes.set(dupOft);
 
     const diags = structuralRules(model, graphFor(model));
     const dupTargetDiags = diags.filter(

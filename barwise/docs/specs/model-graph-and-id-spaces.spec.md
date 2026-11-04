@@ -692,7 +692,9 @@ caller that bypassed the dispatcher, a programming error rather than a
 model defect.
 
 **Which kinds the guard applies to is the whole subtlety, and it is
-`requiresLocalRoles` in `model/Constraint.ts`.** Exclusion, subset,
+`isInternalConstraint` in `model/Constraint.ts`** (derived from the
+`PLACEMENT` table since orm-format-3 WS3a-ii; this spec introduced it as
+`requiresLocalRoles`). Exclusion, subset,
 equality, exclusive-or and disjunctive mandatory span fact types
 routinely; an external uniqueness constraint that is entirely local is
 the anomaly, not the other way round; join constraints reach across by
@@ -705,7 +707,7 @@ That classification now lives in two places -- this predicate and
 `constraintConsistency`'s per-kind switch -- and the repo's rule is that
 such a pair is shared, derived, registered or drift-tested in the same
 commit. Sharing does not fit: `constraintConsistency` needs a rule id
-per kind, not a boolean. So `tests/model/requiresLocalRoles.test.ts` is
+per kind, not a boolean. So `tests/model/internalConstraintLocality.test.ts` is
 the drift test, and it is empirical rather than a second list: for each
 kind it plants a role of another fact type and asks the engine whether
 that is an error.

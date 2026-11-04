@@ -1,0 +1,130 @@
+{
+  "run": "effect-t1-r1",
+  "arm": "effect",
+  "task": "T1",
+  "phase": "second-series",
+  "pair": "r1",
+  "start": "8d36e4fc",
+  "head": "528c0baa",
+  "startedAt": "2026-10-15T04:13:52Z",
+  "rounds": 2,
+  "leftoverCommit": false,
+  "outcome": "pass",
+  "readSpec": false,
+  "usage": {
+    "inputProcessed": 5135476,
+    "turns": 47,
+    "finalContext": 134665,
+    "rounds": [
+      {
+        "round": 1,
+        "turns": 40,
+        "inputProcessed": 4215655
+      },
+      {
+        "round": 2,
+        "turns": 7,
+        "inputProcessed": 919821
+      }
+    ],
+    "source": "measure:comparison -- usage over the run's transcript; per turn in effect-t1-r1.usage.json"
+  },
+  "scoring": [
+    {
+      "round": 1,
+      "head": "d2062021",
+      "trial": {
+        "exit": 0,
+        "protectedTouched": []
+      },
+      "heldout": {
+        "passed": 11,
+        "of": 13,
+        "failed": [
+          "an empty unit in a file is refused, or kept and diffed like any value",
+          "an empty unit from code is refused, or kept and diffed like any value"
+        ]
+      },
+      "harnessAfterRound": {
+        "tokens": 125994,
+        "toolCalls": 45,
+        "wallMs": 693069
+      },
+      "sentBack": "held-out empty-unit cases"
+    },
+    {
+      "round": 2,
+      "head": "528c0baa",
+      "trial": {
+        "exit": 0,
+        "protectedTouched": []
+      },
+      "heldout": {
+        "passed": 13,
+        "of": 13
+      },
+      "build": 0,
+      "test": 0,
+      "validateExamples": 0,
+      "promptlabDrift": {
+        "exit": 0,
+        "tests": "15 passed"
+      },
+      "harness": {
+        "tokens": 135378,
+        "toolCalls": 12,
+        "wallMs": 228082,
+        "note": "this round alone, as the harness reported it on resume (x2's round-2 figures were cumulative); the run's total wall time is 921151 ms"
+      }
+    }
+  ],
+  "diff": {
+    "files": 7,
+    "hunks": 11,
+    "added": 34,
+    "removed": 1,
+    "consumerFiles": [
+      "barwise/packages/core/schemas/orm-model.schema.json",
+      "barwise/packages/core/src/diff/breakingLevel.ts",
+      "barwise/packages/core/src/diff/changeDescription.ts",
+      "barwise/packages/core/src/diff/elementDiff.ts"
+    ],
+    "sliceLines": 633
+  },
+  "redChecks": [
+    {
+      "class": "environment",
+      "command": "git ... / compound shell command",
+      "firstError": "the worktree sandbox refused a command it could not verify stayed inside the worktree",
+      "note": "harness isolation, not the code (2 times)"
+    },
+    {
+      "class": "task logic",
+      "command": "npx vitest run (packages/core)",
+      "firstError": "FAIL tests/laws/counterexample.law.test.ts: pinned count 88 against 123",
+      "note": "a newly drawn unit in tests/arbitraries/model.ts shifted the seeded samples; the unit is now copied from a value type's default value where it has one, so the stream did not move"
+    },
+    {
+      "class": "environment",
+      "command": "npm test (round 1)",
+      "firstError": "three cli tests in prompt.test.ts and promptEvalOffline.test.ts failed (two 30 s timeouts) under parallel load",
+      "note": "alone they passed 42/42 and the cli package 463/463; second full run passed 24/24; session full suite passed"
+    },
+    {
+      "class": "task logic",
+      "command": "session scoring: measure:comparison -- heldout",
+      "firstError": "empty-unit cases (file and code) failed: accepted, diffed as absent",
+      "note": "round 2 refused an empty unit in the value-type schema and the JSON Schema (minLength 1)"
+    }
+  ],
+  "observations": [
+    "did not edit the protected layout test, under the amended prompt and without reading the experiment spec",
+    "missed both empty-unit cases in round 1, as every Effect run in the first series did"
+  ],
+  "agentJudgmentCalls": [
+    "empty unit refused (round 2)",
+    "unit written after data_type",
+    "unit change is breaking level caution",
+    "unit copied from a value type's default value in the random model generator, so the seeded law samples did not move"
+  ]
+}

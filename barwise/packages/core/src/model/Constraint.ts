@@ -45,15 +45,6 @@ export interface InternalUniquenessConstraint extends ConstraintBase {
   readonly type: "internal_uniqueness";
   /** Role ids within the same fact type. */
   readonly roleIds: readonly string[];
-  /**
-   * True if this uniqueness constraint is the preferred identifier for
-   * the entity type that plays the constrained role(s). The preferred
-   * identifier determines the primary key in relational mapping.
-   *
-   * At most one internal uniqueness constraint per entity type should
-   * be marked as preferred.
-   */
-  readonly isPreferred?: boolean;
 }
 
 /**
@@ -112,18 +103,37 @@ export interface ValueConstraint extends ConstraintBase {
 // ---------------------------------------------------------------------------
 
 /**
+ * The operand of an exclusion, a disjunctive mandatory or an exclusive-or:
+ * the roles it constrains, or, for a supertype's subtypes, the subtype
+ * facts (orm-format-3, Open decision 2, option a). Exactly one is present,
+ * so a reader of `roleIds` must first ask which it has.
+ */
+export type RoleOrSubtypeOperand =
+  | {
+    /** Role ids (may span fact types). */
+    readonly roleIds: readonly string[];
+    readonly subtypeFactIds?: never;
+  }
+  | {
+    /** Subtype fact ids, all of one supertype. */
+    readonly subtypeFactIds: readonly string[];
+    readonly roleIds?: never;
+  };
+
+/**
  * Disjunctive mandatory constraint.
  *
  * Each instance of the common object type must play at least one of
- * the specified roles. The roles may span multiple fact types.
+ * the specified roles. The roles may span multiple fact types. Over
+ * subtype facts it is totality: each instance of the supertype is an
+ * instance of at least one of the subtypes.
  *
  * Example: "Each Person drives some Car or rides some Bus."
  */
-export interface DisjunctiveMandatoryConstraint extends ConstraintBase {
-  readonly type: "disjunctive_mandatory";
-  /** Two or more role ids (may span fact types). */
-  readonly roleIds: readonly string[];
-}
+export type DisjunctiveMandatoryConstraint =
+  & ConstraintBase
+  & { readonly type: "disjunctive_mandatory"; }
+  & RoleOrSubtypeOperand;
 
 /**
  * Exclusion constraint.
@@ -133,11 +143,10 @@ export interface DisjunctiveMandatoryConstraint extends ConstraintBase {
  *
  * Example: "No Person both drives some Car and rides some Bus."
  */
-export interface ExclusionConstraint extends ConstraintBase {
-  readonly type: "exclusion";
-  /** Two or more role ids (may span fact types). */
-  readonly roleIds: readonly string[];
-}
+export type ExclusionConstraint =
+  & ConstraintBase
+  & { readonly type: "exclusion"; }
+  & RoleOrSubtypeOperand;
 
 /**
  * Exclusive-or constraint.
@@ -147,11 +156,10 @@ export interface ExclusionConstraint extends ConstraintBase {
  *
  * Example: "Each Person either drives some Car or rides some Bus but not both."
  */
-export interface ExclusiveOrConstraint extends ConstraintBase {
-  readonly type: "exclusive_or";
-  /** Two or more role ids (may span fact types). */
-  readonly roleIds: readonly string[];
-}
+export type ExclusiveOrConstraint =
+  & ConstraintBase
+  & { readonly type: "exclusive_or"; }
+  & RoleOrSubtypeOperand;
 
 /**
  * Subset constraint.
@@ -301,7 +309,8 @@ export interface RingConstraint extends ConstraintBase {
  * sequence bounds a combination ("each (Room, TimeSlot) pair is booked
  * 0..1 times").
  *
- * Example: "Each Customer places at least 2 and at most 5 Orders."
+ * Example: "Each Customer that places some Order places at least 2 and at
+ * most 5 instances of Order."
  */
 export interface FrequencyConstraint extends ConstraintBase {
   readonly type: "frequency";
@@ -404,6 +413,28 @@ export interface JoinExclusionConstraint extends ConstraintBase {
 }
 
 /**
+ * Join ring constraint: a ring property of the relation a join path
+ * projects. The flat `RingConstraint` covers a relation one fact type
+ * states; this variant reaches the relation along a role path, so it may
+ * span fact types and lives in the model, as the other join kinds do
+ * (`docs/specs/join-ring-constraint.spec.md`).
+ *
+ * The operand projects exactly two nodes, both played by one object type;
+ * `constraint/join-ring-arity` and `constraint/join-ring-different-players`
+ * report an operand that does not.
+ *
+ * Example (irreflexive): "No Person is a grandparent of that same Person"
+ * over `Person is child of Person` joined to itself, projecting [0, 2].
+ */
+export interface JoinRingConstraint extends ConstraintBase {
+  readonly type: "join_ring";
+  /** The path whose two projected nodes are the relation's two ends. */
+  readonly operand: JoinOperand;
+  /** The ring property being constrained. */
+  readonly ringType: RingType;
+}
+
+/**
  * Union of all constraint types.
  */
 export type Constraint =
@@ -422,7 +453,8 @@ export type Constraint =
   | CardinalityConstraint
   | JoinSubsetConstraint
   | JoinEqualityConstraint
-  | JoinExclusionConstraint;
+  | JoinExclusionConstraint
+  | JoinRingConstraint;
 
 /**
  * Every member of the `Constraint` union, keyed for compile-checked
@@ -454,6 +486,7 @@ const CONSTRAINT_TYPE_MEMBERS: Record<Constraint["type"], true> = {
   join_subset: true,
   join_equality: true,
   join_exclusion: true,
+  join_ring: true,
 };
 
 /** Every constraint type discriminator, in declaration order. */
@@ -539,6 +572,10 @@ export function isJoinExclusion(c: Constraint): c is JoinExclusionConstraint {
   return c.type === "join_exclusion";
 }
 
+export function isJoinRing(c: Constraint): c is JoinRingConstraint {
+  return c.type === "join_ring";
+}
+
 /**
  * Every role id a constraint references, across every constraint shape.
  *
@@ -561,11 +598,13 @@ export function roleIdsOf(c: Constraint): string[] {
   switch (c.type) {
     case "internal_uniqueness":
     case "external_uniqueness":
+    case "frequency":
+      return [...c.roleIds];
     case "disjunctive_mandatory":
     case "exclusion":
     case "exclusive_or":
-    case "frequency":
-      return [...c.roleIds];
+      // A subtype operand names no role; `subtypeFactIdsOf` has it.
+      return c.roleIds ? [...c.roleIds] : [];
     case "mandatory":
     case "cardinality":
       return [c.roleId];
@@ -581,6 +620,7 @@ export function roleIdsOf(c: Constraint): string[] {
     case "join_subset":
     case "join_equality":
     case "join_exclusion":
+    case "join_ring":
       return joinOperandsOf(c).flatMap(operandRoleIds);
   }
 }
@@ -588,6 +628,69 @@ export function roleIdsOf(c: Constraint): string[] {
 /** Role ids a join operand references: both ends of every hop in its path. */
 export function operandRoleIds(o: JoinOperand): string[] {
   return o.path.steps.flatMap((s) => [s.entry, s.exit]);
+}
+
+/**
+ * Every SUBTYPE FACT id a constraint references: the operand of an
+ * exclusion, a disjunctive mandatory or an exclusive-or over a supertype's
+ * subtypes (orm-format-3, Open decision 2). The sibling of `roleIdsOf`,
+ * which returns none for such a constraint: a caller asking which fact
+ * types or elements a constraint touches must ask both, or a subtype
+ * constraint touches nothing.
+ */
+export function subtypeFactIdsOf(c: Constraint): string[] {
+  switch (c.type) {
+    case "disjunctive_mandatory":
+    case "exclusion":
+    case "exclusive_or":
+      return c.subtypeFactIds ? [...c.subtypeFactIds] : [];
+    default:
+      return [];
+  }
+}
+
+/** An exclusion, disjunctive mandatory or exclusive-or over subtype facts. */
+export type SubtypeConstraint =
+  & (DisjunctiveMandatoryConstraint | ExclusionConstraint | ExclusiveOrConstraint)
+  & { readonly subtypeFactIds: readonly string[]; };
+
+/**
+ * Whether a constraint's operand is subtype facts rather than roles. The one
+ * test for it, so every reader agrees on a constraint whose subtype fact
+ * list is empty: it is over subtypes, and validation reports it as too few.
+ */
+export function isOverSubtypes(c: Constraint): c is SubtypeConstraint {
+  return (c.type === "disjunctive_mandatory" || c.type === "exclusion" || c.type === "exclusive_or")
+    && c.subtypeFactIds !== undefined;
+}
+
+/**
+ * What a constraint over subtypes still says once some of its subtype facts
+ * are gone, or undefined when it says nothing. An exclusion narrows: no
+ * Person is two of the rest still holds. An exclusive-or keeps its
+ * exclusion half over the rest. A disjunctive mandatory goes: "each Person
+ * is at least one of Male, Female" without Male is not "each Person is a
+ * Female", a rule nobody stated, and an exclusive-or's exhaustive half goes
+ * for the same reason. An exclusion left over fewer than two states nothing.
+ * One with none gone is returned as it is.
+ *
+ * `OrmModel.removeSubtypeFact` and the merge both read it, so a subtype
+ * fact removed by hand and one a merge leaves out leave the same rule.
+ */
+export function withoutSubtypeFacts(
+  c: ExternalConstraint,
+  gone: (subtypeFactId: string) => boolean,
+): ExternalConstraint | undefined {
+  const ids = subtypeFactIdsOf(c);
+  if (!ids.some(gone)) return c;
+  const rest = ids.filter((id) => !gone(id));
+  if (c.type === "disjunctive_mandatory" || rest.length < 2) return undefined;
+  return {
+    ...(c.id !== undefined ? { id: c.id } : {}),
+    ...(c.modality !== undefined ? { modality: c.modality } : {}),
+    type: "exclusion",
+    subtypeFactIds: rest,
+  };
 }
 
 /**
@@ -621,6 +724,7 @@ export function objectTypeIdsOf(c: Constraint): string[] {
     case "join_subset":
     case "join_equality":
     case "join_exclusion":
+    case "join_ring":
       return joinOperandsOf(c).map((o) => o.path.root);
   }
 }
@@ -629,8 +733,8 @@ export function objectTypeIdsOf(c: Constraint): string[] {
  * The join operands a constraint carries, or none for the kinds that
  * have no role path.
  *
- * The three join kinds spell their operands differently -- `join_subset`
- * names its two, the other two hold a list -- and three call sites had
+ * The join kinds spell their operands differently -- `join_subset`
+ * names its two, equality and exclusion hold a list, a ring has one -- and three call sites had
  * each grown their own version of that switch. Exhaustive with no
  * `default` arm, for the reason `roleIdsOf` gives.
  */
@@ -655,6 +759,8 @@ export function joinOperandsOf(c: Constraint): readonly JoinOperand[] {
     case "join_equality":
     case "join_exclusion":
       return c.operands;
+    case "join_ring":
+      return [c.operand];
   }
 }
 
@@ -674,31 +780,113 @@ export function joinOperandsOf(c: Constraint): readonly JoinOperand[] {
  * treat a "no" as a defect: whether it is a defect depends on the kind,
  * and that judgement is this function.
  *
- * A total `Record` rather than a list of the seven, so a constraint kind
+ * The same table decides where a constraint lives
+ * (`docs/specs/orm-format-3.spec.md`, placement by kind): a kind whose
+ * roles must be local is internal and belongs to its fact type, every
+ * other kind is external and belongs to the model. One table, so the
+ * placement rule and the locality rule cannot disagree, and the
+ * `InternalConstraint` type below is derived from it rather than listed
+ * a second time.
+ *
+ * A total record rather than a list of the seven, so a constraint kind
  * added later fails to compile until someone classifies it, instead of
  * silently defaulting to whichever answer the author of the list
  * happened to write first.
  */
-const REQUIRES_LOCAL_ROLES: Record<Constraint["type"], boolean> = {
-  internal_uniqueness: true,
-  mandatory: true,
-  value_constraint: true,
-  ring: true,
-  frequency: true,
-  cardinality: true,
-  value_comparison: true,
-  external_uniqueness: false,
-  disjunctive_mandatory: false,
-  exclusion: false,
-  exclusive_or: false,
-  subset: false,
-  equality: false,
-  join_subset: false,
-  join_equality: false,
-  join_exclusion: false,
-};
+const PLACEMENT = {
+  internal_uniqueness: "internal",
+  mandatory: "internal",
+  value_constraint: "internal",
+  ring: "internal",
+  frequency: "internal",
+  cardinality: "internal",
+  value_comparison: "internal",
+  external_uniqueness: "external",
+  disjunctive_mandatory: "external",
+  exclusion: "external",
+  exclusive_or: "external",
+  subset: "external",
+  equality: "external",
+  join_subset: "external",
+  join_equality: "external",
+  join_exclusion: "external",
+  join_ring: "external",
+} as const satisfies Record<Constraint["type"], "internal" | "external">;
 
-/** See `REQUIRES_LOCAL_ROLES`. */
-export function requiresLocalRoles(c: Constraint): boolean {
-  return REQUIRES_LOCAL_ROLES[c.type];
+type InternalKind = {
+  [K in keyof typeof PLACEMENT]: (typeof PLACEMENT)[K] extends "internal" ? K : never;
+}[keyof typeof PLACEMENT];
+
+/** The kinds that live in their fact type: every role is one of its roles. */
+export type InternalConstraint = Extract<Constraint, { type: InternalKind; }>;
+
+/** The kinds that live in the model: their roles may span fact types. */
+export type ExternalConstraint = Exclude<Constraint, InternalConstraint>;
+
+/**
+ * Where a constraint of this kind lives, by its kind's name: for a reader
+ * of a raw document, which has a type string and no `Constraint` yet.
+ * Undefined for a name that is no kind.
+ */
+export function placementOf(type: string): "internal" | "external" | undefined {
+  return Object.hasOwn(PLACEMENT, type) ? PLACEMENT[type as keyof typeof PLACEMENT] : undefined;
+}
+
+/** Whether `c` lives in its fact type (see `PLACEMENT`). */
+export function isInternalConstraint(c: Constraint): c is InternalConstraint {
+  return PLACEMENT[c.type] === "internal";
+}
+
+/** Whether `c` lives in the model (see `PLACEMENT`). */
+export function isExternalConstraint(c: Constraint): c is ExternalConstraint {
+  return PLACEMENT[c.type] === "external";
+}
+
+/**
+ * A constraint as a reader finds it in the file, for a message that must
+ * tell two constraints sharing an id apart: its kind as the file spells it,
+ * where it lives (its fact type, or the model), and the role or
+ * subtype-fact ids it names. Built only from what the constraint states,
+ * never from what its references resolve to, so a dangling role cannot
+ * hide the repeat.
+ */
+export function describeConstraintPlace(c: Constraint, factTypeName: string | undefined): string {
+  const home = factTypeName !== undefined ? ` in fact type ${JSON.stringify(factTypeName)}` : "";
+  if (isOverSubtypes(c)) {
+    const facts = subtypeFactIdsOf(c);
+    return `${c.type}${home} over ${
+      facts.length > 0 ? `subtype facts ${facts.join(", ")}` : "no subtype facts"
+    }`;
+  }
+  const roles = roleIdsOf(c);
+  return `${c.type}${home} over ${roles.length > 0 ? `roles ${roles.join(", ")}` : "no roles"}`;
+}
+
+/** How many entries a repeat message lists before it counts the rest. */
+const REPEAT_LIST_LIMIT = 5;
+
+function listCapped(items: readonly string[], separator: string): string {
+  const rest = items.length - REPEAT_LIST_LIMIT;
+  return items.slice(0, REPEAT_LIST_LIMIT).join(separator)
+    + (rest > 0 ? `${separator}and ${rest} more` : "");
+}
+
+/**
+ * One repeated constraint id and its holders, as both the 3.0 loader's
+ * refusal and `structural/duplicate-constraint-id` print it, so the same
+ * repeat reads the same whichever path reports it: the id JSON-quoted, then
+ * each holder's place, at most five and a count of the rest.
+ */
+export function describeConstraintRepeat(
+  id: string,
+  holders: readonly (readonly [Constraint, string | undefined])[],
+): string {
+  return `${JSON.stringify(id)} (${
+    listCapped(holders.map(([c, ft]) => describeConstraintPlace(c, ft)), "; ")
+  })`;
+}
+
+/** Several repeats, as the loader lists them: at most five, then a count. */
+export function describeConstraintRepeats(repeats: readonly string[]): string {
+  return listCapped(repeats, ", ");
 }

@@ -13,6 +13,35 @@ was built while commits have touched the source it names (barwise-910). -->
 Created: <YYYY-MM-DD>
 Last-updated: <YYYY-MM-DD>
 Tracking: barwise-<id> (or: REPO_REVIEW-<YYYY-MM-DD>.md finding #<n>)
+Touches: <repo-rooted paths this plan changes, comma-separated; +path for
+a file it creates, -path for one it deletes, a trailing / for a directory>
+
+<!-- Touches: is the plan's machine-read file list. audit:specs reads it
+instead of inferring a subject from every backticked path (so a path
+cited as context, like ci.yml, no longer counts), and check:spec-touches
+fails on an unmarked entry that names nothing tracked. Shared wiring
+(ci.yml, the package.json files, scripts/tests/, the root CLAUDE.md)
+belongs here when the plan changes it; the audit ignores it.
+docs/specs/plan-scope-check.spec.md. Required on a new spec, with at
+least one entry standing for a path outside barwise/docs/specs/: an
+unmarked entry, or a `-` entry for a file tracked when the rule's cutoff
+was set or at any commit since. `+` entries alone do not count, and
+neither does the spec's own path or directory, so a placeholder cannot
+satisfy it (check:spec-touches; docs/specs/touches-required.spec.md). -->
+
+<!-- Plan-reviewed: <commit> (code-review, pr-review)
+
+Add that line to the header above after /code-review and /pr-review have
+run on the spec, and before any implementation commit: <commit> is the
+head those reviews read (spec-writer, step 8). It is left in this comment
+because a template that carried it would ship a spec claiming a review
+that never ran. The line vouches for the body, everything below the
+header block, as it stood at that commit, so header edits such as Status
+do not void it and a rewritten plan does. check:plan-review fails a pull
+request that names this spec and changes a Touches: path, while the spec
+is new or its Status claims nothing is built, unless the line names a
+commit that precedes every such change and whose body matches the plan
+as implementation began. -->
 
 ## Principle
 

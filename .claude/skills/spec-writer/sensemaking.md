@@ -55,6 +55,18 @@ not show if the frame holds, then go check:
 A frame that makes no checkable prediction cannot be tested, and an
 untested frame is how a spec ships the wrong scope.
 
+When the anchor is "a test would catch this" -- a spec leaning on an
+existing guard, golden file or law -- the check is to break the code
+and watch, and the instrument is `barwise/scripts/mutate.mjs`, not a
+hand-rolled edit and restore. A hand-rolled break looks identical at
+the call site whether it applied or not (barwise-906), and a restore
+checked with `git status` says nothing about a bundle built from the
+broken source (barwise-r7j), so rebuild with `--force` after the
+restore before anything reads a bundle. Grounding
+`effect-comparison.spec.md` found that a spec's "golden bytes do not
+change" had no instrument for half the fields it covered; one break and
+one `npx vitest run` showed it.
+
 ## Stress test, then commit
 
 Before drafting, hunt for disconfirming evidence -- other callers, edge

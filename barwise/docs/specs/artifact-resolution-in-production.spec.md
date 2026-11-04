@@ -2,7 +2,7 @@
 
 Status: Accepted (workstreams 1 and 2 implemented; see Implementation notes)
 Created: 2026-08-09
-Last-updated: 2026-08-20
+Last-updated: 2026-10-25
 Tracking: completes workstream 1 of
 `docs/specs/prompt-optimization-harness.spec.md` (whose Inventory
 claims production resolution that was never wired); motivated by
@@ -54,6 +54,8 @@ The refinement that keeps this honest: promotion must not silently
 duplicate what a variant already says. After a rule moves into the
 default, the variants must drop their copy, or the two will drift and
 a reader will not know which is authoritative.
+
+Recorded as `docs/adr/production-prompt-resolution.md`.
 
 ## Scope
 

@@ -11,9 +11,14 @@ import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { executeLineageStatus } from "../../src/tools/lineageStatus.js";
 import { writeManifest } from "../workspace/manifestFixture.js";
+import { usePrivateCwd } from "../workspace/privateCwd.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const fixtures = resolve(__dirname, "../fixtures");
+
+// The inline-source fallback reads the cwd; an empty private one, so "no
+// manifest" does not depend on what the shared package directory holds.
+const ws = usePrivateCwd();
 
 describe("lineage_status tool", () => {
   let tempDir: string;
@@ -51,7 +56,7 @@ describe("lineage_status tool", () => {
     const oldHash = "a1b2c3d4e5f6000000000000000000000000000000000000000000000000";
 
     const manifest: LineageManifest = {
-      version: 1,
+      version: 2,
       sourceModel: "test.orm.yaml",
       sourceModelHash: oldHash,
       exports: [
@@ -61,6 +66,7 @@ describe("lineage_status tool", () => {
           exportedAt: "2026-03-06T12:00:00Z",
           modelHash: oldHash,
           sources: [],
+          sourceModel: "test.orm.yaml",
         },
         {
           artifact: "models/game.sql",
@@ -68,6 +74,7 @@ describe("lineage_status tool", () => {
           exportedAt: "2026-03-06T12:00:00Z",
           modelHash: oldHash,
           sources: [],
+          sourceModel: "test.orm.yaml",
         },
       ],
     };
@@ -106,8 +113,128 @@ describe("lineage_status tool", () => {
 
   it("falls back to the current working directory for inline content (no path)", () => {
     const yaml = fs.readFileSync(`${fixtures}/simple.orm.yaml`, "utf-8");
-    const result = executeLineageStatus(yaml);
-    const parsed = JSON.parse(result.content[0]!.text);
-    expect(parsed.manifestFound).toBe(false);
+    expect(JSON.parse(executeLineageStatus(yaml).content[0]!.text).manifestFound).toBe(false);
+
+    // And it is the working directory that is read: a manifest put there is found.
+    writeManifest(ws.dir(), {
+      version: 2,
+      sourceModel: "inline.orm.yaml",
+      sourceModelHash: "x",
+      exports: [],
+    });
+    expect(JSON.parse(executeLineageStatus(yaml).content[0]!.text).manifestFound).toBe(true);
+  });
+
+  // iri-identity 6a: a manifest serves every model in its directory, and
+  // inline YAML names no file, so there is no model to read exports for.
+  it("refuses inline content when the manifest's exports name more than one model", () => {
+    const exportOf = (artifact: string, sourceModel: string | undefined) => ({
+      artifact,
+      format: "ddl",
+      exportedAt: "2026-10-29T00:00:00Z",
+      modelHash: "h",
+      sources: [{
+        elementId: "ot-customer",
+        elementType: "EntityType" as const,
+        elementName: "Customer",
+      }],
+      ...(sourceModel !== undefined ? { sourceModel } : {}),
+    });
+
+    const yaml = fs.readFileSync(`${fixtures}/simple.orm.yaml`, "utf-8");
+    writeManifest(ws.dir(), {
+      version: 2,
+      sourceModel: "b.orm.yaml",
+      sourceModelHash: "h",
+      exports: [exportOf("a.sql", "a.orm.yaml"), exportOf("b.sql", "b.orm.yaml")],
+    });
+    const out = JSON.parse(executeLineageStatus(yaml).content[0]!.text);
+    expect(out.error).toMatch(/holds the exports of a\.orm\.yaml, b\.orm\.yaml\./);
+    expect(out.error).toMatch(/file path/);
+  });
+
+  it("refuses inline content when one model's exports sit beside exports naming none", () => {
+    // The unnamed ones may be another domain's, from before exports named
+    // their model.
+    const exportOf = (artifact: string, sourceModel: string | undefined) => ({
+      artifact,
+      format: "ddl",
+      exportedAt: "2026-10-29T00:00:00Z",
+      modelHash: "h",
+      sources: [{
+        elementId: "ot-customer",
+        elementType: "EntityType" as const,
+        elementName: "Customer",
+      }],
+      ...(sourceModel !== undefined ? { sourceModel } : {}),
+    });
+
+    const yaml = fs.readFileSync(`${fixtures}/simple.orm.yaml`, "utf-8");
+    writeManifest(ws.dir(), {
+      version: 2,
+      sourceModel: "a.orm.yaml",
+      sourceModelHash: "h",
+      exports: [exportOf("a.sql", "a.orm.yaml"), exportOf("legacy.sql", undefined)],
+    });
+    const out = JSON.parse(executeLineageStatus(yaml).content[0]!.text);
+    expect(out.error).toMatch(/holds the exports of a\.orm\.yaml and exports naming no model\./);
+  });
+
+  it("reads inline content as before when the exports name one model, or none", () => {
+    const exportOf = (artifact: string, sourceModel: string | undefined) => ({
+      artifact,
+      format: "ddl",
+      exportedAt: "2026-10-29T00:00:00Z",
+      modelHash: "h",
+      sources: [{
+        elementId: "ot-customer",
+        elementType: "EntityType" as const,
+        elementName: "Customer",
+      }],
+      ...(sourceModel !== undefined ? { sourceModel } : {}),
+    });
+    const yaml = fs.readFileSync(`${fixtures}/simple.orm.yaml`, "utf-8");
+    for (const named of ["a.orm.yaml", undefined]) {
+      writeManifest(ws.dir(), {
+        version: 2,
+        sourceModel: "a.orm.yaml",
+        sourceModelHash: "h",
+        exports: [exportOf("a.sql", named), exportOf("a2.sql", named)],
+      });
+      const out = JSON.parse(executeLineageStatus(yaml).content[0]!.text);
+      expect(out.error).toBeUndefined();
+      expect(out.staleArtifacts.map((s: { artifact: string; }) => s.artifact)).toEqual([
+        "a.sql",
+        "a2.sql",
+      ]);
+    }
+  });
+
+  it("reads only the named model's exports given a path", () => {
+    const exportOf = (artifact: string, sourceModel: string | undefined) => ({
+      artifact,
+      format: "ddl",
+      exportedAt: "2026-10-29T00:00:00Z",
+      modelHash: "h",
+      sources: [{
+        elementId: "ot-customer",
+        elementType: "EntityType" as const,
+        elementName: "Customer",
+      }],
+      ...(sourceModel !== undefined ? { sourceModel } : {}),
+    });
+
+    const modelPath = path.join(tempDir, "a.orm.yaml");
+    fs.copyFileSync(`${fixtures}/simple.orm.yaml`, modelPath);
+    writeManifest(tempDir, {
+      version: 2,
+      sourceModel: "b.orm.yaml",
+      sourceModelHash: "h",
+      exports: [exportOf("a.sql", "a.orm.yaml"), exportOf("b.sql", "b.orm.yaml")],
+    });
+    const out = JSON.parse(executeLineageStatus(modelPath).content[0]!.text);
+    expect(out.staleArtifacts.map((s: { artifact: string; }) => s.artifact)).toEqual(["a.sql"]);
+    // b.orm.yaml is not on disk: its export names a file that is gone.
+    expect(out.orphanedArtifacts).toEqual(["b.sql"]);
   });
 });

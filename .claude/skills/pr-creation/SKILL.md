@@ -30,11 +30,29 @@ least once:
 
 - **The spec exists and its header says what this PR ships.**
   Spec-before-code is the convention (`spec-writer` skill). A PR is
-  one workstream of a spec and names which. Update the spec's
+  one workstream of a spec and names which. Run `npm run plan-scope --
+  --base origin/<your base branch>`: it lists every changed file the spec
+  does not plan, and the reading guide accounts for each one -- planned
+  late, or out of scope and why. It reports and never gates; a long list
+  is a question for the body, not a failure
+  (`docs/specs/plan-scope-check.spec.md`). Update the spec's
   `Status` in the commit that lands the workstream: `audit:specs
   --check` catches only a spec claiming _no_ implementation, so a
   partial claim decays unwatched (barwise-912). Record what the spec
   did not anticipate in its implementation notes.
+- **The plan was reviewed before the code.** A PR that adds a spec and
+  implements it shows, in its commit list, the spec's
+  `Plan-reviewed: <commit> (code-review, pr-review)` line landing
+  before the first implementation commit, with `<commit>` the head the
+  two reviews read (`spec-writer`, step 8). Reviewing the plan beside
+  the code it was meant to shape is what the rule replaces.
+  `npm run check:plan-review` runs it locally and in CI; it covers a
+  spec the PR names that declares `Touches:` and is new in the PR or
+  whose Status at the base claims nothing is built.
+  `check:spec-touches` fails a PR that adds a spec without a satisfying
+  `Touches:`, so a new spec always declares the paths the rule compares
+  with the diff; the rule still applies only where those paths overlap
+  what the PR changes.
 - **The tracking issue exists and this PR does not close it.** File
   it with `node barwise/scripts/beads-crud.mjs create` if missing. Closure is
   a tracker-only follow-up after merge (`steward`, section 5); the
@@ -50,7 +68,12 @@ least once:
   --noEmit` (root `CLAUDE.md`, the stale-`dist` trap).
 - **`pr-review/checklist.md` has been run against your own diff**, as
   a reviewer would run it, and what it found is fixed rather than
-  promised.
+  promised. Start from `npm run pr:risk -- --base origin/<your base branch>`: it lists
+  the groups and REVIEW.md failure modes the diff triggers, with the
+  files, so the selection is not made by hand.
+- **The author-side review lanes have run**: `/code-review` on your own
+  diff, and `/security-review` when the diff meets a trigger listed in the
+  root `REVIEW.md`, which owns that list and which lane runs when.
 - **Each fact is written once; everything else points to it.** A
   count, a status, a list of entries, or a claim about what the code
   does has one home: wherever it is produced or decided -- the spec's
@@ -220,7 +243,8 @@ shell ran them as commands and the tool reported success.
   locally, `gh auth switch --user gabeschenz` first (`AGENTS.md`).
 - Subscribe to the PR's activity, then read the `steward` skill: from
   here the PR is being driven, and that file owns the mechanics
-  (tracker conflicts, regenerators, the ratchet, the pre-push order).
+  (tracker conflicts, regenerators, the ratchet, the pre-push order)
+  and the condition for merging (its section 4b).
 - Nothing is done until `git status` shows the branch up to date with
   origin (root `CLAUDE.md`, Session Completion).
 

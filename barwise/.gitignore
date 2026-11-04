@@ -3,6 +3,8 @@ dist/
 *.tsbuildinfo
 .turbo/
 coverage/
+# Test-by-test reports check:adr-tests reads (scripts/lib/test-reports.mjs).
+test-results/
 *.vsix
 .DS_Store
 .vscode-test/

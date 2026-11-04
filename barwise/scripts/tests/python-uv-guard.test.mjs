@@ -60,7 +60,7 @@ const REFUSED = [
   ["--project pointing elsewhere", "uv run --frozen --project /tmp python -V", /outside barwise/],
 ];
 
-test("refuses uv run from the repository root, where uv finds no pyproject", () => {
+test("refuses uv run from the repository root, where uv finds no pyproject [adr:python-from-the-lockfile#project-ancestor]", () => {
   const r = bash("uv run --frozen python -V", join(PROJECT, ".."));
   assert.equal(r.status, 2, r.stderr);
   assert.match(r.stderr, /outside barwise/);

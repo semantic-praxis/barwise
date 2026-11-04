@@ -4,7 +4,7 @@ Status: Workstreams 1-3 implemented (project moved; all six call sites
 converted and the sqlglot tier runs in CI; check:python-uv gating the
 rule); workstream 4 pending
 Created: 2026-09-05
-Last-updated: 2026-09-05
+Last-updated: 2026-10-25
 Tracking: barwise-921 (uv execution gate), barwise-916 (sqlglot absent in
 CI), barwise-915 (the interpreter pin this completes)
 
@@ -61,6 +61,8 @@ shipped CLI or VSIX on a user's machine, and that is correct. No project
 means no sqlglot, `sqlglotAvailable()` returns false, and callers take
 the regex cascade -- the same degradation that already fires when Python
 is absent. Unavailable-and-honest beats available-and-unpinned.
+
+Recorded as `docs/adr/python-from-the-lockfile.md`.
 
 ## Scope
 

@@ -104,7 +104,7 @@ describe("getAnthropicApiKey", () => {
     expect(state.updates).toEqual([]);
   });
 
-  it("migrates a global settings value and clears it", async () => {
+  it("migrates a global settings value and clears it [adr:keyless-model-access#no-key-in-setting]", async () => {
     state.inspected = { globalValue: KEY };
     expect(await getAnthropicApiKey(secrets)).toBe(KEY);
     expect(state.secrets.get(SECRET_KEY)).toBe(KEY);
@@ -114,7 +114,7 @@ describe("getAnthropicApiKey", () => {
     expect(state.warnings).toEqual([]);
   });
 
-  it("migrates a WORKSPACE settings value, which is the committable one", async () => {
+  it("migrates a WORKSPACE settings value, which is the committable one [adr:keyless-model-access#no-key-in-setting]", async () => {
     // This is the case the whole change exists for: a key in
     // .vscode/settings.json, a file people commit.
     state.inspected = { workspaceValue: KEY };

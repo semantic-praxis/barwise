@@ -1,6 +1,6 @@
 ---
 name: pr-review
-description: Use when reviewing a barwise pull request, judging whether a PR or diff is mergeable, or asked what you think of a change - your own diff before opening it, another session's PR, or one the user asks you to review. Speaks for the reader - locates the risk, settles what a machine can settle, verifies the body's claims, and hands the human a defensible recommendation with what was and was not checked. Recommends; never approves or merges. The barwise invariants CI cannot check live in checklist.md beside this file.
+description: Use when reviewing a barwise pull request, judging whether a PR or diff is mergeable, or asked what you think of a change - your own diff before opening it, another session's PR, or one the user asks you to review. Speaks for the reader - locates the risk, settles what a machine can settle, verifies the body's claims, and hands the human a defensible recommendation with what was and was not checked. Recommends; never approves, and merges only where the steward skill (section 4b) delegates it. The barwise invariants CI cannot check live in checklist.md beside this file.
 ---
 
 # Reviewing a barwise PR
@@ -23,10 +23,12 @@ function is in scope), audits every removed line for the invariant it
 enforced and where that invariant now lives, traces callers and
 callees across files, and hunts language pitfalls. Run it on the spine
 at high effort and on the fallout at low, never with `--comment`, and
-afterwards confirm the PR carries no review or comment from you; take
+afterwards confirm `/code-review` posted no review or comment (a
+steward's trace comment from its section 4b is not that); take
 its CONFIRMED findings and treat its PLAUSIBLE ones under section 4's
 rule. `security-review`
-applies when the diff touches subprocess, network, or file I/O;
+applies when the diff meets a trigger in the root `REVIEW.md`, which
+owns that list;
 `duplication-audit` when it adds a copy; `assertion-audit` when it
 adds a test for a refusal or error; `articulation` in critique mode
 for the body and any doc; and `sensemaking` -- the repo's own copy is
@@ -37,7 +39,8 @@ ci:local` checks is never a finding here: CI will say it, and saying
 it twice costs a round trip.
 Where `/code-review` is not available (another harness, a Copilot
 session), run its angles yourself on the spine and say so under Not
-checked: read each hunk and its enclosing function, audit each deleted
+checked (and such a review does not license a merge under the
+`steward` skill's section 4b): read each hunk and its enclosing function, audit each deleted
 line, trace callers of each changed function, scan for the language's
 pitfalls.
 
@@ -121,7 +124,9 @@ first-class checks, run on every PR, not incidental coverage:
   pass.
 - **Scope drift and volume.** Files the reading guide cannot account
   for; work beyond what the spec workstream or issue asked, arriving
-  unnamed. The body's first paragraph is where it should have been
+  unnamed. Read `npm run plan-scope -- --base origin/<the PR's base>`
+  rather than re-deriving the file list: it names the files outside the
+  spec's plan, and the size with generated files left out. The body's first paragraph is where it should have been
   declared (`pr-creation`, section 4).
 - **Intent absent.** A change with no stated reason. Ask for one on
   the thread; never supply one for the author, because the next
@@ -133,7 +138,17 @@ first-class checks, run on every PR, not incidental coverage:
   fired on the case that prompted it.
 
 Then run `checklist.md`: the barwise invariants CI cannot check,
-grouped by what the diff touches. Say which groups applied.
+grouped by what the diff touches. Do not pick the groups by hand: run
+`npm run pr:risk -- --base origin/<the PR's base branch>` on the head
+(the PR's own base, so a stacked PR is not routed on its parent's
+files). The checklist groups it lists, every group it lists as not
+path-derivable, and every REVIEW.md failure mode it prints (the
+path-triggered ones first, the rest after, all of them run) are the
+ones you run; say under Cleared which ran and what cleared each, and
+under Not checked any listed one that did not. A group skipped because nobody noticed the diff
+touched a script reads exactly like one that did not apply, which is
+the decision the routing takes off the reviewer
+(`docs/specs/review-routing.spec.md`).
 
 Finish with one more pass over the diff holding the list of what you
 have found, looking only for what is not on it. The first pass tends
@@ -214,9 +229,13 @@ claim makes the verdict "cannot tell", not "merge".
 - Another PR: post as a review (a pending review, inline comments,
   then submit as COMMENT, or REQUEST_CHANGES when a finding blocks)
   through the GitHub MCP tools or `gh`, with the attribution footer.
-  Never APPROVE and never merge. The merge decision and its
-  accountability stay with a person; a model cannot be paged and
-  cannot answer for what it shipped.
+  As the reviewer, never APPROVE and never merge.
+- The agent driving its own PR, before merging it: deliver the review
+  in the session and post nothing; the `steward` skill, section 4b,
+  owns what happens next. The review recommends; the merge decision
+  and its accountability stay with the owner, who has delegated it to
+  that agent only after this review recommends `merge` on the head
+  being merged.
 - REQUEST_CHANGES is only available when the review posts as someone
   other than the PR's author: GitHub rejects it on one's own PR, and a
   remote session posts as the user, so on the user's PRs it fails

@@ -278,7 +278,7 @@ Each Order is placed by at least one Customer.
 Order includes Product
 Product is included in Order
 Each combination of Order and Product is unique in Order includes Product.
-Each Order includes at least 1 and at most 5 Product.
+Each Order that includes some Product includes at least 1 and at most 5 instances of Product.
 Order has OrderStatus
 Each Order has at most one OrderStatus.
 The possible values of OrderStatus are: {'open', 'shipped', 'cancelled'}.

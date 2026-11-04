@@ -10,9 +10,9 @@
  * compile error, and the runtime list cannot lag the union.
  *
  * `messages` is a dictionary keyed by message id, following SARIF's
- * `reportingDescriptor.messageStrings`: nine rules report more than one
- * condition (`population/exclusion-violation` fires both for roles
- * within a fact type and for roles spanning several) and SARIF names the
+ * `reportingDescriptor.messageStrings`: several rules report more than one
+ * condition (`population/equality-violation` names which side of the
+ * constraint is missing the tuple) and SARIF names the
  * message rather than splitting the rule. The id maps onto a result's
  * `message.id` on export, so the distinction stays machine-readable.
  *
@@ -45,13 +45,18 @@ export const RULE_ID = {
   missingPreferredIdentifier: "completeness/missing-preferred-identifier",
   missingValueTypeDataType: "completeness/missing-value-type-data-type",
   conflictingIdentification: "completeness/conflicting-identification",
-  multiplePreferredIdentifiers: "completeness/multiple-preferred-identifiers",
+  preferredIdentifierInvalid: "completeness/preferred-identifier-invalid",
+  preferredIdentifierOptional: "completeness/preferred-identifier-optional",
+  acrossFactTypesUnknownRole: "constraint/across-fact-types-unknown-role",
   cardinalityInvalidRole: "constraint/cardinality-invalid-role",
   cardinalityMaxLessThanMin: "constraint/cardinality-max-less-than-min",
   cardinalityNonUnary: "constraint/cardinality-non-unary",
   disjunctiveMandatoryTooFewRoles: "constraint/disjunctive-mandatory-too-few-roles",
   equalityArityMismatch: "constraint/equality-arity-mismatch",
   exclusionTooFewRoles: "constraint/exclusion-too-few-roles",
+  subtypeConstraintTooFewSubtypes: "constraint/subtype-constraint-too-few-subtypes",
+  subtypeConstraintMixedSupertypes: "constraint/subtype-constraint-mixed-supertypes",
+  subtypeConstraintUnknownSubtypeFact: "constraint/subtype-constraint-unknown-subtype-fact",
   exclusiveOrTooFewRoles: "constraint/exclusive-or-too-few-roles",
   externalUniquenessAllLocal: "constraint/external-uniqueness-all-local",
   frequencyEmptyRoles: "constraint/frequency-empty-roles",
@@ -65,6 +70,9 @@ export const RULE_ID = {
   joinColumnTypeMismatch: "constraint/join-column-type-mismatch",
   joinDiscontiguous: "constraint/join-discontiguous",
   joinEmptyProjection: "constraint/join-empty-projection",
+  joinRingArity: "constraint/join-ring-arity",
+  joinRingDifferentPlayers: "constraint/join-ring-different-players",
+  joinRingSingleFactType: "constraint/join-ring-single-fact-type",
   joinTooFewOperands: "constraint/join-too-few-operands",
   joinUnknownRoot: "constraint/join-unknown-root",
   mandatoryInvalidRole: "constraint/mandatory-invalid-role",
@@ -93,6 +101,9 @@ export const RULE_ID = {
   valueConstraintViolation: "population/value-constraint-violation",
   valueTypeDomainViolation: "population/value-type-domain-violation",
   valueTypeDataTypeViolation: "population/value-type-data-type-violation",
+  domainNamespaceOverridden: "project/domain-namespace-overridden",
+  importedContextMissing: "project/imported-context-missing",
+  duplicateNamespace: "project/duplicate-namespace",
   entityMappingSourceMissing: "project/entity-mapping-source-missing",
   entityMappingTargetMissing: "project/entity-mapping-target-missing",
   mappingSourceContextMissing: "project/mapping-source-context-missing",
@@ -103,11 +114,16 @@ export const RULE_ID = {
   danglingRoleReference: "structural/dangling-role-reference",
   diagramDanglingReference: "structural/diagram-dangling-reference",
   diagramEmptyView: "structural/diagram-empty-view",
+  duplicateConstraintId: "structural/duplicate-constraint-id",
   duplicateFactTypeName: "structural/duplicate-fact-type-name",
   duplicateObjectTypeName: "structural/duplicate-object-type-name",
   duplicateObjectification: "structural/duplicate-objectification",
   duplicateObjectificationTarget: "structural/duplicate-objectification-target",
   duplicateRoleId: "structural/duplicate-role-id",
+  duplicateRoleName: "structural/duplicate-role-name",
+  encodedLocalName: "structural/encoded-local-name",
+  localNameCollision: "structural/local-name-collision",
+  duplicateSubtypeFact: "structural/duplicate-subtype-fact",
   objectifiedDanglingFactType: "structural/objectified-dangling-fact-type",
   objectifiedDanglingObjectType: "structural/objectified-dangling-object-type",
   objectifiedNotEntity: "structural/objectified-not-entity",
@@ -116,9 +132,15 @@ export const RULE_ID = {
   subtypeDanglingSubtype: "structural/subtype-dangling-subtype",
   subtypeDanglingSupertype: "structural/subtype-dangling-supertype",
   subtypeNotEntity: "structural/subtype-not-entity",
+  replayedIds: "structural/replayed-ids",
+  idNotFromName: "structural/id-not-from-name",
+  staleMintedName: "structural/stale-minted-name",
+  aliasNotImported: "structural/alias-not-imported",
+  unstoredId: "structural/unstored-id",
   joinSubsetViolation: "population/join-subset-violation",
   joinEqualityViolation: "population/join-equality-violation",
   joinExclusionViolation: "population/join-exclusion-violation",
+  joinRingViolation: "population/join-ring-violation",
   ringViolation: "population/ring-violation",
   mergeError: "merge-error",
 } as const;
@@ -200,12 +222,61 @@ const RULE_DESCRIPTORS = {
         `Object type "${otName}" inherits its identity from a supertype and also declares ${kinds}. Each object type should be identified once; the relational mapper picks one.`,
     },
   },
-  [RULE_ID.multiplePreferredIdentifiers]: {
-    severity: "warning",
-    description: "An entity type has more than one uniqueness constraint marked preferred.",
+  [RULE_ID.preferredIdentifierInvalid]: {
+    severity: "error",
+    description:
+      "An entity type names as its preferred identifier a constraint that does not identify it.",
     messages: {
-      default: (otName: string, preferredCount: number): string =>
-        `Entity type "${otName}" has ${preferredCount} preferred identifiers. Each entity should have exactly one.`,
+      dangling: (otName: string, constraintId: string): string =>
+        `Entity type "${otName}" names constraint "${constraintId}" as its preferred identifier, and the model has no constraint with that id.`,
+      notUniqueness: (otName: string, constraintId: string, kind: string): string =>
+        `Entity type "${otName}" names constraint "${constraintId}" as its preferred identifier, but its kind is ${kind}; a preferred identifier is a uniqueness constraint, internal or external.`,
+      notThisEntity: (otName: string, constraintId: string): string =>
+        `Entity type "${otName}" names uniqueness constraint "${constraintId}" as its preferred identifier, but that constraint does not identify "${otName}".`,
+      // One per shape rule an external uniqueness must meet to identify an
+      // entity (external-preferred-identifier.spec.md), so the message
+      // says which one failed.
+      externalNoCommonObject: (otName: string, constraintId: string): string =>
+        `Entity type "${otName}" names external uniqueness "${constraintId}" as its preferred identifier, but its roles do not join on one object type: each role must be in its own fact type, with one object type playing one other role in every one of them.`,
+      externalOtherEntity: (otName: string, constraintId: string, joined: string): string =>
+        `Entity type "${otName}" names external uniqueness "${constraintId}" as its preferred identifier, but that constraint identifies "${joined}".`,
+      externalNotBinary: (otName: string, constraintId: string): string =>
+        `Entity type "${otName}" names external uniqueness "${constraintId}" as its preferred identifier, but a fact type it spans is not binary; each component of a reference scheme is a binary between "${otName}" and what identifies it.`,
+      externalNearNotUnique: (otName: string, constraintId: string): string =>
+        `Entity type "${otName}" names external uniqueness "${constraintId}" as its preferred identifier, but a role "${otName}" plays in one of its fact types has no uniqueness of its own, so one "${otName}" could have several values of that component.`,
+    },
+  },
+  [RULE_ID.preferredIdentifierOptional]: {
+    severity: "warning",
+    description:
+      "An entity type's preferred identifier rests on a role the entity plays that is not mandatory.",
+    messages: {
+      // The identifier is named by its fact types, not its constraint id:
+      // an importer's ids are UUIDs, which name nothing a modeller can find.
+      default: (
+        otName: string,
+        through: string,
+        optional: string,
+        number: "singular" | "plural",
+      ): string =>
+        `Entity type "${otName}" is identified through ${through}, but its ${
+          number === "plural" ? "roles" : "role"
+        } in ${optional} ${
+          number === "plural" ? "are" : "is"
+        } not declared mandatory, so nothing says every "${otName}" has its identifier. A reference scheme's roles are mandatory; add the mandatory constraint, or identify "${otName}" another way.`,
+    },
+  },
+  [RULE_ID.acrossFactTypesUnknownRole]: {
+    severity: "error",
+    description: "A constraint across fact types names a role that no fact type in the model has.",
+    messages: {
+      default: (kind: string, span: string, roleId: string): string =>
+        `${kind} constraint over ${span} references role id "${roleId}", which no fact type in the model has.`,
+      // None of its roles resolve, so there is no span to name, and "over no
+      // fact type in the model ... which no fact type in the model has" says
+      // the same thing twice.
+      noSpan: (kind: string, roleId: string): string =>
+        `${kind} constraint references role id "${roleId}", which no fact type in the model has; none of its roles resolve.`,
     },
   },
   [RULE_ID.cardinalityInvalidRole]: {
@@ -241,8 +312,8 @@ const RULE_DESCRIPTORS = {
     severity: "error",
     description: "A disjunctive mandatory constraint spans fewer than two roles.",
     messages: {
-      default: (ftName: string): string =>
-        `Disjunctive mandatory constraint in fact type "${ftName}" must reference at least 2 roles.`,
+      default: (span: string): string =>
+        `Disjunctive mandatory constraint over ${span} must reference at least 2 roles.`,
     },
   },
   [RULE_ID.equalityArityMismatch]: {
@@ -250,27 +321,54 @@ const RULE_DESCRIPTORS = {
     description: "An equality constraint compares two role sequences of different lengths.",
     messages: {
       default: (
-        ftName: string,
+        span: string,
         constraintRoleIds1Length: number,
         constraintRoleIds2Length: number,
       ): string =>
-        `Equality constraint in fact type "${ftName}" has mismatched role sequence lengths: first has ${constraintRoleIds1Length} roles, second has ${constraintRoleIds2Length} roles.`,
+        `Equality constraint over ${span} has mismatched role sequence lengths: first has ${constraintRoleIds1Length} roles, second has ${constraintRoleIds2Length} roles.`,
     },
   },
   [RULE_ID.exclusionTooFewRoles]: {
     severity: "error",
     description: "An exclusion constraint spans fewer than two roles.",
     messages: {
-      default: (ftName: string): string =>
-        `Exclusion constraint in fact type "${ftName}" must reference at least 2 roles.`,
+      default: (span: string): string =>
+        `Exclusion constraint over ${span} must reference at least 2 roles.`,
+    },
+  },
+  [RULE_ID.subtypeConstraintTooFewSubtypes]: {
+    severity: "error",
+    description:
+      "An exclusion or exclusive-or over subtypes names fewer than two subtype facts, or a disjunctive mandatory names none.",
+    messages: {
+      default: (kind: string, supertype: string, count: number, min: number): string =>
+        `${kind} constraint over the subtypes of ${supertype} names ${count} subtype fact${
+          count === 1 ? "" : "s"
+        }; it needs at least ${min}.`,
+    },
+  },
+  [RULE_ID.subtypeConstraintMixedSupertypes]: {
+    severity: "error",
+    description: "A constraint over subtypes names subtype facts of more than one supertype.",
+    messages: {
+      default: (kind: string, supertypes: string): string =>
+        `${kind} constraint names subtype facts of more than one supertype (${supertypes}); the subtypes it constrains must share one.`,
+    },
+  },
+  [RULE_ID.subtypeConstraintUnknownSubtypeFact]: {
+    severity: "error",
+    description: "A constraint over subtypes names a subtype fact the model does not have.",
+    messages: {
+      default: (kind: string, subtypeFactId: string): string =>
+        `${kind} constraint references subtype fact id "${subtypeFactId}", which the model does not have.`,
     },
   },
   [RULE_ID.exclusiveOrTooFewRoles]: {
     severity: "error",
     description: "An exclusive-or constraint spans fewer than two roles.",
     messages: {
-      default: (ftName: string): string =>
-        `Exclusive-or constraint in fact type "${ftName}" must reference at least 2 roles.`,
+      default: (span: string): string =>
+        `Exclusive-or constraint over ${span} must reference at least 2 roles.`,
     },
   },
   [RULE_ID.externalUniquenessAllLocal]: {
@@ -278,8 +376,10 @@ const RULE_DESCRIPTORS = {
     description:
       "An external uniqueness constraint spans roles that all belong to one fact type, where an internal one would say the same thing.",
     messages: {
-      default: (ftName: string): string =>
-        `External uniqueness constraint in fact type "${ftName}" references only roles within this fact type. Consider using internal uniqueness instead.`,
+      default: (span: string): string =>
+        `External uniqueness constraint over ${span} references only roles within that fact type. Consider using internal uniqueness instead.`,
+      noRoles: (): string =>
+        `External uniqueness constraint references no roles. Name the roles whose combination is unique, or remove it.`,
     },
   },
   [RULE_ID.frequencyEmptyRoles]: {
@@ -334,16 +434,16 @@ const RULE_DESCRIPTORS = {
     description:
       "A join constraint's operands project tuples of different lengths, so they cannot be compared.",
     messages: {
-      default: (ftName: string): string =>
-        `Join constraint in fact type "${ftName}" has operands that project tuples of different arity; they must match.`,
+      default: (span: string): string =>
+        `Join constraint over ${span} has operands that project tuples of different arity; they must match.`,
     },
   },
   [RULE_ID.joinBadProjection]: {
     severity: "error",
     description: "A join constraint projects a path node that does not exist on the path.",
     messages: {
-      default: (ftName: string, idx: number, nodeTypesLength1: number): string =>
-        `Join constraint in fact type "${ftName}" projects node ${idx}, which is outside the path (0..${nodeTypesLength1}).`,
+      default: (span: string, idx: number, nodeTypesLength1: number): string =>
+        `Join constraint over ${span} projects node ${idx}, which is outside the path (0..${nodeTypesLength1}).`,
     },
   },
   [RULE_ID.joinBadStep]: {
@@ -351,16 +451,16 @@ const RULE_DESCRIPTORS = {
     description:
       "A join constraint has a step whose entry and exit roles do not share a fact type.",
     messages: {
-      default: (ftName: string, stepEntry: string, stepExit: string): string =>
-        `Join constraint in fact type "${ftName}" has a step whose entry "${stepEntry}" / exit "${stepExit}" are not both roles of one fact type.`,
+      default: (span: string, stepEntry: string, stepExit: string): string =>
+        `Join constraint over ${span} has a step whose entry "${stepEntry}" / exit "${stepExit}" are not both roles of one fact type.`,
     },
   },
   [RULE_ID.joinColumnTypeMismatch]: {
     severity: "error",
     description: "A join constraint compares two projected columns whose object types differ.",
     messages: {
-      default: (ftName: string, col1: number): string =>
-        `Join constraint in fact type "${ftName}" projects column ${col1} from different object types across operands; they must match.`,
+      default: (span: string, col1: number): string =>
+        `Join constraint over ${span} projects column ${col1} from different object types across operands; they must match.`,
     },
   },
   [RULE_ID.joinDiscontiguous]: {
@@ -368,24 +468,51 @@ const RULE_DESCRIPTORS = {
     description:
       "A join constraint's path is not contiguous: a step does not start where the previous one ended.",
     messages: {
-      default: (ftName: string, stepEntry: string): string =>
-        `Join constraint in fact type "${ftName}" is not contiguous: the entry role "${stepEntry}" is not played by the preceding path node.`,
+      default: (span: string, stepEntry: string): string =>
+        `Join constraint over ${span} is not contiguous: the entry role "${stepEntry}" is not played by the preceding path node.`,
     },
   },
   [RULE_ID.joinEmptyProjection]: {
     severity: "error",
     description: "A join constraint has an operand that projects no nodes.",
     messages: {
-      default: (ftName: string): string =>
-        `Join constraint in fact type "${ftName}" has an operand with an empty projection.`,
+      default: (span: string): string =>
+        `Join constraint over ${span} has an operand with an empty projection.`,
+    },
+  },
+  [RULE_ID.joinRingArity]: {
+    severity: "error",
+    description:
+      "A join ring constraint's operand does not project exactly two distinct path nodes.",
+    messages: {
+      default: (span: string, projection: string): string =>
+        `Join ring constraint over ${span} projects [${projection}]; a ring relates exactly two distinct path nodes.`,
+    },
+  },
+  [RULE_ID.joinRingDifferentPlayers]: {
+    severity: "error",
+    description:
+      "A join ring constraint's two projected path nodes are played by different object types.",
+    messages: {
+      default: (span: string): string =>
+        `Join ring constraint over ${span} requires both projected columns to be played by the same object type.`,
+    },
+  },
+  [RULE_ID.joinRingSingleFactType]: {
+    severity: "warning",
+    description:
+      "A join ring constraint's path is one hop within one fact type, which a plain ring constraint states.",
+    messages: {
+      default: (span: string): string =>
+        `Join ring constraint over ${span} is one hop within one fact type; state it as a ring constraint on that fact type.`,
     },
   },
   [RULE_ID.joinTooFewOperands]: {
     severity: "error",
     description: "A join equality or exclusion constraint has fewer than two operands.",
     messages: {
-      default: (cTypeJoinEqualityEqualityExclusion: string, ftName: string): string =>
-        `Join ${cTypeJoinEqualityEqualityExclusion} constraint in fact type "${ftName}" must have at least two operands.`,
+      default: (cTypeJoinEqualityEqualityExclusion: string, span: string): string =>
+        `Join ${cTypeJoinEqualityEqualityExclusion} constraint over ${span} must have at least two operands.`,
     },
   },
   [RULE_ID.joinUnknownRoot]: {
@@ -393,8 +520,8 @@ const RULE_DESCRIPTORS = {
     description:
       "A join constraint's path is rooted at an object type that does not exist in the model.",
     messages: {
-      default: (ftName: string, pathRoot: string): string =>
-        `Join constraint in fact type "${ftName}" references an unknown root object type "${pathRoot}".`,
+      default: (span: string, pathRoot: string): string =>
+        `Join constraint over ${span} references an unknown root object type "${pathRoot}".`,
     },
   },
   [RULE_ID.mandatoryInvalidRole]: {
@@ -435,11 +562,11 @@ const RULE_DESCRIPTORS = {
     description: "A subset constraint compares two role sequences of different lengths.",
     messages: {
       default: (
-        ftName: string,
+        span: string,
         constraintSubsetRoleIdsLength: number,
         constraintSupersetRoleIdsLength: number,
       ): string =>
-        `Subset constraint in fact type "${ftName}" has mismatched role sequence lengths: subset has ${constraintSubsetRoleIdsLength} roles, superset has ${constraintSupersetRoleIdsLength} roles.`,
+        `Subset constraint over ${span} has mismatched role sequence lengths: subset has ${constraintSubsetRoleIdsLength} roles, superset has ${constraintSupersetRoleIdsLength} roles.`,
     },
   },
   [RULE_ID.valueComparisonInvalidRole]: {
@@ -499,26 +626,10 @@ const RULE_DESCRIPTORS = {
     severity: "error",
     description: "A tuple appears in one side of an equality constraint and not the other.",
     messages: {
-      local: (tuple: string, cRoleIds1: string, cRoleIds2: string): string =>
+      default: (tuple: string, cRoleIds1: string, cRoleIds2: string): string =>
         `Equality constraint is violated: tuple [${tuple}] in roles [${cRoleIds1}] has no match in roles [${cRoleIds2}].`,
-      localReverse: (tuple: string, cRoleIds2: string, cRoleIds1: string): string =>
+      reverse: (tuple: string, cRoleIds2: string, cRoleIds1: string): string =>
         `Equality constraint is violated: tuple [${tuple}] in roles [${cRoleIds2}] has no match in roles [${cRoleIds1}].`,
-      spanning: (
-        popId: string,
-        instId: string,
-        key1: string,
-        eqRoleIds1: string,
-        eqRoleIds2: string,
-      ): string =>
-        `Population "${popId}": instance "${instId}" has tuple [${key1}] in roles [${eqRoleIds1}] with no matching tuple in roles [${eqRoleIds2}].`,
-      spanningReverse: (
-        popId: string,
-        instId: string,
-        key2: string,
-        eqRoleIds2: string,
-        eqRoleIds1: string,
-      ): string =>
-        `Population "${popId}": instance "${instId}" has tuple [${key2}] in roles [${eqRoleIds2}] with no matching tuple in roles [${eqRoleIds1}].`,
     },
   },
   [RULE_ID.exclusionViolation]: {
@@ -526,28 +637,17 @@ const RULE_DESCRIPTORS = {
     description:
       "An object instance plays more than one of the roles an exclusion constraint forbids combining.",
     messages: {
-      local: (cRoleIds: string, value: string, count: number): string =>
+      default: (cRoleIds: string, value: string, count: number): string =>
         `Exclusion constraint on roles [${cRoleIds}] is violated: "${value}" plays ${count} of the excluded roles.`,
-      spanning: (popId: string, instId: string, val: string, roles: string): string =>
-        `Population "${popId}": instance "${instId}" has value "${val}" in multiple excluded roles [${roles}].`,
     },
   },
   [RULE_ID.exclusiveOrViolation]: {
     severity: "error",
     description:
-      "An object instance plays none of the roles an exclusive-or constraint requires exactly one of.",
+      "An object plays none, or more than one, of the roles an exclusive-or constraint requires exactly one of.",
     messages: {
-      localMultiple: (cRoleIds: string, value: string, count: number): string =>
+      default: (cRoleIds: string, value: string, count: number): string =>
         `Exclusive-or constraint on roles [${cRoleIds}] is violated: "${value}" plays ${count} of them (must be exactly one).`,
-      localNone: (
-        popId: string,
-        instId: string,
-        playedRolesLength: number,
-        playedRoles: string,
-      ): string =>
-        `Population "${popId}": instance "${instId}" plays ${playedRolesLength} of the exclusive-or roles [${playedRoles}] but must play exactly one.`,
-      spanning: (popId: string, instId: string, localRoleIds: string): string =>
-        `Population "${popId}": instance "${instId}" does not play any of the exclusive-or roles [${localRoleIds}].`,
     },
   },
   [RULE_ID.externalUniquenessViolation]: {
@@ -612,16 +712,8 @@ const RULE_DESCRIPTORS = {
     description:
       "A tuple appears in a subset constraint's subset side without appearing in its superset side.",
     messages: {
-      local: (tuple: string, cSubsetRoleIds: string, cSupersetRoleIds: string): string =>
+      default: (tuple: string, cSubsetRoleIds: string, cSupersetRoleIds: string): string =>
         `Subset constraint is violated: tuple [${tuple}] in roles [${cSubsetRoleIds}] has no match in roles [${cSupersetRoleIds}].`,
-      spanning: (
-        popId: string,
-        instId: string,
-        subsetKey: string,
-        scSubsetRoleIds: string,
-        scSupersetRoleIds: string,
-      ): string =>
-        `Population "${popId}": instance "${instId}" has subset tuple [${subsetKey}] for roles [${scSubsetRoleIds}] with no matching superset tuple in roles [${scSupersetRoleIds}].`,
     },
   },
   [RULE_ID.unaryRoleCardinalityViolation]: {
@@ -710,6 +802,36 @@ const RULE_DESCRIPTORS = {
       ): string =>
         `Population "${popId}": instance "${instId}" has value "${val}" for a role played by `
         + `value type "${playerName}", which declares data type ${dataTypeName}.`,
+    },
+  },
+  [RULE_ID.domainNamespaceOverridden]: {
+    severity: "error",
+    description:
+      "A domain declares a namespace other than the one its project's iri_base gives it.",
+    messages: {
+      default: (domainPath: string, context: string, own: string, projects: string): string =>
+        `Domain "${context}" (${domainPath}) declares namespace "${own}", but the project's iri_base gives it "${projects}", which is the one used. Delete the domain's namespace line.`,
+    },
+  },
+  [RULE_ID.importedContextMissing]: {
+    severity: "warning",
+    description:
+      "A domain imports an alias bound to a context no domain of the project supplies, so references through that alias resolve to nothing in the project.",
+    messages: {
+      default: (domainPath: string, context: string, alias: string, target: string): string =>
+        `Domain "${context}" (${domainPath}) imports "${alias}" as the context "${target}", which no domain of this project supplies. Add that domain to the project, or bind "${alias}" to a context the project holds.`,
+    },
+  },
+  [RULE_ID.duplicateNamespace]: {
+    severity: "error",
+    description: "Two domains of a project have one namespace, so their elements would share IRIs.",
+    messages: {
+      default: (namespace: string, contexts: string): string =>
+        `Domains ${contexts} have the same namespace "${namespace}", so their elements would share IRIs. Give each domain its own namespace.`,
+      // With iri_base the project's namespace wins over a domain's own
+      // (namespaceOf), so the context is the only thing to change.
+      fromIriBase: (namespace: string, contexts: string): string =>
+        `Domains ${contexts} have the same namespace "${namespace}" from the project's iri_base, so their elements would share IRIs. Rename a context so the two differ.`,
     },
   },
   [RULE_ID.entityMappingSourceMissing]: {
@@ -819,6 +941,29 @@ const RULE_DESCRIPTORS = {
         `Diagram "${diagramName}" lists no elements, so it draws an empty canvas.`,
     },
   },
+  [RULE_ID.duplicateConstraintId]: {
+    severity: "error",
+    description:
+      "Two constraints share an id, so any reference to that id (a preferred identifier, a diff, a merge, another file) names one of them arbitrarily.",
+    messages: {
+      // The repeat is described by `describeConstraintRepeat`, which the
+      // 3.0 loader's refusal prints too, from what each constraint states
+      // rather than what its roles resolve to, so a dangling role cannot
+      // hide it (model-invariants, workstream 1).
+      default: (repeat: string): string =>
+        `Constraint id ${repeat} is held by more than one constraint. `
+        + `A constraint id names one constraint.`,
+    },
+  },
+  [RULE_ID.duplicateSubtypeFact]: {
+    severity: "error",
+    description:
+      "Two subtype facts relate the same subtype to the same supertype, so the relationship is stated twice under two ids.",
+    messages: {
+      default: (ids: string, subtype: string, supertype: string): string =>
+        `Subtype facts ${ids} each make "${subtype}" a subtype of "${supertype}"; a subtype relationship is stated once.`,
+    },
+  },
   [RULE_ID.duplicateFactTypeName]: {
     severity: "error",
     description: "Two fact types share a name, so any reference to that name is ambiguous.",
@@ -833,6 +978,93 @@ const RULE_DESCRIPTORS = {
     messages: {
       default: (otName: string, existing: string): string =>
         `Duplicate object type name "${otName}". Another object type with this name already exists (id: ${existing}).`,
+    },
+  },
+  [RULE_ID.localNameCollision]: {
+    severity: "warning",
+    description:
+      "Two elements hold one id, which a model built in code can allow; in format 4.0 an id names one element, and a file holding the repeat does not load (iri-identity.spec.md).",
+    messages: {
+      default: (name: string, kind: string, other: string, otherKind: string, id: string): string =>
+        `The ${kind} "${name}" and the ${otherKind} "${other}" both hold the id "${id}"; in format 4.0 an id names one element. Give one of them another id.`,
+      population: (factType: string, id: string): string =>
+        `Fact type "${factType}" has a role and a population that both hold the id "${id}"; in format 4.0 an id names one element. Rename the role.`,
+    },
+  },
+  [RULE_ID.idNotFromName]: {
+    severity: "warning",
+    description:
+      "An element's id is not the one its name gives, so a reader of the file cannot tell the element from its id (iri-identity decision 13).",
+    messages: {
+      default: (kind: string, name: string, id: string, expected: string): string =>
+        `The ${kind} "${name}" has the id "${id}", where its name gives "${expected}". Renaming it, even to the name it has, gives it that id.`,
+      suffixed: (kind: string, name: string, id: string, expected: string): string =>
+        `The ${kind} "${name}" has the suffixed id "${id}", because another element holds "${expected}", the id its name gives. Rename one of them so each name gives its own id.`,
+      // A population has no name of its own: decision 7 gives its id from
+      // its fact type's, and the fact type is what a person renames.
+      population: (factType: string, id: string, expected: string): string =>
+        `The population of fact type "${factType}" has the id "${id}", where its fact type gives "${expected}". Renaming the fact type, even to the name it has, gives it that id.`,
+      populationSuffixed: (factType: string, id: string, expected: string): string =>
+        `The population of fact type "${factType}" has the suffixed id "${id}", because a role holds "${expected}", the id its fact type gives. Rename the role, and the population takes that id.`,
+    },
+  },
+  [RULE_ID.staleMintedName]: {
+    severity: "warning",
+    description:
+      "An id was named from what its element said when it was named, and the element now says something else (iri-identity decision 14).",
+    messages: {
+      default: (kind: string, id: string): string =>
+        `The ${kind} "${id}" was named from what it said when it was named, and it now says something else, so its id may describe it wrongly. State an id that says what it does now, or remove its minted_from to keep this one as chosen.`,
+    },
+  },
+  [RULE_ID.aliasNotImported]: {
+    severity: "error",
+    description:
+      "An id or reference names another context by an alias the model does not import, so nothing says which context the alias means.",
+    messages: {
+      default: (id: string, alias: string): string =>
+        `"${id}" names the alias "${alias}", which the model does not import. Add "${alias}" to its imports, bound to the context it means.`,
+    },
+  },
+  [RULE_ID.duplicateRoleName]: {
+    severity: "warning",
+    description:
+      "Two roles of one fact type share a role name, so in format 4.0, where a role's id is its fact type's and its role name, their name gives them one id.",
+    messages: {
+      default: (factType: string, roles: string, id: string): string =>
+        `Fact type "${factType}" has roles ${roles} whose name gives each the id "${id}"; in format 4.0 all but the first hold a suffixed id, and new authoring refuses the repeat. Give each a different role name.`,
+    },
+  },
+  [RULE_ID.encodedLocalName]: {
+    severity: "info",
+    description:
+      "A name holds characters an id cannot hold as written, so its format 4.0 id percent-encodes them.",
+    messages: {
+      default: (kind: string, name: string, id: string): string =>
+        `The ${kind} "${name}" will take the id "${id}" in format 4.0, with its reserved or unsafe characters percent-encoded.`,
+    },
+  },
+  [RULE_ID.replayedIds]: {
+    severity: "info",
+    description:
+      "The file is in a format before 4.0, so it loads under format 4.0's ids, which are not the ones it states.",
+    messages: {
+      default: (): string =>
+        `This file is in a format before 4.0. It loads under format 4.0's ids, which these `
+        + `diagnostics use and the file does not state. Run \`barwise migrate\` on it to write `
+        + `them into the file, or on its project's .orm-project.yaml when it is a domain of `
+        + `one, so its shadows name their owners' ids.`,
+    },
+  },
+  [RULE_ID.unstoredId]: {
+    severity: "warning",
+    description:
+      "An element the file gives no id is named again on every load, so nothing outside the model can refer to it by id until the file states it.",
+    messages: {
+      default: (id: string): string =>
+        `"${id}" is not stored in the file: the element is given it again on every load, so `
+        + `nothing else may refer to it by that id yet. Store it with the editor's `
+        + `"Store ids" quick fix or \`barwise migrate\`.`,
     },
   },
   [RULE_ID.duplicateObjectification]: {
@@ -928,8 +1160,8 @@ const RULE_DESCRIPTORS = {
     description:
       "A tuple projected by a join subset constraint's subset path is absent from its superset path.",
     messages: {
-      default: (factTypeName: string, tuple: string): string =>
-        `Join subset constraint in fact type "${factTypeName}" is violated: the subset tuple [${tuple}] is not in the superset operand.`,
+      default: (span: string, tuple: string): string =>
+        `Join subset constraint over ${span} is violated: the subset tuple [${tuple}] is not in the superset operand.`,
     },
   },
   [RULE_ID.joinEqualityViolation]: {
@@ -937,8 +1169,8 @@ const RULE_DESCRIPTORS = {
     description:
       "The tuple sets a join equality constraint compares across its paths are not identical.",
     messages: {
-      default: (factTypeName: string, tuple: string): string =>
-        `Join equality constraint in fact type "${factTypeName}" is violated: the tuple [${tuple}] is not projected by every operand.`,
+      default: (span: string, tuple: string): string =>
+        `Join equality constraint over ${span} is violated: the tuple [${tuple}] is not projected by every operand.`,
     },
   },
   [RULE_ID.joinExclusionViolation]: {
@@ -946,8 +1178,19 @@ const RULE_DESCRIPTORS = {
     description:
       "A tuple appears in the projected sets of more than one operand of a join exclusion constraint.",
     messages: {
-      default: (factTypeName: string, tuple: string): string =>
-        `Join exclusion constraint in fact type "${factTypeName}" is violated: the tuple [${tuple}] is projected by more than one operand.`,
+      default: (span: string, tuple: string): string =>
+        `Join exclusion constraint over ${span} is violated: the tuple [${tuple}] is projected by more than one operand.`,
+    },
+  },
+  [RULE_ID.joinRingViolation]: {
+    severity: "error",
+    description:
+      "The pairs a join ring constraint's path projects break the relational property it asserts.",
+    messages: {
+      // Rendered whole by `joinRingViolationTexts` in population/ring.ts
+      // (its `JOIN_DETAIL` table), with the path's span in place of a
+      // population and instance.
+      default: (text: string): string => text,
     },
   },
   [RULE_ID.ringViolation]: {

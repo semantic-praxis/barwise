@@ -17,7 +17,13 @@ import {
 } from "@barwise/core";
 import { collectExportAnnotations, type ExportAnnotation } from "@barwise/core/annotation";
 import { generateDdlLineage } from "@barwise/core/lineage";
-import { openApiToJson, RelationalMapper, renderOpenApi } from "@barwise/core/mapping";
+import {
+  openApiToJson,
+  RelationalMapper,
+  renderOpenApi,
+  unreportedConstraintSpecs,
+  withConstraintSpecs,
+} from "@barwise/core/mapping";
 
 /**
  * OpenAPI 3.0 export format.
@@ -89,6 +95,9 @@ export class OpenApiExportFormat implements ExportFormatAdapter {
       // set it, so every manifest recorded `sources: []` (barwise-ofb).
       lineage: generateDdlLineage(model, schema),
       annotations: annotations.length > 0 ? annotations : undefined,
+      // The constraints the schema does not carry, by the DDL router's own
+      // rule (schema-export-constraint-specs.spec.md).
+      ...withConstraintSpecs(unreportedConstraintSpecs(model, schema)),
     };
   }
 }

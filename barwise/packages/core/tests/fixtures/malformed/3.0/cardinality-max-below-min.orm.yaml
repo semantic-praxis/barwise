@@ -1,0 +1,10 @@
+orm_version: "3.0"
+model:
+  name: Malformed
+  object_types:
+    - id: ot-size
+      name: Size
+      kind: value
+      cardinality:
+        min: 5
+        max: 2

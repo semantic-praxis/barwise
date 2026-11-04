@@ -8,10 +8,18 @@
  * fact type is a warning (it is typically unintended).
  */
 import { describe, expect, it } from "vitest";
+import {
+  type Constraint,
+  isExternalConstraint,
+  isInternalConstraint,
+} from "../../src/model/Constraint.js";
 import { OrmModel } from "../../src/model/OrmModel.js";
 import { constraintConsistencyRules } from "../../src/validation/rules/constraintConsistency.js";
 
-/** Builds a binary fact type ("Widget has Color") with the given constraints. */
+/**
+ * Builds a binary fact type ("Widget has Color") with the given constraints:
+ * the internal kinds on the fact type, the rest on the model.
+ */
 function buildModelWithConstraints(
   constraints: Array<Record<string, unknown>>,
 ): OrmModel {
@@ -21,6 +29,7 @@ function buildModelWithConstraints(
     kind: "entity",
     referenceMode: "widget_id",
   });
+  const all = constraints as unknown as Constraint[];
   model.addFactType({
     name: "Widget has Color",
     roles: [
@@ -28,8 +37,9 @@ function buildModelWithConstraints(
       { name: "of", playerId: ot.id, id: "r2" },
     ],
     readings: ["{0} has {1}", "{1} of {0}"],
-    constraints: constraints as never,
+    constraints: all.filter(isInternalConstraint),
   });
+  for (const c of all.filter(isExternalConstraint)) model.addConstraint(c);
   return model;
 }
 

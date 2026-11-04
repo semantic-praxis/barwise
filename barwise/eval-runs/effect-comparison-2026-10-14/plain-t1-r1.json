@@ -1,0 +1,96 @@
+{
+  "run": "plain-t1-r1",
+  "arm": "plain",
+  "task": "T1",
+  "phase": "second-series",
+  "pair": "r1",
+  "start": "8398a193",
+  "head": "59b4c9bb",
+  "startedAt": "2026-10-15T04:13:52Z",
+  "rounds": 1,
+  "leftoverCommit": false,
+  "outcome": "pass",
+  "readSpec": false,
+  "usage": {
+    "inputProcessed": 4869419,
+    "turns": 44,
+    "finalContext": 136407,
+    "rounds": [
+      {
+        "round": 1,
+        "turns": 44,
+        "inputProcessed": 4869419
+      }
+    ],
+    "source": "measure:comparison -- usage over the run's transcript; per turn in plain-t1-r1.usage.json"
+  },
+  "scoring": [
+    {
+      "round": 1,
+      "head": "59b4c9bb",
+      "trial": {
+        "exit": 0,
+        "protectedTouched": []
+      },
+      "heldout": {
+        "passed": 13,
+        "of": 13
+      },
+      "build": 0,
+      "test": 0,
+      "validateExamples": 0,
+      "promptlabDrift": {
+        "exit": 0,
+        "tests": "15 passed"
+      },
+      "harness": {
+        "tokens": 138564,
+        "toolCalls": 49,
+        "wallMs": 652657
+      }
+    }
+  ],
+  "diff": {
+    "files": 7,
+    "hunks": 16,
+    "added": 42,
+    "removed": 4,
+    "consumerFiles": [
+      "barwise/packages/core/schemas/orm-model.schema.json",
+      "barwise/packages/core/src/diff/breakingLevel.ts",
+      "barwise/packages/core/src/diff/changeDescription.ts",
+      "barwise/packages/core/src/diff/elementDiff.ts"
+    ],
+    "sliceLines": 981
+  },
+  "redChecks": [
+    {
+      "class": "environment",
+      "command": "git ... / compound shell command",
+      "firstError": "the worktree sandbox refused a command it could not verify stayed inside the worktree",
+      "note": "harness isolation, not the code (2 times)"
+    },
+    {
+      "class": "task logic",
+      "command": "npx vitest run (packages/core)",
+      "firstError": "FAIL tests/laws/counterexample.law.test.ts: pinned count 88 against 123",
+      "note": "a newly drawn unit in tests/arbitraries/model.ts shifted the seeded samples; the unit is now derived from the generated data type's name, so the stream did not move"
+    },
+    {
+      "class": "environment",
+      "command": "npm test (round 1)",
+      "firstError": "two cli prompt tests timed out at 30 s under parallel load",
+      "note": "alone they passed 42/42; a rerun with --concurrency=2 passed 24/24; session full suite passed"
+    }
+  ],
+  "observations": [
+    "did not edit the protected layout test in round 1, under the amended prompt and without reading the experiment spec",
+    "refused an empty unit in round 1, in the shared rule, reasoning that code could otherwise save a file the schema then refuses on load"
+  ],
+  "agentJudgmentCalls": [
+    "empty unit refused, in the shared rule (round 1)",
+    "unit written after data_type",
+    "unit change is breaking level caution",
+    "unit derived from the data type's name in the random model generator, so the seeded law samples did not move and the serialization law covers it"
+  ]
+}

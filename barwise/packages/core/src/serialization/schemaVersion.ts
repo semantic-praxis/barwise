@@ -15,7 +15,37 @@ import { migrateDiagramReferencesToIds } from "./migrations/diagramReferencesToI
  * this onto every document it produces, and the JSON Schema pins its
  * `orm_version` `const` to the same value.
  */
-export const CURRENT_ORM_VERSION = "2.0";
+export const CURRENT_ORM_VERSION = "4.0";
+
+/**
+ * The previous major, which this build still reads: a 3.0 file is read by
+ * the frozen 3.0 decoders and replayed into 4.0's ids
+ * (`serialization/replay.ts`, iri-identity WS6), and is written as 4.0
+ * when saved.
+ */
+export const PREVIOUS_ORM_VERSION = "3.0";
+
+/**
+ * The oldest major this build reads: a 2.0 file is read by the 2.0 reader
+ * (`readDocument20`) straight into a model, against the 2.0 schema frozen
+ * when 3.0 landed, and replayed as a 3.0 one is (iri-identity decision
+ * 18). Older versions migrate to it first.
+ */
+export const LEGACY_ORM_VERSION = "2.0";
+
+/**
+ * The first version of the current major, derived from
+ * {@link CURRENT_ORM_VERSION} so a major bump moves it. A file from here up
+ * to the current version is read by the current reader after the
+ * registered minor migrations bring it forward, so a minor bump keeps
+ * every earlier file of its major loadable (barwise-jj8).
+ */
+export const CURRENT_MAJOR_FIRST_VERSION = majorFirst(CURRENT_ORM_VERSION);
+
+/** The first version of `version`'s major: "3.1" gives "3.0". */
+export function majorFirst(version: string): string {
+  return `${version.split(".")[0]}.0`;
+}
 
 /**
  * Upgrades a parsed `.orm.yaml` document from one version to the next.
@@ -31,10 +61,14 @@ export interface OrmVersionMigration {
 }
 
 /**
- * Registered migrations, applied in chain order on load. When a new
- * version lands, bump
- * {@link CURRENT_ORM_VERSION} and the schema `const`, and add the
- * version-to-version migration here.
+ * Registered migrations on the raw document, applied in chain order on
+ * load: up to {@link LEGACY_ORM_VERSION} for an older major, and from
+ * {@link CURRENT_MAJOR_FIRST_VERSION} to {@link CURRENT_ORM_VERSION} for a
+ * minor of the current one. 2.0 to 3.0 is not one of them:
+ * placing a 2.0 preferred-identifier flag needs the model (Open decision
+ * 8 reads object type kinds, objectifications and roles), so a 2.0 file is
+ * read into the model and the model is what 3.0 states. A raw document
+ * that needs 3.0 is `writeDocument(readDocument20(doc))`.
  */
 export const ORM_VERSION_MIGRATIONS: readonly OrmVersionMigration[] = [
   // 1.0 -> 1.1 added optional constructs (value ranges were de-facto part of
@@ -46,7 +80,7 @@ export const ORM_VERSION_MIGRATIONS: readonly OrmVersionMigration[] = [
     to: "1.1",
     migrate: (doc) => ({ ...doc, orm_version: "1.1" }),
   },
-  // 1.1 -> 2.0 is structural, so it is a major bump (ADR-0001): diagram
+  // 1.1 -> 2.0 is structural, so it is a major bump (ADR `schema-versioning`): diagram
   // references change from element names to element ids. A 1.x reader
   // would look each id up as a name and silently render the whole model;
   // the version is what makes it refuse instead.
@@ -83,7 +117,11 @@ export function compareOrmVersions(a: string, b: string): number {
 }
 
 /**
- * Plan the migration from `version` to `current`.
+ * Plan the raw-document migration from `version` to `current`. No default:
+ * the loader asks for 2.0 (`LEGACY_ORM_VERSION`), the last version a step
+ * on the raw document reaches, because 2.0 to 3.0 goes through the model
+ * (orm-format-3 WS4b); a default of either version would answer some
+ * caller's question wrongly.
  *
  * Pure: `current` and `migrations` are injectable so the planner can be
  * exercised with synthetic versions in tests. Returns the ordered steps
@@ -95,7 +133,7 @@ export function compareOrmVersions(a: string, b: string): number {
  */
 export function planMigration(
   version: string,
-  current: string = CURRENT_ORM_VERSION,
+  current: string,
   migrations: readonly OrmVersionMigration[] = ORM_VERSION_MIGRATIONS,
 ): MigrationPlan {
   if (version === current) return { ok: true, steps: [] };
@@ -125,4 +163,125 @@ export function applyMigrations(
     result = step.migrate(result);
   }
   return result;
+}
+
+/** The versions {@link planRead} decides between; injectable for tests. */
+export interface ReadVersions {
+  readonly current: string;
+  /**
+   * The earlier majors a reader exists for, newest first, each stated as
+   * the version its reader reads: older versions of the last one migrate
+   * to it, and nothing else migrates between majors.
+   */
+  readonly legacy: readonly string[];
+  readonly migrations: readonly OrmVersionMigration[];
+}
+
+const THIS_BUILD: ReadVersions = {
+  current: CURRENT_ORM_VERSION,
+  legacy: [PREVIOUS_ORM_VERSION, LEGACY_ORM_VERSION],
+  migrations: ORM_VERSION_MIGRATIONS,
+};
+
+/**
+ * How a document stating a version is read: the raw-document steps to
+ * apply first, then the reader -- the current one, or an earlier major's,
+ * named by `target` -- and the version the document states once the steps
+ * have run. A
+ * refusal is a newer version; a version between the two majors, or one no
+ * chain reaches (`unknown`); a looping registry (`cycle`); or a version
+ * of the current major that a release wrote -- the major's first, or one a
+ * registered step names -- but whose chain does not reach the current one,
+ * which is a missing registration in barwise (`unregistered`).
+ */
+export type ReadPlan =
+  | {
+    readonly ok: true;
+    readonly reader: "current" | "legacy";
+    readonly target: string;
+    readonly steps: readonly OrmVersionMigration[];
+  }
+  | Extract<MigrationPlan, { ok: false; }>
+  | { readonly ok: false; readonly reason: "unregistered"; };
+
+/** Plan the read of a document stating `version`. Pure. */
+export function planRead(version: string, versions: ReadVersions = THIS_BUILD): ReadPlan {
+  const { current, legacy, migrations } = versions;
+  // A version that is not dotted numbers is malformed, not newer:
+  // `compareOrmVersions` falls back to string order for it, which would
+  // tell a user with a typo ("3.x") to upgrade barwise.
+  if (!/^\d+(\.\d+)*$/.test(version)) return { ok: false, reason: "unknown" };
+  if (compareOrmVersions(version, current) > 0) return { ok: false, reason: "newer" };
+  if (compareOrmVersions(version, majorFirst(current)) >= 0) {
+    const plan = planMigration(version, current, migrations);
+    if (plan.ok) return { ok: true, reader: "current", target: current, steps: plan.steps };
+    // A major's first version, and any version a step names, was written
+    // by a release, so a missing chain from it is a bug; "3.0.0" or "3"
+    // stays an unknown version.
+    const named = version === majorFirst(current)
+      || migrations.some((m) => m.from === version || m.to === version);
+    return plan.reason === "unknown" && named ? { ok: false, reason: "unregistered" } : plan;
+  }
+  // Newest major first. A version past a legacy reader's, below the next
+  // major, has no reader; one of the oldest major or before migrates to it.
+  for (const [i, target] of legacy.entries()) {
+    if (compareOrmVersions(version, target) > 0) return { ok: false, reason: "unknown" };
+    const oldest = i === legacy.length - 1;
+    if (!oldest && compareOrmVersions(version, majorFirst(target)) < 0) continue;
+    const plan = planMigration(version, target, migrations);
+    return plan.ok ? { ok: true, reader: "legacy", target, steps: plan.steps } : plan;
+  }
+  return { ok: false, reason: "unknown" };
+}
+
+/**
+ * What a reader tells the user for each reason {@link planRead} refuses a
+ * version. One table for every versioned file kind, so `.orm.yaml`,
+ * `.orm-project.yaml` and `.map.yaml` give the same answer to the same
+ * reason (iri-identity WS4).
+ */
+export const READ_PLAN_ADVICE: Readonly<
+  Record<Extract<ReadPlan, { ok: false; }>["reason"], string>
+> = {
+  newer: "the file was written by a newer barwise; upgrade barwise to read it.",
+  unknown: "no migration path is available; re-export from a compatible version.",
+  cycle: "the migration registry loops back on itself, which is a bug in barwise.",
+  unregistered: "no registered migration reaches it, which is a bug in barwise.",
+};
+
+/**
+ * Why a `.orm-project.yaml` or `.map.yaml` document cannot be read at its
+ * stated `format_version`, or `undefined` when it can. Run before schema
+ * validation, so a newer file is refused as newer rather than for a field
+ * this build does not know (`schema-versioning.md` decision 1).
+ *
+ * A file without `format_version` was written before these kinds were
+ * versioned and is read as their first version, whose schema it already
+ * satisfies; a non-string value is left to the schema to report. Neither
+ * kind has a migration step yet, so the only readable version is
+ * `current`; the step shape is decided by the first minor of each kind.
+ */
+export function formatVersionProblem(doc: unknown, current: string): string | undefined {
+  if (typeof doc !== "object" || doc === null) return undefined;
+  const version = (doc as Record<string, unknown>).format_version;
+  if (typeof version !== "string") return undefined;
+  const plan = planRead(version, { current, legacy: [], migrations: [] });
+  if (plan.ok) return undefined;
+  return unsupportedVersionMessage("format_version", version, current, plan.reason);
+}
+
+/**
+ * The refusal for a document whose version this build cannot read, in one
+ * shape for every versioned file kind: the field, the stated and readable
+ * versions, and {@link READ_PLAN_ADVICE} for the reason.
+ */
+export function unsupportedVersionMessage(
+  field: "orm_version" | "format_version",
+  version: string,
+  current: string,
+  reason: Extract<ReadPlan, { ok: false; }>["reason"],
+): string {
+  return `Unsupported ${field} "${version}" (this build reads ${current}): ${
+    READ_PLAN_ADVICE[reason]
+  }`;
 }

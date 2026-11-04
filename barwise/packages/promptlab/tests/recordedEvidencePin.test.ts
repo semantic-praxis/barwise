@@ -30,7 +30,7 @@ import { rescoreDirectory } from "../src/record/rescore.js";
 const ROUND = join(import.meta.dirname, "../../../eval-payloads/20260828-1647");
 const suite = loadSuite(defaultSuitePath());
 
-// Per arm: payload count and mean, under suite 2.12.0.
+// Per arm: payload count and mean, under suite 2.13.0.
 //
 // 2.9.0: every arm fell when must_validate left the rubric
 // (barwise-902), and the SHAPE of that fall was the point -- the
@@ -58,6 +58,11 @@ const suite = loadSuite(defaultSuitePath());
 // No model shipped in this repository writes that form -- all six
 // frequency constraints in the corpus are min 1 with a finite max -- so
 // the eval round is the only place it occurs.
+// 2.13.0 moves one payload UP, because the warning it loses was false:
+// `completeness/multiple-preferred-identifiers` stopped counting a flag
+// that identifies another entity (orm-format-3 WS4a, barwise-971).
+// sonnet5-3-train/order-management-run4 rises 0.807143 -> 0.832143, and
+// its arm 0.891838 -> 0.893309; the other 114 payloads are unchanged.
 const EXPECTED: readonly (readonly [string, number, number])[] = [
   ["default-haiku-dev", 13, 0.906833],
   ["default-haiku-train", 18, 0.853031],
@@ -66,7 +71,7 @@ const EXPECTED: readonly (readonly [string, number, number])[] = [
   ["haiku45-2-dev", 11, 0.950027],
   ["haiku45-2-train", 16, 0.895506],
   ["sonnet5-3-dev", 14, 0.827405],
-  ["sonnet5-3-train", 17, 0.891838],
+  ["sonnet5-3-train", 17, 0.893309],
 ];
 
 describe.skipIf(!existsSync(ROUND))("the committed 2026-08-28 round, rescored", () => {

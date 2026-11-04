@@ -24,12 +24,12 @@ const EXPORT_OPTIONS: ExportOption[] = [
   {
     id: "ddl",
     label: "As DDL",
-    description: "Generate CREATE TABLE statements",
+    description: "Generate SQL DDL: tables, constraint clauses, and example INSERTs",
   },
   {
     id: "avro",
     label: "As Avro Schemas",
-    description: "Generate .avsc schema files for each table",
+    description: "Generate .avsc schema files for each table, with review notes in their docs",
   },
 ];
 

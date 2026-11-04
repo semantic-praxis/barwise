@@ -78,18 +78,47 @@ export function checklistHeadings(file = CHECKLIST) {
  * why the gate refuses rather than the classifier shrugging.
  */
 export function tierRows(file = TABLE) {
-  let parsed;
-  try {
-    parsed = JSON.parse(readFileSync(file, "utf8"));
-  } catch (cause) {
-    throw new Error(`cannot read or parse the tier table at ${file}`, { cause });
-  }
-  const rows = parsed?.rows;
+  const rows = readTable(file)?.rows;
   if (!Array.isArray(rows) || rows.length === 0) {
     throw new Error(`${file} declares no rows -- this is not the tier table`);
   }
+  return validateRows(rows, "row");
+}
+
+/**
+ * The table's `failureModes` rows: one per REVIEW.md "Always check" item,
+ * keyed by its title (docs/specs/review-routing.spec.md, WS2). Same shape
+ * and the same validator as the checklist rows, so there is one row rule
+ * and one pattern language. Required wherever it is read: pr-risk
+ * printing no failure modes with exit 0 would read as a diff that needs
+ * none.
+ */
+export function failureModeRows(file = TABLE) {
+  const modes = readTable(file)?.failureModes;
+  if (!Array.isArray(modes) || modes.length === 0) {
+    throw new Error(
+      `${file} declares no failureModes -- REVIEW.md's failure modes have no routing`,
+    );
+  }
+  return validateRows(modes, "failure mode");
+}
+
+function readTable(file) {
+  try {
+    return JSON.parse(readFileSync(file, "utf8"));
+  } catch (cause) {
+    throw new Error(`cannot read or parse the tier table at ${file}`, { cause });
+  }
+}
+
+/**
+ * Each row checked for shape and pattern language, for both arrays. A
+ * `not-path-derivable` row carries no globs by design; any other tier
+ * without globs is an error rather than a silently unmatchable row.
+ */
+function validateRows(rows, kind) {
   for (const [i, row] of rows.entries()) {
-    const at = `row ${i} (${row?.heading ?? "no heading"})`;
+    const at = `${kind} ${i} (${row?.heading ?? "no heading"})`;
     if (typeof row?.heading !== "string" || row.heading.length === 0) {
       throw new Error(`${at}: heading must be a non-empty string`);
     }
@@ -119,6 +148,49 @@ export function tierRows(file = TABLE) {
   return rows;
 }
 
+/** `barwise/scripts/lib` -> the repo root -> REVIEW.md. */
+export const REVIEW = resolve(SCRIPTS, "../../REVIEW.md");
+
+/**
+ * The titles of REVIEW.md's "Always check" items: the bold lead of each
+ * numbered item under the first `## ` heading that starts with "Always
+ * check", trailing period stripped (`1. **Input dropped at a boundary.**`
+ * -> `Input dropped at a boundary`). The heading's date range can change
+ * without breaking it. Throws on a missing heading or no items, as
+ * checklistHeadings does, so the gate refuses rather than calling eight
+ * rows stale from a file it never read.
+ */
+export function reviewFailureModes(file = REVIEW) {
+  let md;
+  try {
+    md = readFileSync(file, "utf8");
+  } catch (cause) {
+    throw new Error(`cannot read REVIEW.md at ${file}`, { cause });
+  }
+  const lines = md.split("\n");
+  const start = lines.findIndex((l) => /^## Always check\b/.test(l));
+  if (start === -1) throw new Error(`no '## Always check' heading in ${file}`);
+  const titles = [];
+  let items = 0;
+  for (const line of lines.slice(start + 1)) {
+    if (line.startsWith("## ")) break;
+    if (!/^\d+\. /.test(line)) continue;
+    items += 1;
+    const m = /^\d+\. \*\*(.+?)\*\*/.exec(line);
+    if (m) titles.push(m[1].replace(/\.$/, ""));
+  }
+  // A numbered item without a one-line bold title would otherwise be
+  // skipped silently: the gate would report the rest OK and pr-risk would
+  // never route the item.
+  if (items !== titles.length) {
+    throw new Error(
+      `${items - titles.length} 'Always check' item(s) in ${file} have no one-line bold title`,
+    );
+  }
+  if (titles.length === 0) throw new Error(`the 'Always check' list in ${file} has no items`);
+  return titles;
+}
+
 /**
  * How the headings and the rows disagree, in both directions.
  *
@@ -137,6 +209,138 @@ export function compareTable(headings, rows) {
     stale: declared.filter((h) => !headings.includes(h)),
     duplicated: declared.filter((h, i) => declared.indexOf(h) !== i),
   };
+}
+
+/**
+ * Is `pattern` file-shaped: one that names a file by its final segment?
+ *
+ * Not `**`, not a directory (trailing `/`), and a final segment that is
+ * a literal name rather than `*`. Earlier segments may be `*`, so
+ * `barwise/packages/<*>/CLAUDE.md` is file-shaped and `a/*` is not: a
+ * directory has no file name to compare, and a final `*` names none.
+ * PRECONDITION, as for `matchesPattern`: `patternFault(pattern)` is null.
+ */
+function fileShaped(pattern) {
+  return pattern !== "**" && !pattern.endsWith("/") && pattern.split("/").at(-1) !== "*";
+}
+
+/**
+ * `reachAcknowledged` is optional; when present it is an object of file
+ * name -> array of distinct, non-empty path strings. Checked here and not
+ * in `validateRows`, because `pr-risk` reads rows through that validator
+ * and never reads this field: a malformed waiver must not make the
+ * classifier refuse (and so request a review on every PR) over a field it
+ * does not use. The gate calls this, and maps the throw to exit 2.
+ *
+ * A path listed twice is malformed, not a finding. A finding (exit 1)
+ * says the table disagrees with the TREE, and editing the table to match
+ * the tree fixes it. A duplicate cannot arise from any tree: the list
+ * declares a set, and a list that repeats a member is a broken
+ * declaration of one, like an empty string in it.
+ */
+function acknowledgements(row, at) {
+  const ack = row.reachAcknowledged;
+  if (ack === undefined) return {};
+  if (ack === null || typeof ack !== "object" || Array.isArray(ack)) {
+    throw new Error(`${at}: reachAcknowledged must be an object of file name -> path list`);
+  }
+  for (const [key, paths] of Object.entries(ack)) {
+    const at2 = `${at}: reachAcknowledged[${JSON.stringify(key)}]`;
+    if (!Array.isArray(paths) || paths.some((p) => typeof p !== "string" || p.length === 0)) {
+      throw new Error(`${at2} must be an array of non-empty strings`);
+    }
+    const twice = paths.filter((p, i) => paths.indexOf(p) !== i);
+    if (twice.length > 0) {
+      throw new Error(`${at2} lists ${twice.map((p) => JSON.stringify(p)).join(", ")} twice`);
+    }
+  }
+  return ack;
+}
+
+/**
+ * Which file-shaped patterns reach less than their name suggests
+ * (docs/specs/review-tier-reach.spec.md, barwise-1046).
+ *
+ * A file-shaped pattern's SHADOW is every tracked file with the same
+ * final segment that no pattern in the same row matches. The instructions
+ * row once listed `CLAUDE.md`, which matched the root file and none of the
+ * thirteen package and optimizer copies, and the zero-match check stayed
+ * green because the pattern matched one file. That is the shape this
+ * detects. It cannot tell whether a row SHOULD reach a same-named file,
+ * which is why a non-empty shadow can be waived -- but only by
+ * `reachAcknowledged` listing exactly that shadow. A waiver by count, or
+ * by "some shadow remains", would silently cover the next same-named file
+ * anyone adds; an exact list fails on the PR that adds it.
+ *
+ * The shadow depends only on the row and the FILE NAME, never on which
+ * pattern carried the name: two same-named patterns in one row exclude
+ * the same reached files and so always share one shadow. So it is
+ * computed once per (row, file name), and `reachAcknowledged` is keyed by
+ * file name. Keyed by pattern, the wiring row repeated twelve paths under
+ * `barwise/package.json` and `package.json`, and one new workspace
+ * package meant editing three lists that could only ever agree.
+ *
+ * Pure: `rows` are validated rows of one kind, `kind` names them in
+ * messages as `validateRows` does ("row", "failure mode"), `tracked` is
+ * the repository's file list. Throws on a malformed `reachAcknowledged`.
+ * Returns, each entry carrying `label` (`row "<heading>"`):
+ *   findings  { label, name, patterns, unacknowledged, acknowledged }
+ *             for each file name whose shadow has paths the row does not
+ *             acknowledge; `patterns` are the row's patterns with that
+ *             name, each once; `acknowledged` is false when there is no
+ *             entry at all, and then `unacknowledged` IS the whole shadow
+ *   stale     { label, key, paths, reason } for each acknowledgement that
+ *             no longer agrees: `paths` are listed but not in the shadow;
+ *             or `paths` is null and `reason` says why the whole key
+ *             waives nothing
+ */
+export function shadowedPatterns(rows, tracked, kind = "row") {
+  const findings = [];
+  const stale = [];
+  const name = (p) => p.split("/").at(-1);
+  for (const row of rows) {
+    const label = `${kind} ${JSON.stringify(row.heading)}`;
+    const ack = acknowledgements(row, label);
+    // Deduped first, so a glob listed twice is named once in a finding.
+    const globs = [...new Set(row.globs ?? [])];
+    const reached = (f) => globs.some((g) => matchesPattern(f, g));
+    const names = new Map();
+    for (const g of globs.filter(fileShaped)) {
+      names.set(name(g), [...(names.get(name(g)) ?? []), g]);
+    }
+    for (const [n, patterns] of names) {
+      const shadow = tracked.filter((f) => name(f) === n && !reached(f)).sort();
+      const listed = Object.hasOwn(ack, n) ? ack[n] : undefined;
+      const unacknowledged = shadow.filter((p) => !listed?.includes(p));
+      if (unacknowledged.length > 0) {
+        findings.push({
+          label,
+          name: n,
+          patterns,
+          unacknowledged,
+          acknowledged: listed !== undefined,
+        });
+      }
+      if (listed === undefined) continue;
+      const gone = listed.filter((p) => !shadow.includes(p));
+      if (gone.length > 0) {
+        stale.push({ label, key: n, paths: gone, reason: null });
+      } else if (shadow.length === 0) {
+        stale.push({ label, key: n, paths: null, reason: "its shadow is empty" });
+      }
+    }
+    for (const key of Object.keys(ack)) {
+      if (!names.has(key)) {
+        stale.push({
+          label,
+          key,
+          paths: null,
+          reason: "not the file name of any file-shaped pattern in this row",
+        });
+      }
+    }
+  }
+  return { findings, stale };
 }
 
 /**
@@ -286,12 +490,7 @@ export function classify(files, rows) {
  * should be loud. The workflow maps any refusal to "request the review".
  */
 export function trivialGlobs(file = TABLE) {
-  let parsed;
-  try {
-    parsed = JSON.parse(readFileSync(file, "utf8"));
-  } catch (cause) {
-    throw new Error(`cannot read or parse the tier table at ${file}`, { cause });
-  }
+  const parsed = readTable(file);
   const globs = parsed?.trivial?.globs;
   if (!Array.isArray(globs) || globs.length === 0) {
     throw new Error(`${file} declares no trivial.globs -- the allow-list is missing`);

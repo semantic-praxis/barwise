@@ -67,7 +67,7 @@ the whole workflow, see
 
 ### Option 1: VS Code Extension (recommended)
 
-Install the **Barwise ORM Modeler** extension. Fifteen of the server's
+Install the **Barwise ORM Modeler** extension. Sixteen of the server's
 tools are registered with VS Code's Language Model Tool API and appear
 automatically in Copilot Chat -- no configuration needed. The gym tools and
 `analyze_repository` are not among them; repository analysis is the
@@ -82,6 +82,7 @@ You can reference any tool directly in Copilot Chat using `#`:
 - `#barwiseDiagram` -- generate an SVG diagram
 - `#barwiseImport` -- extract a model from a transcript
 - `#barwiseMerge` -- merge two models (writes the base file)
+- `#barwiseRename` -- rename an element, across a project (writes the files)
 - `#barwiseExport` -- export to any registered format
 - `#barwiseDescribe` -- summarize entities and rules
 - `#barwiseQuery` -- run a structural query
@@ -340,6 +341,12 @@ Generate a relational schema (DDL or JSON) from an ORM model.
 | `source`  | string              | yes      | File path to an `.orm.yaml` file, or inline YAML content |
 | `format`  | `"ddl"` or `"json"` | no       | Output format. Defaults to `"ddl"`.                      |
 
+Deprecated in favour of `export_model`; with `format: "ddl"` it returns
+what `export_model` returns for `format: "ddl"` with no annotations and no
+examples: the DDL, bounded to a file with a preview when it is large, and
+a second content block naming each constraint DDL could not express, when
+there is one (`docs/specs/schema-ddl-routing.spec.md`).
+
 **Returns** with `format: "ddl"`:
 
 ```sql
@@ -378,10 +385,12 @@ CREATE TABLE Department (
 
 Compare two ORM models and return structural deltas.
 
-| Parameter  | Type   | Required | Description                                               |
-| ---------- | ------ | -------- | --------------------------------------------------------- |
-| `base`     | string | yes      | File path or inline YAML for the base (original) model    |
-| `incoming` | string | yes      | File path or inline YAML for the incoming (changed) model |
+| Parameter  | Type   | Required | Description                                                     |
+| ---------- | ------ | -------- | --------------------------------------------------------------- |
+| `base`     | string | yes      | File path or inline YAML for the base (original) model          |
+| `incoming` | string | yes      | File path or inline YAML for the incoming (changed) model       |
+| `matching` | string | no       | `id-first` (default) or `content`; as `barwise diff --matching` |
+| `renames`  | array  | no       | `{ kind, from, to }` pairs; as `barwise diff --rename`          |
 
 **Returns** JSON:
 
@@ -419,7 +428,21 @@ Compare two ORM models and return structural deltas.
 `changes` is what changed, as data: one entry per change, discriminated
 by `change` (`definition`, `aliases`, `dataTypeChanged`, `readings`,
 `constraintsAdded`, and so on), usually with the `from` and `to`
-values. `changeDescriptions` is the same list rendered as sentences.
+values. `constraintsModified` is the exception: it carries
+`constraints: [{ from, to }]`, one pair per constraint. Object types and
+fact types pair by id where both models hold it, then by name, so a rename
+that keeps the id is one `modified` delta with a `name` change. What id
+and name leave unpaired is paired by content, as `barwise diff` describes,
+and such a delta carries `pairedBy: "recognized"`; one named in `renames`
+(`kind` is `objectType` or `factType`) carries `pairedBy: "declared"`.
+`merge_models` never pairs by content. Within a
+paired fact type, a constraint whose id occurs once in each model is paired
+by id, so an edit that keeps the id is one `constraintsModified` entry; the
+rest are paired by content, so a model with fresh ids still matches its
+base. A merge that would leave two object types or two fact types with one
+name, such as a swap of two names with only one rename accepted, is
+refused with a `merge-error` that names both.
+`changeDescriptions` is the same list rendered as sentences.
 Both are empty for an added or removed element. `barwise diff --format
 json` emits the same shape.
 
@@ -536,6 +559,50 @@ base as inline YAML to get the result without a write. The CLI's
 
 ---
 
+### rename_element
+
+Rename an object type, a fact type or a role, in a model or across a
+project. Every id is kept. The element's definition, when the term is its
+alone, and the reference mode of each entity keyed by a renamed value type
+follow the rename; free text is left as written. Given a project, the
+rename also follows an owned object type into its shadows in other domains,
+every domain's definitions, and both sides of each mapping file.
+
+| Parameter      | Type    | Required | Description                                                         |
+| -------------- | ------- | -------- | ------------------------------------------------------------------- |
+| `source`       | string  | yes      | File path or inline YAML for a model, or a `.orm-project.yaml` path |
+| `domain`       | string  | no       | For a project source: the domain that holds the element             |
+| `objectType`   | string  | no       | The object type to rename                                           |
+| `factType`     | string  | no       | The fact type to rename, or the one holding the role                |
+| `role`         | string  | no       | With `factType`: the role to rename, by name                        |
+| `rolePosition` | integer | no       | With `factType`: the role to rename, by position (from 0)           |
+| `to`           | string  | yes      | The new name                                                        |
+| `check`        | boolean | no       | Write nothing; report what would change                             |
+
+Name exactly one element: `objectType`, `factType`, or `factType` with
+`role` or `rolePosition`.
+
+**Returns** JSON: for inline YAML, `yaml` (the renamed model), `changes`
+and `warnings`; for a file or project source, `written`, `writtenTo` (or
+`files` under `check`), `changes` and `warnings`; for a refusal, `error`
+and nothing written. If replacing the files fails part-way, the result has
+`error` together with `written: true`, `writtenTo` naming the files
+already replaced, and `changes`: some files are renamed and the rest are
+not. A model that declares a `domain_context` gets a
+warning: rename a project's domain through the project so its shadows and
+mapping files follow. A project that did not load cleanly is refused, and
+so is a model, or any domain of a project, that is not at the current
+format: run `barwise migrate` on it first.
+
+**Like `merge_models`, this is an editing tool: a file source is written
+back.** Every changed file is staged before any is replaced, and files are
+written from the model, so YAML comments in them are lost. The
+lineage manifest beside each changed file is rewritten in the same
+write, its exports naming the new ids and still stale until re-exported.
+The CLI's `barwise rename` writes the same way.
+
+---
+
 ### split_model
 
 Split one `.orm.yaml` model into a multi-domain project: a
@@ -611,7 +678,10 @@ default) is spilled to a file -- `outputPath` if given, otherwise
 `.barwise/mcp-cache/` next to the model -- and the tool returns the
 file path plus a short preview. A single call produces one artifact,
 so exporting a multi-domain project requires `domain`; without it the
-tool returns an error listing the available domains.
+tool returns an error listing the available domains. When the format
+reports constraints it could not express (DDL, OpenAPI, Avro, dbt,
+Ossie), a second content block lists each one with its pseudocode and
+a counterexample.
 
 ---
 
@@ -716,6 +786,15 @@ YAML it falls back to the server's working directory. Only the CLI's
 `barwise export` records artifacts in the manifest; `export_model` does
 not, so artifacts exported through this server are not reported.
 
+Given a path, only that model's exports are read; `unattributedArtifacts`
+lists exports that name no model and that this model does not own, and
+`orphanedArtifacts` exports naming a model file that no longer exists
+(see `barwise lineage` in CLI.md). Given inline YAML
+there is no file to read for: the tool reads every export when they all
+name one model, or all name none (a manifest from before exports named
+their model, read as it always was), and otherwise returns an `error`
+naming the models and asking for a path.
+
 ---
 
 ### impact_analysis
@@ -731,7 +810,20 @@ artifacts depend on it.
 **Returns** JSON impact report listing the exported artifacts recorded
 in the lineage manifest that depend on the element. As with
 `lineage_status`, the manifest is located next to the model file when
-`source` is a path.
+`source` is a path, and only that model's exports are read (with any
+that name no model). Given inline YAML, every export holding the id as a
+4.0 id is read, and each affected artifact carries the `sourceModel` its
+export names. `exportsBefore40` lists the exports written under 3.x ids
+(a `version: 1` manifest) that impact could not match: they may depend
+on the element under its old id, so re-export them. Given a path to a 3.x
+file, they are matched by the id that file states; inline, there is no
+model to read 3.x ids through, so each is listed. Given a path whose model
+does not load, the report adds `modelDidNotLoad: true`, since the id is
+then read as a 4.0 id. Asked by a 3.x id the file stated for more than one
+element, `ambiguous` names those elements' 4.0 ids: exports written under
+3.x ids are not matched by it, and those holding it are listed in
+`exportsBefore40`; exports written under 4.0 ids still match the element
+that holds it as its 4.0 id, if any.
 
 ---
 
@@ -824,8 +916,9 @@ validation.
 
 ### orm-model://{path}
 
-Returns a deserialized ORM model from a file path as JSON. Allows AI
-tools to inspect model contents programmatically without parsing YAML
+Returns the model at a file path as JSON: the current-format document a
+save would write, in the shape `orm-schema://json-schema` describes. Allows
+AI tools to inspect model contents programmatically without parsing YAML
 themselves.
 
 ---

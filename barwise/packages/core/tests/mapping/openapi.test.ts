@@ -20,6 +20,7 @@ import { openApiToJson, renderOpenApi } from "../../src/mapping/renderers/openap
 import type { OpenApiSpec } from "../../src/mapping/renderers/openapi.js";
 import { OrmModel } from "../../src/model/OrmModel.js";
 import { ModelBuilder } from "../helpers/ModelBuilder.js";
+import { placeFlags } from "../helpers/placeFlags.js";
 
 const mapper = new RelationalMapper();
 
@@ -47,7 +48,7 @@ describe("OpenAPI renderer", () => {
         .withEntityType("Customer", { referenceMode: "customer_id" })
         .build();
 
-      const relSchema = mapper.map(model);
+      const relSchema = mapper.map(placeFlags(model));
       const spec = renderOpenApi(relSchema);
 
       expect(spec.openapi).toBe("3.0.0");
@@ -70,7 +71,7 @@ describe("OpenAPI renderer", () => {
         })
         .build();
 
-      const relSchema = mapper.map(model);
+      const relSchema = mapper.map(placeFlags(model));
       const spec = renderOpenApi(relSchema);
       const schemaNames = Object.keys(spec.components.schemas);
 
@@ -87,7 +88,7 @@ describe("OpenAPI renderer", () => {
         })
         .build();
 
-      const relSchema = mapper.map(model);
+      const relSchema = mapper.map(placeFlags(model));
       const spec = renderOpenApi(relSchema);
       const schemaNames = Object.keys(spec.components.schemas);
 
@@ -103,7 +104,7 @@ describe("OpenAPI renderer", () => {
         .withEntityType("Customer", { referenceMode: "customer_id" })
         .build();
 
-      const relSchema = mapper.map(model);
+      const relSchema = mapper.map(placeFlags(model));
       const spec = renderOpenApi(relSchema, {
         title: "My Domain API",
         version: "2.0.0",
@@ -118,7 +119,7 @@ describe("OpenAPI renderer", () => {
         .withEntityType("Customer", { referenceMode: "customer_id" })
         .build();
 
-      const relSchema = mapper.map(model);
+      const relSchema = mapper.map(placeFlags(model));
       const spec = renderOpenApi(relSchema, { basePath: "/api/v1" });
       const pathKeys = Object.keys(spec.paths);
 
@@ -130,7 +131,7 @@ describe("OpenAPI renderer", () => {
         .withEntityType("Customer", { referenceMode: "customer_id" })
         .build();
 
-      const relSchema = mapper.map(model);
+      const relSchema = mapper.map(placeFlags(model));
       const spec = renderOpenApi(relSchema, { basePath: "api/v1" });
       const pathKeys = Object.keys(spec.paths);
 
@@ -171,12 +172,15 @@ describe("OpenAPI renderer", () => {
           { id: "r2", name: "is of", playerId: customerId.id },
         ],
         readings: ["{0} has {1}", "{1} is of {0}"],
-        constraints: [{ type: "internal_uniqueness", roleIds: ["r1"], isPreferred: true }],
+        constraints: [
+          { type: "internal_uniqueness", roleIds: ["r1"], isPreferred: true },
+          { type: "internal_uniqueness", roleIds: ["r2"] },
+        ],
       });
       const pop = model.addPopulation({ factTypeId: idFt.id });
       pop.addInstance({ roleValues: { r1: "C001", r2: "C001" } });
 
-      const relSchema = mapper.map(model);
+      const relSchema = mapper.map(placeFlags(model));
       const spec = renderOpenApi(relSchema, model);
       const schema = getSchema(spec, "Customer")!;
 
@@ -187,7 +191,7 @@ describe("OpenAPI renderer", () => {
 
     it("accepts a model with options as a third parameter", () => {
       const model = customerModel();
-      const relSchema = mapper.map(model);
+      const relSchema = mapper.map(placeFlags(model));
       const spec = renderOpenApi(relSchema, model, { title: "Model + Options API" });
 
       expect(spec.info.title).toBe("Model + Options API");
@@ -208,12 +212,15 @@ describe("OpenAPI renderer", () => {
           { id: "r2", name: "is of", playerId: email.id },
         ],
         readings: ["{0} has {1}", "{1} is of {0}"],
-        constraints: [{ type: "internal_uniqueness", roleIds: ["r1"], isPreferred: true }],
+        constraints: [
+          { type: "internal_uniqueness", roleIds: ["r1"], isPreferred: true },
+          { type: "internal_uniqueness", roleIds: ["r2"] },
+        ],
       });
       const pop = model.addPopulation({ factTypeId: idFt.id });
       pop.addInstance({ roleValues: { r1: "C001", r2: "c001@example.com" } });
 
-      const relSchema = mapper.map(model);
+      const relSchema = mapper.map(placeFlags(model));
       const spec = renderOpenApi(relSchema, model, { includeExamples: false });
       const schema = getSchema(spec, "Customer")!;
 
@@ -227,7 +234,7 @@ describe("OpenAPI renderer", () => {
         .withEntityType("Customer", { referenceMode: "customer_id" })
         .build();
 
-      const relSchema = mapper.map(model);
+      const relSchema = mapper.map(placeFlags(model));
       const spec = renderOpenApi(relSchema);
       const schema = getSchema(spec, "Customer")!;
 
@@ -246,7 +253,7 @@ describe("OpenAPI renderer", () => {
         })
         .build();
 
-      const relSchema = mapper.map(model);
+      const relSchema = mapper.map(placeFlags(model));
       const spec = renderOpenApi(relSchema);
       const schema = getSchema(spec, "Customer")!;
 
@@ -286,7 +293,7 @@ describe("OpenAPI renderer", () => {
         })
         .build();
 
-      const relSchema = mapper.map(model);
+      const relSchema = mapper.map(placeFlags(model));
       const spec = renderOpenApi(relSchema);
       const orderSchema = getSchema(spec, "Order")!;
       const props = getProperties(orderSchema);
@@ -304,7 +311,7 @@ describe("OpenAPI renderer", () => {
         .withEntityType("Customer", { referenceMode: "customer_id" })
         .build();
 
-      const relSchema = mapper.map(model);
+      const relSchema = mapper.map(placeFlags(model));
       const spec = renderOpenApi(relSchema);
       const schema = getSchema(spec, "Customer")!;
       const props = getProperties(schema);
@@ -323,7 +330,7 @@ describe("OpenAPI renderer", () => {
         })
         .build();
 
-      const relSchema = mapper.map(model);
+      const relSchema = mapper.map(placeFlags(model));
       const spec = renderOpenApi(relSchema);
       const schema = getSchema(spec, "Item")!;
       const props = getProperties(schema);
@@ -343,7 +350,7 @@ describe("OpenAPI renderer", () => {
         })
         .build();
 
-      const relSchema = mapper.map(model);
+      const relSchema = mapper.map(placeFlags(model));
       const spec = renderOpenApi(relSchema);
       const schema = getSchema(spec, "Task")!;
       const props = getProperties(schema);
@@ -362,7 +369,7 @@ describe("OpenAPI renderer", () => {
         })
         .build();
 
-      const relSchema = mapper.map(model);
+      const relSchema = mapper.map(placeFlags(model));
       const spec = renderOpenApi(relSchema);
       const schema = getSchema(spec, "Event")!;
       const props = getProperties(schema);
@@ -382,7 +389,7 @@ describe("OpenAPI renderer", () => {
         })
         .build();
 
-      const relSchema = mapper.map(model);
+      const relSchema = mapper.map(placeFlags(model));
       const spec = renderOpenApi(relSchema);
       const schema = getSchema(spec, "Log")!;
       const props = getProperties(schema);
@@ -404,7 +411,7 @@ describe("OpenAPI renderer", () => {
         })
         .build();
 
-      const relSchema = mapper.map(model);
+      const relSchema = mapper.map(placeFlags(model));
       const spec = renderOpenApi(relSchema);
       const schema = getSchema(spec, "Product")!;
       const props = getProperties(schema);
@@ -423,7 +430,7 @@ describe("OpenAPI renderer", () => {
         })
         .build();
 
-      const relSchema = mapper.map(model);
+      const relSchema = mapper.map(placeFlags(model));
       const spec = renderOpenApi(relSchema);
       const schema = getSchema(spec, "Shift")!;
       const props = getProperties(schema);
@@ -443,7 +450,7 @@ describe("OpenAPI renderer", () => {
         })
         .build();
 
-      const relSchema = mapper.map(model);
+      const relSchema = mapper.map(placeFlags(model));
       const spec = renderOpenApi(relSchema);
       const schema = getSchema(spec, "Document")!;
       const props = getProperties(schema);
@@ -463,7 +470,7 @@ describe("OpenAPI renderer", () => {
         })
         .build();
 
-      const relSchema = mapper.map(model);
+      const relSchema = mapper.map(placeFlags(model));
       const spec = renderOpenApi(relSchema);
       const schema = getSchema(spec, "Device")!;
       const props = getProperties(schema);
@@ -483,7 +490,7 @@ describe("OpenAPI renderer", () => {
         })
         .build();
 
-      const relSchema = mapper.map(model);
+      const relSchema = mapper.map(placeFlags(model));
       const spec = renderOpenApi(relSchema);
       const schema = getSchema(spec, "Log")!;
       const props = getProperties(schema);
@@ -529,7 +536,7 @@ describe("OpenAPI renderer", () => {
         })
         .build();
 
-      const relSchema = mapper.map(model);
+      const relSchema = mapper.map(placeFlags(model));
       const spec = renderOpenApi(relSchema);
       const schema = getSchema(spec, "Session")!;
       const props = getProperties(schema);
@@ -545,7 +552,7 @@ describe("OpenAPI renderer", () => {
         .withEntityType("Customer", { referenceMode: "customer_id" })
         .build();
 
-      const relSchema = mapper.map(model);
+      const relSchema = mapper.map(placeFlags(model));
       const spec = renderOpenApi(relSchema);
       const pathKeys = Object.keys(spec.paths);
 
@@ -558,7 +565,7 @@ describe("OpenAPI renderer", () => {
         .withEntityType("Customer", { referenceMode: "customer_id" })
         .build();
 
-      const relSchema = mapper.map(model);
+      const relSchema = mapper.map(placeFlags(model));
       const spec = renderOpenApi(relSchema);
       const collectionPath = spec.paths["/customer"] as Record<string, unknown>;
 
@@ -571,7 +578,7 @@ describe("OpenAPI renderer", () => {
         .withEntityType("Customer", { referenceMode: "customer_id" })
         .build();
 
-      const relSchema = mapper.map(model);
+      const relSchema = mapper.map(placeFlags(model));
       const spec = renderOpenApi(relSchema);
       const itemPath = spec.paths["/customer/{customer_id}"] as Record<
         string,
@@ -581,6 +588,37 @@ describe("OpenAPI renderer", () => {
       expect(itemPath["get"]).toBeDefined();
       expect(itemPath["put"]).toBeDefined();
       expect(itemPath["delete"]).toBeDefined();
+      // One key column, one required path parameter, on each operation.
+      for (const op of ["get", "put", "delete"]) {
+        const params =
+          (itemPath[op] as { parameters: { name: string; in: string; required: boolean; }[]; })
+            .parameters;
+        expect(params.map((p) => [p.name, p.in, p.required])).toEqual([[
+          "customer_id",
+          "path",
+          true,
+        ]]);
+      }
+    });
+
+    it("gives a many-to-many table, as the mapper keys it, both key columns in the item path", () => {
+      const model = new ModelBuilder("Test")
+        .withEntityType("Student", { referenceMode: "student_id" })
+        .withEntityType("Course", { referenceMode: "course_id" })
+        .withBinaryFactType("Student enrolls in Course", {
+          role1: { player: "Student", name: "enrolls in" },
+          role2: { player: "Course", name: "has enrolled" },
+          uniqueness: "spanning",
+        })
+        .build();
+      const relSchema = mapper.map(placeFlags(model));
+      const table = relSchema.tables.find((t) => t.name === "student_enrolls_in_course")!;
+      const key = table.primaryKey.columnNames;
+      expect(key).toHaveLength(2);
+      const spec = renderOpenApi(relSchema);
+      expect(Object.keys(spec.paths)).toContain(
+        `/student-enrolls-in-course/${key.map((c) => `{${c}}`).join("/")}`,
+      );
     });
 
     it("uses kebab-case for path segments", () => {
@@ -593,7 +631,7 @@ describe("OpenAPI renderer", () => {
         })
         .build();
 
-      const relSchema = mapper.map(model);
+      const relSchema = mapper.map(placeFlags(model));
       const spec = renderOpenApi(relSchema);
       const pathKeys = Object.keys(spec.paths);
 
@@ -688,7 +726,7 @@ describe("OpenAPI renderer", () => {
         .withEntityType("Customer", { referenceMode: "customer_id" })
         .build();
 
-      const relSchema = mapper.map(model);
+      const relSchema = mapper.map(placeFlags(model));
       const spec = renderOpenApi(relSchema);
       const collectionPath = spec.paths["/customer"] as Record<string, Record<string, unknown>>;
       const getOp = collectionPath["get"] as Record<string, unknown>;
@@ -726,6 +764,102 @@ describe("OpenAPI renderer", () => {
 
       expect(pathKeys).toContain("/log-entry/{id}");
     });
+
+    it("names every column of a key over several columns, in key order, in the path and every item operation", () => {
+      // openapi-composite-key-path.spec.md (barwise-pki): the first column
+      // alone addresses many rows.
+      const column = (name: string) => ({
+        name,
+        dataType: "TEXT",
+        dataTypeDefaulted: false,
+        nullable: false,
+      });
+      const relSchema: RelationalSchema = {
+        sourceModelId: "test",
+        tables: [{
+          name: "seat_booking",
+          columns: [column("flight_id"), column("seat_no"), column("leg_no"), column("passenger")],
+          primaryKey: { columnNames: ["flight_id", "leg_no", "seat_no"] },
+          foreignKeys: [],
+          sourceElementId: "ft-seat-booking",
+        }],
+      };
+      const spec = renderOpenApi(relSchema);
+      const itemPath = "/seat-booking/{flight_id}/{leg_no}/{seat_no}";
+      expect(Object.keys(spec.paths)).toEqual(["/seat-booking", itemPath]);
+      const item = spec.paths[itemPath] as Record<
+        string,
+        { parameters: { name: string; in: string; required: boolean; }[]; }
+      >;
+      for (const op of ["get", "put", "delete"]) {
+        expect(item[op]!.parameters.map((p) => [p.name, p.in, p.required])).toEqual([
+          ["flight_id", "path", true],
+          ["leg_no", "path", true],
+          ["seat_no", "path", true],
+        ]);
+      }
+    });
+  });
+
+  describe("path parameters are valid template variables (barwise-9g3)", () => {
+    const column = (name: string) => ({
+      name,
+      dataType: "TEXT",
+      dataTypeDefaulted: false,
+      nullable: false,
+    });
+    /** The item path and its get operation's parameters, for one table. */
+    function item(columns: string[], key: string[]) {
+      const spec = renderOpenApi({
+        sourceModelId: "test",
+        tables: [{
+          name: "finding",
+          columns: columns.map(column),
+          primaryKey: { columnNames: key },
+          foreignKeys: [],
+          sourceElementId: "ot-finding",
+        }],
+      });
+      const path = Object.keys(spec.paths)[1]!;
+      const ops = spec.paths[path] as Record<
+        string,
+        { parameters: { name: string; description?: string; }[]; }
+      >;
+      return { path, parameters: ops["get"]!.parameters };
+    }
+
+    it("renames a column outside the alphabet, and says which column it carries", () => {
+      const { path, parameters } = item(["(ambiguous)", "note"], ["(ambiguous)"]);
+      expect(path).toBe("/finding/{_ambiguous_}");
+      expect(parameters).toEqual([
+        expect.objectContaining({
+          name: "_ambiguous_",
+          description: 'The key column "(ambiguous)".',
+        }),
+      ]);
+    });
+
+    it("keeps a valid name as it is, with no description", () => {
+      const { path, parameters } = item(["order__id", "_id"], ["order__id", "_id"]);
+      expect(path).toBe("/finding/{order__id}/{_id}");
+      expect(parameters.map((p) => p.description)).toEqual([undefined, undefined]);
+    });
+
+    it("never takes a valid key column's name, whatever the key order", () => {
+      // "x(y" maps to "x_y", which the later, valid column holds.
+      const { path } = item(["x(y", "x_y"], ["x(y", "x_y"]);
+      expect(path).toBe("/finding/{x_y_2}/{x_y}");
+    });
+
+    it("never takes another column's name", () => {
+      const { path } = item(["(ambiguous)", "_ambiguous_"], ["(ambiguous)"]);
+      expect(path).toBe("/finding/{_ambiguous__2}");
+    });
+
+    it("gives two columns that map to one name distinct names", () => {
+      const { path } = item(["a(b", "a)b"], ["a(b", "a)b"]);
+      expect(path).toBe("/finding/{a_b}/{a_b_2}");
+    });
   });
 
   describe("openApiToJson", () => {
@@ -734,7 +868,7 @@ describe("OpenAPI renderer", () => {
         .withEntityType("Customer", { referenceMode: "customer_id" })
         .build();
 
-      const relSchema = mapper.map(model);
+      const relSchema = mapper.map(placeFlags(model));
       const spec = renderOpenApi(relSchema);
       const json = openApiToJson(spec);
 
@@ -748,7 +882,7 @@ describe("OpenAPI renderer", () => {
         .withEntityType("Customer", { referenceMode: "customer_id" })
         .build();
 
-      const relSchema = mapper.map(model);
+      const relSchema = mapper.map(placeFlags(model));
       const spec = renderOpenApi(relSchema);
       const json = openApiToJson(spec);
 

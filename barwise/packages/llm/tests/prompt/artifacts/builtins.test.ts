@@ -18,7 +18,7 @@ const llmRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
 const fromDisk = loadArtifactsFromDir(resolve(llmRoot, "prompts"));
 
 describe("builtinArtifacts", () => {
-  it("matches what the loader reads from prompts/, element for element", () => {
+  it("matches what the loader reads from prompts/, element for element [adr:production-prompt-resolution#shipped-only]", () => {
     expect(builtinArtifacts).toEqual(fromDisk);
   });
 

@@ -220,7 +220,11 @@ model:
       ["sees first", "Patient"],
     ]);
     // The uniqueness the DDL states sits on the patient's role, as before.
-    expect(primary?.constraints.map(({ type, ...c }) => [type, "roleIds" in c ? c.roleIds : []]))
+    expect(
+      (primary ? model.constraintsTouching(primary.id) : undefined)?.map((
+        { type, ...c },
+      ) => [type, "roleIds" in c ? c.roleIds : []]),
+    )
       .toEqual([["internal_uniqueness", [primary!.roles[1]!.id]]]);
     expect(model.getFactTypeByName("Patient reports AllergyNote")?.roles.map((r) => r.name))
       .toEqual(["reports", "is reported by"]);
@@ -230,6 +234,34 @@ model:
     const plain = ddl.parse(new DdlExportFormat().export(original, { annotate: false }).text).model;
     expect(plain.getFactTypeByName("Doctor is primary for Patient")).toBeUndefined();
     expect(plain.getObjectTypeByName("Patient")?.definition).toBeUndefined();
+  });
+
+  it("reads back a ring whose two roles share a name, its role ids under the suffix rule", () => {
+    // A 3.0 file states its role ids, so a ring may name both roles alike;
+    // the import that reads the annotation back takes the suffix rule
+    // (iri-identity decision 5, as amended for imports).
+    const ring = new OrmYamlSerializer().deserialize(`orm_version: "3.0"
+model:
+  name: Ring
+  object_types:
+    - { id: p, name: Person, kind: entity, reference_mode: nr }
+  fact_types:
+    - id: f
+      name: Person mentors Person
+      roles:
+        - { id: f0, player: p, role_name: mentors }
+        - { id: f1, player: p, role_name: mentors }
+      readings: ["{0} mentors {1}"]
+      constraints:
+        - { id: u1, type: internal_uniqueness, roles: [f1] }
+`);
+    const { model, warnings } = ddl.parse(new DdlExportFormat().export(ring).text);
+    expect(warnings).toEqual([]);
+    const ft = model.getFactTypeByName("Person mentors Person")!;
+    expect(ft.roles.map((r) => [r.name, r.id])).toEqual([
+      ["mentors", "Person_mentors_Person.mentors"],
+      ["mentors", "Person_mentors_Person.mentors_2"],
+    ]);
   });
 
   it("names an annotation whose column a hand edit renamed, and guesses for the column", () => {
@@ -465,7 +497,7 @@ describe("over the trial kernels and the examples", () => {
       const where = new Map(
         m.factTypes.flatMap((f) => f.roles.map((r, i) => [r.id, `${players(f)}#${i}`] as const)),
       );
-      return m.factTypes.flatMap((f) => f.constraints)
+      return m.everyConstraint().map(([c]) => c)
         .flatMap((c) => c.type === "external_uniqueness" ? [c.roleIds] : [])
         .map((ids) => ids.map((id) => where.get(id) ?? id).sort().join(" + "))
         .sort();

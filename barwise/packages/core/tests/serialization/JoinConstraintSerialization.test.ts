@@ -7,22 +7,22 @@
  * inline paths and deserialize back to an equal structure.
  */
 import { describe, expect, it } from "vitest";
-import type { Constraint, JoinOperand } from "../../src/model/Constraint.js";
+import type { Constraint, ExternalConstraint, JoinOperand } from "../../src/model/Constraint.js";
 import { OrmModel } from "../../src/model/OrmModel.js";
 import { OrmYamlSerializer } from "../../src/serialization/OrmYamlSerializer.js";
 
 const serializer = new OrmYamlSerializer();
 
 const bornIn: JoinOperand = {
-  path: { root: "ot-person", steps: [{ entry: "pb-person", exit: "pb-country" }] },
+  path: { root: "ot-person", steps: [{ entry: "pb.person", exit: "pb.country" }] },
   projection: [0, 1],
 };
 const citizenOf: JoinOperand = {
-  path: { root: "ot-person", steps: [{ entry: "pc-person", exit: "pc-country" }] },
+  path: { root: "ot-person", steps: [{ entry: "pc.person", exit: "pc.country" }] },
   projection: [0, 1],
 };
 
-function buildModel(constraint: Constraint): OrmModel {
+function buildModel(constraint: ExternalConstraint): OrmModel {
   const model = new OrmModel({ name: "Test" });
   const person = model.addObjectType({
     id: "ot-person",
@@ -38,27 +38,28 @@ function buildModel(constraint: Constraint): OrmModel {
   model.addFactType({
     name: "Person was born in Country",
     roles: [
-      { name: "was born in", playerId: person.id, id: "pb-person" },
-      { name: "is birthplace of", playerId: country.id, id: "pb-country" },
+      { name: "was born in", playerId: person.id, id: "pb.person" },
+      { name: "is birthplace of", playerId: country.id, id: "pb.country" },
     ],
     readings: ["{0} was born in {1}"],
   });
   model.addFactType({
     name: "Person is citizen of Country",
     roles: [
-      { name: "is citizen of", playerId: person.id, id: "pc-person" },
-      { name: "has citizen", playerId: country.id, id: "pc-country" },
+      { name: "is citizen of", playerId: person.id, id: "pc.person" },
+      { name: "has citizen", playerId: country.id, id: "pc.country" },
     ],
     readings: ["{0} is citizen of {1}"],
-    constraints: [constraint],
   });
+  model.addConstraint(constraint);
   return model;
 }
 
-function roundTrip(constraint: Constraint): Constraint {
+function roundTrip(constraint: ExternalConstraint): Constraint {
   const yaml = serializer.serialize(buildModel(constraint));
   const restored = serializer.deserialize(yaml);
-  return restored.getFactTypeByName("Person is citizen of Country")!.constraints
+  const citizenFt = restored.getFactTypeByName("Person is citizen of Country")!;
+  return restored.constraintsTouching(citizenFt.id)
     .find((c) => c.type === constraint.type)!;
 }
 

@@ -11,7 +11,7 @@ export function createEntityTypes(ctx: DbtMapperContext): void {
     const composite = ctx.compositeMap.get(m.name);
     // A model with no identifiable key is skipped; a composite-key model
     // needs an entity only to objectify its fact type.
-    if (!pk && !composite?.objectified) continue;
+    if (!pk && !composite?.objectified && !ctx.referenceKeyed.has(m.name)) continue;
 
     const entityName = toPascalCase(m.name);
     const refMode = pk?.columnName ?? `${m.name}_id`;

@@ -9,13 +9,15 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { runCli } from "../workspace/run.js";
+import { runCli, warmPromptCommand } from "../workspace/run.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const responsesDir = resolve(
   __dirname,
   "../../../promptlab/tests/fixtures/responses",
 );
+
+warmPromptCommand();
 
 describe("barwise prompt score", () => {
   it("scores a recorded payload against its case", async () => {

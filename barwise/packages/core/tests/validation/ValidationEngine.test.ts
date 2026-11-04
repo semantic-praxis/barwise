@@ -10,7 +10,9 @@
  *   - Custom rule registration via addRule
  */
 import { describe, expect, it } from "vitest";
+import { localName } from "../../src/model/name.js";
 import { OrmModel } from "../../src/model/OrmModel.js";
+import { remapIds } from "../../src/rename/remapIds.js";
 import type { Diagnostic } from "../../src/validation/Diagnostic.js";
 import { ValidationEngine } from "../../src/validation/ValidationEngine.js";
 import { ModelBuilder } from "../helpers/ModelBuilder.js";
@@ -38,13 +40,15 @@ describe("ValidationEngine", () => {
       .withBinaryFactType("Customer has CustomerId", {
         role1: { player: "Customer", name: "has" },
         role2: { player: "CustomerId", name: "is of" },
-        uniqueness: "role1",
+        uniqueness: "both",
+        mandatory: "role1",
         isPreferred: true,
       })
       .withBinaryFactType("Order has OrderNumber", {
         role1: { player: "Order", name: "has" },
         role2: { player: "OrderNumber", name: "is of" },
-        uniqueness: "role1",
+        uniqueness: "both",
+        mandatory: "role1",
         isPreferred: true,
       })
       .withBinaryFactType("Customer places Order", {
@@ -55,8 +59,22 @@ describe("ValidationEngine", () => {
       })
       .build();
 
-    const diagnostics = engine.validate(model);
-    expect(diagnostics).toHaveLength(0);
+    // The builder gives roles `<fact type>.roleN`, which is not the id a
+    // role's name gives (decision 13), so a well-formed 4.0 model takes
+    // those (barwise-wcg.4v7 tracks the builders).
+    const canonical = remapIds(
+      model,
+      new Map(
+        model.factTypes.flatMap((ft) =>
+          ft.roles.map((r) => [r.id, `${ft.id}.${localName(r.name)}`] as const)
+        ),
+      ),
+    );
+    expect(engine.validate(canonical)).toEqual([]);
+    // And the builder's ids are what the rule reports, one per role.
+    expect(engine.validate(model).map((d) => d.ruleId)).toEqual(
+      Array(6).fill("structural/id-not-from-name"),
+    );
   });
 
   it("returns no diagnostics for an empty model", () => {

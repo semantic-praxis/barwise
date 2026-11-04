@@ -4,7 +4,7 @@
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { describe, expect, it } from "vitest";
+import { afterAll, describe, expect, it } from "vitest";
 import { runCli } from "../workspace/run.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -137,5 +137,128 @@ describe("barwise diff", () => {
     ]);
     expect(result.stderr).toContain("File not found");
     expect(result.exitCode).toBe(1);
+  });
+});
+
+describe("barwise diff --matching", () => {
+  // Two samples that numbered their object types in their own order
+  // (barwise-uy7).
+  const dir = join(testOutput, "diff-matching");
+  const write = (name: string, text: string) => {
+    mkdirSync(dir, { recursive: true });
+    const path = join(dir, name);
+    writeFileSync(path, text);
+    return path;
+  };
+  // Cleaned up once, after all three, so a failing assertion leaves nothing.
+  afterAll(() => rmSync(dir, { recursive: true, force: true }));
+  const a = () =>
+    write(
+      "a.orm.yaml",
+      'orm_version: "3.0"\nmodel:\n  name: S\n  object_types:\n    - { id: ot0, name: Dog, kind: value }\n    - { id: ot1, name: Cat, kind: value }\n',
+    );
+  const b = () =>
+    write(
+      "b.orm.yaml",
+      'orm_version: "3.0"\nmodel:\n  name: S\n  object_types:\n    - { id: ot0, name: Cat, kind: value }\n    - { id: ot1, name: Dog, kind: value }\n',
+    );
+
+  it("pairs by id by default", async () => {
+    const result = await runCli(["diff", a(), b()]);
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain("2 change(s) detected");
+  });
+
+  it("pairs by name with --matching content", async () => {
+    const result = await runCli(["diff", a(), b(), "--matching", "content"]);
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain("No changes");
+  });
+
+  it("refuses a mode it does not know", async () => {
+    const result = await runCli(["diff", a(), b(), "--matching", "bogus"]);
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr).toContain("--matching must be id-first or content");
+  });
+});
+
+describe("barwise diff, renames (iri-identity 6a)", () => {
+  const dir = join(testOutput, "diff-renames");
+  mkdirSync(dir, { recursive: true });
+  afterAll(() => rmSync(dir, { recursive: true, force: true }));
+  // Two models of one shop with unrelated ids, as two imports have.
+  const shop = (file: string, p: string, customer: string, places: string, role: string) => {
+    const path = join(dir, file);
+    writeFileSync(
+      path,
+      `orm_version: "3.0"
+model:
+  name: Shop
+  object_types:
+    - { id: ${p}c, name: ${customer}, kind: entity, reference_mode: nr }
+    - { id: ${p}o, name: Order, kind: entity, reference_mode: nr }
+  fact_types:
+    - id: ${p}f
+      name: ${places}
+      roles:
+        - { id: ${p}r0, player: ${p}c, role_name: ${role} }
+        - { id: ${p}r1, player: ${p}o, role_name: placed by }
+      readings: ["{0} ${role} {1}"]
+`,
+      "utf-8",
+    );
+    return path;
+  };
+
+  it("reports a recognized rename in text and json", async () => {
+    const a = shop("a.orm.yaml", "a", "Customer", "Customer places Order", "places");
+    const b = shop("b.orm.yaml", "b", "Client", "Customer places Order", "places");
+    const text = await runCli(["diff", a, b]);
+    expect(text.exitCode).toBe(0);
+    expect(text.stdout).toContain(
+      "Possibly a rename: paired by what it says, not by its id or name.",
+    );
+    const json = JSON.parse((await runCli(["diff", a, b, "--format", "json"])).stdout);
+    expect(json.deltas).toContainEqual(
+      expect.objectContaining({ name: "Customer", kind: "modified", pairedBy: "recognized" }),
+    );
+  });
+
+  it("pairs a declared rename with --rename", async () => {
+    const a = shop("c.orm.yaml", "a", "Customer", "Customer places Order", "places");
+    const b = shop("d.orm.yaml", "b", "Customer", "Customer submits Order", "submits");
+    const before = JSON.parse((await runCli(["diff", a, b, "--format", "json"])).stdout);
+    expect(
+      before.deltas.filter((d: { elementType: string; }) => d.elementType === "fact_type")
+        .map((d: { kind: string; }) => d.kind).sort(),
+    ).toEqual(["added", "removed"]);
+    const after = JSON.parse(
+      (await runCli([
+        "diff",
+        a,
+        b,
+        "--format",
+        "json",
+        "--rename",
+        "fact-type:Customer places Order=Customer submits Order",
+      ])).stdout,
+    );
+    expect(after.deltas).toContainEqual(
+      expect.objectContaining({ elementType: "fact_type", kind: "modified", pairedBy: "declared" }),
+    );
+  });
+
+  it.each([
+    ["role:places=submits", /--rename must be object-type:<old>=<new> or fact-type:<old>=<new>/],
+    ["fact-type:Customer places Order", /--rename must be/],
+    ["fact-type:=X", /names both the old and the new name/],
+    ["constructor:Customer=Client", /--rename must be/],
+    ["object-type:Nobody=Client", /existing model has no object type named "Nobody"/],
+  ])("refuses --rename %j", async (value, reason) => {
+    const a = shop("e.orm.yaml", "a", "Customer", "Customer places Order", "places");
+    const b = shop("f.orm.yaml", "b", "Client", "Customer places Order", "places");
+    const result = await runCli(["diff", a, b, "--rename", value]);
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr).toMatch(reason);
   });
 });

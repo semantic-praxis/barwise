@@ -1,11 +1,31 @@
 // Mapping: relational mapper, schema, and format renderers.
 export { renderPopulationAsSql } from "../export/populationRenderer.js";
-export { RelationalMapper, type RelationalMapperOptions } from "./RelationalMapper.js";
+export {
+  type ConstraintPlacement,
+  type ConstraintRouting,
+  routeConstraints,
+  type RoutedClause,
+  routeUniqueOnly,
+  type SpilledConstraint,
+  unreportedConstraintSpecs,
+  withConstraintSpecs,
+} from "./constraintRouting.js";
+export {
+  type ConstraintChannel,
+  type DialectCapabilityProfile,
+  resolveDialectProfile,
+} from "./dialectCapabilities.js";
+export {
+  objectificationGivesKey,
+  RelationalMapper,
+  type RelationalMapperOptions,
+} from "./RelationalMapper.js";
 export type {
   Column,
   ForeignKey,
   PrimaryKey,
   RelationalSchema,
+  RoutedUnique,
   Table,
 } from "./RelationalSchema.js";
 export {
@@ -18,6 +38,7 @@ export {
   renderAvro,
 } from "./renderers/avro.js";
 export {
+  DBT_KEY_TEST,
   type DbtModelFile,
   type DbtProject,
   type DbtRenderOptions,
@@ -25,6 +46,7 @@ export {
 } from "./renderers/dbt.js";
 export { annotateDbtExport, type ExportAnnotationResult } from "./renderers/DbtExportAnnotator.js";
 export { renderDdl } from "./renderers/ddl.js";
+export { AVRO_NAME, avroFieldNames, toAvroName } from "./renderers/names.js";
 export {
   type OpenApiPropertyType,
   type OpenApiRenderOptions,
@@ -32,3 +54,9 @@ export {
   openApiToJson,
   renderOpenApi,
 } from "./renderers/openapi.js";
+export {
+  hasGeneratedKeys,
+  SURROGATE_KEY_TYPE,
+  SURROGATE_POPULATION_NOTE,
+  withSurrogateKeys,
+} from "./surrogateKeys.js";

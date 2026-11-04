@@ -1,0 +1,158 @@
+{
+  "run": "plain-t2-m2",
+  "arm": "plain",
+  "task": "T2",
+  "phase": "t2",
+  "pair": "m2",
+  "start": "8398a193",
+  "head": "87477954",
+  "startedAt": "2026-10-15T06:34:22Z",
+  "rounds": 2,
+  "leftoverCommit": false,
+  "outcome": "pass",
+  "readSpec": true,
+  "readSpecNote": "in round 1 it grepped its own checkout's effect-comparison.spec.md for \"subtype\" and printed lines 600 to 660 (Appendices A to C as of the arm head). The arm-head copy predates the T2 grounding: it names FactType as the provisional T2 with SubtypeFact as the fallback, and holds no held-out case, scoring rule or generated-case description",
+  "usage": {
+    "inputProcessed": 13897084,
+    "turns": 83,
+    "finalContext": 230474,
+    "rounds": [
+      {
+        "round": 1,
+        "turns": 65,
+        "inputProcessed": 9921860
+      },
+      {
+        "round": 2,
+        "turns": 18,
+        "inputProcessed": 3975224
+      }
+    ],
+    "source": "measure:comparison -- usage over the run's transcript; per turn in plain-t2-m2.usage.json"
+  },
+  "scoring": [
+    {
+      "round": 1,
+      "head": "28c8d053",
+      "trial": {
+        "exit": 0,
+        "protectedTouched": []
+      },
+      "heldout": {
+        "passed": 43,
+        "of": 64,
+        "failed": [
+          "code refuses what a file refuses: subtype_fact.defining_rule is not an object",
+          "code refuses what a file refuses: subtype_fact.defining_rule.expression is missing",
+          "code refuses what a file refuses: subtype_fact.defining_rule.expression is null",
+          "code refuses what a file refuses: subtype_fact.defining_rule.expression is not a string",
+          "code refuses what a file refuses: subtype_fact.defining_rule.is_formal is null",
+          "code refuses what a file refuses: subtype_fact.defining_rule.is_formal is not a boolean",
+          "code refuses what a file refuses: subtype_fact.defining_rule.kind is missing",
+          "code refuses what a file refuses: subtype_fact.defining_rule.kind is null",
+          "code refuses what a file refuses: subtype_fact.defining_rule.kind is not a string",
+          "code refuses what a file refuses: subtype_fact.defining_rule.kind is outside its enum",
+          "code refuses what a file refuses: subtype_fact.defining_rule.storage is null",
+          "code refuses what a file refuses: subtype_fact.defining_rule.storage is not a string",
+          "code refuses what a file refuses: subtype_fact.defining_rule.storage is outside its enum",
+          "code refuses what a file refuses: subtype_fact.id is null",
+          "code refuses what a file refuses: subtype_fact.id is not a string",
+          "code refuses what a file refuses: subtype_fact.is_exclusive is null",
+          "code refuses what a file refuses: subtype_fact.is_exclusive is not a boolean",
+          "code refuses what a file refuses: subtype_fact.is_exhaustive is null",
+          "code refuses what a file refuses: subtype_fact.is_exhaustive is not a boolean",
+          "code refuses what a file refuses: subtype_fact.provides_identification is null",
+          "code refuses what a file refuses: subtype_fact.provides_identification is not a boolean"
+        ]
+      },
+      "harnessAfterRound": {
+        "tokens": 206322,
+        "toolCalls": 75,
+        "wallMs": 1244636
+      },
+      "sentBack": "held-out cases: code accepted values a file refuses (types, nulls, the defining rule's shape)",
+      "feedback": "Scoring found failures in your work on `trial/plain-t2-m2`. The protected-file check passed. An acceptance check of the task's requirements, run against your built core, failed 21 cases:\n\n- \"code refuses what a file refuses: subtype_fact.defining_rule is not an object\"\n- \"code refuses what a file refuses: subtype_fact.defining_rule.expression is missing\"\n- \"code refuses what a file refuses: subtype_fact.defining_rule.expression is null\"\n- \"code refuses what a file refuses: subtype_fact.defining_rule.expression is not a string\"\n- \"code refuses what a file refuses: subtype_fact.defining_rule.is_formal is null\"\n- \"code refuses what a file refuses: subtype_fact.defining_rule.is_formal is not a boolean\"\n- \"code refuses what a file refuses: subtype_fact.defining_rule.kind is missing\"\n- \"code refuses what a file refuses: subtype_fact.defining_rule.kind is null\"\n- \"code refuses what a file refuses: subtype_fact.defining_rule.kind is not a string\"\n- \"code refuses what a file refuses: subtype_fact.defining_rule.kind is outside its enum\"\n- \"code refuses what a file refuses: subtype_fact.defining_rule.storage is null\"\n- \"code refuses what a file refuses: subtype_fact.defining_rule.storage is not a string\"\n- \"code refuses what a file refuses: subtype_fact.defining_rule.storage is outside its enum\"\n- \"code refuses what a file refuses: subtype_fact.id is null\"\n- \"code refuses what a file refuses: subtype_fact.id is not a string\"\n- \"code refuses what a file refuses: subtype_fact.is_exclusive is null\"\n- \"code refuses what a file refuses: subtype_fact.is_exclusive is not a boolean\"\n- \"code refuses what a file refuses: subtype_fact.is_exhaustive is null\"\n- \"code refuses what a file refuses: subtype_fact.is_exhaustive is not a boolean\"\n- \"code refuses what a file refuses: subtype_fact.provides_identification is null\"\n- \"code refuses what a file refuses: subtype_fact.provides_identification is not a boolean\"\n\nThe requirements behind them, from the task:\n- A subtype fact built in code (`OrmModel.addSubtypeFact`) is refused exactly when the same subtype fact in a file would be. Each \"code refuses what a file refuses\" case gives code a config whose file equivalent the file format refuses, and code accepted it.\n\nThe task's other requirements and done checks still apply. Fix this, commit on the same branch (do not push), and report what you changed and which done checks you ran and how they came out."
+    },
+    {
+      "round": 2,
+      "head": "87477954",
+      "trial": {
+        "exit": 0,
+        "protectedTouched": []
+      },
+      "heldout": {
+        "passed": 64,
+        "of": 64
+      },
+      "build": 0,
+      "test": 0,
+      "validateExamples": 0,
+      "promptlabDrift": {
+        "exit": 0,
+        "tests": "15 passed"
+      },
+      "harness": {
+        "tokens": 231987,
+        "toolCalls": 103,
+        "wallMs": 1677819,
+        "note": "cumulative over both rounds"
+      }
+    }
+  ],
+  "diff": {
+    "files": 11,
+    "hunks": 52,
+    "added": 489,
+    "removed": 124,
+    "consumerFiles": [
+      "barwise/packages/core/src/diff/ModelMerge.ts",
+      "barwise/packages/core/src/index.ts"
+    ],
+    "sliceLines": 2124
+  },
+  "redChecks": [
+    {
+      "class": "environment",
+      "command": "git ... / compound shell command",
+      "firstError": "the worktree sandbox refused a command it could not verify stayed inside the worktree",
+      "note": "harness isolation, not the code (3 times)"
+    },
+    {
+      "class": "task logic",
+      "command": "npx vitest run (packages/core)",
+      "firstError": "FAIL tests/model/SubtypeFact.test.ts > construction > creates with required properties",
+      "note": "an existing test still built the old class shape; updated to the record"
+    },
+    {
+      "class": "task logic",
+      "command": "npx vitest run (packages/core, its own new tests)",
+      "firstError": "Tests 1 failed | 162 passed (163); then 2 failed | 172 passed (174)",
+      "note": "its own decoder tests while it built them, fixed before commit"
+    },
+    {
+      "class": "task logic",
+      "command": "npx vitest run (a deliberate mutation)",
+      "firstError": "Tests 28 failed | 258 passed (286)",
+      "note": "it disabled the boolean-shape rule by hand to confirm its parity tests notice, then restored it; not a defect"
+    },
+    {
+      "class": "task logic",
+      "command": "session scoring: measure:comparison -- heldout --task t2",
+      "firstError": "21 of 64 failed: code accepted wrong types, nulls and malformed defining rules a file refuses",
+      "note": "round 2 moved every shape rule into the shared rule function, run from code and file alike"
+    }
+  ],
+  "observations": [
+    "did not edit a protected file",
+    "read its arm-head copy of the experiment spec (see readSpecNote); that copy held nothing about T2's scoring",
+    "round 1 split the checks as this arm's ObjectType does (shape in the file decoder only), the same split plain-t2-m1 made; 21 refusal cases failed. Unlike plain-t2-m1 it froze the defining rule in round 1",
+    "checked its own parity tests by breaking a rule on purpose, in both rounds"
+  ],
+  "agentJudgmentCalls": [
+    "shape rules in the shared rule function, used by code and file (round 2)",
+    "a field path spelled in each caller's own spelling",
+    "unknown keys refused in a file, dropped from a config (as ObjectType on this arm)",
+    "is_formal: false read as absent, so a serialized record decodes back to an equal one",
+    "shared isRecord and shown moved to src/model/shape.ts"
+  ]
+}

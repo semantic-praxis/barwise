@@ -36,6 +36,7 @@ import {
   existsSync,
   mkdirSync,
   mkdtempSync,
+  readdirSync,
   readFileSync,
   rmSync,
   symlinkSync,
@@ -45,6 +46,8 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { decisionIds, parseEnforcedBy } from "../lib/adr-enforcement.mjs";
+import { ciLocalLibs } from "./ci-local-files.mjs";
 
 const SCRIPTS = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const REPO = execFileSync("git", ["rev-parse", "--show-toplevel"], {
@@ -111,11 +114,13 @@ const ROOT_DEPENDENT_GATES = [
   "check-secrets.mjs",
   "audit-corrections.mjs",
   "check-lockfile-agrees.mjs",
+  "check-git-listing.mjs",
+  "check-plan-review.mjs",
 ];
 
 for (const script of ROOT_DEPENDENT_GATES) {
   for (const mode of ["empty", "fail"]) {
-    test(`${script} refuses with exit 2 when git ${mode === "empty" ? "answers emptily" : "fails"}`, () => {
+    test(`${script} refuses with exit 2 when git ${mode === "empty" ? "answers emptily" : "fails"} [adr:gate-refusal-contract#three-results] [adr:gate-refusal-contract#refuse-not-find]`, () => {
       const r = gateWithStubGit(script, mode);
       assert.equal(
         r.status,
@@ -232,7 +237,7 @@ const CWDS = [REPO, join(REPO, "barwise"), join(REPO, "barwise", "packages", "co
 // its history mode depends on clone depth, so the invariance test uses
 // `--staged` and cannot share this loop's argument-free call.
 for (const script of ["check-no-nul.mjs", "check-shell.mjs", "audit-corrections.mjs"]) {
-  test(`${script} reports the same coverage from every cwd`, (t) => {
+  test(`${script} reports the same coverage from every cwd [adr:gate-refusal-contract#cwd-invariant]`, (t) => {
     const runs = CWDS.map((cwd) => ({ cwd, ...gate(script, cwd) }));
     if (skippedForMissingTool(t, runs, `${script}'s tool`)) return;
     for (const r of runs) {
@@ -547,6 +552,63 @@ test("check-lockfile-agrees refuses with exit 2 when nothing is installed", () =
   }
 });
 
+test("check-git-listing fails on a script that lists untracked files itself", () => {
+  // The spelling trial used before PR #641's fix, in a script outside lib/.
+  const dir = tempRepo();
+  try {
+    stage(dir, "barwise/scripts/fine.mjs", "export const x = 1;\n");
+    stage(dir, "barwise/scripts/lib/changed-class.mjs", 'git(["ls-files", "--others"]);\n');
+    stage(dir, "barwise/scripts/tests/probe.test.mjs", 'git(["ls-files", "--others"]);\n');
+    const green = gate("check-git-listing.mjs", dir);
+    assert.equal(green.status, 0, `lib/ and tests/ are out of scope:\n${green.stderr}`);
+
+    stage(
+      dir,
+      "barwise/scripts/rolled.mjs",
+      'const a = 1;\nconst u = git(["ls-files", "--others", "--exclude-standard"], path);\n',
+    );
+    const red = gate("check-git-listing.mjs", dir);
+    assert.equal(red.status, 1, red.stdout);
+    assert.match(red.stderr, /barwise\/scripts\/rolled\.mjs:2/);
+    assert.match(red.stderr, /uncommittedPaths/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("check-git-listing refuses a script it cannot read, and skips a deleted one", () => {
+  const dir = tempRepo();
+  try {
+    stage(dir, "barwise/scripts/fine.mjs", "export const x = 1;\n");
+    stage(dir, "barwise/scripts/gone.mjs", "export const y = 1;\n");
+    rmSync(join(dir, "barwise/scripts/gone.mjs"));
+    assert.equal(gate("check-git-listing.mjs", dir).status, 0, "a deleted script is skipped");
+
+    // A directory where a tracked script was: readFileSync throws EISDIR.
+    rmSync(join(dir, "barwise/scripts/fine.mjs"));
+    mkdirSync(join(dir, "barwise/scripts/fine.mjs"));
+    const r = gate("check-git-listing.mjs", dir);
+    assert.equal(r.status, 2, r.stdout);
+    assert.match(r.stderr, /could not read barwise\/scripts\/fine\.mjs \(EISDIR\)/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("check-git-listing refuses when no script is in scope", () => {
+  // A layout change that empties the filter would otherwise print OK over
+  // nothing (barwise-905's shape).
+  const dir = tempRepo();
+  try {
+    stage(dir, "README.md", "x\n");
+    const r = gate("check-git-listing.mjs", dir);
+    assert.equal(r.status, 2, r.stdout);
+    assert.match(r.stderr, /no tracked \.mjs files under barwise\/scripts/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test("check-no-nul fails on a TRACKED NUL byte and passes without one", () => {
   const dir = tempRepo();
   try {
@@ -704,7 +766,7 @@ function commitAll(dir, message) {
  * measuring.
  */
 for (const [rule, { probe, content }] of Object.entries(GITLEAKS_PROBES)) {
-  test(`check-secrets fails on a staged ${rule}`, (t) => {
+  test(`check-secrets fails on a staged ${rule} [adr:credential-handling#gitleaks-detects]`, (t) => {
     const dir = secretsRepo();
     try {
       const clean = gate("check-secrets.mjs", dir, "--staged");
@@ -731,7 +793,7 @@ for (const [rule, { probe, content }] of Object.entries(GITLEAKS_PROBES)) {
   });
 }
 
-test("check-secrets refuses when gitleaks is absent rather than reporting clean", () => {
+test("check-secrets refuses when gitleaks is absent rather than reporting clean [adr:credential-handling#wrapper-contract]", () => {
   // The container this project develops in does not ship gitleaks, so this
   // is the reading a fresh session gets until the bootstrap installs it.
   const dir = secretsRepo();
@@ -753,7 +815,7 @@ test("check-secrets refuses when gitleaks is absent rather than reporting clean"
   }
 });
 
-test("check-secrets refuses a gitleaks status that is neither clean nor a finding", () => {
+test("check-secrets refuses a gitleaks status that is neither clean nor a finding [adr:credential-handling#wrapper-contract]", () => {
   // The distinction the wrapper exists for. gitleaks uses 1 for findings,
   // so any OTHER non-zero status is the tool failing to run -- and
   // reporting that as a finding would send the reader hunting a credential
@@ -781,7 +843,7 @@ test("check-secrets refuses a gitleaks status that is neither clean nor a findin
   }
 });
 
-test("check-secrets refuses when .gitleaks.toml is missing", (t) => {
+test("check-secrets refuses when .gitleaks.toml is missing [adr:credential-handling#wrapper-contract]", (t) => {
   // Without this, gitleaks falls back to its bundled defaults: it would
   // still find most things and would silently drop the Anthropic rule,
   // which is the credential this repository is most likely to leak and the
@@ -803,7 +865,7 @@ test("check-secrets refuses when .gitleaks.toml is missing", (t) => {
   }
 });
 
-test("check-secrets refuses a history scan of a shallow clone, but --staged still works", (t) => {
+test("check-secrets refuses a history scan of a shallow clone, but --staged still works [adr:credential-handling#wrapper-contract]", (t) => {
   // Every fresh session clone of this project is shallow. A history scan
   // there would report a clean bill of health over whatever few commits
   // arrived, which is why the default mode refuses -- while `--staged`
@@ -1201,7 +1263,7 @@ test("mutate reports a failed restore on an UNTRACKED file, which git diff canno
   }
 });
 
-test("mutate refuses a command that already fails WITHOUT the mutation", () => {
+test("mutate refuses a command that already fails WITHOUT the mutation [adr:gate-refusal-contract#readers-keep-third]", () => {
   // CAUGHT is decided from the command's exit status alone, so a command
   // that is already red reports CAUGHT for every mutation -- including ones
   // nothing catches. Five readings in PR #505 were recorded that way: the
@@ -1250,16 +1312,30 @@ test("mutate refuses a run whose command was KILLED rather than exiting", async 
   // process object rather than through a pipeline, for the reason the
   // helper itself spawns without a shell.
   const dir = mutateRepo({ subject: "value = GOOD\n" });
-  const marker = `mutate-kill-probe-${process.pid}.mjs`;
+  let child;
+  let probePid;
   try {
+    // The probe records its own pid once the mutated run is executing, and
+    // the test signals exactly that process. The kill used to go through
+    // `pkill -f` on a marker after waiting only for the mutation on disk:
+    // mutate writes the file BEFORE it spawns the run, so on a loaded
+    // runner the kill could land in that gap, the probe slept out its 60 s
+    // and exited 0, and the run read UNCAUGHT -- exit 1 after 60230 ms in
+    // CI (barwise-rfb). The marker also matched mutate's own argv, so
+    // pkill signalled mutate too, and its exit status could not tell
+    // whether the probe had been reached.
     writeFileSync(
-      join(dir, marker),
-      `import { readFileSync } from "node:fs";\n`
+      join(dir, "probe.mjs"),
+      `import { readFileSync, renameSync, writeFileSync } from "node:fs";\n`
         + `if (!readFileSync("subject.txt", "utf8").includes("BAD")) process.exit(0);\n`
+        // Written whole, then renamed: a half-written file would read as 0,
+        // and process.kill(0) signals the whole process group.
+        + `writeFileSync("probe-pid.tmp", String(process.pid));\n`
+        + `renameSync("probe-pid.tmp", "probe-pid");\n`
         + `setTimeout(() => {}, 60_000);\n`,
     );
 
-    const child = spawn(process.execPath, [
+    child = spawn(process.execPath, [
       join(SCRIPTS, "mutate.mjs"),
       "--file",
       "subject.txt",
@@ -1269,7 +1345,7 @@ test("mutate refuses a run whose command was KILLED rather than exiting", async 
       "BAD",
       "--",
       process.execPath,
-      marker,
+      "probe.mjs",
     ], { cwd: dir, stdio: ["ignore", "pipe", "pipe"] });
 
     let stderr = "";
@@ -1279,23 +1355,17 @@ test("mutate refuses a run whose command was KILLED rather than exiting", async 
 
     const exited = new Promise((res) => child.on("exit", (code) => res(code)));
 
-    // Wait until the mutation is on disk, so the kill lands while the
-    // command runs rather than during setup. A fixed sleep would make
-    // this test time-dependent; the file content is the real signal.
+    // Poll for the probe's pid rather than sleeping: a fixed sleep would
+    // only move the race.
+    const pidFile = join(dir, "probe-pid");
     const deadline = Date.now() + 15_000;
-    while (Date.now() < deadline) {
-      if (readFileSync(join(dir, "subject.txt"), "utf8").includes("BAD")) break;
+    while (Date.now() < deadline && !existsSync(pidFile)) {
       await new Promise((res) => setTimeout(res, 25));
     }
-    assert.match(
-      readFileSync(join(dir, "subject.txt"), "utf8"),
-      /BAD/,
-      "the mutation never reached disk, so this test would kill the wrong phase",
-    );
-
-    // A marker unique to this run, so the kill cannot reach another
-    // test's child or a developer's unrelated process.
-    spawnSync("pkill", ["-TERM", "-f", marker], { stdio: "ignore" });
+    assert.ok(existsSync(pidFile), "the mutated run never started, so there is nothing to kill");
+    probePid = Number(readFileSync(pidFile, "utf8"));
+    assert.ok(Number.isInteger(probePid) && probePid > 0, `not a pid: ${probePid}`);
+    process.kill(probePid, "SIGTERM");
 
     const status = await exited;
 
@@ -1304,12 +1374,26 @@ test("mutate refuses a run whose command was KILLED rather than exiting", async 
       2,
       `a killed run must refuse, not report CAUGHT. stderr:\n${stderr}`,
     );
-    assert.match(stderr, /killed by SIG/);
+    assert.match(stderr, /killed by SIGTERM/);
 
     // The tree is still restored, which is the other half of the
     // guarantee and the reason the `finally` exists.
     assert.equal(readFileSync(join(dir, "subject.txt"), "utf8"), "value = GOOD\n");
   } finally {
+    // On a failed assertion above, mutate and its probe may still be
+    // running; stop both before removing the directory they work in. Only
+    // while mutate runs: once it has exited, so has the probe it waited
+    // on, and either pid may already belong to an unrelated process.
+    if (child && child.exitCode === null && child.signalCode === null) {
+      for (const pid of [probePid, child.pid]) {
+        if (!pid) continue;
+        try {
+          process.kill(pid, "SIGKILL");
+        } catch {
+          // Already exited.
+        }
+      }
+    }
     rmSync(dir, { recursive: true, force: true });
   }
 });
@@ -1914,7 +1998,7 @@ function tempCiRepo() {
   // `lib/changed-class.mjs` likewise: the change classification ci.yml's
   // detect step runs, which ci-local imports to apply the same `if:`s.
   mkdirSync(join(root, "scripts", "lib"), { recursive: true });
-  for (const lib of ["ci-gates.mjs", "changed-class.mjs"]) {
+  for (const lib of ciLocalLibs(SCRIPTS)) {
     writeFileSync(join(root, "scripts", "lib", lib), readFileSync(join(SCRIPTS, "lib", lib)));
   }
   return {
@@ -1933,7 +2017,7 @@ function runCiLocal(repo, ...args) {
   return { ...r, all: `${r.stdout}${r.stderr}` };
 }
 
-test("ci-local reports a REFUSED gate apart from a failure, and exits 2", () => {
+test("ci-local reports a REFUSED gate apart from a failure, and exits 2 [adr:gate-refusal-contract#readers-keep-third]", () => {
   // The runner was binary -- status 0 or FAIL -- so the two gates that refuse
   // for want of shellcheck and gitleaks in any fresh container read as "3 of
   // 32 gates failed", indistinguishable from a real shellcheck finding or a
@@ -2434,7 +2518,7 @@ const A_CORRECTION =
   "# Probe\n\nThe draft said the loader was pure, and implementing it showed the\n"
   + "loader reads the environment, so the claim was wrong in kind.\n";
 
-test("audit-corrections fails on a correction record missing from the baseline", () => {
+test("audit-corrections fails on a correction record missing from the baseline [adr:findings-close-by-mechanism#ratchet-both-ways]", () => {
   const dir = correctionRepo({ "probe.spec.md": A_CORRECTION }, {});
   try {
     const red = gate("audit-corrections.mjs", dir, "--check");
@@ -2446,7 +2530,7 @@ test("audit-corrections fails on a correction record missing from the baseline",
   }
 });
 
-test("audit-corrections fails on a baseline entry no longer detected", () => {
+test("audit-corrections fails on a baseline entry no longer detected [adr:findings-close-by-mechanism#ratchet-both-ways]", () => {
   const dir = correctionRepo({ "probe.spec.md": A_CORRECTION }, {});
   try {
     const id = idOf(dir, "the draft said the loader was pure");
@@ -2526,10 +2610,29 @@ test("audit-corrections refuses to WRITE a baseline while a spec is untracked", 
     assert.match(write.stderr, /draft\.spec\.md/);
     assert.doesNotMatch(write.stdout, /wrote/);
 
-    // --check is unaffected: the untracked draft is simply out of scope.
+    // --check keeps its verdict and exit code -- the untracked draft is out
+    // of its corpus -- but names the draft as unchecked, so the verdict does
+    // not read as covering it (barwise-qch).
     const check = gate("audit-corrections.mjs", dir, "--check");
     assert.equal(check.status, 1, "the tracked probe is still unclassified, so --check finds it");
-    assert.doesNotMatch(`${check.stdout}${check.stderr}`, /draft\.spec\.md/);
+    assert.match(
+      check.stdout,
+      /audit-corrections: unchecked \(untracked\): barwise\/docs\/specs\/draft\.spec\.md/,
+    );
+
+    // An archived spec is outside the corpus even once tracked, so it is
+    // neither named as unchecked nor a reason to refuse a write.
+    mkdirSync(join(dir, "barwise/docs/specs/archive"), { recursive: true });
+    writeFileSync(join(dir, "barwise/docs/specs/archive/old.spec.md"), A_CORRECTION);
+    const withArchive = gate("audit-corrections.mjs", dir, "--check");
+    assert.doesNotMatch(withArchive.stdout, /archive\/old\.spec\.md/);
+    rmSync(join(dir, "barwise/docs/specs/draft.spec.md"));
+    const archiveOnly = gate("audit-corrections.mjs", dir, "--write");
+    assert.equal(
+      archiveOnly.status,
+      0,
+      `an archived draft alone must not block --write:\n${archiveOnly.stderr}`,
+    );
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -2558,6 +2661,22 @@ test("audit-spec-status refuses to WRITE a baseline while a spec is untracked", 
       `expected refusal (2), got ${write.status}:\n${write.stdout}${write.stderr}`,
     );
     assert.match(write.stderr, /draft\.spec\.md/);
+
+    // --check names it as unchecked and keeps its own verdict (barwise-qch).
+    const check = gate("audit-spec-status.mjs", dir, "--check");
+    assert.equal(check.status, 0, `${check.stdout}${check.stderr}`);
+    assert.match(
+      check.stdout,
+      /audit-spec-status: unchecked \(untracked\): barwise\/docs\/specs\/draft\.spec\.md/,
+    );
+
+    // Archived specs are outside this audit's corpus too.
+    mkdirSync(join(dir, "barwise/docs/specs/archive"), { recursive: true });
+    writeFileSync(join(dir, "barwise/docs/specs/archive/old.spec.md"), A_CORRECTION);
+    assert.doesNotMatch(
+      gate("audit-spec-status.mjs", dir, "--check").stdout,
+      /archive\/old\.spec\.md/,
+    );
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -2638,11 +2757,19 @@ const BASELINE_WRITERS = [
     key: "specs",
     human: ["note"],
     placeholder: "TODO: classify",
+    // The one change a rewrite may make to a verdict: reopening it, with the
+    // old note kept whole, when commits it never covered have landed
+    // (barwise-qs8). Anything else is the barwise-1026 loss.
+    reopened: (before, after) => {
+      const inner = /Previous note: ([\s\S]*)$/.exec(before)?.[1] ?? before;
+      return typeof after === "string" && /^TODO: re-read -- /.test(after)
+        && after.endsWith(`Previous note: ${/^TODO: re-read -- /.test(before) ? inner : before}`);
+    },
   },
 ];
 
 for (const w of BASELINE_WRITERS) {
-  test(`${w.script} rewrites without changing a committed verdict`, (t) => {
+  test(`${w.script} rewrites without changing a committed verdict${w.needsDist === undefined ? " [adr:baselines-merge-on-write#merge-not-regenerate]" : ""}`, (t) => {
     if (w.needsDist !== undefined && !existsSync(join(REPO, "barwise", w.needsDist))) {
       t.skip(`${w.needsDist} not built; run npm run build first`);
       return;
@@ -2668,6 +2795,7 @@ for (const w of BASELINE_WRITERS) {
       for (const [id, row] of Object.entries(oldRows)) {
         assert.ok(id in newRows, `${w.file}: row ${id} was dropped by a rewrite`);
         for (const field of w.human) {
+          if (w.reopened?.(row[field], newRows[id][field])) continue;
           assert.deepEqual(
             newRows[id][field],
             row[field],
@@ -2838,7 +2966,7 @@ test("audit-corrections --write reports a row it dropped rather than dropping it
   }
 });
 
-test("audit-spec-status writes nothing without --write", () => {
+test("audit-spec-status writes nothing without --write [adr:baselines-merge-on-write#specs-write-on-ask]", () => {
   // The write path used to be the `else` of `--check`, so bare
   // `npm run audit:specs` -- the spelling a reader tries first to see what the
   // gate says -- rewrote the baseline and blanked every note. The operator
@@ -2855,8 +2983,9 @@ test("audit-spec-status writes nothing without --write", () => {
   }
 });
 
-test("audit-duplication.mjs still has no baseline writer", () => {
-  // CLAUDE.md and baseline-write-preserves-verdicts.spec.md both say this gate
+test("audit-duplication.mjs still has no baseline writer [adr:baselines-merge-on-write#duplication-no-writer]", () => {
+  // docs/adr/baselines-merge-on-write.md (decision 5) and
+  // baseline-write-preserves-verdicts.spec.md both say this gate
   // never had the clobber defect BECAUSE it has no writer -- its 48 candidates
   // are hand-maintained. That is a claim about code, so it is checked here
   // rather than asserted in prose: adding a writer to this script would make
@@ -3095,19 +3224,45 @@ test("run-script-tests refuses an absent tests directory rather than failing", (
  */
 const VALID_TRIVIAL = { globs: [".beads/issues.jsonl"], why: "fixture" };
 
-/** A minimal pair of inputs the gate accepts, written into a temp dir. */
-function tierFixture(dir, headings, rows) {
+/**
+ * A minimal set of inputs the gate accepts, written into a temp dir. The
+ * tracked-file list makes the fixture globs live (the gate fails a glob
+ * that matches nothing), and `tracked` replaces it for the dead-glob cases.
+ */
+function tierFixture(
+  dir,
+  headings,
+  rows,
+  tracked = ["x/a.ts", ".beads/issues.jsonl"],
+  { titles = ["F"], modes = ["F"], modeGlobs = ["x/"], noModes = false } = {},
+) {
+  writeFileSync(join(dir, "tracked.txt"), tracked.join("\n"));
   const md = ["# Checklist", "", ...headings.flatMap((h) => [`## ${h}`, "", "- item", ""])];
   writeFileSync(join(dir, "checklist.md"), md.join("\n"));
+  // REVIEW.md's shape: numbered items with a bold lead under "Always check".
+  const review = [
+    "# Review",
+    "",
+    "## Always check: fixture",
+    "",
+    ...titles.map((t, i) => `${i + 1}. **${t}.** Body.`),
+    "",
+    "## After",
+    "",
+  ];
+  writeFileSync(join(dir, "REVIEW.md"), review.join("\n"));
+  const row = (r) =>
+    r.tier === "not-path-derivable"
+      ? { heading: r.heading, tier: r.tier, why: "fixture" }
+      : { heading: r.heading, tier: r.tier ?? "routine", globs: ["x/"], why: "fixture" };
   writeFileSync(
     join(dir, "review-tiers.json"),
     JSON.stringify({
       trivial: VALID_TRIVIAL,
-      rows: rows.map((r) =>
-        r.tier === "not-path-derivable"
-          ? { heading: r.heading, tier: r.tier, why: "fixture" }
-          : { heading: r.heading, tier: r.tier ?? "routine", globs: ["x/"], why: "fixture" }
-      ),
+      rows: rows.map(row),
+      ...(noModes
+        ? {}
+        : { failureModes: modes.map((heading) => ({ ...row({ heading }), globs: modeGlobs })) }),
     }),
   );
   return [
@@ -3115,8 +3270,448 @@ function tierFixture(dir, headings, rows) {
     join(dir, "checklist.md"),
     "--table",
     join(dir, "review-tiers.json"),
+    "--review",
+    join(dir, "REVIEW.md"),
+    "--tracked",
+    join(dir, "tracked.txt"),
   ];
 }
+
+/**
+ * REVIEW.md's failure modes and the table's failureModes rows agree both
+ * ways, and an unreadable or empty REVIEW.md is "cannot answer"
+ * (review-routing.spec.md, WS2).
+ */
+test("check-review-tiers fails both ways on REVIEW.md failure modes, and refuses an unreadable list", () => {
+  const dir = mkdtempSync(join(tmpdir(), "barwise-tiers-"));
+  try {
+    let args = tierFixture(dir, ["A"], [{ heading: "A" }], undefined, {
+      titles: ["F", "G"],
+      modes: ["F"],
+    });
+    let run = gate("check-review-tiers.mjs", dir, ...args);
+    assert.equal(run.status, 1, "a REVIEW.md title with no row");
+    assert.match(run.stderr, /no failureModes row for REVIEW\.md failure mode: G/);
+
+    args = tierFixture(dir, ["A"], [{ heading: "A" }], undefined, {
+      titles: ["F"],
+      modes: ["F", "Gone"],
+    });
+    run = gate("check-review-tiers.mjs", dir, ...args);
+    assert.equal(run.status, 1, "a row with no REVIEW.md title");
+    assert.match(run.stderr, /failureModes row names a mode REVIEW\.md no longer has: Gone/);
+
+    args = tierFixture(dir, ["A"], [{ heading: "A" }]);
+    assert.equal(
+      gate("check-review-tiers.mjs", dir, ...args).status,
+      0,
+      "the agreeing fixture passes",
+    );
+    rmSync(join(dir, "REVIEW.md"));
+    run = gate("check-review-tiers.mjs", dir, ...args);
+    assert.equal(run.status, 2, "REVIEW.md missing");
+    assert.match(run.stderr, /cannot read REVIEW\.md/);
+
+    writeFileSync(
+      join(dir, "REVIEW.md"),
+      "# Review\n\n## Always check: none\n\nNo items.\n\n## After\n\n1. **Not this.** x\n",
+    );
+    run = gate("check-review-tiers.mjs", dir, ...args);
+    assert.equal(run.status, 2, "an empty Always check list");
+    assert.match(run.stderr, /'Always check' list .* has no items/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("an Always check item without a one-line bold title is refused, not skipped", () => {
+  const dir = mkdtempSync(join(tmpdir(), "barwise-tiers-"));
+  try {
+    const args = tierFixture(dir, ["A"], [{ heading: "A" }]);
+    writeFileSync(
+      join(dir, "REVIEW.md"),
+      "# Review\n\n## Always check: x\n\n1. **F.** Body.\n2. Retry storms, not bold.\n",
+    );
+    const run = gate("check-review-tiers.mjs", dir, ...args);
+    assert.equal(run.status, 2);
+    assert.match(run.stderr, /1 'Always check' item\(s\) .* have no one-line bold title/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("pr-risk refuses a table with no failureModes rather than routing none", () => {
+  const dir = mkdtempSync(join(tmpdir(), "barwise-risk-"));
+  try {
+    const args = tierFixture(dir, ["A"], [{ heading: "A" }], undefined, { noModes: true });
+    const table = args[args.indexOf("--table") + 1];
+    const run = gate("pr-risk.mjs", dir, ...fileList(dir, ["x/a.ts"]), "--table", table);
+    assert.equal(run.status, 2, run.stdout);
+    assert.match(run.stderr, /declares no failureModes/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("check-review-tiers checks failureModes rows as it checks the checklist rows", () => {
+  const dir = mkdtempSync(join(tmpdir(), "barwise-tiers-"));
+  try {
+    // A dead failure-mode glob, distinct from the row globs.
+    let args = tierFixture(dir, ["A"], [{ heading: "A" }], undefined, { modeGlobs: ["nowhere/"] });
+    let run = gate("check-review-tiers.mjs", dir, ...args);
+    assert.equal(run.status, 1);
+    assert.match(run.stderr, /glob matches no tracked file: F: nowhere\//);
+    // A mode declared twice.
+    args = tierFixture(dir, ["A"], [{ heading: "A" }], undefined, {
+      titles: ["F"],
+      modes: ["F", "F"],
+    });
+    run = gate("check-review-tiers.mjs", dir, ...args);
+    assert.equal(run.status, 1);
+    assert.match(run.stderr, /failure mode declared by more than one row: F/);
+    // A malformed mode row is refused by the same validator.
+    args = tierFixture(dir, ["A"], [{ heading: "A" }], undefined, { modeGlobs: ["*.ts"] });
+    run = gate("check-review-tiers.mjs", dir, ...args);
+    assert.equal(run.status, 2);
+    assert.match(run.stderr, /failure mode 0 \(F\): pattern "\*\.ts"/);
+    // A table with no failureModes block at all.
+    args = tierFixture(dir, ["A"], [{ heading: "A" }], undefined, { noModes: true });
+    run = gate("check-review-tiers.mjs", dir, ...args);
+    assert.equal(run.status, 2);
+    assert.match(run.stderr, /declares no failureModes/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("check-review-tiers fails on a row glob that matches no tracked file", () => {
+  // barwise-fs0: a row named a path that did not exist and routed nothing
+  // for five weeks while every other check passed.
+  const dir = mkdtempSync(join(tmpdir(), "barwise-tiers-"));
+  try {
+    const args = tierFixture(dir, ["A"], [{ heading: "A" }], [".beads/issues.jsonl"]);
+    const run = gate("check-review-tiers.mjs", dir, ...args);
+    assert.equal(run.status, 1, `a dead glob must fail: ${run.stdout}${run.stderr}`);
+    assert.match(`${run.stdout}${run.stderr}`, /glob matches no tracked file: A: x\//);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("check-review-tiers REFUSES an empty tracked-file list rather than calling every glob dead", () => {
+  const dir = mkdtempSync(join(tmpdir(), "barwise-tiers-"));
+  try {
+    const args = tierFixture(dir, ["A"], [{ heading: "A" }], []);
+    const run = gate("check-review-tiers.mjs", dir, ...args);
+    assert.equal(run.status, 2, `an empty listing answers nothing: ${run.stdout}${run.stderr}`);
+    assert.match(`${run.stdout}${run.stderr}`, /tracked-file list is empty/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("check-review-tiers REFUSES a --tracked flag with no value rather than reading the live repository", () => {
+  const dir = mkdtempSync(join(tmpdir(), "barwise-tiers-"));
+  try {
+    const args = tierFixture(dir, ["A"], [{ heading: "A" }], ["x/a"]).slice(0, -1);
+    // --tracked is last, so dropping its value leaves the flag bare.
+    const run = gate("check-review-tiers.mjs", dir, ...args);
+    assert.equal(run.status, 2, `a flag with no value answers nothing: ${run.stdout}${run.stderr}`);
+    assert.match(`${run.stdout}${run.stderr}`, /--tracked needs a value/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("check-review-tiers passes on the real table and tracked files, with no overrides", () => {
+  // The default path: lib/tracked.mjs and repo-rooted globs, which every
+  // fixture test above bypasses with --tracked.
+  const run = gate("check-review-tiers.mjs", REPO);
+  assert.equal(run.status, 0, `the live table must agree: ${run.stdout}${run.stderr}`);
+});
+
+test("check-review-tiers fails on a trivial glob that matches no tracked file", () => {
+  const dir = mkdtempSync(join(tmpdir(), "barwise-tiers-"));
+  try {
+    const args = tierFixture(dir, ["A"], [{ heading: "A" }], ["x/a.ts"]);
+    const run = gate("check-review-tiers.mjs", dir, ...args);
+    assert.equal(run.status, 1, `a dead trivial glob must fail: ${run.stdout}${run.stderr}`);
+    assert.match(
+      `${run.stdout}${run.stderr}`,
+      /glob matches no tracked file: trivial: \.beads\/issues\.jsonl/,
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// The reach check (docs/specs/review-tier-reach.spec.md, barwise-1046): a
+// file-shaped glob whose name also lives at tracked paths the row does not
+// reach fails, unless reachAcknowledged lists exactly those paths under
+// that file name. The instructions row's `CLAUDE.md` matched the root
+// file and none of the package copies, and every earlier check stayed
+// green.
+
+const REACH_TRACKED = ["x/a.ts", ".beads/issues.jsonl", "CLAUDE.md", "p/CLAUDE.md", "q/CLAUDE.md"];
+
+/**
+ * tierFixture's inputs, with row A's and failure mode F's fields replaced.
+ * Row A defaults to the barwise-1046 shape: `CLAUDE.md` alone.
+ */
+function reachFixture(dir, rowA = {}, modeF = {}, tracked = REACH_TRACKED) {
+  const args = tierFixture(dir, ["A"], [{ heading: "A" }], tracked);
+  const table = JSON.parse(readFileSync(join(dir, "review-tiers.json"), "utf8"));
+  Object.assign(table.rows[0], { globs: ["CLAUDE.md"] }, rowA);
+  Object.assign(table.failureModes[0], modeF);
+  writeFileSync(join(dir, "review-tiers.json"), JSON.stringify(table));
+  return args;
+}
+
+test("check-review-tiers fails on a file-shaped glob whose same-named files it does not reach", () => {
+  const dir = mkdtempSync(join(tmpdir(), "barwise-tiers-"));
+  try {
+    let run = gate("check-review-tiers.mjs", dir, ...reachFixture(dir));
+    assert.equal(run.status, 1, `the barwise-1046 shape must fail: ${run.stdout}${run.stderr}`);
+    assert.match(
+      run.stderr,
+      /shadowed: row "A": CLAUDE\.md \(CLAUDE\.md\) has 2 unreached same-named path\(s\), unacknowledged:\n {4}p\/CLAUDE\.md\n {4}q\/CLAUDE\.md\n/,
+    );
+    // The same check on failureModes rows, labelled as failure modes.
+    run = gate(
+      "check-review-tiers.mjs",
+      dir,
+      ...reachFixture(dir, { globs: ["x/"] }, { globs: ["x/", "p/CLAUDE.md"] }),
+    );
+    assert.equal(run.status, 1, run.stderr);
+    assert.match(
+      run.stderr,
+      /shadowed: failure mode "F": CLAUDE\.md \(p\/CLAUDE\.md\) has 2 .*\n {4}CLAUDE\.md\n {4}q\/CLAUDE\.md\n/,
+    );
+    // Two same-named patterns share one shadow, so one finding names both;
+    // a glob listed twice is named once.
+    run = gate(
+      "check-review-tiers.mjs",
+      dir,
+      ...reachFixture(dir, { globs: ["CLAUDE.md", "p/CLAUDE.md", "p/CLAUDE.md"] }),
+    );
+    assert.equal(run.status, 1, run.stderr);
+    assert.match(
+      run.stderr,
+      /shadowed: row "A": CLAUDE\.md \(CLAUDE\.md, p\/CLAUDE\.md\) has 1 [^\n]*\n {4}q\/CLAUDE\.md\n/,
+    );
+    assert.equal(run.stderr.match(/shadowed:/g).length, 1, "one finding per file name");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("check-review-tiers passes a shadow its row acknowledges exactly, or reaches", () => {
+  const dir = mkdtempSync(join(tmpdir(), "barwise-tiers-"));
+  try {
+    let run = gate(
+      "check-review-tiers.mjs",
+      dir,
+      ...reachFixture(dir, {
+        reachAcknowledged: { "CLAUDE.md": ["q/CLAUDE.md", "p/CLAUDE.md"] },
+      }),
+    );
+    assert.equal(run.status, 0, `an exact waiver passes, in any order: ${run.stderr}`);
+    // One entry per file name, however many patterns carry it.
+    run = gate(
+      "check-review-tiers.mjs",
+      dir,
+      ...reachFixture(dir, {
+        globs: ["CLAUDE.md", "p/CLAUDE.md"],
+        reachAcknowledged: { "CLAUDE.md": ["q/CLAUDE.md"] },
+      }),
+    );
+    assert.equal(run.status, 0, `one key covers both same-named patterns: ${run.stderr}`);
+    // An exact waiver on a failure mode.
+    run = gate(
+      "check-review-tiers.mjs",
+      dir,
+      ...reachFixture(dir, { globs: ["x/"] }, {
+        globs: ["x/", "p/CLAUDE.md"],
+        reachAcknowledged: { "CLAUDE.md": ["CLAUDE.md", "q/CLAUDE.md"] },
+      }),
+    );
+    assert.equal(run.status, 0, `a failure mode's exact waiver passes: ${run.stderr}`);
+    // Widened instead: `*/CLAUDE.md` reaches both copies, so nothing is
+    // shadowed. A final `*` names no file and a directory has no name, so
+    // `x/*` and `x/` are never checked.
+    run = gate(
+      "check-review-tiers.mjs",
+      dir,
+      ...reachFixture(dir, { globs: ["CLAUDE.md", "*/CLAUDE.md", "x/*", "x/"] }),
+    );
+    assert.equal(run.status, 0, `a row that reaches its shadow passes: ${run.stderr}`);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("check-review-tiers fails on a shadow path its acknowledgement does not list", () => {
+  // The reason the waiver is a list and not a count: a new same-named file
+  // fails the PR that adds it, instead of being waived by membership.
+  const dir = mkdtempSync(join(tmpdir(), "barwise-tiers-"));
+  try {
+    const args = reachFixture(dir, { reachAcknowledged: { "CLAUDE.md": ["p/CLAUDE.md"] } });
+    const run = gate("check-review-tiers.mjs", dir, ...args);
+    assert.equal(run.status, 1, run.stderr);
+    assert.match(
+      run.stderr,
+      /shadowed: row "A": CLAUDE\.md \(CLAUDE\.md\) has 1 same-named path\(s\) missing from its reachAcknowledged list:\n {4}q\/CLAUDE\.md\n/,
+    );
+    assert.doesNotMatch(run.stderr, / {4}p\/CLAUDE\.md/, "the listed path is waived");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("check-review-tiers fails on an acknowledged path that is no longer shadowed", () => {
+  const dir = mkdtempSync(join(tmpdir(), "barwise-tiers-"));
+  try {
+    const args = reachFixture(dir, {
+      reachAcknowledged: { "CLAUDE.md": ["p/CLAUDE.md", "q/CLAUDE.md", "gone/CLAUDE.md"] },
+    });
+    let run = gate("check-review-tiers.mjs", dir, ...args);
+    assert.equal(run.status, 1, run.stderr);
+    assert.match(
+      run.stderr,
+      /stale reachAcknowledged path\(s\): row "A": CLAUDE\.md, no longer shadowed:\n {4}gone\/CLAUDE\.md\n/,
+    );
+    assert.doesNotMatch(run.stderr, /shadowed: row "A"/, "the shadow itself is waived");
+    // The same on a failure mode.
+    run = gate(
+      "check-review-tiers.mjs",
+      dir,
+      ...reachFixture(dir, { globs: ["x/"] }, {
+        globs: ["x/", "p/CLAUDE.md"],
+        reachAcknowledged: { "CLAUDE.md": ["CLAUDE.md", "q/CLAUDE.md", "gone/CLAUDE.md"] },
+      }),
+    );
+    assert.equal(run.status, 1, run.stderr);
+    assert.match(
+      run.stderr,
+      /stale reachAcknowledged path\(s\): failure mode "F": CLAUDE\.md, no longer shadowed:\n {4}gone\/CLAUDE\.md\n/,
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("check-review-tiers fails on an acknowledgement key that waives nothing, and says why", () => {
+  const NOT_A_NAME = "not the file name of any file-shaped pattern in this row";
+  const dir = mkdtempSync(join(tmpdir(), "barwise-tiers-"));
+  try {
+    // A key that is not the name of any file-shaped pattern of the row.
+    let run = gate(
+      "check-review-tiers.mjs",
+      dir,
+      ...reachFixture(dir, {
+        globs: ["x/"],
+        reachAcknowledged: { "CLAUDE.md": ["p/CLAUDE.md", "q/CLAUDE.md"] },
+      }),
+    );
+    assert.equal(run.status, 1, run.stderr);
+    assert.match(
+      run.stderr,
+      new RegExp(`stale reachAcknowledged key: row "A": CLAUDE\\.md \\(${NOT_A_NAME}\\)`),
+    );
+    // A file name of the row whose shadow is empty, acknowledged with [].
+    run = gate(
+      "check-review-tiers.mjs",
+      dir,
+      ...reachFixture(dir, { reachAcknowledged: { "CLAUDE.md": [] } }, {}, [
+        "x/a.ts",
+        ".beads/issues.jsonl",
+        "CLAUDE.md",
+      ]),
+    );
+    assert.equal(run.status, 1, run.stderr);
+    assert.match(
+      run.stderr,
+      /stale reachAcknowledged key: row "A": CLAUDE\.md \(its shadow is empty\)/,
+    );
+    // Keys that are patterns rather than names, and the "names" a
+    // non-file-shaped pattern would have if it counted: `**`, the empty
+    // segment after a directory's `/`, a final `*`. Each is a stale KEY,
+    // not a list of stale paths -- the entry waives nothing at all.
+    run = gate(
+      "check-review-tiers.mjs",
+      dir,
+      ...reachFixture(dir, {
+        globs: ["CLAUDE.md", "p/CLAUDE.md", "q/CLAUDE.md", "**", "x/", "x/*"],
+        reachAcknowledged: {
+          "p/CLAUDE.md": ["x/a.ts"],
+          "**": ["x/a.ts"],
+          "": ["x/a.ts"],
+          "*": ["x/a.ts"],
+        },
+      }),
+    );
+    assert.equal(run.status, 1, run.stderr);
+    for (const key of ["p/CLAUDE\\.md", "\\*\\*", "", "\\*"]) {
+      assert.match(
+        run.stderr,
+        new RegExp(`stale reachAcknowledged key: row "A": ${key} \\(${NOT_A_NAME}\\)`),
+      );
+    }
+    assert.doesNotMatch(run.stderr, /stale reachAcknowledged path/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("check-review-tiers REFUSES a malformed reachAcknowledged, and pr-risk ignores it", () => {
+  const dir = mkdtempSync(join(tmpdir(), "barwise-tiers-"));
+  try {
+    const malformed = [
+      [["p/CLAUDE.md"], /row "A": reachAcknowledged must be an object/],
+      [null, /row "A": reachAcknowledged must be an object/],
+      ["p/CLAUDE.md", /row "A": reachAcknowledged must be an object/],
+      [
+        { "CLAUDE.md": "p/CLAUDE.md" },
+        /row "A": reachAcknowledged\["CLAUDE\.md"\] must be an array/,
+      ],
+      [{ "CLAUDE.md": ["p/CLAUDE.md", ""] }, /must be an array of non-empty strings/],
+      [{ "CLAUDE.md": [7] }, /must be an array of non-empty strings/],
+      // A duplicate cannot come from any tree, so it is a broken
+      // declaration (2), not a disagreement with the tree (1).
+      [
+        { "CLAUDE.md": ["p/CLAUDE.md", "q/CLAUDE.md", "p/CLAUDE.md"] },
+        /reachAcknowledged\["CLAUDE\.md"\] lists "p\/CLAUDE\.md" twice/,
+      ],
+    ];
+    const cases = [
+      ...malformed.map(([value, reason]) => [{ reachAcknowledged: value }, {}, value, reason]),
+      // On a failure mode, labelled as one.
+      [
+        { globs: ["x/"] },
+        { reachAcknowledged: ["CLAUDE.md"] },
+        "a failure mode's array",
+        /failure mode "F": reachAcknowledged must be an object/,
+      ],
+    ];
+    for (const [rowA, modeF, what, reason] of cases) {
+      const args = reachFixture(dir, rowA, modeF);
+      const run = gate("check-review-tiers.mjs", dir, ...args);
+      assert.equal(run.status, 2, `${JSON.stringify(what)} is cannot-answer: ${run.stderr}`);
+      assert.match(run.stderr, reason);
+      // pr-risk reads rows through tierRows and never this field, so a
+      // malformed waiver must not make the classifier refuse.
+      const table = args[args.indexOf("--table") + 1];
+      const risk = gate("pr-risk.mjs", dir, ...fileList(dir, ["x/a.ts"]), "--table", table);
+      assert.equal(
+        risk.status,
+        0,
+        `pr-risk is unaffected by ${JSON.stringify(what)}: ${risk.stderr}`,
+      );
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
 
 test("check-review-tiers passes when every heading has exactly one row", () => {
   const dir = mkdtempSync(join(tmpdir(), "barwise-tiers-"));
@@ -3362,12 +3957,12 @@ function fileList(dir, files) {
   return ["--files", path];
 }
 
-test("pr-risk classifies a real file list and exits 0 for either tier", () => {
+test("pr-risk classifies a real file list and exits 0 for either tier [adr:review-policy#tier-informs]", () => {
   const dir = mkdtempSync(join(tmpdir(), "barwise-risk-"));
   try {
     const routine = gate("pr-risk.mjs", dir, ...fileList(dir, ["barwise/docs/specs/a.spec.md"]));
     assert.equal(routine.status, 0, `${routine.stdout}${routine.stderr}`);
-    assert.match(routine.stdout, /^pr-risk: routine/);
+    assert.match(routine.stdout, /^pr-risk: routine/m);
 
     const risky = gate("pr-risk.mjs", dir, ...fileList(dir, ["barwise/packages/core/src/a.ts"]));
     assert.equal(
@@ -3375,7 +3970,7 @@ test("pr-risk classifies a real file list and exits 0 for either tier", () => {
       0,
       "high-risk is an ANSWER, not a failure -- the gate contract lets such a PR merge on a clean review",
     );
-    assert.match(risky.stdout, /^pr-risk: high-risk/);
+    assert.match(risky.stdout, /^pr-risk: high-risk/m);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -3387,8 +3982,71 @@ test("pr-risk names the triggering heading and the file that triggered it", () =
     const run = gate("pr-risk.mjs", dir, ...fileList(dir, ["barwise/packages/core/src/model.ts"]));
     assert.match(run.stdout, /@barwise\/core` changed/);
     assert.match(run.stdout, /barwise\/packages\/core\/src\/model\.ts/);
-    // And the caveat WS4 depends on.
-    assert.match(run.stdout, /routine tier does NOT mean the checklist is satisfied/);
+    // The groups no path can see are listed on every run, under their own
+    // heading (review-routing WS1), so a routine tier never reads as a
+    // satisfied checklist; and for a routine tier the caveat WS4 depends
+    // on is still printed.
+    assert.match(run.stdout, /Checklist groups no path can detect -- run these on every PR too/);
+    const routine = gate("pr-risk.mjs", dir, ...fileList(dir, ["barwise/docs/specs/a.spec.md"]));
+    assert.match(routine.stdout, /routine tier does NOT mean the checklist is satisfied/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+/**
+ * The routing a reviewer works from (review-routing.spec.md): the groups
+ * and REVIEW.md failure modes first, the tier last; every failure mode
+ * printed, the path-triggered ones first with their files; and the
+ * failure modes never change the tier or the exit status.
+ */
+test("pr-risk leads with the routing and prints every REVIEW.md failure mode [adr:review-policy#tier-informs]", () => {
+  const dir = mkdtempSync(join(tmpdir(), "barwise-risk-"));
+  try {
+    const run = gate("pr-risk.mjs", dir, ...fileList(dir, ["barwise/scripts/x.mjs"]));
+    assert.equal(run.status, 0);
+    const out = run.stdout;
+    const at = (re) => out.search(re);
+    assert.ok(at(/^Checklist groups to run/m) === 0, "the groups come first");
+    assert.ok(at(/^REVIEW\.md failure modes -- run all of them/m) > 0);
+    assert.ok(at(/^pr-risk: high-risk/m) > at(/^REVIEW\.md failure modes/m), "the tier comes last");
+    const triggered = out.indexOf("A gate answers without seeing its input");
+    const rest = out.indexOf("not triggered by the paths in this diff -- still run:");
+    assert.ok(triggered > 0 && rest > triggered, "the triggered mode is listed before the rest");
+    for (
+      const title of ["Input dropped at a boundary", "A restated fact went stale", "ORM shape"]
+    ) {
+      assert.ok(out.indexOf(title) > rest, `${title} is still listed, after the triggered ones`);
+    }
+    // The mode no path can ever detect has its own heading, apart from the
+    // ones this diff's paths happened not to trigger.
+    const pathless = out.indexOf("no path can detect -- run on every PR:");
+    assert.ok(pathless > rest && out.indexOf("A restated fact went stale") > pathless);
+    assert.ok(out.indexOf("ORM shape") < pathless, "a path-routed mode is not listed as pathless");
+    const json = JSON.parse(
+      gate("pr-risk.mjs", dir, ...fileList(dir, ["barwise/scripts/x.mjs"]), "--json").stdout,
+    );
+    assert.deepEqual(json.failureModes.map((m) => m.heading).sort(), [
+      "A gate answers without seeing its input",
+      "A test that cannot fail",
+      "PR description claims",
+    ]);
+    assert.equal(json.failureModes.length + json.failureModesBeyondReach.length, 8);
+    // A failure mode alone never makes a diff high-risk: a formats file
+    // triggers the high-risk "Boundary text" mode and no high-risk
+    // checklist row, and the tier stays routine.
+    const ddl = JSON.parse(
+      gate(
+        "pr-risk.mjs",
+        dir,
+        ...fileList(dir, ["barwise/packages/formats/src/ddl/a.ts"]),
+        "--json",
+      ).stdout,
+    );
+    assert.ok(
+      ddl.failureModes.some((m) => m.heading === "Boundary text" && m.tier === "high-risk"),
+    );
+    assert.equal(ddl.tier, "routine", "failure modes route; they do not change the tier");
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -3490,6 +4148,13 @@ test("check-review-tiers REFUSES a table whose pattern the language does not def
       const run = gate("check-review-tiers.mjs", dir, ...args);
       assert.equal(run.status, 2, `${glob} is valid JSON and an invalid pattern`);
       assert.match(`${run.stdout}${run.stderr}`, /cannot answer/);
+      // The pattern's own fault, not any refusal: the table also lacks a
+      // failureModes block, which the gate refuses too, so the exit code
+      // alone would pass with pattern validation deleted (round-1 review).
+      assert.ok(
+        `${run.stdout}${run.stderr}`.includes(`pattern ${JSON.stringify(glob)}`),
+        `${glob}: refused for its pattern`,
+      );
     }
   } finally {
     rmSync(dir, { recursive: true, force: true });
@@ -3771,7 +4436,7 @@ test("pr-risk's git path keeps a rename's source and reads names exactly", () =>
   }
 });
 
-test("the Copilot workflow reads its allow-list from main, never from the pull request", () => {
+test("the Copilot workflow reads its allow-list from main, never from the pull request [adr:review-policy#copilot-requested]", () => {
   // pull_request would check out the PR's tree, and a PR could widen the
   // allow-list and exempt itself. This pins the trigger and the checkout.
   const wf = readFileSync(join(REPO, ".github/workflows/copilot-review.yml"), "utf8");
@@ -4077,7 +4742,7 @@ test("workflow, decide: requests only when Copilot has neither reviewed nor been
   }
 });
 
-test("workflow, classify: skips only an edit to the tracker; every other shape requests", () => {
+test("workflow, classify: skips only an edit to the tracker; every other shape requests [adr:review-policy#copilot-requested]", () => {
   const rec = (status, filename, previous_filename) =>
     previous_filename ? { filename, status, previous_filename } : { filename, status };
   const skip = runWorkflowStep(CLASSIFY, { files: [rec("modified", ".beads/issues.jsonl")] });
@@ -4108,7 +4773,7 @@ test("workflow, classify: skips only an edit to the tracker; every other shape r
   }
 });
 
-test("workflow, classify: every uncertainty requests, and a request that did not land is red", () => {
+test("workflow, classify: every uncertainty requests, and a request that did not land is red [adr:review-policy#copilot-requested]", () => {
   const tracker = { filename: ".beads/issues.jsonl", status: "modified" };
   const uncertain = [
     ["the files API failing", {}, ["files"], /::warning::Could not read the changed files/],
@@ -4391,6 +5056,47 @@ test("check-tracker-closes reads a tracker larger than execFileSync's default 1 
   }
 });
 
+test("check-tracker-closes, run as ci:local --commit runs it, fails a close beside a code change", () => {
+  // The pre-push shape: no BASE_SHA, the base taken from
+  // `git merge-base origin/main HEAD`, in a detached linked worktree of the
+  // pushed commit. barwise-40t suspected this path of passing #723's close;
+  // it does not -- that push ran no hook at all, because core.hooksPath is
+  // relative and a `git worktree add` checkout has no barwise/.husky/_
+  // (barwise-qma). Pinned so the fallback stays the one CI's base agrees with.
+  const r = trackerRepo();
+  const tree = mkdtempSync(join(tmpdir(), "barwise-closes-wt-"));
+  try {
+    // Only origin/main can supply the base: the local default branch is
+    // deleted (a fresh ci:local worktree need not have one), so a fallback
+    // that read it would refuse instead of passing.
+    r.g("update-ref", "refs/remotes/origin/main", r.base);
+    const local = r.g("rev-parse", "--abbrev-ref", "HEAD").trim();
+    r.g("checkout", "-q", "-b", "feature");
+    r.g("branch", "-q", "-D", local);
+    // The close and the code change in separate commits, so a base of
+    // HEAD~1 would see the code change alone and report clean.
+    r.issues([["a", "closed"], ["b", "open"]]);
+    r.commit("close a");
+    writeFileSync(join(r.dir, "src.ts"), "export const x = 6;\n");
+    const head = r.commit("fix");
+    rmSync(tree, { recursive: true, force: true });
+    r.g("worktree", "add", "--detach", "-q", tree, head);
+    // From a subdirectory of the worktree, as ci:local runs gates from its
+    // barwise/: a cwd-scoped listing would miss the root-level tracker.
+    const out = spawnSync(process.execPath, [join(tree, "scripts", "check-tracker-closes.mjs")], {
+      cwd: join(tree, "scripts"),
+      encoding: "utf8",
+      env: { ...process.env, BASE_SHA: "" },
+    });
+    assert.equal(out.status, 1, out.stdout + out.stderr);
+    assert.match(out.stderr, /closed: {2}a\b/);
+    assert.match(out.stderr, /src\.ts/);
+  } finally {
+    rmSync(tree, { recursive: true, force: true });
+    rmSync(r.dir, { recursive: true, force: true });
+  }
+});
+
 test("check-tracker-closes refuses with no base rather than reporting clean", () => {
   const r = trackerRepo();
   try {
@@ -4399,6 +5105,901 @@ test("check-tracker-closes refuses with no base rather than reporting clean", ()
     assert.doesNotMatch(out.stdout, /OK/);
   } finally {
     rmSync(r.dir, { recursive: true, force: true });
+  }
+});
+
+/**
+ * check-plan-review: a spec's plan is reviewed before its implementation
+ * is committed (docs/specs/plan-scope-check.spec.md, WS6).
+ *
+ * A sandbox repository with the gate and the libraries it imports copied
+ * in. `main` holds `src/a.ts`; each case builds a branch, and `BASE_SHA`
+ * stands in for the pull request's base commit, as ci.yml passes it.
+ */
+const PLAN_SPEC = "barwise/docs/specs/x.spec.md";
+
+function planRepo() {
+  const dir = mkdtempSync(join(tmpdir(), "barwise-planrev-"));
+  const g = (...args) =>
+    execFileSync("git", args, { cwd: dir, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] })
+      .trim();
+  g("init", "-q", "-b", "main");
+  g("config", "user.email", "t@example.com");
+  g("config", "user.name", "t");
+  mkdirSync(join(dir, "scripts", "lib"), { recursive: true });
+  mkdirSync(join(dir, "barwise", "docs", "specs"), { recursive: true });
+  mkdirSync(join(dir, "src"));
+  for (
+    const f of [
+      "check-plan-review.mjs",
+      join("lib", "args.mjs"),
+      join("lib", "git-run.mjs"),
+      join("lib", "name-status.mjs"),
+      join("lib", "review-tiers.mjs"),
+      join("lib", "spec-reader.mjs"),
+      join("lib", "tracked.mjs"),
+    ]
+  ) {
+    writeFileSync(join(dir, "scripts", f), readFileSync(join(SCRIPTS, f)));
+  }
+  const commit = (msg) => {
+    g("add", "-A");
+    g("commit", "-q", "-m", msg);
+    return g("rev-parse", "HEAD");
+  };
+  /** The spec, with `Plan-reviewed:` naming `reviewed` when given. */
+  const spec = ({ status = "Draft", reviewed, body = "The plan." } = {}) =>
+    writeFileSync(
+      join(dir, PLAN_SPEC),
+      `# X\n\nStatus: ${status}\nTracking: barwise-x\n`
+        + (reviewed ? `Plan-reviewed: ${reviewed.slice(0, 8)} (code-review, pr-review)\n` : "")
+        + `Touches: src/a.ts, +src/b.ts\n\n## Plan\n\n${body}\n`,
+    );
+  const implement = (n) => writeFileSync(join(dir, "src", "a.ts"), `export const a = ${n};\n`);
+  implement(0);
+  const base = commit("base");
+  g("checkout", "-q", "-b", "feature");
+  const run = (env = { BASE_SHA: base }) =>
+    spawnSync(process.execPath, [join(dir, "scripts", "check-plan-review.mjs")], {
+      cwd: dir,
+      encoding: "utf8",
+      env: { ...process.env, BASE_SHA: "", ...env },
+    });
+  return { dir, g, commit, spec, implement, base, run };
+}
+
+test("check-plan-review fails an implementation whose spec has no Plan-reviewed: line", () => {
+  const r = planRepo();
+  try {
+    r.spec();
+    r.commit("spec");
+    r.implement(1);
+    const first = r.commit("implement");
+    const out = r.run();
+    assert.equal(out.status, 1, out.stdout + out.stderr);
+    assert.match(out.stderr, /x\.spec\.md: no Plan-reviewed: line/);
+    assert.match(out.stderr, new RegExp(`first change to its Touches: is ${first.slice(0, 8)}`));
+  } finally {
+    rmSync(r.dir, { recursive: true, force: true });
+  }
+});
+
+test("check-plan-review fails a Plan-reviewed: line naming a commit after the first implementation", () => {
+  // The review happened, but of a tree that already held the code.
+  const r = planRepo();
+  try {
+    r.spec();
+    r.commit("spec");
+    r.implement(1);
+    const first = r.commit("implement");
+    r.spec({ reviewed: first });
+    r.commit("record the review");
+    const out = r.run();
+    assert.equal(out.status, 1, out.stdout + out.stderr);
+    assert.match(
+      out.stderr,
+      new RegExp(`does not precede ${first.slice(0, 8)}, a change to its Touches:`),
+    );
+  } finally {
+    rmSync(r.dir, { recursive: true, force: true });
+  }
+});
+
+test("check-plan-review fails a review recorded at a later commit than the first implementation", () => {
+  // Not the first change itself but a descendant of it: only the ancestry
+  // test can see that the review came after the code began.
+  const r = planRepo();
+  try {
+    r.spec();
+    r.commit("spec");
+    r.implement(1);
+    const first = r.commit("implement");
+    r.implement(2);
+    const later = r.commit("implement more");
+    r.spec({ reviewed: later });
+    r.commit("record the review");
+    const out = r.run();
+    assert.equal(out.status, 1, out.stdout + out.stderr);
+    assert.match(out.stderr, new RegExp(`does not precede ${first.slice(0, 8)}`));
+  } finally {
+    rmSync(r.dir, { recursive: true, force: true });
+  }
+});
+
+test("check-plan-review fails an unreviewed implementation on a side line merged in", () => {
+  // The first changing commit in topological order descends from the
+  // review; the side line's does not, and it is checked too.
+  const r = planRepo();
+  try {
+    r.spec();
+    const specAt = r.commit("spec");
+    // Cut from the base, before the spec and its review existed.
+    r.g("checkout", "-q", "-b", "side", r.base);
+    writeFileSync(join(r.dir, "src", "b.ts"), "export const b = 1;\n");
+    const side = r.commit("side implementation, before any review");
+    r.g("checkout", "-q", "feature");
+    r.spec({ reviewed: specAt });
+    r.commit("record the review");
+    r.implement(1);
+    r.commit("implement");
+    r.g("merge", "-q", "--no-ff", "-m", "merge side", "side");
+    const out = r.run();
+    assert.equal(out.status, 1, out.stdout + out.stderr);
+    assert.match(out.stderr, new RegExp(`does not precede ${side.slice(0, 8)}`));
+  } finally {
+    rmSync(r.dir, { recursive: true, force: true });
+  }
+});
+
+test("check-plan-review compares the plan where each line of implementation began", () => {
+  // A side line cut after the review rewrites the plan, then implements
+  // it. The main line's first change still sees the reviewed body; the
+  // side line's does not, and it is compared too.
+  const r = planRepo();
+  try {
+    r.spec();
+    const reviewed = r.commit("spec");
+    r.spec({ reviewed });
+    r.commit("record the review");
+    r.g("checkout", "-q", "-b", "side");
+    r.spec({ reviewed, body: "A different plan." });
+    r.commit("rewrite the plan on the side line");
+    writeFileSync(join(r.dir, "src", "b.ts"), "export const b = 1;\n");
+    const side = r.commit("implement the rewritten plan");
+    r.g("checkout", "-q", "feature");
+    r.implement(1);
+    r.commit("implement");
+    r.g("merge", "-q", "--no-ff", "-X", "theirs", "-m", "merge side", "side");
+    const out = r.run();
+    assert.equal(out.status, 1, out.stdout + out.stderr);
+    assert.match(
+      out.stderr,
+      new RegExp(`the plan changed between the reviewed .* and ${side.slice(0, 8)}`),
+    );
+  } finally {
+    rmSync(r.dir, { recursive: true, force: true });
+  }
+});
+
+test("check-plan-review reads Touches: and Status at the base, so a branch cannot drop either", () => {
+  // The spec exists at the base with no Status line (read as claiming
+  // nothing built), and the branch drops the path it implements from
+  // Touches: -- a header edit, which leaves a review standing.
+  const r = planRepo();
+  try {
+    r.g("checkout", "-q", "main");
+    writeFileSync(join(r.dir, PLAN_SPEC), "# X\n\nTouches: src/a.ts\n\n## Plan\n\nThe plan.\n");
+    const base = r.commit("spec on main, no Status");
+    r.g("checkout", "-q", "-B", "feature");
+    writeFileSync(join(r.dir, PLAN_SPEC), "# X\n\nTouches: src/other.ts\n\n## Plan\n\nThe plan.\n");
+    r.implement(1);
+    r.commit("implement, and drop the entry");
+    const out = r.run({ BASE_SHA: base });
+    assert.equal(out.status, 1, out.stdout + out.stderr);
+    assert.match(out.stderr, /x\.spec\.md: no Plan-reviewed: line/);
+  } finally {
+    rmSync(r.dir, { recursive: true, force: true });
+  }
+});
+
+test("check-plan-review fails a Plan-reviewed: line naming a commit without the spec", () => {
+  // `base` precedes the implementation, so only the containment test can
+  // tell that nothing reviewed there was this plan.
+  const r = planRepo();
+  try {
+    r.spec({ reviewed: r.base });
+    r.commit("spec, claiming a review at the base");
+    r.implement(1);
+    r.commit("implement");
+    const out = r.run();
+    assert.equal(out.status, 1, out.stdout + out.stderr);
+    assert.match(out.stderr, /does not contain the spec/);
+  } finally {
+    rmSync(r.dir, { recursive: true, force: true });
+  }
+});
+
+test("check-plan-review fails a plan rewritten after the commit its review names", () => {
+  const r = planRepo();
+  try {
+    r.spec();
+    const reviewed = r.commit("spec");
+    r.spec({ reviewed });
+    r.commit("record the review");
+    r.spec({ reviewed, body: "A different plan." });
+    r.commit("rewrite the plan");
+    r.implement(1);
+    r.commit("implement");
+    const out = r.run();
+    assert.equal(out.status, 1, out.stdout + out.stderr);
+    assert.match(out.stderr, /the plan changed between the reviewed/);
+  } finally {
+    rmSync(r.dir, { recursive: true, force: true });
+  }
+});
+
+test("check-plan-review passes a review recorded before the first implementation commit", () => {
+  // Recording the line and updating Status change only the header block,
+  // so neither disturbs the body the review vouches for; nor does a plan
+  // amended in the implementation commit itself, which is after it began.
+  const r = planRepo();
+  try {
+    r.spec();
+    const reviewed = r.commit("spec");
+    r.spec({ reviewed });
+    r.commit("record the review");
+    r.implement(1);
+    r.spec({ reviewed, status: "Workstream 1 implemented", body: "The plan, as built." });
+    const first = r.commit("implement");
+    const out = r.run();
+    assert.equal(out.status, 0, out.stdout + out.stderr);
+    assert.match(
+      out.stdout,
+      new RegExp(
+        `x\\.spec\\.md \\(reviewed at ${reviewed.slice(0, 8)}, first change ${
+          first.slice(0, 8)
+        }\\)`,
+      ),
+    );
+  } finally {
+    rmSync(r.dir, { recursive: true, force: true });
+  }
+});
+
+test("check-plan-review leaves a spec whose Status at the base claims work is built", () => {
+  // Named by a commit message, and changing its Touches:, but the rule
+  // applies to implementation after it lands, not to later workstreams.
+  const r = planRepo();
+  try {
+    r.g("checkout", "-q", "main");
+    r.spec({ status: "Workstream 1 implemented 2026-10-24; 2 not yet" });
+    const base = r.commit("spec with workstream 1");
+    r.g("checkout", "-q", "-B", "feature");
+    r.implement(2);
+    r.commit("workstream 2 of x.spec.md");
+    const out = r.run({ BASE_SHA: base });
+    assert.equal(out.status, 0, out.stdout + out.stderr);
+    assert.match(out.stdout, /1 spec\(s\) named, none implemented/);
+  } finally {
+    rmSync(r.dir, { recursive: true, force: true });
+  }
+});
+
+test("check-plan-review leaves a pull request that does not name the Draft spec", () => {
+  // Open decision 5: editing a file a Draft spec plans to change does not
+  // make an unrelated PR answer for that spec's review.
+  const r = planRepo();
+  try {
+    r.g("checkout", "-q", "main");
+    r.spec();
+    const base = r.commit("draft spec");
+    r.g("checkout", "-q", "-B", "feature");
+    r.implement(2);
+    r.commit("an unrelated fix");
+    const out = r.run({ BASE_SHA: base });
+    assert.equal(out.status, 0, out.stdout + out.stderr);
+    assert.match(out.stdout, /0 spec\(s\) named/);
+  } finally {
+    rmSync(r.dir, { recursive: true, force: true });
+  }
+});
+
+test("check-plan-review refuses when git fails to answer whether the review precedes the code", () => {
+  // `merge-base --is-ancestor` exits 128 when git itself fails (a missing
+  // object, a corrupt history). Read as "no", that would fail the author
+  // for what git could not see.
+  const r = planRepo();
+  const shim = mkdtempSync(join(tmpdir(), "barwise-planrev-git-"));
+  try {
+    r.spec();
+    const reviewed = r.commit("spec");
+    r.spec({ reviewed });
+    r.commit("record the review");
+    r.implement(1);
+    r.commit("implement");
+    const real = execFileSync("sh", ["-c", "command -v git"], { encoding: "utf8" }).trim();
+    writeFileSync(
+      join(shim, "git"),
+      `#!/bin/sh\nfor a in "$@"; do [ "$a" = --is-ancestor ] && exit 128; done\nexec "${real}" "$@"\n`,
+    );
+    chmodSync(join(shim, "git"), 0o755);
+    const out = r.run({ BASE_SHA: r.base, PATH: `${shim}:${process.env.PATH}` });
+    assert.equal(out.status, 2, out.stdout + out.stderr);
+    assert.match(out.stderr, /--is-ancestor/);
+  } finally {
+    rmSync(shim, { recursive: true, force: true });
+    rmSync(r.dir, { recursive: true, force: true });
+  }
+});
+
+test("check-plan-review refuses when git cannot resolve the base", () => {
+  const r = planRepo();
+  try {
+    r.spec();
+    r.commit("spec");
+    r.implement(1);
+    r.commit("implement");
+    const out = r.run({ BASE_SHA: "no-such-ref" });
+    assert.equal(out.status, 2, out.stdout + out.stderr);
+    assert.match(out.stderr, /cannot answer/);
+    assert.doesNotMatch(out.stdout, /OK/);
+  } finally {
+    rmSync(r.dir, { recursive: true, force: true });
+  }
+});
+
+test("check-plan-review refuses a shallow clone", () => {
+  // Ancestry in a truncated history is not an answer: a review commit cut
+  // off by the depth reads as "names no commit", a finding it is not.
+  const r = planRepo();
+  const shallow = mkdtempSync(join(tmpdir(), "barwise-planrev-shallow-"));
+  try {
+    r.spec();
+    r.commit("spec");
+    r.implement(1);
+    r.commit("implement");
+    execFileSync("git", [
+      "clone",
+      "-q",
+      "--depth",
+      "1",
+      "--branch",
+      "feature",
+      `file://${r.dir}`,
+      shallow,
+    ], {
+      stdio: "ignore",
+    });
+    const out = spawnSync(process.execPath, [join(shallow, "scripts", "check-plan-review.mjs")], {
+      cwd: shallow,
+      encoding: "utf8",
+      env: { ...process.env, BASE_SHA: "HEAD" },
+    });
+    assert.equal(out.status, 2, out.stdout + out.stderr);
+    assert.match(out.stderr, /shallow clone/);
+  } finally {
+    rmSync(r.dir, { recursive: true, force: true });
+    rmSync(shallow, { recursive: true, force: true });
+  }
+});
+
+/**
+ * check-spec-touches, the new-spec rule: a corpus spec whose file name was
+ * nowhere under barwise/docs/specs/ at a fixed cutoff commit fails unless
+ * its `Touches:` names a tracked path outside that directory
+ * (docs/specs/touches-required.spec.md).
+ *
+ * A sandbox repository with the gate and its libraries copied in. The
+ * cutoff commit holds `src/a.ts`, `src/gone.ts`, two specs without
+ * `Touches:` (the existing corpus, exempt) and one in `archive/`; each
+ * case changes the tree after it, and `--cutoff` names it, since the real
+ * cutoff is not in the sandbox.
+ */
+const TOUCHES_SPECS = "barwise/docs/specs";
+
+function touchesRepo() {
+  const dir = mkdtempSync(join(tmpdir(), "barwise-touchesreq-"));
+  const g = (...args) =>
+    execFileSync("git", args, { cwd: dir, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] })
+      .trim();
+  g("init", "-q", "-b", "main");
+  g("config", "user.email", "t@example.com");
+  g("config", "user.name", "t");
+  mkdirSync(join(dir, "scripts", "lib"), { recursive: true });
+  mkdirSync(join(dir, TOUCHES_SPECS, "archive"), { recursive: true });
+  mkdirSync(join(dir, "src"));
+  for (
+    const f of [
+      "check-spec-touches.mjs",
+      join("lib", "args.mjs"),
+      join("lib", "git-run.mjs"),
+      join("lib", "review-tiers.mjs"),
+      join("lib", "spec-reader.mjs"),
+      join("lib", "tracked.mjs"),
+    ]
+  ) {
+    writeFileSync(join(dir, "scripts", f), readFileSync(join(SCRIPTS, f)));
+  }
+  /** Write a spec at `rel` under the specs directory; `touchesLine` undefined omits the field. */
+  const spec = (rel, touchesLine) => {
+    mkdirSync(dirname(join(dir, TOUCHES_SPECS, rel)), { recursive: true });
+    writeFileSync(
+      join(dir, TOUCHES_SPECS, rel),
+      "# S\n\nStatus: Draft\n"
+        + (touchesLine === undefined ? "" : `Touches: ${touchesLine}\n`)
+        + "\n## Plan\n\nThe plan.\n",
+    );
+  };
+  const commit = (msg) => {
+    g("add", "-A");
+    g("commit", "-q", "-m", msg);
+    return g("rev-parse", "HEAD");
+  };
+  writeFileSync(join(dir, "src", "a.ts"), "export const a = 0;\n");
+  writeFileSync(join(dir, "src", "gone.ts"), "export const gone = 0;\n");
+  spec("old.spec.md");
+  spec("other.spec.md");
+  spec("archive/arch.spec.md");
+  const cutoff = commit("cutoff");
+  const run = (args = ["--cutoff", cutoff], env = {}) =>
+    spawnSync(process.execPath, [join(dir, "scripts", "check-spec-touches.mjs"), ...args], {
+      cwd: dir,
+      encoding: "utf8",
+      env: { ...process.env, ...env },
+    });
+  return {
+    dir,
+    g,
+    spec,
+    commit,
+    cutoff,
+    run,
+    done: () => rmSync(dir, { recursive: true, force: true }),
+  };
+}
+
+test("check-spec-touches fails a new spec that declares no Touches:", () => {
+  const r = touchesRepo();
+  try {
+    r.spec("new.spec.md");
+    r.commit("add a spec");
+    const out = r.run();
+    assert.equal(out.status, 1, out.stdout + out.stderr);
+    assert.match(
+      out.stderr,
+      /barwise\/docs\/specs\/new\.spec\.md: new since the cutoff and declares no Touches:/,
+    );
+  } finally {
+    r.done();
+  }
+});
+
+test("check-spec-touches fails a new spec whose Touches: is only +none", () => {
+  // A + entry is a file the plan creates and may be absent, so the tree
+  // rule passes it; alone, it is a placeholder.
+  const r = touchesRepo();
+  try {
+    r.spec("new.spec.md", "+none");
+    // A + entry naming a real path still counts for nothing, even beside a
+    // - entry (which makes the gate read every path it could name).
+    r.spec("plus.spec.md", "+src/a.ts, -src/never.ts");
+    r.commit("add specs with placeholders");
+    const out = r.run();
+    assert.equal(out.status, 1, out.stdout + out.stderr);
+    assert.match(out.stderr, /new\.spec\.md: new since the cutoff, and no Touches: entry names/);
+    assert.match(out.stderr, /plus\.spec\.md: new since the cutoff, and no Touches: entry names/);
+  } finally {
+    r.done();
+  }
+});
+
+test("check-spec-touches fails a new spec whose only - entry names nothing tracked at the cutoff", () => {
+  const r = touchesRepo();
+  try {
+    r.spec("new.spec.md", "-src/never.ts, +src/b.ts");
+    r.commit("add a spec");
+    const out = r.run();
+    assert.equal(out.status, 1, out.stdout + out.stderr);
+    assert.match(out.stderr, /new\.spec\.md: new since the cutoff, and no Touches: entry names/);
+  } finally {
+    r.done();
+  }
+});
+
+test("check-spec-touches fails a new spec whose only entry is its own path or the specs directory", () => {
+  // Both are tracked as soon as the spec is, so they would satisfy the
+  // rule by naming the plan rather than what the plan changes.
+  const r = touchesRepo();
+  try {
+    r.spec("self.spec.md", `${TOUCHES_SPECS}/self.spec.md`);
+    r.spec("dir.spec.md", `${TOUCHES_SPECS}/`);
+    r.commit("add two specs that name only the specs directory");
+    const out = r.run();
+    assert.equal(out.status, 1, out.stdout + out.stderr);
+    assert.match(out.stderr, /2 spec\(s\) new since the cutoff/);
+    assert.match(out.stderr, /self\.spec\.md: new since the cutoff, and no Touches: entry names/);
+    assert.match(out.stderr, /dir\.spec\.md: new since the cutoff, and no Touches: entry names/);
+  } finally {
+    r.done();
+  }
+});
+
+test("check-spec-touches expands entries, so no spelling of the specs directory satisfies the rule", () => {
+  // Compared as text, each of these slipped past a prefix test: no
+  // trailing slash, a pattern matching only the spec, and a parent
+  // directory that holds nothing but specs here.
+  const r = touchesRepo();
+  try {
+    r.spec("bare.spec.md", `-${TOUCHES_SPECS}`);
+    r.spec("pattern.spec.md", "barwise/*/specs/pattern.spec.md");
+    r.spec("parent.spec.md", "barwise/docs/");
+    r.commit("add three specs that name only the specs directory");
+    const out = r.run();
+    assert.equal(out.status, 1, out.stdout + out.stderr);
+    assert.match(out.stderr, /3 spec\(s\) new since the cutoff/);
+    for (const id of ["bare", "pattern", "parent"]) {
+      assert.match(
+        out.stderr,
+        new RegExp(`${id}\\.spec\\.md: new since the cutoff, and no Touches: entry names`),
+      );
+    }
+    // The tree rule has nothing to say about any of them: only the
+    // expansion catches them.
+    assert.doesNotMatch(out.stderr, /not resolve/);
+  } finally {
+    r.done();
+  }
+});
+
+test("check-spec-touches reports an unmarked bare specs directory under both rules", () => {
+  // The tree rule finds `barwise/docs/specs` (no slash) names nothing
+  // tracked; the new rule must not count it as a path outside the
+  // directory it names, or a fix to the first finding would hide the second.
+  const r = touchesRepo();
+  try {
+    r.spec("bare.spec.md", TOUCHES_SPECS);
+    r.commit("add a spec naming the bare specs directory");
+    const out = r.run();
+    assert.equal(out.status, 1, out.stdout + out.stderr);
+    assert.match(out.stderr, /bare\.spec\.md: barwise\/docs\/specs -- names nothing tracked/);
+    assert.match(out.stderr, /bare\.spec\.md: new since the cutoff, and no Touches: entry names/);
+  } finally {
+    r.done();
+  }
+});
+
+test("check-spec-touches accepts a - entry for a file created after the cutoff, through to its deletion", () => {
+  // Checked against the cutoff alone, -src/b.ts could never pass, and the
+  // unmarked src/b.ts fails the tree rule once the deletion lands.
+  const r = touchesRepo();
+  try {
+    writeFileSync(join(r.dir, "src", "b.ts"), "export const b = 0;\n");
+    r.spec("removes-b.spec.md", "src/b.ts");
+    r.commit("add b.ts, and a spec that plans to remove it");
+    let out = r.run();
+    assert.equal(out.status, 0, out.stdout + out.stderr);
+    rmSync(join(r.dir, "src", "b.ts"));
+    r.spec("removes-b.spec.md", "-src/b.ts");
+    r.commit("remove b.ts, and mark the entry");
+    out = r.run();
+    assert.equal(out.status, 0, out.stdout + out.stderr);
+    assert.match(out.stdout, /1 spec\(s\) new since the cutoff/);
+  } finally {
+    r.done();
+  }
+});
+
+test("check-spec-touches passes a new spec with an unmarked entry, and one with only a - entry tracked at the cutoff", () => {
+  const r = touchesRepo();
+  try {
+    r.spec("unmarked.spec.md", "src/a.ts, +src/b.ts");
+    // The tree no longer holds src/gone.ts, so only the cutoff vouches for it.
+    r.spec("deletes.spec.md", "-src/gone.ts");
+    // A - directory spelled without its slash stands for the files under it.
+    r.spec("deletes-dir.spec.md", "-src");
+    rmSync(join(r.dir, "src", "gone.ts"));
+    r.commit("add three specs, delete gone.ts");
+    const out = r.run();
+    assert.equal(out.status, 0, out.stdout + out.stderr);
+    assert.match(
+      out.stdout,
+      /3 spec\(s\) new since the cutoff [0-9a-f]{8}, each declaring a tracked path/,
+    );
+  } finally {
+    r.done();
+  }
+});
+
+test("check-spec-touches reports an empty Touches: on a new spec once, as the existing finding", () => {
+  const r = touchesRepo();
+  try {
+    r.spec("new.spec.md", "");
+    r.commit("add a spec with an empty Touches:");
+    const out = r.run();
+    assert.equal(out.status, 1, out.stdout + out.stderr);
+    assert.match(out.stderr, /new\.spec\.md: Touches: has no entries/);
+    assert.doesNotMatch(out.stderr, /new since the cutoff/);
+    assert.equal(out.stderr.match(/new\.spec\.md/g).length, 1, out.stderr);
+  } finally {
+    r.done();
+  }
+});
+
+test("check-spec-touches exempts a spec that existed by name at the cutoff: edited, archived, restored, moved", () => {
+  const r = touchesRepo();
+  try {
+    writeFileSync(
+      join(r.dir, TOUCHES_SPECS, "old.spec.md"),
+      "# S\n\nStatus: Draft\n\n## Plan\n\nEdited.\n",
+    );
+    r.commit("edit an existing spec");
+    r.g("mv", `${TOUCHES_SPECS}/other.spec.md`, `${TOUCHES_SPECS}/archive/other.spec.md`);
+    r.commit("archive one");
+    r.g("mv", `${TOUCHES_SPECS}/archive/arch.spec.md`, `${TOUCHES_SPECS}/arch.spec.md`);
+    r.commit("restore an archived spec");
+    mkdirSync(join(r.dir, TOUCHES_SPECS, "sub"));
+    r.g("mv", `${TOUCHES_SPECS}/old.spec.md`, `${TOUCHES_SPECS}/sub/old.spec.md`);
+    r.commit("move a spec between directories");
+    const out = r.run();
+    assert.equal(out.status, 0, out.stdout + out.stderr);
+    assert.match(out.stdout, /0 spec\(s\) new since the cutoff/);
+  } finally {
+    r.done();
+  }
+});
+
+test("check-spec-touches leaves an added archived spec, an ADR and a non-spec document alone", () => {
+  const r = touchesRepo();
+  try {
+    r.spec("archive/frozen.spec.md");
+    mkdirSync(join(r.dir, "barwise", "docs", "adr"), { recursive: true });
+    writeFileSync(
+      join(r.dir, "barwise", "docs", "adr", "0001-x.md"),
+      "# ADR\n\nStatus: Accepted\n",
+    );
+    writeFileSync(join(r.dir, TOUCHES_SPECS, "README.md"), "# Specs\n");
+    r.commit("add an archived spec, an ADR and a README");
+    const out = r.run();
+    assert.equal(out.status, 0, out.stdout + out.stderr);
+    assert.match(out.stdout, /0 spec\(s\) new since the cutoff/);
+  } finally {
+    r.done();
+  }
+});
+
+test("check-spec-touches reads a spec renamed to a new file name as new", () => {
+  // Open decision 2: a new name is a new document with its own plan, and
+  // a new name is absent at the cutoff.
+  const r = touchesRepo();
+  try {
+    r.g("mv", `${TOUCHES_SPECS}/old.spec.md`, `${TOUCHES_SPECS}/renamed.spec.md`);
+    r.commit("rename a spec");
+    const out = r.run();
+    assert.equal(out.status, 1, out.stdout + out.stderr);
+    assert.match(out.stderr, /renamed\.spec\.md: new since the cutoff and declares no Touches:/);
+  } finally {
+    r.done();
+  }
+});
+
+test("check-spec-touches judges the working tree: a staged spec, and an unstaged edit that drops Touches:", () => {
+  // The tree rule reads the working tree; the new rule reads the same
+  // text, so plain ci:local before a commit sees what the commit will.
+  const r = touchesRepo();
+  try {
+    r.spec("staged.spec.md");
+    r.g("add", "-A");
+    let out = r.run();
+    assert.equal(out.status, 1, out.stdout + out.stderr);
+    assert.match(out.stderr, /staged\.spec\.md: new since the cutoff and declares no Touches:/);
+    r.spec("staged.spec.md", "src/a.ts");
+    r.commit("the spec, with Touches:");
+    out = r.run();
+    assert.equal(out.status, 0, out.stdout + out.stderr);
+    r.spec("staged.spec.md");
+    out = r.run();
+    assert.equal(out.status, 1, out.stdout + out.stderr);
+    assert.match(out.stderr, /staged\.spec\.md: new since the cutoff and declares no Touches:/);
+  } finally {
+    r.done();
+  }
+});
+
+test("check-spec-touches keeps checking a spec that reached main without passing, on every later run", () => {
+  // The escape a per-push base left open: once a later push's before-SHA
+  // held the spec, it read as existing. Against the cutoff it stays new.
+  const r = touchesRepo();
+  try {
+    r.spec("pushed.spec.md");
+    r.commit("a spec pushed straight to main, its run cancelled");
+    writeFileSync(join(r.dir, "src", "a.ts"), "export const a = 1;\n");
+    r.commit("a later push");
+    const out = r.run();
+    assert.equal(out.status, 1, out.stdout + out.stderr);
+    assert.match(out.stderr, /pushed\.spec\.md: new since the cutoff and declares no Touches:/);
+  } finally {
+    r.done();
+  }
+});
+
+test("check-spec-touches refuses when the cutoff is not in the clone", () => {
+  // Without --cutoff the gate looks for the real cutoff commit, which the
+  // sandbox does not hold: the same reading as a clone fetched short of it.
+  const r = touchesRepo();
+  try {
+    r.spec("new.spec.md");
+    r.commit("add a spec");
+    const out = r.run([]);
+    assert.equal(out.status, 2, out.stdout + out.stderr);
+    assert.match(
+      out.stderr,
+      /cannot answer for new specs -- the cutoff [0-9a-f]+ is not in this clone/,
+    );
+    assert.match(out.stderr, /git fetch origin main/);
+    assert.doesNotMatch(out.stdout, /OK/);
+  } finally {
+    r.done();
+  }
+});
+
+test("check-spec-touches refuses a --cutoff that names no single commit, about the revision", () => {
+  // A typo in a replay is not a stale clone; fetching would not mend it.
+  const r = touchesRepo();
+  try {
+    r.spec("new.spec.md");
+    r.commit("add a spec");
+    for (const rev of ["f".repeat(40), "no-such-ref"]) {
+      const out = r.run(["--cutoff", rev]);
+      assert.equal(out.status, 2, out.stdout + out.stderr);
+      assert.match(out.stderr, new RegExp(`--cutoff ${rev} names no single commit`));
+      assert.doesNotMatch(out.stderr, /fetch/);
+    }
+  } finally {
+    r.done();
+  }
+});
+
+test("check-spec-touches refuses when git fails to say whether the cutoff exists", () => {
+  // rev-parse --verify --quiet exits 1 for "no such commit" and 128 when
+  // git itself fails; only the first is a missing cutoff.
+  const r = touchesRepo();
+  const shim = mkdtempSync(join(tmpdir(), "barwise-touchesreq-git-"));
+  try {
+    r.spec("new.spec.md", "src/a.ts");
+    r.commit("add a spec");
+    const real = execFileSync("sh", ["-c", "command -v git"], { encoding: "utf8" }).trim();
+    writeFileSync(
+      join(shim, "git"),
+      `#!/bin/sh\nfor a in "$@"; do [ "$a" = --verify ] && exit 128; done\nexec "${real}" "$@"\n`,
+    );
+    chmodSync(join(shim, "git"), 0o755);
+    const out = r.run(undefined, { PATH: `${shim}:${process.env.PATH}` });
+    assert.equal(out.status, 2, out.stdout + out.stderr);
+    assert.match(
+      out.stderr,
+      /cannot answer for new specs -- `git rev-parse --verify .*` exited 128/,
+    );
+    assert.doesNotMatch(out.stderr, /fetch/);
+    assert.doesNotMatch(out.stdout, /OK/);
+  } finally {
+    rmSync(shim, { recursive: true, force: true });
+    r.done();
+  }
+});
+
+test("check-spec-touches answers in a shallow clone that holds the cutoff", () => {
+  // The rule reads one tree, not history, so a clone deep enough to hold
+  // the cutoff commit can answer.
+  const r = touchesRepo();
+  const shallow = mkdtempSync(join(tmpdir(), "barwise-touchesreq-deep2-"));
+  try {
+    r.spec("new.spec.md", "src/a.ts");
+    r.commit("add a spec");
+    execFileSync("git", ["clone", "-q", "--depth", "2", `file://${r.dir}`, shallow], {
+      stdio: "ignore",
+    });
+    const out = spawnSync(
+      process.execPath,
+      [join(shallow, "scripts", "check-spec-touches.mjs"), "--cutoff", r.cutoff],
+      { cwd: shallow, encoding: "utf8" },
+    );
+    assert.equal(out.status, 0, out.stdout + out.stderr);
+    assert.match(out.stdout, /1 spec\(s\) new since the cutoff/);
+  } finally {
+    r.done();
+    rmSync(shallow, { recursive: true, force: true });
+  }
+});
+
+test("check-spec-touches refuses a shallow clone that stops short of the cutoff", () => {
+  const r = touchesRepo();
+  const shallow = mkdtempSync(join(tmpdir(), "barwise-touchesreq-shallow-"));
+  try {
+    r.spec("new.spec.md", "src/a.ts");
+    r.commit("add a spec");
+    execFileSync("git", ["clone", "-q", "--depth", "1", `file://${r.dir}`, shallow], {
+      stdio: "ignore",
+    });
+    const out = spawnSync(
+      process.execPath,
+      [join(shallow, "scripts", "check-spec-touches.mjs"), "--cutoff", r.cutoff],
+      { cwd: shallow, encoding: "utf8" },
+    );
+    assert.equal(out.status, 2, out.stdout + out.stderr);
+    assert.match(out.stderr, /This clone is shallow\. Fix: git fetch --unshallow/);
+  } finally {
+    r.done();
+    rmSync(shallow, { recursive: true, force: true });
+  }
+});
+
+/**
+ * A `git` that exits `code`, printing nothing, for one subcommand, and is
+ * the real git otherwise: 128 is git failing, 0 is git answering emptily.
+ */
+function failingGit(subcommand, code = 128) {
+  const shim = mkdtempSync(join(tmpdir(), "barwise-touchesreq-git-"));
+  const real = execFileSync("sh", ["-c", "command -v git"], { encoding: "utf8" }).trim();
+  writeFileSync(
+    join(shim, "git"),
+    `#!/bin/sh\n[ "$1" = ${subcommand} ] && exit ${code}\nexec "${real}" "$@"\n`,
+  );
+  chmodSync(join(shim, "git"), 0o755);
+  return shim;
+}
+
+test("check-spec-touches refuses when git lists nothing at the cutoff", () => {
+  // An empty listing would make every spec read as new, or, with the
+  // check inverted, none: either way an answer about no tree at all.
+  const r = touchesRepo();
+  const shim = failingGit("ls-tree", 0);
+  try {
+    r.spec("new.spec.md", "src/a.ts");
+    r.commit("add a spec");
+    const out = r.run(undefined, { PATH: `${shim}:${process.env.PATH}` });
+    assert.equal(out.status, 2, out.stdout + out.stderr);
+    assert.match(out.stderr, /git listed no files at the cutoff/);
+  } finally {
+    rmSync(shim, { recursive: true, force: true });
+    r.done();
+  }
+});
+
+test("check-spec-touches refuses when git cannot list the cutoff's tree", () => {
+  const r = touchesRepo();
+  const shim = failingGit("ls-tree");
+  try {
+    r.spec("new.spec.md");
+    r.commit("add a spec");
+    const out = r.run(undefined, { PATH: `${shim}:${process.env.PATH}` });
+    assert.equal(out.status, 2, out.stdout + out.stderr);
+    assert.match(out.stderr, /cannot answer for new specs -- `git ls-tree .*` failed/);
+    assert.doesNotMatch(out.stdout, /OK/);
+  } finally {
+    rmSync(shim, { recursive: true, force: true });
+    r.done();
+  }
+});
+
+test("check-spec-touches prints the tree rule's findings before a refusal, and fails on them", () => {
+  // The tree rule's findings are answers whatever the new-spec rule would
+  // say, so a refusal there must not hide them behind exit 2.
+  const r = touchesRepo();
+  const shim = failingGit("ls-tree");
+  try {
+    r.spec("rotted.spec.md", "src/moved.ts");
+    r.commit("a spec whose entry names nothing tracked");
+    const out = r.run(undefined, { PATH: `${shim}:${process.env.PATH}` });
+    assert.equal(out.status, 1, out.stdout + out.stderr);
+    assert.match(out.stderr, /rotted\.spec\.md: src\/moved\.ts -- names nothing tracked/);
+    assert.match(out.stderr, /cannot answer for new specs/);
+    assert.ok(
+      out.stderr.indexOf("names nothing tracked") < out.stderr.indexOf("cannot answer"),
+      out.stderr,
+    );
+  } finally {
+    rmSync(shim, { recursive: true, force: true });
+    r.done();
   }
 });
 
@@ -4417,7 +6018,13 @@ function refsRepo({ allow = [], files = {} } = {}) {
     execFileSync("git", args, { cwd: dir, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
   g("init", "-q");
   mkdirSync(join(dir, "scripts", "lib"), { recursive: true });
-  for (const f of ["check-instruction-refs.mjs", join("lib", "tracked.mjs")]) {
+  for (
+    const f of [
+      "check-instruction-refs.mjs",
+      join("lib", "tracked.mjs"),
+      join("lib", "instruction-files.mjs"),
+    ]
+  ) {
     writeFileSync(join(dir, "scripts", f), readFileSync(join(SCRIPTS, f)));
   }
   writeFileSync(
@@ -4440,6 +6047,7 @@ function refsRepo({ allow = [], files = {} } = {}) {
       "Run `node build.mjs`; the entry is `unique.ts`; ours is `src/twin.ts`.\n",
     // `CLAUDE.md` exists at the root and in barwise/pkg/: the root one wins.
     ".claude/skills/s/SKILL.md": "Read `./notes.md`, then `CLAUDE.md`.\n",
+    "REVIEW.md": "Also apply `barwise/docs/guide.md`.\n",
   };
   for (const [f, body] of Object.entries({ ...base, ...files })) {
     if (body === null) continue;
@@ -4460,7 +6068,8 @@ test("check-instruction-refs passes every live branch, from the root and from a 
   try {
     const top = r.run();
     assert.equal(top.status, 0, top.stdout + top.stderr);
-    assert.match(top.stdout, /4 instruction file\(s\)/); // notes.md is under .claude/ too
+    // notes.md is under .claude/ too, and the root REVIEW.md counts.
+    assert.match(top.stdout, /5 instruction file\(s\)/);
     const sub = r.run(join(r.dir, "barwise", "pkg"));
     assert.equal(sub.status, 0, sub.stderr);
     assert.equal(sub.stdout, top.stdout);
@@ -4506,6 +6115,36 @@ for (
       { "CLAUDE.md": 'Run `node "$(git rev-parse --show-toplevel)/barwise/scripts/gone.mjs"`.\n' },
       /show-toplevel\)\/barwise\/scripts\/gone\.mjs` -- resolves neither from the repo root/,
     ],
+    [
+      // A nested REVIEW.md is read once the default branch is protected.
+      "a dead path in a nested REVIEW.md",
+      { "barwise/pkg/REVIEW.md": "Apply `barwise/docs/gone.md`.\n" },
+      /barwise\/pkg\/REVIEW\.md:1: `barwise\/docs\/gone\.md` -- no tracked file/,
+    ],
+    [
+      // The root REVIEW.md is the one the service reads today (barwise-f4v).
+      "a dead path in the root REVIEW.md",
+      { "REVIEW.md": "Apply `barwise/docs/gone.md`.\n" },
+      /\sREVIEW\.md:1: `barwise\/docs\/gone\.md` -- no tracked file/,
+    ],
+    [
+      // The Copilot reviewer reads it as instructions (barwise-yi6).
+      "a dead path in .github/copilot-instructions.md",
+      { ".github/copilot-instructions.md": "Apply `barwise/docs/gone.md`.\n" },
+      /\.github\/copilot-instructions\.md:1: `barwise\/docs\/gone\.md` -- no tracked file/,
+    ],
+    [
+      // Copilot's path-specific instructions, at any depth (barwise-yi6).
+      "a dead path in a nested .github/instructions/*.instructions.md",
+      { ".github/instructions/ts/code.instructions.md": "Apply `barwise/docs/gone.md`.\n" },
+      /\.github\/instructions\/ts\/code\.instructions\.md:1: `barwise\/docs\/gone\.md` -- no tracked file/,
+    ],
+    [
+      // ... and flat in that directory, the layout Copilot documents.
+      "a dead path in a flat .github/instructions/*.instructions.md",
+      { ".github/instructions/ts.instructions.md": "Apply `barwise/docs/gone.md`.\n" },
+      /\.github\/instructions\/ts\.instructions\.md:1: `barwise\/docs\/gone\.md` -- no tracked file/,
+    ],
   ]
 ) {
   test(`check-instruction-refs fails ${name}`, () => {
@@ -4519,6 +6158,27 @@ for (
     }
   });
 }
+
+test("check-instruction-refs does not read a bare URI scheme as a path", () => {
+  // `orm-schema://` ends in `/`, so without the scheme rule it is an
+  // unrooted directory that no tracked path ends with (barwise-yi6).
+  const r = refsRepo({
+    files: {
+      "CLAUDE.md":
+        "Read the `orm-schema://` resource, or `Orm-Model://`; see `HTTPS://example.com/a.md`.\n",
+      // Not an instruction file: a dead path here is not read at all.
+      ".github/pull_request_template.md": "See `barwise/docs/gone.md`.\n",
+      ".github/instructions/README.md": "See `barwise/docs/gone.md`.\n",
+    },
+  });
+  try {
+    const out = r.run();
+    assert.equal(out.status, 0, out.stdout + out.stderr);
+    assert.doesNotMatch(out.stderr, /orm-schema|Orm-Model|gone\.md/);
+  } finally {
+    rmSync(r.dir, { recursive: true, force: true });
+  }
+});
 
 test("check-instruction-refs fails an ignored untracked path unless allowlisted, and a stale row", () => {
   // `git check-ignore` cannot tell a build output from a typo under dist/.
@@ -4561,6 +6221,7 @@ test("check-instruction-refs refuses a listing with no instruction file rather t
       "barwise/pkg/CLAUDE.md": null,
       ".claude/skills/s/SKILL.md": null,
       ".claude/skills/s/notes.md": null,
+      "REVIEW.md": null,
     },
   });
   try {
@@ -4578,7 +6239,13 @@ test("check-instruction-refs refuses an empty listing rather than reporting OK",
   try {
     execFileSync("git", ["init", "-q"], { cwd: dir });
     mkdirSync(join(dir, "scripts", "lib"), { recursive: true });
-    for (const f of ["check-instruction-refs.mjs", join("lib", "tracked.mjs")]) {
+    for (
+      const f of [
+        "check-instruction-refs.mjs",
+        join("lib", "tracked.mjs"),
+        join("lib", "instruction-files.mjs"),
+      ]
+    ) {
       writeFileSync(join(dir, "scripts", f), readFileSync(join(SCRIPTS, f)));
     }
     writeFileSync(join(dir, "scripts", "instruction-refs-allowlist.json"), '{"rows":[]}');
@@ -4588,6 +6255,1354 @@ test("check-instruction-refs refuses an empty listing rather than reporting OK",
     });
     assert.equal(out.status, 2, out.stdout + out.stderr);
     assert.doesNotMatch(out.stdout, /OK/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+/**
+ * A spec's Touches: header replaces inference (plan-scope-check.spec.md,
+ * WS2): a path cited only as context no longer makes an unrelated edit
+ * read as implementation, and shared wiring listed in Touches: is
+ * ignored by the audit. The control is the same spec without the header,
+ * which does trip on the same edit.
+ */
+test("audit-spec-status reads Touches: instead of every cited path, and ignores wiring", () => {
+  const dir = mkdtempSync(join(tmpdir(), "barwise-touches-audit-"));
+  const g = (...args) =>
+    execFileSync("git", args, { cwd: dir, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] })
+      .trim();
+  const run = () =>
+    spawnSync(process.execPath, [join(SCRIPTS, "audit-spec-status.mjs"), "--check"], {
+      cwd: dir,
+      encoding: "utf8",
+    });
+  const specs = join(dir, "barwise", "docs", "specs");
+  try {
+    g("init", "-q");
+    g("config", "user.email", "test@example.com");
+    g("config", "user.name", "test");
+    mkdirSync(join(dir, "barwise", "src"), { recursive: true });
+    mkdirSync(join(dir, ".github", "workflows"), { recursive: true });
+    mkdirSync(specs, { recursive: true });
+    mkdirSync(join(dir, ".beads"), { recursive: true });
+    writeFileSync(join(dir, ".beads", "issues.jsonl"), "");
+    writeFileSync(join(dir, "barwise", "src", "a.ts"), "0\n");
+    writeFileSync(join(dir, ".github", "workflows", "ci.yml"), "0\n");
+    writeFileSync(join(dir, "barwise", "spec-status-baseline.json"), '{"specs":{}}\n');
+    const body = "Builds `barwise/src/a.ts`; CI runs it from `.github/workflows/ci.yml`.\n";
+    writeFileSync(
+      join(specs, "declared.spec.md"),
+      `# D\n\nStatus: Draft -- no workstream implemented\nTouches: barwise/src/a.ts, .github/workflows/ci.yml\n\n## Body\n\n${body}`,
+    );
+    writeFileSync(
+      join(specs, "inferred.spec.md"),
+      `# I\n\nStatus: Draft -- no workstream implemented\n\n## Body\n\n${body}`,
+    );
+    g("add", "-A");
+    g("commit", "-qm", "specs");
+    writeFileSync(join(dir, ".github", "workflows", "ci.yml"), "1\n");
+    g("commit", "-qam", "ci");
+    const r = run();
+    assert.equal(r.status, 1, "the inferred spec reads ci.yml as its subject");
+    assert.match(r.stderr, /NEW: inferred\.spec\.md/);
+    assert.doesNotMatch(
+      r.stderr,
+      /declared\.spec\.md/,
+      "Touches: lists ci.yml as wiring, which the audit ignores",
+    );
+    writeFileSync(join(dir, "barwise", "src", "a.ts"), "1\n");
+    g("commit", "-qam", "implementation");
+    assert.match(run().stderr, /NEW: declared\.spec\.md/, "a declared subject still counts");
+    // Touches: that omits ci.yml altogether (the spec's WS2 case): the
+    // body still cites it, and an edit to it is not this spec's subject.
+    writeFileSync(
+      join(specs, "omits.spec.md"),
+      `# O\n\nStatus: Draft -- no workstream implemented\nTouches: barwise/src/b.ts\n\n## Body\n\n${body}`,
+    );
+    writeFileSync(join(dir, "barwise", "src", "b.ts"), "0\n");
+    g("add", "-A");
+    g("commit", "-qm", "omits");
+    writeFileSync(join(dir, ".github", "workflows", "ci.yml"), "2\n");
+    g("commit", "-qam", "ci again");
+    assert.doesNotMatch(run().stderr, /omits\.spec\.md/);
+    // A directory entry is a subject: the audit used to drop it with the
+    // non-code entries, which left a directory-only plan unaudited.
+    mkdirSync(join(dir, "barwise", "lib"), { recursive: true });
+    writeFileSync(join(dir, "barwise", "lib", "c.ts"), "0\n");
+    writeFileSync(
+      join(specs, "dir.spec.md"),
+      "# R\n\nStatus: Draft -- no workstream implemented\nTouches: barwise/lib/\n\n## Body\n",
+    );
+    g("add", "-A");
+    g("commit", "-qm", "dir spec");
+    writeFileSync(join(dir, "barwise", "lib", "c.ts"), "1\n");
+    g("commit", "-qam", "lib");
+    assert.match(run().stderr, /NEW: dir\.spec\.md/);
+    // Declared entries pass the audit's filters too: Markdown, a barrel,
+    // and wiring under a declared directory are never a spec's subject.
+    mkdirSync(join(dir, "barwise", "tool", "tests"), { recursive: true });
+    for (const p of ["README.md", "index.ts", "tests/t.mjs", "real.ts"]) {
+      writeFileSync(join(dir, "barwise", "tool", p), "0\n");
+    }
+    mkdirSync(join(dir, "barwise", "scripts", "tests"), { recursive: true });
+    writeFileSync(join(dir, "barwise", "scripts", "tests", "w.mjs"), "0\n");
+    writeFileSync(
+      join(specs, "filtered.spec.md"),
+      "# F\n\nStatus: Draft -- no workstream implemented\n"
+        + "Touches: barwise/tool/README.md, barwise/tool/index.ts, barwise/scripts/\n\n## Body\n",
+    );
+    g("add", "-A");
+    g("commit", "-qm", "filtered spec");
+    for (
+      const p of ["barwise/tool/README.md", "barwise/tool/index.ts", "barwise/scripts/tests/w.mjs"]
+    ) {
+      writeFileSync(join(dir, p), "1\n");
+    }
+    g("commit", "-qam", "markdown, a barrel, wiring");
+    assert.doesNotMatch(run().stderr, /filtered\.spec\.md/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+/**
+ * audit-spec-status: a verdict covers the commits it was written against
+ * (barwise-qs8). A refresh once added nine commits to a row under a note
+ * describing older ones, and --check passed. --check now reports commits a
+ * verdict never recorded, without failing on them, and --write reopens the
+ * note so the refresh cannot stand in for a re-read.
+ */
+test("audit-spec-status reports commits a verdict never covered, and --write reopens the note [adr:baselines-merge-on-write#merge-not-regenerate]", () => {
+  const dir = mkdtempSync(join(tmpdir(), "barwise-specaudit-"));
+  const g = (...args) =>
+    execFileSync("git", args, { cwd: dir, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] })
+      .trim();
+  const run = (...args) =>
+    spawnSync(process.execPath, [join(SCRIPTS, "audit-spec-status.mjs"), ...args], {
+      cwd: dir,
+      encoding: "utf8",
+    });
+  const baselineFile = join(dir, "barwise", "spec-status-baseline.json");
+  try {
+    g("init", "-q");
+    g("config", "user.email", "test@example.com");
+    g("config", "user.name", "test");
+    mkdirSync(join(dir, "barwise", "src"), { recursive: true });
+    mkdirSync(join(dir, "barwise", "docs", "specs"), { recursive: true });
+    mkdirSync(join(dir, ".beads"), { recursive: true });
+    writeFileSync(join(dir, ".beads", "issues.jsonl"), "");
+    writeFileSync(join(dir, "barwise", "src", "a.ts"), "0\n");
+    g("add", "-A");
+    g("commit", "-qm", "source");
+    writeFileSync(
+      join(dir, "barwise", "docs", "specs", "s.spec.md"),
+      "# S\n\nStatus: Draft -- no workstream implemented\n\nBuilds `barwise/src/a.ts`.\n",
+    );
+    g("add", "-A");
+    g("commit", "-qm", "spec");
+    const touch = (n) => {
+      writeFileSync(join(dir, "barwise", "src", "a.ts"), `${n}\n`);
+      g("commit", "-qam", `touch ${n}`);
+      return g("rev-parse", "HEAD");
+    };
+
+    const first = touch(1);
+    // Six characters, shorter than the seven git abbreviates to here: the
+    // match must be by prefix, as a growing repository lengthens them.
+    writeFileSync(
+      baselineFile,
+      JSON.stringify({
+        specs: {
+          "s.spec.md": {
+            status: "Draft -- no workstream implemented",
+            commits: [first.slice(0, 6)],
+            note: "Reviewed: the commit is unrelated to this spec.",
+          },
+        },
+      }),
+    );
+    let r = run("--check");
+    assert.equal(r.status, 0, `a covered verdict passes: ${r.stdout}${r.stderr}`);
+    assert.doesNotMatch(r.stdout, /predate commits/, "a recorded commit is not reported");
+
+    const second = touch(2);
+    r = run("--check");
+    assert.equal(r.status, 0, `an unrecorded commit is reported, not failed: ${r.stderr}`);
+    assert.match(r.stdout, new RegExp(`s\\.spec\\.md: ${second.slice(0, 7)}`));
+
+    r = run("--write");
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    assert.match(
+      r.stdout,
+      new RegExp(
+        `reopened \\(re-read before --check passes\\): s\\.spec\\.md: ${second.slice(0, 7)}`,
+      ),
+      "a write that rewrites a note must say so",
+    );
+    const note = JSON.parse(readFileSync(baselineFile, "utf8")).specs["s.spec.md"].note;
+    assert.match(note, /^TODO: re-read -- /, "the write must reopen the verdict, not keep it");
+    assert.match(note, /Previous note: Reviewed: the commit is unrelated/);
+    r = run("--check");
+    assert.equal(r.status, 1, "a reopened verdict stays red until a person re-reads it");
+    assert.match(r.stderr, /UNCLASSIFIED: s\.spec\.md -- reopened: TODO: re-read -- /);
+    assert.doesNotMatch(r.stderr, /has no note/, "a reopened row has a note; say what it asks");
+
+    // A commit that lands while the row is reopened joins its TODO, so the
+    // re-read covers everything the row will then record.
+    const third = touch(3);
+    r = run("--write");
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    const again = JSON.parse(readFileSync(baselineFile, "utf8")).specs["s.spec.md"].note;
+    assert.match(
+      again,
+      new RegExp(`^TODO: re-read -- ${second.slice(0, 7)}\\w*, ${third.slice(0, 7)}`),
+    );
+    assert.match(again, /Previous note: Reviewed: the commit is unrelated to this spec\.$/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// --- check:architecture: the package graph's copies agree with INTENDED ---
+
+/**
+ * A committed copy of every input check:architecture reads, from this
+ * repo's real files -- all the package manifests, not a sample -- so the
+ * test proves the real graph passes before each mutation proves a planted
+ * disagreement is seen. Returns the directory and how many manifests it
+ * copied, so no count is restated here.
+ */
+function architectureRepo({ entry = "none" } = {}) {
+  const dir = tempRepo();
+  const copy = (rel) => stage(dir, rel, readFileSync(join(REPO, rel), "utf8"));
+  copy("CLAUDE.md");
+  copy("barwise/scripts/lib/intended.cjs");
+  copy("barwise/docs/ARCHITECTURE.md");
+  // The tracked ADRs only: the copied ARCHITECTURE.md indexes those, and
+  // an untracked draft in this checkout would otherwise read as "stale".
+  const adrList = execFileSync("git", ["ls-files", "-z", "barwise/docs/adr/"], {
+    cwd: REPO,
+    encoding: "utf8",
+  });
+  // An ADR that declares Enforced-by: names gates, tests and issues whose
+  // inputs (ci.yml, the root scripts, the live tracker) this fixture does
+  // not carry. Its header is rewritten to one open fixture issue covering
+  // every decision, so graph and shape cases keep testing what they test
+  // and never depend on the live tracker or ci.yml; the enforcement cases
+  // build their own inputs (executable-adrs.spec.md, WS3).
+  let declaring = 0;
+  for (const rel of adrList.split("\0").filter(Boolean)) {
+    const text = readFileSync(join(REPO, rel), "utf8");
+    assert.ok(parseEnforcedBy(text).present, `${rel}: has no Enforced-by: header to rewrite`);
+    const ids = decisionIds(text).decisions.map((d) => d.id);
+    // Enforced-by: is the last header field (check:architecture holds it to
+    // that, and requires it), so it runs to the blank line. `entry: "tests"`
+    // declares every decision as tested instead, which check:architecture
+    // answers from no input at all, for a case that needs a tree with no
+    // tracker.
+    const value = entry === "tests"
+      ? `Enforced-by: tests (${ids.join(", ")})\n`
+      : `Enforced-by: none (barwise-fx1: ${ids.join(", ")})\n`;
+    const rewritten = text.replace(/^Enforced-by:[^]*?\n(?=\n)/m, value);
+    assert.notEqual(rewritten, text, `${rel}: its Enforced-by: header was not rewritten`);
+    stage(dir, rel, rewritten);
+    declaring += 1;
+  }
+  if (entry !== "tests") {
+    stage(dir, ".beads/issues.jsonl", '{"id":"barwise-fx1","status":"open","title":"fixture"}\n');
+  }
+  let manifests = 0;
+  for (const pkg of readdirSync(join(REPO, "barwise", "packages"))) {
+    const rel = `barwise/packages/${pkg}/package.json`;
+    if (existsSync(join(REPO, rel))) {
+      copy(rel);
+      manifests += 1;
+    }
+  }
+  // The rewritten headers render differently in the index, so the copied
+  // section is regenerated from them, as stageAdr() does for one ADR.
+  {
+    const r = spawnSync(
+      process.execPath,
+      [join(SCRIPTS, "regen-architecture.mjs"), "--root", dir],
+      {
+        encoding: "utf8",
+      },
+    );
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    stage(
+      dir,
+      "barwise/docs/ARCHITECTURE.md",
+      readFileSync(join(dir, "barwise/docs/ARCHITECTURE.md"), "utf8"),
+    );
+  }
+  execFileSync("git", ["commit", "-qm", "inputs"], { cwd: dir });
+  return { dir, manifests, declaring };
+}
+
+const ARCH_CMD = [process.execPath, join(SCRIPTS, "check-architecture.mjs"), "--root", "."];
+const ARCH = ["--", ...ARCH_CMD];
+/** Run check:architecture over the fixture in `dir`, or with other arguments. */
+const runArch = (dir, args = ARCH_CMD.slice(1)) =>
+  spawnSync(ARCH_CMD[0], args, { cwd: dir, encoding: "utf8" });
+
+/** Run check:architecture in `dir` with one file edited, then restore it. */
+function archPlanted(dir, rel, edit) {
+  const path = join(dir, rel);
+  const before = readFileSync(path, "utf8");
+  const after = edit(before);
+  assert.notEqual(after, before, `${rel}: the edit did not apply`);
+  writeFileSync(path, after);
+  try {
+    return runArch(dir);
+  } finally {
+    writeFileSync(path, before);
+  }
+}
+
+const CLAUDE_LLM = "@barwise/llm             (core)";
+const ROOT_ROW = "@barwise/core               (no internal deps)";
+
+/** `row` with a comment, wrapped onto `more` lines at the comment text's column. */
+function commented(row, comment, ...more) {
+  const col = row.length + 5;
+  return [`${row}  -- ${comment}`, ...more.map((t) => `  |${" ".repeat(col - 3)}${t}`)].join("\n");
+}
+const MCP_ROW =
+  "  |--- @barwise/mcp             (core, diagram, diagram-ui, llm, code-analysis, dbt, formats, learn)";
+const CORE_PKG = "barwise/packages/core/package.json";
+const INTENDED_CJS = "barwise/scripts/lib/intended.cjs";
+
+/** Each planted disagreement: file, anchor, replacement, the line it must report. */
+const ARCH_DISAGREEMENTS = [
+  // A dependency added to a commented row: its untouched wraps still read
+  // as its comment, so the new edge is compared, not refused.
+  [
+    "CLAUDE.md",
+    "@barwise/dbt             (core)",
+    "@barwise/dbt             (core, llm)",
+    /CLAUDE\.md draws dbt -> llm, INTENDED does not/,
+  ],
+  // Both directions of an edge disagreement.
+  [
+    "CLAUDE.md",
+    CLAUDE_LLM,
+    "@barwise/llm             (core, diagram)",
+    /CLAUDE\.md draws llm -> diagram, INTENDED does not/,
+  ],
+  [
+    "CLAUDE.md",
+    CLAUDE_LLM,
+    "@barwise/llm             ()",
+    /INTENDED has llm -> core, CLAUDE\.md does not/,
+  ],
+  [
+    INTENDED_CJS,
+    `"promptlab": ["core", "llm", "learn"]`,
+    `"promptlab": ["core", "llm"]`,
+    /CLAUDE\.md draws promptlab -> learn/,
+  ],
+  // Packages present on one side only, or listed twice.
+  ["CLAUDE.md", `  |--- ${CLAUDE_LLM}\n`, "", /CLAUDE\.md does not list llm/],
+  [
+    "CLAUDE.md",
+    `  |--- ${CLAUDE_LLM}\n`,
+    `  |--- ${CLAUDE_LLM}\n  |--- ${CLAUDE_LLM}\n`,
+    /CLAUDE\.md lists llm twice/,
+  ],
+  [
+    "CLAUDE.md",
+    CLAUDE_LLM,
+    "@barwise/llm             (core, core)",
+    /CLAUDE\.md lists llm -> core twice/,
+  ],
+  [
+    "CLAUDE.md",
+    CLAUDE_LLM,
+    `${CLAUDE_LLM}\n  |--- @barwise/ghost           (core)`,
+    /CLAUDE\.md lists @barwise\/ghost, INTENDED does not/,
+  ],
+  [INTENDED_CJS, `"learn": ["core"],`, "", /packages\/learn: not in INTENDED/],
+  // A row for a package with no manifest yet is still compared.
+  [
+    "CLAUDE.md",
+    `  |--- ${CLAUDE_LLM}\n`,
+    `  |--- ${CLAUDE_LLM}\n  |--- barwise-jetbrains (core, mcp)\n`,
+    /CLAUDE\.md lists barwise-jetbrains, INTENDED does not/,
+  ],
+  // One edge spelled in both vocabularies is still a duplicate.
+  [
+    "CLAUDE.md",
+    CLAUDE_LLM,
+    "@barwise/llm             (core, @barwise/core)",
+    /CLAUDE\.md lists llm -> core twice/,
+  ],
+  // The map agreeing with the picture is not enough.
+  [
+    INTENDED_CJS,
+    `"learn": ["core"],`,
+    `"learn": ["cor"],`,
+    /INTENDED has learn -> cor, and cor is not a key/,
+  ],
+  [
+    INTENDED_CJS,
+    `"learn": ["core"],`,
+    `"learn": ["core", "constructor"],`,
+    /INTENDED has learn -> constructor, and constructor is not a key/,
+  ],
+  [
+    INTENDED_CJS,
+    `"learn": ["core"],`,
+    `"learn": ["core", "core"],`,
+    /INTENDED lists learn -> core twice/,
+  ],
+  [
+    INTENDED_CJS,
+    `"learn": ["core"],`,
+    `"learn": ["core", "learn"],`,
+    /INTENDED has learn -> learn, a self-edge/,
+  ],
+  // Each runtime dependency field.
+  [
+    CORE_PKG,
+    `"dependencies": {`,
+    `"dependencies": {\n    "@barwise/llm": "*",`,
+    /packages\/core: dependencies has @barwise\/llm, INTENDED does not allow it/,
+  ],
+  [
+    CORE_PKG,
+    `"dependencies": {`,
+    `"peerDependencies": { "@barwise/llm": "*" },\n  "dependencies": {`,
+    /packages\/core: peerDependencies has @barwise\/llm/,
+  ],
+  [
+    CORE_PKG,
+    `"dependencies": {`,
+    `"optionalDependencies": { "barwise-vscode": "*" },\n  "dependencies": {`,
+    /packages\/core: optionalDependencies has barwise-vscode/,
+  ],
+];
+
+test("check:architecture passes the real graph and catches each planted disagreement", () => {
+  const { dir, manifests } = architectureRepo();
+  try {
+    const clean = runArch(dir);
+    assert.equal(clean.status, 0, clean.stdout + clean.stderr);
+    assert.match(clean.stdout, new RegExp(`and ${manifests} package manifests agree`));
+    for (const [file, old, replacement, why] of ARCH_DISAGREEMENTS) {
+      const r = mutate(dir, ["--file", file, "--old", old, "--new", replacement, ...ARCH]);
+      // mutate passes the child's output through, so its own result says
+      // both that the check failed and which disagreement it named.
+      assert.equal(r.status, 0, `${file}: expected CAUGHT:\n${r.stdout}${r.stderr}`);
+      assert.match(r.stdout, /CAUGHT -- the command failed \(exit 1\)/, `${file}: not exit 1`);
+      assert.match(r.stderr, why);
+    }
+    // A package listed twice keeps its first listing: the second invents
+    // no edge disagreement beside the real one.
+    const twice = archPlanted(
+      dir,
+      "CLAUDE.md",
+      (s) =>
+        s.replace(
+          `  |--- ${CLAUDE_LLM}\n`,
+          `  |--- ${CLAUDE_LLM}\n  |--- @barwise/llm (core, dbt)\n`,
+        ),
+    );
+    assert.equal(twice.status, 1, twice.stderr);
+    assert.match(twice.stderr, /CLAUDE\.md lists llm twice/);
+    assert.doesNotMatch(twice.stderr, /llm -> /);
+    // None of these is a disagreement: comment prose, whatever package
+    // names or parentheses it holds, wrapped at its comment's column; npm
+    // names inside a list; a directory name as the row name; bare `|`
+    // drawing lines; a commented root; a CRLF checkout.
+    const vscodeRow =
+      "  |--- barwise-vscode           (core, diagram, diagram-ui, llm, code-analysis, dbt, formats, mcp)";
+    for (
+      const edit of [
+        (x) =>
+          x.replace(vscodeRow, commented(vscodeRow, "the editor;", "bundles (esbuild) everything")),
+        (x) => x.replace(CLAUDE_LLM, "@barwise/llm             (@barwise/core)"),
+        (x) => x.replace("|--- barwise-vscode  ", "|--- vscode          "),
+        (x) => x.replace(`  |--- ${CLAUDE_LLM}\n`, `  |\n  |--- ${CLAUDE_LLM}\n  |\n`),
+        (x) =>
+          x.replace(
+            "(diagram)  -- React renderer over the",
+            "(diagram)  -- renders with @xyflow/react (MIT) over the",
+          ),
+        (x) =>
+          x.replace(
+            MCP_ROW,
+            commented(
+              MCP_ROW,
+              "the server;",
+              "embedded by barwise-vscode (in-process)",
+              "barwise-vscode (and CLI) embed it",
+              "registry (FormatDescriptor)",
+              "(exercise format) and `barwise tutorial`",
+              "-- providers (Anthropic, OpenAI)",
+            ),
+          ),
+        (x) => x.replace(ROOT_ROW, `${ROOT_ROW}  -- the kernel`),
+        // A wrapped root comment beside the arrow, a wrap with no `|` under
+        // the last row, and a `--` wrap under the row's own `--`.
+        (x) =>
+          x.replace(
+            `${ROOT_ROW}\n  ^\n`,
+            `${ROOT_ROW}  -- the kernel;\n  ^${" ".repeat(ROOT_ROW.length + 2)}depends inward\n`,
+          ),
+        (x) =>
+          x.replace(
+            vscodeRow,
+            `${vscodeRow}  -- the editor;\n${" ".repeat(vscodeRow.length + 5)}bundles everything`,
+          ),
+        (x) =>
+          x.replace(
+            MCP_ROW,
+            `${MCP_ROW}  -- the server\n  |${" ".repeat(MCP_ROW.length - 1)}-- in-process`,
+          ),
+        (x) => x.replace(/\n/g, "\r\n"),
+        (x) =>
+          x
+            .replace("connector package: registers\n", "unlike @barwise/formats (which\n")
+            .replace("code importers into the", "is pure) code importers"),
+      ]
+    ) {
+      const ok = archPlanted(dir, "CLAUDE.md", edit);
+      assert.equal(ok.status, 0, ok.stdout + ok.stderr);
+    }
+    // A package removed from packages/ while the map and picture keep it.
+    rmSync(join(dir, "barwise", "packages", "learn"), { recursive: true });
+    const gone = runArch(dir);
+    assert.equal(gone.status, 1, gone.stderr);
+    assert.match(gone.stderr, /INTENDED has learn, which is not a package under packages\//);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("check:architecture cannot answer when an input is unreadable or misshapen", () => {
+  const { dir } = architectureRepo();
+  const refused = (r, why) => {
+    assert.equal(r.status, 2, r.stdout + r.stderr);
+    assert.match(r.stderr, why);
+  };
+  const core = /cannot answer -- \S*packages\/core\/package\.json: /;
+  try {
+    refused(
+      archPlanted(dir, "CLAUDE.md", (s) => s.replace("## Dependency Graph", "## Packages")),
+      /cannot answer -- CLAUDE\.md has no "## Dependency Graph" heading/,
+    );
+    // The section keeps its heading and loses its block: it must refuse,
+    // not read a later section's fence as the graph.
+    refused(
+      archPlanted(
+        dir,
+        "CLAUDE.md",
+        (s) => s.replace(/(## Dependency Graph\n\n)```\n[\s\S]*?\n```\n/, "$1"),
+      ),
+      /the Dependency Graph section has no fenced block/,
+    );
+    refused(archPlanted(dir, CORE_PKG, (s) => s.replace("{", "{,")), core);
+    // Valid JSON of the wrong shape: read on, each would crash with exit 1
+    // or skip a field whose keys are array indices.
+    refused(archPlanted(dir, CORE_PKG, () => "null\n"), core);
+    refused(
+      archPlanted(dir, CORE_PKG, (s) => s.replace(`"name": "@barwise/core"`, `"name": 5`)),
+      core,
+    );
+    refused(
+      archPlanted(
+        dir,
+        CORE_PKG,
+        (s) =>
+          s.replace(
+            `"dependencies": {`,
+            `"peerDependencies": ["@barwise/cli"],\n  "dependencies": {`,
+          ),
+      ),
+      core,
+    );
+    // The graph block names no package, or wraps a list onto a second line.
+    refused(
+      archPlanted(
+        dir,
+        "CLAUDE.md",
+        (s) => s.replace(/(## Dependency Graph\n\n```\n)[\s\S]*?(\n```\n)/, "$1$2"),
+      ),
+      /the Dependency Graph block names no package/,
+    );
+    // Every line outside the grammar is refused by name: a wrapped list,
+    // a misdrawn or nested connector, a second root, a legend above the
+    // root, box-drawing characters, a row with no space before its list.
+    const LLM_ROW = `  |--- ${CLAUDE_LLM}`;
+    for (
+      const [from, to, line] of [
+        [
+          CLAUDE_LLM,
+          "@barwise/llm             (core,\n  |   diagram)",
+          /\|--- @barwise\/llm\s+\(core,/,
+        ],
+        [LLM_ROW, "  |---   (core)", /\|---   \(core\)/],
+        [LLM_ROW, "  |---- @barwise/llm      (core)", /\|---- @barwise\/llm/],
+        [LLM_ROW, "  +--- @barwise/llm      (core)", /\+--- @barwise\/llm/],
+        [LLM_ROW, `  |     |--- ${CLAUDE_LLM}`, /\|     \|--- @barwise\/llm/],
+        [LLM_ROW, "  \u251c\u2500\u2500 @barwise/llm (core)", /\u251c\u2500\u2500 @barwise\/llm/],
+        [LLM_ROW, "  |--- @barwise/llm(core)", /\|--- @barwise\/llm\(core\)/],
+        [LLM_ROW, `${LLM_ROW} extra`, /\(core\) extra/],
+        [LLM_ROW, "  |---------- connectors ----------", /\|---------- connectors/],
+        [LLM_ROW, `${LLM_ROW}\n\n@barwise/planned            (core)`, /@barwise\/planned/],
+        // Comment text only continues a row that opened a comment: under a
+        // row without one it is a wrapped list or a lost connector.
+        [LLM_ROW, `${LLM_ROW}\n  |                              (mcp)`, /\(mcp\)/],
+        [LLM_ROW, `${LLM_ROW}\n  |   barwise-planned       (core)  (planned)`, /barwise-planned/],
+        [LLM_ROW, `${LLM_ROW}\n  |   planned(core)`, /planned\(core\)/],
+        [LLM_ROW, `${LLM_ROW}\n  |   a stray note`, /a stray note/],
+        // Under a commented row, text at any other column is not its comment:
+        // a lost row, a list, or prose one column off.
+        [
+          MCP_ROW,
+          `${MCP_ROW}  -- the server\n  |   barwise-planned (core)`,
+          /\|   barwise-planned/,
+        ],
+        [MCP_ROW, `${MCP_ROW}  -- the server\n  |   (core, llm)`, /\|   \(core, llm\)/],
+        [MCP_ROW, `${MCP_ROW}  -- the server\n  |   planned(core)`, /\|   planned\(core\)/],
+        [
+          MCP_ROW,
+          `${MCP_ROW}  -- the server\n  |   planned (core)  --planned`,
+          /\|   planned \(core\)/,
+        ],
+        [
+          MCP_ROW,
+          `${commented(MCP_ROW, "the server")}\n  |${
+            " ".repeat(MCP_ROW.indexOf("(") - 3)
+          }at the list column`,
+          /at the list column/,
+        ],
+        [
+          MCP_ROW,
+          `${MCP_ROW}  -- the server\n  |   lost (core)`,
+          new RegExp(
+            `under @barwise/mcp must start right of column ${
+              MCP_ROW.indexOf("(") + 1
+            }, and this one starts at column 7`,
+          ),
+        ],
+        // A drawing line ends the comment: text after it continues nothing.
+        // ... even one padded with trailing spaces past the list column.
+        [
+          MCP_ROW,
+          `${commented(MCP_ROW, "the server")}\n  |${" ".repeat(MCP_ROW.length)}\n  |${
+            " ".repeat(MCP_ROW.length + 2)
+          }after padding`,
+          /after padding/,
+        ],
+        [
+          MCP_ROW,
+          `${commented(MCP_ROW, "the server")}\n  |\n  |${
+            " ".repeat(MCP_ROW.length + 2)
+          }after a gap`,
+          /after a gap/,
+        ],
+        [MCP_ROW, `${MCP_ROW}  -- the server\n  |\n  |   a stray note`, /a stray note/],
+        // A row that lost its connector, in any spelling, is not prose.
+        [LLM_ROW, `${LLM_ROW}\n  |   @barwise/planned   (core)`, /\|   @barwise\/planned/],
+        [LLM_ROW, `${LLM_ROW}\n  @barwise/planned   (core)`, /"  @barwise\/planned/],
+        [LLM_ROW, `${LLM_ROW}\n  |   barwise-planned (core)`, /\|   barwise-planned/],
+        [LLM_ROW, `${LLM_ROW}\n  |   @xyflow/react (MIT) is not used here`, /@xyflow\/react/],
+        [LLM_ROW, "  '--- @barwise/llm   (core)", /'--- @barwise\/llm/],
+        [LLM_ROW, "  ^--- @barwise/llm   (core)", /\^--- @barwise\/llm/],
+        [LLM_ROW, `        |--- ${CLAUDE_LLM}`, /\|--- @barwise\/llm/],
+        // A name or list the grammar cannot read.
+        [LLM_ROW, "  |--- `@barwise/llm`   (core)", /\|--- `@barwise\/llm`/],
+        [LLM_ROW, "  |--- @barwise/llm   (core; diagram)", /\(core; diagram\)/],
+      ]
+    ) {
+      const r = archPlanted(dir, "CLAUDE.md", (s) => s.replace(from, to));
+      refused(r, /the graph block line ".*" is not one the grammar allows/);
+      assert.match(r.stderr, line);
+    }
+    // A malformed row after a commented row is not blamed on that comment.
+    const dash = archPlanted(
+      dir,
+      "CLAUDE.md",
+      (s) =>
+        s.replace(
+          "(core)  -- connector package: registers\n  |                                        the dbt",
+          "(core)  \u2014 connector package: registers\n  |                                        the dbt",
+        ),
+    );
+    refused(dash, /\(core\)  \u2014 connector package/);
+    assert.doesNotMatch(dash.stderr, /must start right of column/);
+    // Nor is a misdrawn or nested connector there.
+    for (
+      const bad of [
+        "        |--- @barwise/llm (core)",
+        "  |     |--- @barwise/llm (core)",
+        "  +--- @barwise/llm (core)",
+      ]
+    ) {
+      const r = archPlanted(dir, "CLAUDE.md", (s) => s.replace(`  |--- ${CLAUDE_LLM}`, bad));
+      refused(r, /is not one the grammar allows/);
+      assert.doesNotMatch(r.stderr, /must start right of column/, bad);
+    }
+    refused(
+      archPlanted(
+        dir,
+        "CLAUDE.md",
+        (s) => s.replace(ROOT_ROW, `Legend: an arrow (^) points at a dependency\n${ROOT_ROW}`),
+      ),
+      /the graph block must open with the root line, not "Legend/,
+    );
+    // A legend shaped like a root row (`Legend (x)`) is taken for the root,
+    // and the real root line is then refused: exit 2 either way, never
+    // compared.
+    refused(
+      archPlanted(dir, "CLAUDE.md", (s) => s.replace(ROOT_ROW, `Legend (arrows)\n${ROOT_ROW}`)),
+      /the graph block line "@barwise\/core\s+\(no internal deps\)" is not one the grammar/,
+    );
+    const shapeFault = /does not export a map of package to package list/;
+    for (const bad of [`"core": [[]]`, `"core": "none"`]) {
+      refused(archPlanted(dir, INTENDED_CJS, (s) => s.replace(`"core": []`, bad)), shapeFault);
+    }
+    refused(archPlanted(dir, INTENDED_CJS, () => "module.exports = {};\n"), shapeFault);
+    // Two manifests with one name: the name maps to neither directory.
+    const copyDir = join(dir, "barwise", "packages", "core-old");
+    mkdirSync(copyDir);
+    writeFileSync(join(copyDir, "package.json"), readFileSync(join(dir, CORE_PKG), "utf8"));
+    refused(
+      runArch(dir),
+      /two package manifests are named @barwise\/core/,
+    );
+    rmSync(copyDir, { recursive: true });
+    // A directory with no manifest is not a package, and no manifest at
+    // all is nothing to compare.
+    mkdirSync(join(dir, "barwise", "packages", "stray-build"));
+    const stray = runArch(dir);
+    assert.equal(stray.status, 0, stray.stdout + stray.stderr);
+    const empty = mkdtempSync(join(tmpdir(), "barwise-arch-empty-"));
+    try {
+      mkdirSync(join(empty, "barwise", "scripts", "lib"), { recursive: true });
+      mkdirSync(join(empty, "barwise", "packages", "core"), { recursive: true });
+      writeFileSync(join(empty, "CLAUDE.md"), readFileSync(join(dir, "CLAUDE.md")));
+      writeFileSync(join(empty, INTENDED_CJS), readFileSync(join(dir, INTENDED_CJS)));
+      refused(
+        runArch(dir, [ARCH_CMD[1], "--root", empty]),
+        /no package\.json under/,
+      );
+    } finally {
+      rmSync(empty, { recursive: true, force: true });
+    }
+    refused(
+      runArch(dir, [ARCH_CMD[1], "--root"]),
+      /--root needs a value/,
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// --- check:architecture, WS2: ADR shape and references ---
+
+/** regen:architecture run against a fixture tree. */
+const regenArch = (dir) =>
+  spawnSync(process.execPath, [join(SCRIPTS, "regen-architecture.mjs"), "--root", dir], {
+    encoding: "utf8",
+  });
+
+/**
+ * Stage an ADR in an architectureRepo fixture and regenerate and stage the
+ * fixture's ARCHITECTURE.md section, as an author does after adding one --
+ * otherwise every such test also reads "stale". It runs the real
+ * regenerator, so these tests also see it agree with the check.
+ */
+function stageAdr(dir, name, text) {
+  stage(dir, `barwise/docs/adr/${name}.md`, text);
+  const r = regenArch(dir);
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  const doc = join(dir, "barwise", "docs", "ARCHITECTURE.md");
+  stage(dir, "barwise/docs/ARCHITECTURE.md", readFileSync(doc, "utf8"));
+}
+
+const ADR_OK = "# A concern\n\nScope: process\nDate: 2026-10-24\nTracking: barwise-ubc\n"
+  + "Enforced-by: none (barwise-fx1: the-rule)\n\n"
+  + "## Context\n\nWhy.\n\n## Decision\n\n1. **The rule.** {#the-rule} It holds.\n\n"
+  + "## Consequences\n\nWhat follows.\n";
+
+test("check:architecture checks each ADR's shape", () => {
+  const { dir } = architectureRepo();
+  try {
+    stageAdr(dir, "a-concern", ADR_OK);
+    execFileSync("git", ["commit", "-qm", "adr"], { cwd: dir });
+    const ok = runArch(dir);
+    assert.equal(ok.status, 0, ok.stdout + ok.stderr);
+    const ADR = "barwise/docs/adr/a-concern.md";
+    for (
+      const [edit, why] of [
+        [(s) => s.replace("Scope: process\n", ""), /a-concern\.md: no Scope: line/],
+        [
+          (s) => s.replace("Scope: process", "Scope: policy"),
+          /a-concern\.md: Scope: policy is not one of architecture, process/,
+        ],
+        [(s) => s.replace("Date: 2026-10-24\n", ""), /a-concern\.md: no Date: line/],
+        [(s) => s.replace("## Decision", "## The rule"), /a-concern\.md: no "## Decision" section/],
+        [(s) => s.replace("# A concern\n", ""), /a-concern\.md: no "# " title line/],
+        // A field in the body is not the ADR's own.
+        [
+          (s) => s.replace("Scope: process\n", "").replace("Why.", "Scope: process"),
+          /no Scope: line/,
+        ],
+      ]
+    ) {
+      const r = archPlanted(dir, ADR, edit);
+      assert.equal(r.status, 1, r.stdout + r.stderr);
+      assert.match(r.stderr, why);
+    }
+    // A README in the directory is not an ADR.
+    stage(dir, "barwise/docs/adr/README.md", "# ADRs\n\nAn index.\n");
+    const readme = runArch(dir);
+    assert.equal(readme.status, 0, readme.stdout + readme.stderr);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("check:architecture resolves each ADR reference in the files that act on it", () => {
+  const { dir } = architectureRepo();
+  try {
+    stageAdr(dir, "a-concern", ADR_OK);
+    // Live references in both forms, from each kind of citing file.
+    stage(dir, "barwise/packages/core/CLAUDE.md", "See ADR `a-concern`.\n");
+    stage(dir, "barwise/packages/core/src/x.ts", "// docs/adr/a-concern.md\n");
+    // A spec may cite an ADR it plans as a `+` Touches: entry.
+    stage(
+      dir,
+      "barwise/docs/specs/p.spec.md",
+      "# P\n\nStatus: Draft\nTouches: +barwise/docs/adr/planned.md\n\n## Body\n\nADR `planned`.\n",
+    );
+    // History is not read: the tracker, an archived spec, a dated record,
+    // and a number, which is not a form at all.
+    stage(
+      dir,
+      ".beads/issues.jsonl",
+      (existsSync(join(dir, ".beads/issues.jsonl"))
+        ? readFileSync(join(dir, ".beads/issues.jsonl"), "utf8")
+        : "")
+        + '{"id":"barwise-h1","d":"ADR `gone`"}\n',
+    );
+    stage(dir, "barwise/docs/specs/archive/old.spec.md", "# O\n\nADR `gone`\n");
+    stage(dir, "barwise/docs/review-2026-08-27.md", "docs/adr/gone.md\n");
+    stage(dir, "barwise/packages/core/CLAUDE.md", "See ADR `a-concern`. ADR 0001 too.\n");
+    execFileSync("git", ["commit", "-qm", "refs"], { cwd: dir });
+    const ok = runArch(dir);
+    assert.equal(ok.status, 0, ok.stdout + ok.stderr);
+    for (
+      const [file, edit, why] of [
+        [
+          "barwise/packages/core/CLAUDE.md",
+          (s) => s.replace("ADR `a-concern`", "ADR `a-concrn`"),
+          /packages\/core\/CLAUDE\.md:1: names ADR a-concrn, and barwise\/docs\/adr\/a-concrn\.md does not exist/,
+        ],
+        [
+          "barwise/packages/core/src/x.ts",
+          (s) => s.replace("a-concern.md", "moved.md"),
+          /core\/src\/x\.ts:1: names ADR moved/,
+        ],
+        // The `+` entry is the spec's own: without it the planned name is dead.
+        [
+          "barwise/docs/specs/p.spec.md",
+          (s) => s.replace("+barwise/docs/adr/planned.md", "+barwise/x.ts"),
+          /p\.spec\.md:8: names ADR planned/,
+        ],
+        // An ADR may cite another, and a retired one is dead there too.
+        [
+          "barwise/docs/adr/a-concern.md",
+          (s) => s.replace("The rule.", "See ADR `retired`."),
+          /a-concern\.md:\d+: names ADR retired/,
+        ],
+      ]
+    ) {
+      const r = archPlanted(dir, file, edit);
+      assert.equal(r.status, 1, r.stdout + r.stderr);
+      assert.match(r.stderr, why);
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("check:architecture reads wrapped, retiring and doc references, and skips a deleted file", () => {
+  const { dir } = architectureRepo();
+  try {
+    stageAdr(dir, "a-concern", ADR_OK);
+    // A spec retiring an ADR names it in its own `-` Touches: entry.
+    stage(
+      dir,
+      "barwise/docs/specs/r.spec.md",
+      "# R\n\nStatus: Draft\nTouches: -barwise/docs/adr/retiring.md\n\n## Body\n\nRetires ADR `retiring`.\n",
+    );
+    // An undated doc and an evals file act on decisions too.
+    stage(dir, "barwise/docs/guide.md", "See ADR\n`a-concern`.\n");
+    // Not references: a word ending in ADR, a blank line between, and
+    // package history (an eval run, a dated file).
+    stage(dir, "barwise/docs/notes.md", "MADR `gone`. See the ADR\n\n`gone` too.\n");
+    stage(dir, "barwise/packages/core/eval-runs/r.json", '"docs/adr/gone.md"\n');
+    stage(dir, "barwise/packages/core/evals/2026-01-01.yaml", "# docs/adr/gone.md\n");
+    stage(dir, "barwise/packages/core/evals/suite.yaml", "# docs/adr/a-concern.md\n");
+    stage(dir, "barwise/packages/core/src/y.ts", "// See ADR\n// `a-concern`\n");
+    execFileSync("git", ["commit", "-qm", "refs"], { cwd: dir });
+    const ok = runArch(dir);
+    assert.equal(ok.status, 0, ok.stdout + ok.stderr);
+    for (
+      const [file, edit, why] of [
+        // A reference split by a reflow is still read, at its first line.
+        [
+          "barwise/docs/guide.md",
+          (s) => s.replace("`a-concern`", "`a-concrn`"),
+          /guide\.md:1: names ADR a-concrn/,
+        ],
+        [
+          "barwise/packages/core/src/y.ts",
+          (s) => s.replace("a-concern", "gone"),
+          /core\/src\/y\.ts:1: names ADR gone/,
+        ],
+        [
+          "barwise/packages/core/evals/suite.yaml",
+          (s) => s.replace("a-concern", "gone"),
+          /evals\/suite\.yaml:1: names ADR gone/,
+        ],
+        [
+          "barwise/docs/specs/r.spec.md",
+          (s) => s.replace("-barwise/docs/adr/retiring.md", "-barwise/x.ts"),
+          /r\.spec\.md:8: names ADR retiring/,
+        ],
+        [
+          "barwise/docs/adr/a-concern.md",
+          (s) => s.replace("2026-10-24", "<YYYY-MM-DD>"),
+          /a-concern\.md: Date: <YYYY-MM-DD> is not YYYY-MM-DD/,
+        ],
+      ]
+    ) {
+      const r = archPlanted(dir, file, edit);
+      assert.equal(r.status, 1, r.stdout + r.stderr);
+      assert.match(r.stderr, why);
+    }
+    // A graph disagreement and an ADR problem are both reported in one run.
+    const both = archPlanted(
+      dir,
+      "barwise/docs/guide.md",
+      (s) => s.replace("`a-concern`", "`nope`"),
+    );
+    assert.equal(both.status, 1);
+    const path = join(dir, "CLAUDE.md");
+    const before = readFileSync(path, "utf8");
+    writeFileSync(path, before.replace(CLAUDE_LLM, "@barwise/llm             (core, diagram)"));
+    writeFileSync(join(dir, "barwise/docs/guide.md"), "See ADR `nope`.\n");
+    const r = runArch(dir);
+    writeFileSync(path, before);
+    writeFileSync(join(dir, "barwise/docs/guide.md"), "See ADR\n`a-concern`.\n");
+    assert.equal(r.status, 1, r.stderr);
+    assert.match(r.stderr, /draws llm -> diagram/);
+    assert.match(r.stderr, /guide\.md:1: names ADR nope/);
+    // An ADR written but not yet staged is not in the tree CI checks: a
+    // reference to it fails, and the run names the file as unchecked.
+    writeFileSync(join(dir, "barwise/docs/adr/unstaged.md"), ADR_OK);
+    writeFileSync(join(dir, "barwise/docs/guide.md"), "See ADR\n`unstaged`.\n");
+    const unstaged = runArch(dir);
+    assert.equal(unstaged.status, 1, unstaged.stdout + unstaged.stderr);
+    assert.match(unstaged.stdout, /unchecked \(untracked\): barwise\/docs\/adr\/unstaged\.md/);
+    assert.match(unstaged.stderr, /guide\.md:1: names ADR unstaged/);
+    writeFileSync(join(dir, "barwise/docs/guide.md"), "See ADR\n`a-concern`.\n");
+    rmSync(join(dir, "barwise/docs/adr/unstaged.md"));
+    // A tracked file deleted from disk is one being removed: it is skipped,
+    // and the references it leaves dead are reported, not a refusal.
+    rmSync(join(dir, "barwise/docs/adr/a-concern.md"));
+    const gone = runArch(dir);
+    assert.equal(gone.status, 1, gone.stdout + gone.stderr);
+    assert.match(gone.stderr, /guide\.md:1: names ADR a-concern/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("check:architecture passes the real tree from any working directory", () => {
+  // No --root: the list and the files read must be one tree, whatever the cwd.
+  for (const cwd of [REPO, tmpdir()]) {
+    const r = spawnSync(process.execPath, [join(SCRIPTS, "check-architecture.mjs")], {
+      cwd,
+      encoding: "utf8",
+    });
+    assert.equal(r.status, 0, `${cwd}: ${r.stdout}${r.stderr}`);
+  }
+});
+
+test("check:architecture fails a stale generated section, and regen:architecture refreshes it", () => {
+  const { dir } = architectureRepo();
+  try {
+    // A new ADR staged without regenerating: the index no longer lists it.
+    stage(dir, "barwise/docs/adr/a-concern.md", ADR_OK);
+    const stale = runArch(dir);
+    assert.equal(stale.status, 1, stale.stdout + stale.stderr);
+    assert.match(
+      stale.stderr,
+      /generated section of barwise\/docs\/ARCHITECTURE\.md is stale .*run npm run regen:architecture/,
+    );
+    // Not reported as an ADR problem: an INTENDED edit makes it stale too.
+    assert.doesNotMatch(stale.stderr, /ADR problem/);
+    // A dollar sign in a title is text, not a replacement pattern.
+    stage(
+      dir,
+      "barwise/docs/adr/b-cost.md",
+      ADR_OK.replace("# A concern", () => "# Costs in $& terms"),
+    );
+    const regen = regenArch(dir);
+    assert.equal(regen.status, 0, regen.stdout + regen.stderr);
+    assert.match(regen.stdout, /wrote the generated section/);
+    const doc = readFileSync(join(dir, "barwise", "docs", "ARCHITECTURE.md"), "utf8");
+    assert.match(doc, /- \[A concern\]\(adr\/a-concern\.md\) -- 2026-10-24/);
+    assert.ok(doc.includes("- [Costs in $& terms](adr/b-cost.md) -- 2026-10-24"), doc);
+    stage(dir, "barwise/docs/ARCHITECTURE.md", doc);
+    const fresh = runArch(dir);
+    assert.equal(fresh.status, 0, fresh.stdout + fresh.stderr);
+    // Run again, it writes nothing.
+    assert.match(regenArch(dir).stdout, /already current/);
+    // An ADR on disk but untracked is one the check does not list, so the
+    // regenerator must not index it either: otherwise the check reads
+    // "stale" and no regen run can make it current.
+    writeFileSync(join(dir, "barwise", "docs", "adr", "draft.md"), ADR_OK);
+    assert.match(regenArch(dir).stdout, /already current/);
+    const still = runArch(dir);
+    assert.equal(still.status, 0, still.stdout + still.stderr);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("check:architecture and regen:architecture refuse without the section's markers", () => {
+  const { dir } = architectureRepo();
+  try {
+    const doc = join(dir, "barwise", "docs", "ARCHITECTURE.md");
+    // The fixture's own document: its section renders the fixture's ADRs,
+    // whose Enforced-by: headers architectureRepo() rewrote.
+    const original = readFileSync(doc, "utf8");
+    stage(
+      dir,
+      "barwise/docs/ARCHITECTURE.md",
+      original.replace("<!-- END regen:architecture -->", ""),
+    );
+    const check = runArch(dir);
+    assert.equal(check.status, 2, check.stdout + check.stderr);
+    assert.match(check.stderr, /ARCHITECTURE\.md has no regen:architecture markers/);
+    const regen = regenArch(dir);
+    assert.equal(regen.status, 2, regen.stdout + regen.stderr);
+    assert.match(regen.stderr, /no regen:architecture markers/);
+    // Prose quoting the END marker above the section does not hide it.
+    const quoted = original
+      .replace(
+        "**Last Updated:**",
+        "Ends at `<!-- END regen:architecture -->`.\n\n**Last Updated:**",
+      );
+    stage(dir, "barwise/docs/ARCHITECTURE.md", quoted);
+    const q = runArch(dir);
+    assert.equal(q.status, 0, q.stdout + q.stderr);
+    // A misshapen INTENDED is refused, not rendered as an empty graph.
+    stage(dir, "barwise/scripts/lib/intended.cjs", "module.exports = {};\n");
+    const empty = regenArch(dir);
+    assert.equal(empty.status, 2, empty.stdout + empty.stderr);
+    assert.match(empty.stderr, /does not export a map of package to package list/);
+    // A bare --root is "could not answer" too.
+    const bare = spawnSync(process.execPath, [join(SCRIPTS, "regen-architecture.mjs"), "--root"], {
+      encoding: "utf8",
+    });
+    assert.equal(bare.status, 2, bare.stdout + bare.stderr);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("check:architecture cannot answer with no ADR to check", () => {
+  const { dir } = architectureRepo();
+  try {
+    execFileSync("git", ["rm", "-rq", "barwise/docs/adr"], { cwd: dir });
+    const r = runArch(dir);
+    assert.equal(r.status, 2, r.stdout + r.stderr);
+    assert.match(r.stderr, /cannot answer -- no ADR under/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// --- check:architecture, executable ADRs WS1: Enforced-by: declarations ---
+
+/**
+ * An ADR declaring all four entry kinds over four decisions, one of whose
+ * bold titles wraps, beside the inputs those entries read: a ci.yml whose
+ * steps are the gates, the root scripts, and a tracker with an open and a
+ * closed issue. Each case below breaks one thing and expects one finding,
+ * or one refusal, from the real check.
+ */
+const ENFORCED_ADR = "# A concern\n\nScope: process\nDate: 2026-10-24\nTracking: barwise-ubc\n"
+  + "Enforced-by: npm run check:x (one), npm run audit:y -- --check (two),\n"
+  + "tests (three), none (barwise-gap: four)\n\n"
+  + "## Context\n\nWhy.\n\n## Decision\n\n"
+  + "1. **One.** {#one} The first rule.\n"
+  + "2. **Two, whose title\n   wraps.** {#two} The second.\n"
+  + "3. **Three.** {#three} The third.\n"
+  + "4. **Four.** {#four} The fourth.\n\n"
+  + "## Consequences\n\nWhat follows.\n";
+const ENFORCED_CI = "name: CI\non: push\njobs:\n  ci:\n    runs-on: ubuntu-latest\n"
+  + "    defaults:\n      run:\n        working-directory: barwise\n    steps:\n"
+  + "      - uses: actions/checkout@v7\n"
+  + "      - run: npm run check:x\n"
+  + "      - run: npm run audit:y -- --check\n"
+  + "        if: steps.changes.outputs.docs_only != 'true'\n";
+const ENFORCED_ROOT_PKG = JSON.stringify({
+  scripts: {
+    "check:x": "node scripts/x.mjs",
+    "audit:y": "node scripts/y.mjs",
+    lint: "turbo run lint",
+    "check:adr-tests": "node scripts/check-adr-tests.mjs",
+  },
+});
+const ENFORCED_TRACKER = '{"id":"barwise-fx1","status":"open","title":"fixture"}\n'
+  + '{"id":"barwise-gap","status":"open","title":"g"}\n'
+  + '{"id":"barwise-shut","status":"closed","title":"s"}\n';
+
+function enforcementRepo() {
+  const fixture = architectureRepo();
+  const { dir } = fixture;
+  stageAdr(dir, "a-concern", ENFORCED_ADR);
+  stage(dir, ".github/workflows/ci.yml", ENFORCED_CI);
+  stage(dir, "barwise/package.json", ENFORCED_ROOT_PKG);
+  stage(dir, ".beads/issues.jsonl", ENFORCED_TRACKER);
+  execFileSync("git", ["commit", "-qm", "enforced"], { cwd: dir });
+  return fixture;
+}
+const ENFORCED_PATH = "barwise/docs/adr/a-concern.md";
+const CI_PATH = ".github/workflows/ci.yml";
+
+test("check:architecture accepts every entry kind when each decision is accounted for", () => {
+  const { dir, declaring } = enforcementRepo();
+  try {
+    const ok = runArch(dir);
+    assert.equal(ok.status, 0, ok.stdout + ok.stderr);
+    // The copied real ADRs that declare, and this fixture's own.
+    assert.match(ok.stdout, new RegExp(`; ${declaring + 1} declare Enforced-by:`));
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("check:architecture names each broken Enforced-by: declaration, exit 1", () => {
+  const { dir } = enforcementRepo();
+  try {
+    for (
+      const [rel, edit, why] of [
+        // Decision ids.
+        [
+          ENFORCED_PATH,
+          (s) => s.replace(" {#three}", ""),
+          /decision 3 \(line \d+\) has no \{#id\}/,
+        ],
+        [
+          ENFORCED_PATH,
+          (s) => s.replace("{#four}", "{#one}"),
+          /decisions 1 and 4 share the id one/,
+        ],
+        [
+          ENFORCED_PATH,
+          (s) => s.replace("tests (three)", "tests (thre)"),
+          /lists thre, which no decision/,
+        ],
+        [
+          ENFORCED_PATH,
+          (s) => s.replace("\ntests (three), ", "\n"),
+          /decision 3 \{#three\} has no Enforced-by: entry/,
+        ],
+        // The header's own form.
+        [ENFORCED_PATH, (s) => s.replace("(one),", "(one)"), /is not an entry/],
+        [
+          ENFORCED_PATH,
+          (s) => s.replace("(barwise-gap: four)", "(barwise-gap: four"),
+          /unclosed "\("/,
+        ],
+        [
+          ENFORCED_PATH,
+          (s) => s.replace("four)\n\n", "four)\nOwner: someone\n\n"),
+          /Enforced-by: is not the last header field \(Owner follows it\)/,
+        ],
+        [
+          ENFORCED_PATH,
+          (s) => s.replace(/Enforced-by:[^]*?four\)\n/, "Enforced-by:\n"),
+          /Enforced-by: declares nothing/,
+        ],
+        // Gate entries.
+        [ENFORCED_PATH, (s) => s.replace("check:x (one)", "lint (one)"), /lint is not a gate name/],
+        [
+          ENFORCED_PATH,
+          (s) => s.replace("check:x (one)", "check:adr-tests (one)"),
+          /check:adr-tests checks other gates and cannot vouch/,
+        ],
+        [
+          ENFORCED_PATH,
+          (s) => s.replace("check:x (one)", "check:nope (one)"),
+          /has no script check:nope/,
+        ],
+        [
+          CI_PATH,
+          (s) => s.replace("run: npm run check:x", "run: npm run --silent check:x"),
+          /no ci\.yml step's run: is exactly "npm run check:x"/,
+        ],
+        // The arguments are part of the match: without them the audit never fails CI.
+        [
+          CI_PATH,
+          (s) => s.replace("audit:y -- --check", "audit:y"),
+          /no ci\.yml step's run: is exactly "npm run audit:y -- --check"/,
+        ],
+        [
+          CI_PATH,
+          (s) => s.replace("!= 'true'", "== 'true'"),
+          /a guard that does not run it on every code change/,
+        ],
+        [
+          CI_PATH,
+          (s) => s.replace("docs_only != 'true'", "optimizer == 'true'"),
+          /a guard that does not run it on every code change/,
+        ],
+        [
+          CI_PATH,
+          (s) =>
+            s.replace("npm run check:x\n", "npm run check:x\n        continue-on-error: true\n"),
+          /"npm run check:x" is continue-on-error/,
+        ],
+        [
+          CI_PATH,
+          (s) => s.replace("    runs-on:", "    continue-on-error: true\n    runs-on:"),
+          /is continue-on-error, so it cannot fail CI/,
+        ],
+        [
+          CI_PATH,
+          (s) =>
+            s.replace(
+              "npm run check:x\n",
+              "npm run check:x\n        working-directory: barwise/packages/core\n",
+            ),
+          /"npm run check:x" does not run in barwise\//,
+        ],
+        // Gap issues.
+        [
+          ENFORCED_PATH,
+          (s) => s.replace("barwise-gap:", "barwise-shut:"),
+          /barwise-shut is closed/,
+        ],
+        [
+          ENFORCED_PATH,
+          (s) => s.replace("barwise-gap:", "barwise-nil:"),
+          /barwise-nil is not in \.beads/,
+        ],
+      ]
+    ) {
+      const r = archPlanted(dir, rel, edit);
+      assert.equal(r.status, 1, `${why}\n${r.stdout}${r.stderr}`);
+      assert.match(r.stderr, why);
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("check:architecture refuses, exit 2, only where it cannot tell, and lists it beside findings", () => {
+  const { dir } = enforcementRepo();
+  try {
+    const unknownGuard = (s) =>
+      s.replace("steps.changes.outputs.docs_only != 'true'", "github.ref == 'refs/heads/main'");
+    const refused = archPlanted(dir, CI_PATH, unknownGuard);
+    assert.equal(refused.status, 2, refused.stdout + refused.stderr);
+    // A gate switched off with `if: false` must not keep counting as an
+    // enforcer; the check cannot evaluate the form, so it refuses.
+    const off = archPlanted(
+      dir,
+      CI_PATH,
+      (s) => s.replace("steps.changes.outputs.docs_only != 'true'", "false"),
+    );
+    assert.equal(off.status, 2, off.stdout + off.stderr);
+    assert.match(off.stderr, /audit:y -- --check.*if: false/);
+    assert.match(
+      refused.stderr,
+      /cannot answer for 1 declaration.*\n.*audit:y -- --check.*if: github\.ref/,
+    );
+    const expression = archPlanted(
+      dir,
+      CI_PATH,
+      (s) =>
+        s.replace(
+          "npm run check:x\n",
+          "npm run check:x\n        continue-on-error: ${{ matrix.x }}\n",
+        ),
+    );
+    assert.equal(expression.status, 2, expression.stdout + expression.stderr);
+    assert.match(expression.stderr, /"npm run check:x \(one\)".*continue-on-error/);
+    // One occurrence never runs on a code change and one cannot be read:
+    // the unreadable one might qualify, so the answer is a refusal, not a
+    // finding (barwise-ym8.7jz review of e247c807).
+    const mixed = archPlanted(
+      dir,
+      CI_PATH,
+      (s) =>
+        s.replace("!= 'true'", "== 'true'")
+        + "      - run: npm run audit:y -- --check\n        if: github.ref == 'refs/heads/main'\n",
+    );
+    assert.equal(mixed.status, 2, mixed.stdout + mixed.stderr);
+    // An expression continue-on-error on a step whose guard never runs it
+    // on a code change cannot qualify either way: a finding, not a refusal.
+    const never = archPlanted(
+      dir,
+      CI_PATH,
+      (s) =>
+        s.replace("!= 'true'", "== 'true'").replace(
+          "audit:y -- --check\n",
+          "audit:y -- --check\n        continue-on-error: ${{ matrix.x }}\n",
+        ),
+    );
+    assert.equal(never.status, 1, never.stdout + never.stderr);
+    assert.match(never.stderr, /a guard that does not run it on every code change/);
+    // A finding with a refusal beside it is exit 1, and both are listed.
+    writeFileSync(join(dir, CI_PATH), unknownGuard(ENFORCED_CI));
+    const both = archPlanted(dir, ENFORCED_PATH, (s) => s.replace("check:x (one)", "lint (one)"));
+    assert.equal(both.status, 1, both.stdout + both.stderr);
+    assert.match(both.stderr, /lint is not a gate name/);
+    assert.match(both.stderr, /cannot answer for 1 declaration/);
+    writeFileSync(join(dir, CI_PATH), ENFORCED_CI);
+    // An input the entries need and cannot read.
+    rmSync(join(dir, ".beads", "issues.jsonl"));
+    const noTracker = runArch(dir);
+    assert.equal(noTracker.status, 2, noTracker.stdout + noTracker.stderr);
+    assert.match(noTracker.stderr, /\.beads\/issues\.jsonl: ENOENT/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("check:architecture requires Enforced-by:, and reads no ci.yml, scripts or tracker no entry needs", () => {
+  // The fixture has no ci.yml, root package.json or tracker, and every ADR
+  // in it declares `tests` only, which needs none of them, so none is a
+  // refusal.
+  const { dir, declaring } = architectureRepo({ entry: "tests" });
+  try {
+    assert.ok(!existsSync(join(dir, ".beads/issues.jsonl")), "the fixture must carry no tracker");
+    stageAdr(dir, "a-concern", ADR_OK.replace("none (barwise-fx1: the-rule)", "tests (the-rule)"));
+    execFileSync("git", ["commit", "-qm", "adr"], { cwd: dir });
+    const ok = runArch(dir);
+    assert.equal(ok.status, 0, ok.stdout + ok.stderr);
+    assert.match(ok.stdout, new RegExp(`; ${declaring + 1} declare Enforced-by:`));
+    // An ADR without the header is a finding naming it, not a skip.
+    const bare = archPlanted(
+      dir,
+      "barwise/docs/adr/a-concern.md",
+      (s) => s.replace("Enforced-by: tests (the-rule)\n", ""),
+    );
+    assert.equal(bare.status, 1, bare.stdout + bare.stderr);
+    assert.match(bare.stderr, /a-concern\.md: no Enforced-by: header/);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

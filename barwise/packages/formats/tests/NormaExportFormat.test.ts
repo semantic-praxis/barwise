@@ -12,7 +12,13 @@
  * plus explicit checks of the structures the conceptual diff does not cover
  * (subtype facts and objectification), so the guard is complete.
  */
-import { clearFormats, getExporter, type OrmModel, registerFormat } from "@barwise/core";
+import {
+  clearFormats,
+  getExporter,
+  OrmModel,
+  registerFormat,
+  subtypeFlagsFromConstraints,
+} from "@barwise/core";
 import { diffModels } from "@barwise/core/diff";
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
@@ -64,13 +70,17 @@ function expectModelsEqual(a: OrmModel, b: OrmModel, fixture: string): void {
 }
 
 function expectSubtypesEqual(a: OrmModel, b: OrmModel, fixture: string): void {
-  const key = (m: OrmModel) =>
-    m.subtypeFacts
+  const key = (m: OrmModel) => {
+    // What the constraints over subtypes say of each (orm-format-3 WS4b).
+    const flags = subtypeFlagsFromConstraints(m.constraints);
+    return m.subtypeFacts
       .map((sf) =>
         `${m.getObjectType(sf.subtypeId)?.name}<:${m.getObjectType(sf.supertypeId)?.name}`
-        + `:excl=${sf.isExclusive}:exh=${sf.isExhaustive}:pid=${sf.providesIdentification}`
+        + `:excl=${flags.get(sf.id)?.exclusive ?? false}`
+        + `:exh=${flags.get(sf.id)?.exhaustive ?? false}:pid=${sf.providesIdentification}`
       )
       .sort();
+  };
   expect(key(b), `subtype facts mismatch for ${fixture}`).toEqual(key(a));
 }
 
@@ -132,9 +142,7 @@ describe("NormaExportFormat", () => {
       expect(xml).toContain('Purpose="SameFactType"');
 
       const reimported = importNormaXml(xml);
-      const joins = reimported.factTypes.flatMap((ft) =>
-        ft.constraints.filter((c) => c.type === "join_equality")
-      );
+      const joins = reimported.constraints.filter((c) => c.type === "join_equality");
       expect(joins).toHaveLength(1);
       expect(joins[0]!.operands).toHaveLength(2);
     });
@@ -201,5 +209,40 @@ describe("NormaExportFormat", () => {
         expect(getExporter("norma")).toBeDefined();
       });
     });
+  });
+});
+
+describe("NORMA export of a constraint the model leaves unnamed", () => {
+  it("states an id NORMA reads, the same on every export, rather than throwing", () => {
+    // A ring over two players has no sentence to mint a name from, so the
+    // model leaves it unnamed (iri-identity decision 19); NORMA states
+    // every constraint's id.
+    const build = () => {
+      const m = new OrmModel({ name: "M" });
+      m.addObjectType({ id: "a", name: "A", kind: "entity", referenceMode: "a_id" });
+      m.addObjectType({ id: "b", name: "B", kind: "entity", referenceMode: "b_id" });
+      m.addFactType({
+        id: "f",
+        name: "A owns B",
+        roles: [{ id: "f.owns", name: "owns", playerId: "a" }, {
+          id: "f.owned",
+          name: "is owned by",
+          playerId: "b",
+        }],
+        readings: ["{0} owns {1}"],
+        constraints: [{
+          type: "ring",
+          roleId1: "f.owns",
+          roleId2: "f.owned",
+          ringType: "irreflexive",
+        }],
+      });
+      return m;
+    };
+    const text = new NormaExportFormat().export(build()).text;
+    // Written under an id derived from its content (decision 12(a)), an NCName.
+    const id = /<orm:RingConstraint [^>]*id="([^"]*)"/.exec(text)?.[1];
+    expect(id).toMatch(/^_[0-9a-f]{8}-[0-9a-f]{4}-8[0-9a-f]{3}-[0-9a-f]{4}-[0-9a-f]{12}$/);
+    expect(new NormaExportFormat().export(build()).text).toBe(text);
   });
 });

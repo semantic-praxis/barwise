@@ -217,7 +217,7 @@ without the rules that span domains that `barwise validate` runs. The
 Besides tools, the server offers:
 
 - `orm-schema://json-schema`: the JSON Schema for `.orm.yaml` files.
-- `orm-model://{path}`: a model file, parsed, as JSON.
+- `orm-model://{path}`: a model file as JSON, in the document shape the schema resource describes.
 - `reasoning-trail://{path}`: the reasoning trail for a model, from its
   `.trail.json` sidecar when the CLI wrote one at import, or else computed from
   the model.
@@ -253,6 +253,7 @@ issues, in [the surface parity audit](../surface-parity-audit-2026-10-12.md).
 | `export_model`       | Exports DDL, dbt, OpenAPI, Avro or NORMA                 |
 | `diff_models`        | Compares two models                                      |
 | `merge_models`       | Merges one model into another (writes the base file)     |
+| `rename_element`     | Renames an element, across a project (writes the files)  |
 | `split_model`        | Previews or writes a multi-domain project from one model |
 | `lineage_status`     | Lists stale exported artifacts                           |
 | `impact_analysis`    | Lists the artifacts built from one element               |

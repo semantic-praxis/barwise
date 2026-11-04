@@ -1,18 +1,30 @@
 /**
  * Phase 2 of the NORMA mapping: fact types.
  *
- * Creates each fact type with its roles (preserving NORMA role ids),
- * readings, and the constraints its InternalConstraints section references.
+ * Creates each fact type with its roles, readings, and the constraints its
+ * InternalConstraints section references, all under NORMA's ids, which the
+ * later phases resolve references through. The replay at the end of
+ * `mapNormaToOrm` gives every element its local name (iri-identity 6c).
  */
-import type { Constraint, OrmModel, RoleConfig } from "@barwise/core";
+import {
+  type Constraint,
+  isExternalConstraint,
+  isInternalConstraint,
+  type OrmModel,
+  type RoleConfig,
+} from "@barwise/core";
 import type { NormaConstraint, NormaFactType } from "../NormaXmlTypes.js";
-import { type NormaMappingContext, NormaMappingError } from "./context.js";
-import { mapNormaConstraint } from "./factConstraints.js";
+import {
+  type ConstraintIdAllocator,
+  type NormaMappingContext,
+  NormaMappingError,
+} from "./context.js";
+import { exclusiveOrToAdd, holdsSame, mapNormaConstraint } from "./factConstraints.js";
 import { createJoinDecoder, type NormaJoinDecoder } from "./joinPaths.js";
 
 /** Create fact types with roles, readings, and internal constraints (phase 2). */
 export function mapFactTypes(ctx: NormaMappingContext): void {
-  const { doc, model, objectTypeIdMap, roleIdMap, factTypeIdMap, constraintById } = ctx;
+  const { doc, model, objectTypeIdMap, roleIdMap, factTypeIdMap } = ctx;
   const joinDecoder = createJoinDecoder(ctx);
 
   for (const nft of doc.factTypes) {
@@ -25,9 +37,14 @@ export function mapFactTypes(ctx: NormaMappingContext): void {
         );
       }
       return {
-        name: nr.name || nr.id,
+        // NORMA leaves most roles unnamed and shows one by its player. A
+        // role's id is `<fact type>.<role name>` (iri-identity 6c), so the
+        // NORMA id this once fell back to became part of the role's id; the
+        // player's name reads as NORMA shows it, and the replay suffixes a
+        // repeat (a ring's two Person roles: Person, Person_2).
+        name: nr.name || model.getObjectType(playerId)!.name,
         playerId,
-        id: nr.id, // Preserve NORMA role id for constraint mapping.
+        id: nr.id, // NORMA's role id, which the constraints name.
       };
     });
 
@@ -41,14 +58,16 @@ export function mapFactTypes(ctx: NormaMappingContext): void {
     }
 
     // Resolve constraints that belong to this fact type.
-    const constraints = resolveConstraintsForFactType(nft, constraintById, joinDecoder);
-    constraints.push(...roleCardinalityConstraints(nft));
+    const constraints = resolveConstraintsForFactType(ctx, nft, joinDecoder);
+    constraints.push(...roleCardinalityConstraints(nft, ctx.constraintIds));
 
     const ft = model.addFactType({
+      // NORMA's own id, as object types take theirs, until the replay names it.
+      ...(nft.id ? { id: nft.id } : {}),
       name: nft.name || generateFactTypeName(nft, objectTypeIdMap, model),
       roles,
       readings,
-      constraints,
+      constraints: constraints.filter(isInternalConstraint),
       definition: nft.definition,
       note: nft.note,
       ...(nft.derivationRule
@@ -66,12 +85,14 @@ export function mapFactTypes(ctx: NormaMappingContext): void {
         : {}),
     });
 
+    // NORMA lists a constraint across fact types under a fact type it
+    // spans; the model holds it (orm-format-3 WS3c), in the order read.
+    for (const c of constraints.filter(isExternalConstraint)) model.addConstraint(c);
+
     factTypeIdMap.set(nft.id, ft.id);
 
-    // Record role id mappings (NORMA id -> Barwise id).
-    // Since we pass NORMA role ids as the id in RoleConfig, the
-    // Barwise role ids will be the same NORMA ids (FactType constructor
-    // uses the provided id).
+    // Record role id mappings (NORMA id -> the id the role is built under,
+    // NORMA's own, since RoleConfig states it).
     for (const nr of nft.roles) {
       const role = ft.getRoleById(nr.id);
       if (role) {
@@ -121,7 +142,10 @@ function generateFactTypeName(
  * (not in InternalConstraints) -> CardinalityConstraint. First NORMA range
  * -> the model's single bound, mirroring the object-type mapping.
  */
-function roleCardinalityConstraints(nft: NormaFactType): Constraint[] {
+function roleCardinalityConstraints(
+  nft: NormaFactType,
+  ids: ConstraintIdAllocator,
+): Constraint[] {
   const constraints: Constraint[] = [];
   for (const nr of nft.roles) {
     const card = nr.cardinality;
@@ -129,7 +153,10 @@ function roleCardinalityConstraints(nft: NormaFactType): Constraint[] {
     if (!card || !r) continue;
     constraints.push({
       type: "cardinality",
-      ...(card.id ? { id: card.id } : {}),
+      // One the file leaves without an id gets one derived from its role
+      // (`cardinalityId`), so the import stays deterministic rather than
+      // falling to the generator.
+      id: ids.claimCardinality(card.id, nr.id),
       roleId: nr.id,
       min: r.from,
       max: r.to ?? "unbounded",
@@ -148,33 +175,53 @@ function roleCardinalityConstraints(nft: NormaFactType): Constraint[] {
  * we pass those as the RoleConfig.id when creating fact types.
  */
 function resolveConstraintsForFactType(
+  ctx: NormaMappingContext,
   nft: NormaFactType,
-  constraintById: Map<string, NormaConstraint>,
   joinDecoder: NormaJoinDecoder,
 ): Constraint[] {
+  const { constraintById, constraintIds: ids, xorPairs } = ctx;
   const constraints: Constraint[] = [];
   const internalRefs = new Set(nft.internalConstraintRefs);
+  // A uniqueness an entity's PreferredIdentifier names is never dropped as a
+  // duplicate: the identifier must keep the constraint it names. Any other
+  // is dropped only as a duplicate of one NORMA marks IsPreferred exactly as
+  // it does, as it was while the flag rode on the mapped constraint, before
+  // format 3.0, so a flag the 2.0 rule reads is never lost to an unflagged copy.
+  const preferred = new Set<Constraint>();
+  const isPreferred = (nc: NormaConstraint) => nc.type === "uniqueness" && nc.isPreferred;
 
   for (const ref of internalRefs) {
     const nc = constraintById.get(ref);
     if (!nc) continue;
 
-    const mapped = mapNormaConstraint(nc, nft, joinDecoder);
+    // A pair builds its exclusive_or from the mandatory -- its roles, its
+    // modality -- so the constraint has one shape whichever half maps first.
+    const mandatoryId = nc.type === "exclusion"
+      ? xorPairs.mandatoryByExclusion.get(nc.id)
+      : undefined;
+    const source = (mandatoryId !== undefined ? constraintById.get(mandatoryId) : undefined) ?? nc;
+    const mapped = mapNormaConstraint(
+      source,
+      nft,
+      xorPairs.exclusiveOrIds.has(source.id),
+      joinDecoder,
+    );
     if (!mapped) continue;
-    // Both halves of an exclusive-or pair map to the same exclusive_or;
-    // if a file lists both in InternalConstraints, keep one.
-    if (
-      mapped.type === "exclusive_or"
-      && constraints.some(
-        (c) =>
-          c.type === "exclusive_or"
-          && c.roleIds.length === mapped.roleIds.length
-          && mapped.roleIds.every((id) => c.roleIds.includes(id)),
-      )
-    ) {
+    if (mapped.type === "exclusive_or") {
+      // Both halves of a pair map to the same exclusive_or, and a file may
+      // list them in one fact type or two; the pair maps once. A second,
+      // distinct pair over the same roles says the same thing.
+      const xor = exclusiveOrToAdd(ids, source, mapped);
+      if (xor) constraints.push(xor);
       continue;
     }
-    constraints.push(mapped);
+    const named = ctx.namedIdentifiers.has(source.id);
+    const flagged = isPreferred(source);
+    const comparable = constraints.filter((c) => preferred.has(c) === flagged);
+    if (!named && holdsSame(comparable, mapped)) continue;
+    const added = { ...mapped, id: ids.claim(source) };
+    if (flagged) preferred.add(added);
+    constraints.push(added);
   }
 
   return constraints;

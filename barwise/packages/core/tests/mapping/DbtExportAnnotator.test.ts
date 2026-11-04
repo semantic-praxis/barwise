@@ -200,6 +200,17 @@ describe("DbtExportAnnotator", () => {
           && a.message.includes("Composite primary key"),
       );
       expect(pkNote).toBeDefined();
+      // Its key test is dbt_utils', so the note says the project needs it
+      // (dbt-composite-key-tests.spec.md, barwise-lqj).
+      expect(
+        result.annotations.filter((a) => a.message.includes("dbt_utils")).map((a) => [
+          a.tableName,
+          a.message,
+        ]),
+      ).toEqual([[
+        "student_enrolls_in_course",
+        "Key tested with dbt_utils.unique_combination_of_columns: the project must declare the dbt_utils package.",
+      ]]);
     });
   });
 
@@ -264,6 +275,24 @@ describe("DbtExportAnnotator", () => {
           && a.severity === "todo",
       );
       expect(orderTodo).toBeDefined();
+    });
+  });
+
+  describe("the dbt_utils note (dbt-alternate-uniqueness.spec.md)", () => {
+    it("names a combination test written for a uniqueness, beside a single-column key", () => {
+      const model = new ModelBuilder("Test")
+        .withEntityType("Room", { referenceMode: "room_id" })
+        .build();
+      const schema = mapper.map(model);
+      const uniques = [{ tableName: "room", columns: ["building", "room_number"] }];
+      const notes = (u: typeof uniques) =>
+        annotateDbtExport(renderDbt(schema).schemaYaml, model, schema, u).annotations
+          .filter((a) => /dbt_utils/.test(a.message)).map((a) => a.message);
+      expect(notes(uniques)).toEqual([
+        "Uniqueness tested with dbt_utils.unique_combination_of_columns: the project must declare the dbt_utils package.",
+      ]);
+      // A single-column uniqueness is dbt core's own unique test.
+      expect(notes([{ tableName: "room", columns: ["badge"] }])).toEqual([]);
     });
   });
 });

@@ -1,17 +1,19 @@
 /**
- * Every registered importer mints element ids through `generateId()`
- * (docs/specs/importer-role-ids.spec.md).
+ * Every registered importer leaves element ids to the model, which names
+ * each element by its rule (docs/specs/importer-role-ids.spec.md;
+ * iri-identity 6b, and 6b-4b, which retired `generateId()`).
  *
- * The id policy lives in one place, core's `generateId`, and the surfaces
- * install UUIDv7 behind it. An importer that passes a hand-built `id` to a
- * role config bypasses it silently: the dbt, DDL and OpenAPI importers did,
- * writing `Customers has CustomerName::role1` and `<uuid>-has-Name-role`,
- * and the DDL/OpenAPI form collided across tables that share a column name.
+ * The id policy lives in one place, the model's naming rules. An importer
+ * that passes a hand-built `id` bypasses it silently: the dbt, DDL and
+ * OpenAPI importers did, writing `Customers has CustomerName::role1` and
+ * `<uuid>-has-Name-role`, and the DDL/OpenAPI form collided across tables
+ * that share a column name.
  *
- * So the oracle is the generator itself: install one that mints `gen-1`,
- * `gen-2`, ..., run each importer, and require every object type, fact
- * type, role and constraint id to be one it minted, with no repeats. Any
- * hand-built id -- textual, or a real UUID with a suffix -- fails.
+ * So the oracle is the model's naming rule: run each importer and require
+ * every object type, fact type, role and constraint id to be the one the
+ * rule gives the element (its local name; `<fact type>.<role>`; its minted
+ * sentence), with the suffix rule's `_N`, and no repeats. Any hand-built
+ * id -- textual, or a UUID -- fails.
  *
  * The test iterates the format registry rather than a list of its own, and
  * an importer with neither a fixture nor an exemption below fails, so a new
@@ -20,26 +22,30 @@
  */
 import { registerCodeFormats } from "@barwise/code-analysis";
 import {
-  generateId,
   type ImportFormat,
   listImporters,
+  localName,
+  mintedName,
   type OrmModel,
-  setIdGenerator,
+  ROLE_ID_PATTERN,
 } from "@barwise/core";
 import { registerDbtFormats } from "@barwise/dbt";
 import { registerStandardFormats } from "@barwise/formats";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { afterAll, afterEach, describe, expect, it } from "vitest";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { afterAll, describe, expect, it } from "vitest";
 
 registerStandardFormats();
 registerDbtFormats();
 registerCodeFormats();
 
 /**
- * Two tables share a `name` column (the value-side collision), and `orders`
- * has two foreign keys, so both of the DDL importer's role-minting paths run.
+ * Two tables share a `name` column (the value-side collision), `orders`
+ * has two foreign keys, and `customer_suppliers` is keyed on its foreign
+ * keys, so the DDL importer's binary paths and its relationship path, whose
+ * roles are all "is in", run.
  * Table-level `FOREIGN KEY` lines, because the importer does not read an
  * inline `REFERENCES` on a column: with inline clauses the foreign-key path
  * never ran, and reverting its fix left this test green (caught in review).
@@ -55,7 +61,28 @@ CREATE TABLE orders (
   FOREIGN KEY (customer_id) REFERENCES customers (customer_id),
   FOREIGN KEY (supplier_id) REFERENCES suppliers (supplier_id)
 );
+CREATE TABLE customer_suppliers (
+  customer_id INTEGER NOT NULL,
+  supplier_id INTEGER NOT NULL,
+  PRIMARY KEY (customer_id, supplier_id),
+  FOREIGN KEY (customer_id) REFERENCES customers (customer_id),
+  FOREIGN KEY (supplier_id) REFERENCES suppliers (supplier_id)
+);
 `;
+
+/**
+ * A NORMA fixture from the formats package whose roles are unnamed, as NORMA
+ * writes most. This oracle asks only that each id follow from its name;
+ * what an unnamed role is named (its player's name, so no NORMA token
+ * reaches the id) is `formats/tests/NormaLocalNames.test.ts`'s to check.
+ */
+const NORMA = readFileSync(
+  join(
+    dirname(fileURLToPath(import.meta.url)),
+    "../../formats/tests/fixtures/personCountryDemo.orm",
+  ),
+  "utf8",
+);
 
 /**
  * The SQL importer reads query patterns, not CREATE TABLE: a JOIN gives it
@@ -120,6 +147,45 @@ models:
         tests:
           - accepted_values:
               values: ['open', 'closed']
+  - name: order_lines
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [order_id, line_no]
+    columns:
+      - name: order_id
+        data_tests:
+          - not_null
+          - relationships: { to: "ref('orders')", field: order_id }
+      - name: line_no
+        data_tests: [not_null]
+`;
+
+/**
+ * Every id path the Ossie importer takes: a declared concept, a built-in a
+ * role names (`String`), each multiplicity, a subtype fact, a single
+ * identifier whose far-role uniqueness the importer adds, a composite one
+ * (an external uniqueness), and a mandatory role from `requires`.
+ */
+const OSSIE = `version: 0.2.0.dev0
+name: Ids
+ontology:
+  - { concept: Code, type: ValueType, extends: [ String ] }
+  - concept: Party
+    type: EntityType
+    identify_by: [ code ]
+    requires: [ Party.code ]
+    relationships:
+      - { name: code, roles: [ { concept: Code } ], multiplicity: ManyToOne, verbalizes: [ "{Party} has {Code}" ] }
+      - { name: nick, roles: [ { concept: String } ], verbalizes: [ "{Party} has nick {String}" ] }
+  - concept: Person
+    type: EntityType
+    extends: [ Party ]
+  - concept: Seat
+    type: EntityType
+    identify_by: [ party, label ]
+    relationships:
+      - { name: party, roles: [ { concept: Party } ], multiplicity: ManyToOne, verbalizes: [ "{Seat} is for {Party}" ] }
+      - { name: label, roles: [ { concept: String } ], multiplicity: OneToOne, verbalizes: [ "{Seat} has label {String}" ] }
 `;
 
 const tempDirs: string[] = [];
@@ -172,16 +238,18 @@ const FIXTURES: Record<string, () => Promise<OrmModel>> = {
   ddl: async () => text("ddl", DDL),
   openapi: async () => text("openapi", OPENAPI),
   sql: async () => text("sql", SQL),
+  ossie: async () => text("ossie", OSSIE),
+  // A NORMA file states an id for every element; the import names each
+  // from its name or sentence all the same (iri-identity 6c).
+  norma: async () => text("norma", NORMA),
   dbt: async () => directory("dbt", dbtProject()),
   typescript: async () => directory("typescript", codeProject()),
   java: async () => directory("java", codeProject()),
   kotlin: async () => directory("kotlin", codeProject()),
 };
 
-/** Importers deliberately not run here, each with the reason. */
-const EXEMPT: Record<string, string> = {
-  norma: "keeps the source .orm file's role GUIDs on purpose; barwise-1070 tracks re-minting them",
-};
+/** Importers deliberately not run here, each with the reason. None since 6c. */
+const EXEMPT: Record<string, string> = {};
 
 function importerFor(name: string): ImportFormat {
   const importer = listImporters().find((d) => d.name === name)?.importer;
@@ -193,59 +261,78 @@ function text(name: string, input: string): OrmModel {
   return importerFor(name).parse!(input).model;
 }
 
-/** Every id an importer could mint, labelled for a readable failure. */
-function allIds(model: OrmModel): string[] {
-  const ids: string[] = [];
-  for (const ot of model.objectTypes) ids.push(`object type ${ot.name}: ${ot.id}`);
+interface GivenId {
+  readonly label: string;
+  readonly id: string;
+  /** The id the model's rule gives the element when the importer states none. */
+  readonly rule: string | undefined;
+}
+
+/** Every id an importer could give, labelled for a readable failure. */
+function allIds(model: OrmModel): GivenId[] {
+  const ids: GivenId[] = [];
+  const add = (label: string, id: string, rule: string | undefined) =>
+    ids.push({ label: `${label}: ${id}`, id, rule });
+  for (const ot of model.objectTypes) add(`object type ${ot.name}`, ot.id, localName(ot.name));
   for (const ft of model.factTypes) {
-    ids.push(`fact type ${ft.name}: ${ft.id}`);
-    for (const r of ft.roles) ids.push(`role ${ft.name}/${r.name}: ${r.id}`);
-    for (const c of ft.constraints) ids.push(`constraint ${ft.name}/${c.type}: ${c.id}`);
+    add(`fact type ${ft.name}`, ft.id, localName(ft.name));
+    for (const r of ft.roles) {
+      add(`role ${ft.name}/${r.name}`, r.id, `${ft.id}.${localName(r.name)}`);
+    }
+  }
+  // Subtype facts too: an importer that maps a supertype (Ossie's extends)
+  // mints their ids, and a hand-built one there passed unseen before.
+  for (const sf of model.subtypeFacts) {
+    const end = (id: string) => model.getObjectType(id)?.name ?? id;
+    add(
+      `subtype fact ${end(sf.subtypeId)} -> ${end(sf.supertypeId)}`,
+      sf.id,
+      mintedName({ kind: "subtypeFact", subtypeFact: sf }, model),
+    );
+  }
+  for (const inView of model.everyConstraint()) {
+    const [c, ft] = inView;
+    add(
+      `constraint ${ft?.name ?? "(across fact types)"}/${c.type}`,
+      c.id!,
+      mintedName({ kind: "constraint", inView }, model),
+    );
   }
   return ids;
 }
 
-let minted: Set<string>;
-function installCountingGenerator(): void {
-  minted = new Set();
-  let n = 0;
-  setIdGenerator(() => {
-    const id = `gen-${++n}`;
-    minted.add(id);
-    return id;
-  });
+/** The id is the rule's, or the rule's under the suffix rule (`_2`, `_3`). */
+function byRule(id: string, rule: string | undefined): boolean {
+  if (rule === undefined) return false;
+  return id === rule || (id.startsWith(`${rule}_`) && /^\d+$/.test(id.slice(rule.length + 1)));
 }
 
-afterEach(() => {
-  setIdGenerator(undefined);
-});
-
-describe("importer ids come from generateId", () => {
+describe("importer ids come from the model's naming rules", () => {
   it("every registered importer has a fixture or a stated exemption", () => {
     const registered = listImporters().map((d) => d.name).sort();
     const accounted = [...Object.keys(FIXTURES), ...Object.keys(EXEMPT)].sort();
     expect(registered).toEqual(accounted);
   });
 
-  it("the counting generator is what generateId uses", () => {
-    installCountingGenerator();
-    expect(generateId()).toBe("gen-1");
-  });
-
   for (const name of Object.keys(FIXTURES)) {
-    it(`${name}: every element id was minted by the generator, and none repeats`, async () => {
-      installCountingGenerator();
+    it(`${name}: every element id is the one its rule gives, and none repeats`, async () => {
       const model = await FIXTURES[name]!();
       const ids = allIds(model);
       expect(ids.length, `${name} produced no elements`).toBeGreaterThan(0);
 
-      const handBuilt = ids.filter((entry) =>
-        !minted.has(entry.slice(entry.lastIndexOf(": ") + 2))
-      );
-      expect(handBuilt, `${name} emitted ids the generator did not mint`).toEqual([]);
+      const handBuilt = ids.filter((e) => !byRule(e.id, e.rule)).map((e) => e.label);
+      expect(handBuilt, `${name} gave ids the model's rules do not`).toEqual([]);
 
-      const values = ids.map((entry) => entry.slice(entry.lastIndexOf(": ") + 2));
+      const values = ids.map((e) => e.id);
       expect(new Set(values).size, `${name} emitted a repeated id`).toBe(values.length);
+
+      // No importer states a role id: each is the model's `<fact type>.<role>`,
+      // the one shape a 4.0 file accepts (iri-identity 6b-4a), so a 4.0 write
+      // of any import is a file the 4.0 reader takes.
+      const statedRoles = model.factTypes.flatMap((ft) => ft.roles)
+        .filter((r) => !ROLE_ID_PATTERN.test(r.id))
+        .map((r) => r.id);
+      expect(statedRoles, `${name} stated role ids of another shape`).toEqual([]);
     });
   }
 });

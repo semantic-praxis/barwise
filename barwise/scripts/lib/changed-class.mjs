@@ -25,6 +25,14 @@ import { fileURLToPath } from "node:url";
 const DOCS_ONLY = /\.md$|^\.beads\//;
 
 /**
+ * An ADR is Markdown but not docs-only: its `Enforced-by:` header names the
+ * tests that pin its decisions, and `check:adr-tests` can only answer after
+ * the tests have run (docs/specs/executable-adrs.spec.md, WS2). ADRs change
+ * rarely, so a full CI run for one costs little.
+ */
+const GATE_INPUT = /^barwise\/docs\/adr\/(?!(?:.*\/)?README\.md$)/;
+
+/**
  * The optimizer lane runs when it is touched, or when the CLI it shells out
  * to is: its metric tests call the real `barwise prompt score`, so a CLI
  * change can break them without touching a Python file.
@@ -41,7 +49,7 @@ const OPTIMIZER = /^barwise\/optimizer\/|^barwise\/packages\/cli\//;
  */
 export function classify(paths) {
   return {
-    docsOnly: paths.length > 0 && paths.every((p) => DOCS_ONLY.test(p)),
+    docsOnly: paths.length > 0 && paths.every((p) => DOCS_ONLY.test(p) && !GATE_INPUT.test(p)),
     optimizer: paths.some((p) => OPTIMIZER.test(p)),
   };
 }
@@ -84,6 +92,24 @@ export function committedPaths(base, cwd = process.cwd()) {
 export function uncommittedPaths(cwd = process.cwd()) {
   return [
     ...gitPaths(["diff", "--name-only", "HEAD"], cwd),
+    ...gitPaths(["ls-files", "--others", "--exclude-standard", "--full-name", "--", ":/"], cwd),
+  ];
+}
+
+/**
+ * Files in the working tree that differ from `sha`: tracked files whose
+ * content differs from that commit (`git diff <sha>` compares the working
+ * tree, staged or not, with the commit), plus untracked files git does not
+ * ignore. Repo-root-relative whatever the cwd.
+ *
+ * The question a push asks is "what is here that the pushed commit does not
+ * hold", and `uncommittedPaths` cannot answer it: it compares with `HEAD`,
+ * and a pushed ref need not be the one checked out
+ * (docs/specs/pushed-tree-verification.spec.md, workstream 3).
+ */
+export function pathsDifferingFrom(sha, cwd = process.cwd()) {
+  return [
+    ...gitPaths(["diff", "--name-only", sha, "--", ":/"], cwd),
     ...gitPaths(["ls-files", "--others", "--exclude-standard", "--full-name", "--", ":/"], cwd),
   ];
 }

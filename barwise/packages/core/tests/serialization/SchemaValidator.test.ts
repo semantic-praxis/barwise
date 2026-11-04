@@ -18,18 +18,18 @@ describe("SchemaValidator", () => {
   describe("valid documents", () => {
     it("accepts a minimal valid document", () => {
       const doc = {
-        orm_version: "2.0",
+        orm_version: "3.0",
         model: { name: "Test" },
       };
 
-      const result = validator.validateModel(doc);
+      const result = validator.validateModel30(doc);
       expect(result.valid).toBe(true);
       expect(result.errors).toHaveLength(0);
     });
 
     it("accepts a document with all fields populated", () => {
       const doc = {
-        orm_version: "2.0",
+        orm_version: "3.0",
         model: {
           name: "Order Management",
           domain_context: "ecommerce",
@@ -59,8 +59,8 @@ describe("SchemaValidator", () => {
               ],
               readings: ["{0} places {1}", "{1} is placed by {0}"],
               constraints: [
-                { type: "internal_uniqueness", roles: ["r-002"] },
-                { type: "mandatory", role: "r-002" },
+                { id: "c-1", type: "internal_uniqueness", roles: ["r-002"] },
+                { id: "c-2", type: "mandatory", role: "r-002" },
               ],
             },
           ],
@@ -74,14 +74,14 @@ describe("SchemaValidator", () => {
         },
       };
 
-      const result = validator.validateModel(doc);
+      const result = validator.validateModel30(doc);
       expect(result.valid).toBe(true);
       expect(result.errors).toHaveLength(0);
     });
 
     it("accepts external_uniqueness constraints", () => {
       const doc = {
-        orm_version: "2.0",
+        orm_version: "3.0",
         model: {
           name: "Test",
           fact_types: [
@@ -90,21 +90,21 @@ describe("SchemaValidator", () => {
               name: "Test Fact",
               roles: [{ id: "r-001", player: "ot-001", role_name: "test" }],
               readings: ["{0} test"],
-              constraints: [
-                { type: "external_uniqueness", roles: ["r-001", "r-002"] },
-              ],
             },
+          ],
+          constraints: [
+            { id: "c-1", type: "external_uniqueness", roles: ["r-001", "r-002"] },
           ],
         },
       };
 
-      const result = validator.validateModel(doc);
+      const result = validator.validateModel30(doc);
       expect(result.valid).toBe(true);
     });
 
     it("accepts value_constraint constraints with optional role", () => {
       const doc = {
-        orm_version: "2.0",
+        orm_version: "3.0",
         model: {
           name: "Test",
           fact_types: [
@@ -114,20 +114,20 @@ describe("SchemaValidator", () => {
               roles: [{ id: "r-001", player: "ot-001", role_name: "test" }],
               readings: ["{0} test"],
               constraints: [
-                { type: "value_constraint", values: ["X", "Y"], role: "r-001" },
+                { id: "c-1", type: "value_constraint", values: ["X", "Y"], role: "r-001" },
               ],
             },
           ],
         },
       };
 
-      const result = validator.validateModel(doc);
+      const result = validator.validateModel30(doc);
       expect(result.valid).toBe(true);
     });
 
     it("accepts value_constraint without role", () => {
       const doc = {
-        orm_version: "2.0",
+        orm_version: "3.0",
         model: {
           name: "Test",
           fact_types: [
@@ -137,14 +137,14 @@ describe("SchemaValidator", () => {
               roles: [{ id: "r-001", player: "ot-001", role_name: "test" }],
               readings: ["{0} test"],
               constraints: [
-                { type: "value_constraint", values: ["X", "Y"] },
+                { id: "c-1", type: "value_constraint", values: ["X", "Y"] },
               ],
             },
           ],
         },
       };
 
-      const result = validator.validateModel(doc);
+      const result = validator.validateModel30(doc);
       expect(result.valid).toBe(true);
     });
   });
@@ -152,26 +152,71 @@ describe("SchemaValidator", () => {
   describe("invalid documents", () => {
     it("rejects a document missing orm_version", () => {
       const doc = { model: { name: "Test" } };
-      const result = validator.validateModel(doc);
+      const result = validator.validateModel30(doc);
       expect(result.valid).toBe(false);
       expect(result.errors.length).toBeGreaterThan(0);
     });
 
     it("rejects a document missing model", () => {
-      const doc = { orm_version: "2.0" };
-      const result = validator.validateModel(doc);
+      const doc = { orm_version: "3.0" };
+      const result = validator.validateModel30(doc);
       expect(result.valid).toBe(false);
     });
 
     it("rejects a document missing model name", () => {
-      const doc = { orm_version: "2.0", model: {} };
-      const result = validator.validateModel(doc);
+      const doc = { orm_version: "3.0", model: {} };
+      const result = validator.validateModel30(doc);
       expect(result.valid).toBe(false);
+    });
+
+    // The value-only fields on an entity: tests/model/valueOnlyFields.test.ts,
+    // generated from the one list rather than restated here.
+
+    describe("naming the element an error is in", () => {
+      it("adds the name of the nearest model element to the message", () => {
+        const result = validator.validateModel30({
+          orm_version: "3.0",
+          model: {
+            name: "Test",
+            object_types: [
+              { id: "ot-1", name: "Weight", kind: "value", data_type: { name: "furlongs" } },
+            ],
+          },
+        });
+        // The data type's own `name` ("furlongs") is a field, not an
+        // element: the message names the object type.
+        expect(result.errors).toContainEqual({
+          path: "/model/object_types/0/data_type/name",
+          message: 'must be equal to one of the allowed values (in "Weight")',
+        });
+      });
+
+      it("adds nothing when the element has no name, or the error is on the model", () => {
+        const unnamed = validator.validateModel30({
+          orm_version: "3.0",
+          model: {
+            name: "Test",
+            object_types: [{ id: "ot-1", name: "  ", kind: "value", colour: 1 }],
+          },
+        });
+        expect(unnamed.errors).toContainEqual({
+          path: "/model/object_types/0",
+          message: "must NOT have additional properties",
+        });
+        const top = validator.validateModel30({
+          orm_version: "3.0",
+          model: { name: "Test", colour: 1 },
+        });
+        expect(top.errors).toContainEqual({
+          path: "/model",
+          message: "must NOT have additional properties",
+        });
+      });
     });
 
     it("rejects an entity type without reference_mode", () => {
       const doc = {
-        orm_version: "2.0",
+        orm_version: "3.0",
         model: {
           name: "Test",
           object_types: [
@@ -180,29 +225,65 @@ describe("SchemaValidator", () => {
         },
       };
 
-      const result = validator.validateModel(doc);
+      const result = validator.validateModel30(doc);
       expect(result.valid).toBe(false);
     });
 
     it("rejects a wrong orm_version", () => {
-      const doc = { orm_version: "3.0", model: { name: "Test" } };
-      const result = validator.validateModel(doc);
+      const doc = { orm_version: "2.0", model: { name: "Test" } };
+      const result = validator.validateModel30(doc);
       expect(result.valid).toBe(false);
+    });
+
+    it("checks a 2.0 document against the frozen 2.0 schema", () => {
+      // A 2.0 file is read by the 2.0 reader; the current schema refuses it.
+      const doc = {
+        orm_version: "2.0",
+        model: {
+          name: "Test",
+          fact_types: [{
+            id: "ft-001",
+            name: "Test Fact",
+            roles: [{ id: "r-001", player: "ot-001", role_name: "test" }],
+            readings: ["{0} test"],
+            constraints: [{ type: "internal_uniqueness", roles: ["r-001"], is_preferred: true }],
+          }],
+        },
+      };
+      expect(validator.validateLegacyModel(doc).valid).toBe(true);
+      expect(validator.validateModel30(doc).valid).toBe(false);
+    });
+
+    it("refuses a constraint without an id in 3.0", () => {
+      const doc = {
+        orm_version: "3.0",
+        model: {
+          name: "Test",
+          fact_types: [{
+            id: "ft-001",
+            name: "Test Fact",
+            roles: [{ id: "r-001", player: "ot-001", role_name: "test" }],
+            readings: ["{0} test"],
+            constraints: [{ type: "internal_uniqueness", roles: ["r-001"] }],
+          }],
+        },
+      };
+      expect(validator.validateModel30(doc).valid).toBe(false);
     });
 
     it("rejects additional properties at the top level", () => {
       const doc = {
-        orm_version: "2.0",
+        orm_version: "3.0",
         model: { name: "Test" },
         extra: "not allowed",
       };
-      const result = validator.validateModel(doc);
+      const result = validator.validateModel30(doc);
       expect(result.valid).toBe(false);
     });
 
     it("rejects a fact type with no roles", () => {
       const doc = {
-        orm_version: "2.0",
+        orm_version: "3.0",
         model: {
           name: "Test",
           fact_types: [
@@ -211,13 +292,13 @@ describe("SchemaValidator", () => {
         },
       };
 
-      const result = validator.validateModel(doc);
+      const result = validator.validateModel30(doc);
       expect(result.valid).toBe(false);
     });
 
     it("rejects a fact type with no readings", () => {
       const doc = {
-        orm_version: "2.0",
+        orm_version: "3.0",
         model: {
           name: "Test",
           fact_types: [
@@ -231,17 +312,17 @@ describe("SchemaValidator", () => {
         },
       };
 
-      const result = validator.validateModel(doc);
+      const result = validator.validateModel30(doc);
       expect(result.valid).toBe(false);
     });
 
     it("rejects non-object input", () => {
-      const result = validator.validateModel("not an object");
+      const result = validator.validateModel30("not an object");
       expect(result.valid).toBe(false);
     });
 
     it("rejects null input", () => {
-      const result = validator.validateModel(null);
+      const result = validator.validateModel30(null);
       expect(result.valid).toBe(false);
     });
   });

@@ -116,7 +116,7 @@ These rules keep the deck consistent and keep it honest to the tool.
   - Subset: `If ... then ...`
   - Equality: `... if and only if ...`
   - Ring (irreflexive): `No Person manages that same Person.`
-  - Frequency (binary): `Each Team includes exactly 11 Player.`
+  - Frequency (binary): `Each Team that includes some Player includes exactly 11 instances of Player.`
 - **Tabs separate fields.** Front, then a literal TAB, then Back. Use
   `<br>` for line breaks inside a field, never a raw newline.
 - **No emoji** (repo-wide convention).
@@ -157,7 +157,7 @@ Book references cite chapter and section numbers verified against the
 - **Halpin & Morgan, _Information Modeling and Relational Databases_,
   3rd ed. (2024).** ISBN 9780443237904. The canonical ORM reference, and
   the edition the barwise metamodel is designed against (see
-  `docs/adr/0001-metamodel-evolution-policy.md`). Key chapters: 3
+  `docs/adr/metamodel-evolution-policy.md`). Key chapters: 3
   (conceptual modeling and the CSDP), 4 (uniqueness), 5 (mandatory roles
   and reference schemes), 6 (value, set-comparison, and subtype
   constraints), 7 (ring, frequency, and final checks), 10.5

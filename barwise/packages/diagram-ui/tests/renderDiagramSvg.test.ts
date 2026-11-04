@@ -94,7 +94,7 @@ describe("renderDiagramSvg", () => {
       .build();
     const ft1 = model.getFactTypeByName("Employee has FirstName")!;
     const ft2 = model.getFactTypeByName("Employee has LastName")!;
-    ft1.addConstraint({
+    model.addConstraint({
       type: "external_uniqueness",
       roleIds: [ft1.roles[1]!.id, ft2.roles[1]!.id],
     });
@@ -122,7 +122,7 @@ describe("renderDiagramSvg", () => {
       .build();
     const ft1 = model.getFactTypeByName("Person has DriverLic")!;
     const ft2 = model.getFactTypeByName("Person has Passport")!;
-    ft1.addConstraint({
+    model.addConstraint({
       type: "exclusion",
       roleIds: [ft1.roles[1]!.id, ft2.roles[1]!.id],
     });

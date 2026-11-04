@@ -2,7 +2,9 @@ import { isEquality, isExclusion, isExclusiveOr, isSubset } from "../../../model
 import type { OrmModel } from "../../../model/OrmModel.js";
 import type { Diagnostic } from "../../Diagnostic.js";
 import { reportAs, RULE_ID } from "../../ruleId.js";
+import { constraintElementId } from "../../span.js";
 import {
+  compositeKeyParts,
   type ObjectUniverse,
   rolePlayerMap,
   severityForModality,
@@ -10,38 +12,42 @@ import {
   valuesPlayedInRole,
 } from "./shared.js";
 
-/**
- * Exclusion constraints whose roles span fact types: no object value may
- * appear in more than one of the excluded roles. (The local case -- all
- * roles in one fact type -- is handled by checkExclusionViolations.)
- */
-export function checkSpanningExclusionViolations(model: OrmModel): Diagnostic[] {
-  const diagnostics: Diagnostic[] = [];
-  for (const ft of model.factTypes) {
-    for (const c of ft.constraints) {
-      if (!isExclusion(c)) continue;
-      if (c.roleIds.every((rid) => ft.hasRole(rid))) continue; // local
+/** A composite key as a message shows it: its parts, not its separator. */
+const showTuple = (key: string): string => compositeKeyParts(key).join(", ");
 
-      const valuesByRole = c.roleIds.map((rid) => valuesPlayedInRole(model, rid));
-      const all = new Set<string>();
-      for (const set of valuesByRole) {
-        for (const value of set) all.add(value);
-      }
-      for (const value of all) {
-        const count = valuesByRole.filter((set) => set.has(value)).length;
-        if (count > 1) {
-          diagnostics.push(
-            reportAs(
-              severityForModality(c),
-              RULE_ID.exclusionViolation,
-              "local",
-              c.id ?? ft.id,
-              c.roleIds.join(", "),
-              value,
-              count,
-            ),
-          );
-        }
+/**
+ * Exclusion constraints: no object may play more than one of the excluded
+ * roles, across the whole population. Every exclusion is checked here,
+ * whether its roles span fact types or sit in one: an object that plays
+ * both roles in different fact instances violates it as surely as one
+ * that plays both in a single instance, which is all a per-instance check
+ * could see (owner, 2026-10-19; orm-format-3 3a-ii-b notes).
+ */
+export function checkExclusionViolations(model: OrmModel): Diagnostic[] {
+  const diagnostics: Diagnostic[] = [];
+  for (const c of model.constraints) {
+    // Over subtypes there is no population to check (see checkExclusiveOrViolations).
+    if (!isExclusion(c) || !c.roleIds) continue;
+
+    const valuesByRole = c.roleIds.map((rid) => valuesPlayedInRole(model, rid));
+    const all = new Set<string>();
+    for (const set of valuesByRole) {
+      for (const value of set) all.add(value);
+    }
+    for (const value of all) {
+      const count = valuesByRole.filter((set) => set.has(value)).length;
+      if (count > 1) {
+        diagnostics.push(
+          reportAs(
+            severityForModality(c),
+            RULE_ID.exclusionViolation,
+            "default",
+            constraintElementId(c),
+            c.roleIds.join(", "),
+            value,
+            count,
+          ),
+        );
       }
     }
   }
@@ -49,45 +55,52 @@ export function checkSpanningExclusionViolations(model: OrmModel): Diagnostic[] 
 }
 
 /**
- * Exclusive-or constraints whose roles span fact types: every instance of
- * the common player type must play exactly one of the roles.
+ * Exclusive-or constraints: every instance of the common player type must
+ * play exactly one of the roles, across the whole population. Checked here
+ * for every exclusive-or, local or spanning: a per-instance reading would
+ * flag every instance of a fact type that fills both roles, which is every
+ * instance of a binary (owner, 2026-10-19).
+ *
+ * The two halves read different sets. "Plays more than one" is present
+ * data, so it reads every value played, sample populations included -- a
+ * sample is positive evidence. "Plays none" is absence, so it reads only
+ * the universe, which leaves samples out.
  */
-export function checkSpanningExclusiveOrViolations(
+export function checkExclusiveOrViolations(
   model: OrmModel,
   universe: ObjectUniverse,
 ): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
-  if (universe.size === 0) return diagnostics;
   const rolePlayer = rolePlayerMap(model);
 
-  for (const ft of model.factTypes) {
-    for (const c of ft.constraints) {
-      if (!isExclusiveOr(c)) continue;
-      if (c.roleIds.every((rid) => ft.hasRole(rid))) continue; // local
+  for (const c of model.constraints) {
+    // Subtype membership is not populated in a model, so an exclusive-or
+    // over subtypes has nothing to check (orm-format-3 WS4b).
+    if (!isExclusiveOr(c) || !c.roleIds) continue;
 
-      const playerId = c.roleIds
-        .map((rid) => rolePlayer.get(rid))
-        .find((p) => p !== undefined);
-      if (playerId === undefined) continue;
-      const required = universe.get(playerId);
-      if (!required || required.size === 0) continue;
+    const playerId = c.roleIds
+      .map((rid) => rolePlayer.get(rid))
+      .find((p) => p !== undefined);
+    if (playerId === undefined) continue;
+    const required = universe.get(playerId) ?? new Set<string>();
 
-      const valuesByRole = c.roleIds.map((rid) => valuesPlayedInRole(model, rid));
-      for (const value of required) {
-        const count = valuesByRole.filter((set) => set.has(value)).length;
-        if (count !== 1) {
-          diagnostics.push(
-            reportAs(
-              severityForModality(c),
-              RULE_ID.exclusiveOrViolation,
-              "localMultiple",
-              c.id ?? ft.id,
-              c.roleIds.join(", "),
-              value,
-              count,
-            ),
-          );
-        }
+    const valuesByRole = c.roleIds.map((rid) => valuesPlayedInRole(model, rid));
+    const candidates = new Set<string>(required);
+    for (const set of valuesByRole) for (const value of set) candidates.add(value);
+    for (const value of candidates) {
+      const count = valuesByRole.filter((set) => set.has(value)).length;
+      if (count > 1 || (count === 0 && required.has(value))) {
+        diagnostics.push(
+          reportAs(
+            severityForModality(c),
+            RULE_ID.exclusiveOrViolation,
+            "default",
+            constraintElementId(c),
+            c.roleIds.join(", "),
+            value,
+            count,
+          ),
+        );
       }
     }
   }
@@ -95,34 +108,34 @@ export function checkSpanningExclusiveOrViolations(
 }
 
 /**
- * Subset constraints whose roles span fact types: every tuple in the subset
- * role sequence must appear in the superset role sequence.
+ * Subset constraints: every tuple in the subset role sequence must appear in
+ * the superset role sequence, across the whole population. Every subset is
+ * checked here, local or spanning (owner, 2026-10-20, barwise-h2a): a
+ * per-population check padded an unfilled role with an empty value and
+ * reported it, and reported a tuple whose match sat in another population
+ * of the same fact type -- two false violations. A tuple with an unfilled role is skipped,
+ * as an incomplete instance is reported on its own.
  */
-export function checkSpanningSubsetViolations(model: OrmModel): Diagnostic[] {
+export function checkSubsetViolations(model: OrmModel): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
-  for (const ft of model.factTypes) {
-    for (const c of ft.constraints) {
-      if (!isSubset(c)) continue;
-      const allLocal = c.subsetRoleIds.every((rid) => ft.hasRole(rid))
-        && c.supersetRoleIds.every((rid) => ft.hasRole(rid));
-      if (allLocal) continue;
+  for (const c of model.constraints) {
+    if (!isSubset(c)) continue;
 
-      const subsetTuples = tuplesForRoleSeq(model, c.subsetRoleIds);
-      const supersetTuples = tuplesForRoleSeq(model, c.supersetRoleIds);
-      for (const tuple of subsetTuples) {
-        if (!supersetTuples.has(tuple)) {
-          diagnostics.push(
-            reportAs(
-              severityForModality(c),
-              RULE_ID.subsetViolation,
-              "local",
-              c.id ?? ft.id,
-              tuple,
-              c.subsetRoleIds.join(", "),
-              c.supersetRoleIds.join(", "),
-            ),
-          );
-        }
+    const subsetTuples = tuplesForRoleSeq(model, c.subsetRoleIds);
+    const supersetTuples = tuplesForRoleSeq(model, c.supersetRoleIds);
+    for (const tuple of subsetTuples) {
+      if (!supersetTuples.has(tuple)) {
+        diagnostics.push(
+          reportAs(
+            severityForModality(c),
+            RULE_ID.subsetViolation,
+            "default",
+            constraintElementId(c),
+            showTuple(tuple),
+            c.subsetRoleIds.join(", "),
+            c.supersetRoleIds.join(", "),
+          ),
+        );
       }
     }
   }
@@ -130,49 +143,45 @@ export function checkSpanningSubsetViolations(model: OrmModel): Diagnostic[] {
 }
 
 /**
- * Equality constraints whose roles span fact types: the tuple sets of both
- * role sequences must be identical.
+ * Equality constraints: the tuple sets of both role sequences must be
+ * identical, across the whole population -- local or spanning, for the
+ * same reasons as subset (barwise-h2a).
  */
-export function checkSpanningEqualityViolations(model: OrmModel): Diagnostic[] {
+export function checkEqualityViolations(model: OrmModel): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
-  for (const ft of model.factTypes) {
-    for (const c of ft.constraints) {
-      if (!isEquality(c)) continue;
-      const allLocal = c.roleIds1.every((rid) => ft.hasRole(rid))
-        && c.roleIds2.every((rid) => ft.hasRole(rid));
-      if (allLocal) continue;
+  for (const c of model.constraints) {
+    if (!isEquality(c)) continue;
 
-      const tuples1 = tuplesForRoleSeq(model, c.roleIds1);
-      const tuples2 = tuplesForRoleSeq(model, c.roleIds2);
-      for (const tuple of tuples1) {
-        if (!tuples2.has(tuple)) {
-          diagnostics.push(
-            reportAs(
-              severityForModality(c),
-              RULE_ID.equalityViolation,
-              "local",
-              c.id ?? ft.id,
-              tuple,
-              c.roleIds1.join(", "),
-              c.roleIds2.join(", "),
-            ),
-          );
-        }
+    const tuples1 = tuplesForRoleSeq(model, c.roleIds1);
+    const tuples2 = tuplesForRoleSeq(model, c.roleIds2);
+    for (const tuple of tuples1) {
+      if (!tuples2.has(tuple)) {
+        diagnostics.push(
+          reportAs(
+            severityForModality(c),
+            RULE_ID.equalityViolation,
+            "default",
+            constraintElementId(c),
+            showTuple(tuple),
+            c.roleIds1.join(", "),
+            c.roleIds2.join(", "),
+          ),
+        );
       }
-      for (const tuple of tuples2) {
-        if (!tuples1.has(tuple)) {
-          diagnostics.push(
-            reportAs(
-              severityForModality(c),
-              RULE_ID.equalityViolation,
-              "localReverse",
-              c.id ?? ft.id,
-              tuple,
-              c.roleIds2.join(", "),
-              c.roleIds1.join(", "),
-            ),
-          );
-        }
+    }
+    for (const tuple of tuples2) {
+      if (!tuples1.has(tuple)) {
+        diagnostics.push(
+          reportAs(
+            severityForModality(c),
+            RULE_ID.equalityViolation,
+            "reverse",
+            constraintElementId(c),
+            showTuple(tuple),
+            c.roleIds2.join(", "),
+            c.roleIds1.join(", "),
+          ),
+        );
       }
     }
   }

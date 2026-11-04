@@ -162,7 +162,7 @@ describe("a ring constraint over one object type survives", () => {
     // And it must actually reach the model -- surviving conformance is
     // worth nothing if the parser then drops it.
     const { model } = parseDraftModel(response, "Ring");
-    const ring = model.factTypes.flatMap((ft) => ft.constraints)
+    const ring = model.everyConstraint().map(([c]) => c)
       .filter((c) => c.type === "ring");
     expect(ring).toHaveLength(1);
   });
@@ -388,7 +388,7 @@ describe("the resolved-arity check does not overreach", () => {
 
     expect(corrections.filter((c) => c.category === "arity_mismatch")).toEqual([]);
     expect(response.inferred_constraints).toHaveLength(1);
-    expect(model.factTypes.flatMap((ft) => ft.constraints)).toEqual([]);
+    expect(model.everyConstraint().map(([c]) => c)).toEqual([]);
   });
 });
 

@@ -37,13 +37,24 @@ const CHANGE_LEVEL = {
   aliases: "safe",
   sourceContext: "safe",
   context: "safe",
+  // A model's namespace and its imports change no id and no pairing, but
+  // every IRI `iriOf` forms from them moves, and an export or a shadow
+  // read through a rebound alias names something else.
+  namespace: "caution",
+  importBinding: "caution",
   readings: "safe",
   roleName: "safe",
+  // A rename under a kept id (model-invariants): naming, like roleName,
+  // though a generated table or column follows it.
+  name: "safe",
 
   // The shape a consumer binds to.
   kind: "breaking",
   arity: "breaking",
   rolePlayer: "breaking",
+  // The identifying uniqueness is the entity's key in the relational
+  // mapping, so a different one moves the primary key (orm-format-3 WS4b).
+  preferredIdentifier: "breaking",
 
   // Which populations are legal, or what a generated schema carries. A
   // reference mode and a data type reach generated schemas; a value
@@ -62,14 +73,13 @@ const CHANGE_LEVEL = {
   dataTypeRemoved: "caution",
   constraintsAdded: "caution",
   constraintsRemoved: "caution",
+  constraintsModified: "caution",
   derivation: "caution",
 
-  // A subtype fact's own fields. `isExclusive` and `isExhaustive` state
-  // which populations the model admits; a defining rule decides what a
-  // derived subtype contains. Neither changes the shape a consumer
-  // binds to.
-  subtypeExclusive: "caution",
-  subtypeExhaustive: "caution",
+  // A subtype fact's own fields. A defining rule decides what a derived
+  // subtype contains, which does not change the shape a consumer binds to.
+  // Whether subtypes are exclusive or exhaustive is a constraint over
+  // them, diffed as one (orm-format-3 WS4b).
   definingRule: "caution",
 
   // `providesIdentification` is the exception, and it is breaking
@@ -128,12 +138,17 @@ export function classifyChange(change: ChangeDescription): BreakingLevel {
  * population sees the sample removed on every pass.
  */
 const REMOVAL_LEVEL = {
+  // A namespace or an import removed moves IRIs or unbinds an alias.
+  model_header: "caution",
   object_type: "breaking",
   fact_type: "breaking",
   definition: "breaking",
   subtype_fact: "breaking",
   objectified_fact_type: "breaking",
   population: "caution",
+  // A constraint is a rule on populations, not shape: removing one reads
+  // as `constraintsRemoved` on a fact type did.
+  constraint: "caution",
 } as const satisfies Record<ElementType, BreakingLevel>;
 
 export function classifyBreakingLevel(
@@ -141,7 +156,10 @@ export function classifyBreakingLevel(
   changes: readonly ChangeDescription[],
   elementType: ElementType,
 ): BreakingLevel {
-  if (kind === "unchanged" || kind === "added") return "safe";
+  if (kind === "unchanged") return "safe";
+  // Adding a constraint narrows what a model admits, as `constraintsAdded`
+  // on a fact type did; adding any other element widens it.
+  if (kind === "added") return elementType === "constraint" ? "caution" : "safe";
   if (kind === "removed") return REMOVAL_LEVEL[elementType];
 
   // Modified: classify each change and take the most severe.

@@ -42,12 +42,32 @@ function role(name: string, playerName: string) {
 const GOLDENS: ReadonlyArray<{ sample: ChangeDescription; text: string; }> = [
   { sample: { change: "kind", from: "entity", to: "value" }, text: "kind: entity -> value" },
   {
+    sample: { change: "name", from: "Customer", to: "Client" },
+    text: 'name: "Customer" -> "Client"',
+  },
+  {
     sample: { change: "referenceMode", from: "customer_id", to: undefined },
     text: `reference mode: "customer_id" -> "(none)"`,
   },
   {
+    sample: {
+      change: "preferredIdentifier",
+      from: '"Customer has Nr" (role 2: Nr)',
+      to: undefined,
+    },
+    text: 'preferred identifier: "Customer has Nr" (role 2: Nr) -> (none)',
+  },
+  {
     sample: { change: "sourceContext", from: undefined, to: "Sales" },
     text: `source context: "(none)" -> "Sales"`,
+  },
+  {
+    sample: { change: "namespace", from: "https://a.example/", to: "https://b.example/" },
+    text: `namespace: "https://a.example/" -> "https://b.example/"`,
+  },
+  {
+    sample: { change: "importBinding", alias: "crm", from: "crm", to: undefined },
+    text: `import "crm": "crm" -> "(none)"`,
   },
   {
     sample: { change: "valueConstraint", from: undefined, to: { values: ["A", "B"] } },
@@ -124,6 +144,17 @@ const GOLDENS: ReadonlyArray<{ sample: ChangeDescription; text: string; }> = [
   },
   {
     sample: {
+      change: "constraintsModified",
+      constraints: [{
+        from: { type: "exclusion", roleIds: ["r1", "r2"] },
+        to: { type: "exclusive_or", roleIds: ["r1", "r2"] },
+      }],
+    },
+    // A kind that changed reads as both.
+    text: "constraints modified: exclusion to exclusive_or",
+  },
+  {
+    sample: {
       change: "derivation",
       from: undefined,
       to: { kind: "derived", expression: "x", isFormal: false },
@@ -146,14 +177,6 @@ const GOLDENS: ReadonlyArray<{ sample: ChangeDescription; text: string; }> = [
   {
     sample: { change: "providesIdentification", from: true, to: false },
     text: "provides identification: true -> false",
-  },
-  {
-    sample: { change: "subtypeExclusive", from: false, to: true },
-    text: "exclusive: false -> true",
-  },
-  {
-    sample: { change: "subtypeExhaustive", from: false, to: true },
-    text: "exhaustive: false -> true",
   },
   {
     sample: { change: "populationDescription", from: "Audited placements.", to: undefined },
@@ -243,7 +266,7 @@ describe("a delta carries copies, not references into the models", () => {
     // would. A variant carrying a reference would follow it; the copy
     // does not. This is the aliasing shape the merge's diagram layouts
     // had, found the same day this union was designed.
-    const source = after.ft.constraints[0]! as { roleId: string; };
+    const source = after.ft.internalConstraints[0]! as { roleId: string; };
     const originalRoleId = source.roleId;
     source.roleId = "mutated-after-the-diff";
 

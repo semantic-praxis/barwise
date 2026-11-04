@@ -82,6 +82,14 @@ const MODELS: readonly ModelFixture[] = [
     path: resolve(repoRoot, "examples/transcripts/clinic-appointments.orm.yaml"),
   },
   {
+    // Its key columns include one named from an unresolved reference mode,
+    // which the OpenAPI export renames to a valid path variable and the Avro
+    // export to a valid field name; the Avro format check found the second
+    // (barwise-9g3).
+    id: "pii-redaction",
+    path: resolve(repoRoot, "examples/transcripts/pii-redaction.orm.yaml"),
+  },
+  {
     id: "constraints-showcase",
     path: resolve(repoRoot, "test-plan/fixtures/constraints-showcase.orm.yaml"),
   },

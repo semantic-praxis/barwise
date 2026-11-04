@@ -26,14 +26,19 @@
  * 39.6s parallel against 42.6s combined, since one file dominates either way.
  */
 import { spawn } from "node:child_process";
-import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { SCRIPT_REPORTS_DIR, scriptReport } from "./lib/test-reports.mjs";
 import { REPO_ROOT } from "./lib/tracked.mjs";
 
 const REFUSED = 2;
 const FAILED = 1;
 
 const TESTS_DIR = resolve(REPO_ROOT, "barwise", "scripts", "tests");
+// The reporter is code beside this script, found from here; only its output
+// goes under the repository being tested.
+const TAG_REPORTER = fileURLToPath(new URL("./lib/test-tag-reporter.mjs", import.meta.url));
 const MANIFEST = join(TESTS_DIR, "expected-counts.json");
 const WRITE = process.argv.includes("--write");
 const MANIFEST_COMMENT =
@@ -105,9 +110,22 @@ function runFile(file) {
         .filter((tok) => !tok.startsWith("--test-reporter"))
         .join(" ");
     }
+    // A second reporter writes what ran, test by test, for check:adr-tests
+    // (docs/specs/executable-adrs.spec.md, WS2). Each reporter is paired
+    // with its own destination, as node requires, and tap stays on stdout
+    // for the parser below. The directory is made first: node does not, and
+    // exits 7 on a fresh checkout without it (barwise-ym8.7jz, item 2).
+    mkdirSync(resolve(REPO_ROOT, SCRIPT_REPORTS_DIR), { recursive: true });
     const child = spawn(
       process.execPath,
-      ["--test", "--test-reporter=tap", join(TESTS_DIR, file)],
+      [
+        "--test",
+        "--test-reporter=tap",
+        "--test-reporter-destination=stdout",
+        `--test-reporter=${TAG_REPORTER}`,
+        `--test-reporter-destination=${resolve(REPO_ROOT, scriptReport(file))}`,
+        join(TESTS_DIR, file),
+      ],
       { cwd: resolve(REPO_ROOT, "barwise"), env },
     );
     child.stdout.setEncoding("utf8");

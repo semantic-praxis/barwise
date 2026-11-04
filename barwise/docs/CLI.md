@@ -84,7 +84,11 @@ turn, each under a `== context ==` header (or as an array in JSON).
 
 ### schema
 
-Generate a relational schema from the ORM model.
+Generate a relational schema from the ORM model. Deprecated: use `export
+--format ddl`. Its DDL is exactly what `barwise export --format ddl
+--no-annotate --no-examples` prints, and the constraints DDL could not
+express are reported on stderr the same way; `--output` writes the file and
+no lineage manifest.
 
 ```sh
 barwise schema university.orm.yaml
@@ -115,6 +119,10 @@ Formats:
 - `openapi` -- OpenAPI 3.0 specification
 - `dbt` -- dbt model YAML and SQL files
 - `avro` -- Avro schemas (`.avsc`)
+- `norma` -- NORMA `.orm` XML
+- `ossie` -- an Apache Ossie ontology document (YAML, version
+  `0.2.0.dev0`); a comment block at its top names every construct the
+  document could not carry (`docs/specs/ossie-ontology-format.spec.md`)
 
 Options:
 
@@ -124,6 +132,25 @@ Options:
 - `--no-annotate` -- exclude TODO/NOTE annotations
 - `--strict` -- fail on validation errors
 - `--no-examples` -- exclude population example data
+- `--surrogate-keys` -- for `ddl` and `dbt`: give every table keyed
+  on several columns a generated key (`<table>_key`, `VARCHAR(32)`, the
+  hash `dbt_utils.generate_surrogate_key` computes), and make every
+  reference to one a single column beside the natural columns it is
+  hashed from. The natural key stays a UNIQUE (a combination test in
+  dbt), the dbt model SQL computes each generated column, and no
+  population rows are written, since barwise computes no hash. Refused
+  for any other format.
+
+When the format reports constraints it could not express (`ddl`, which
+spills them per dialect; `openapi`, `avro` and `dbt`, which carry only
+the relational schema; and `ossie`), `export` writes them to
+stderr after the artifact: a heading with the count and format, then one
+line per distinct verbalization, with `(xN)` when N specs share it: a
+value type's own value constraint is reported once per column it
+constrains, and two constraints can read alike, so N can mean N checks
+to implement. Stdout and the exit code are unchanged, so
+`barwise export ... | psql` still receives only the artifact. A project
+export reports each domain as it is written, naming the domain.
 
 Given a `.orm-project.yaml` manifest, `export` exports each domain (or
 the one named with `--domain`). A project's
@@ -157,20 +184,59 @@ renders just the named domain as a single SVG.
 
 Compare two ORM model files and report structural deltas.
 
+A change to the model's own `namespace`, or to one alias its `imports`
+bind, is reported as a `Model header` delta of its own: added, removed or
+modified like any element. It changes no id and no pairing, only the IRIs
+the model's elements expand to. `barwise merge` takes added and changed
+ones and, as for every element, never acts on a removal. An alias the two
+models bind to different contexts is refused: the base's shadows behind it
+would come to name another context.
+
 ```sh
 barwise diff old.orm.yaml new.orm.yaml
 barwise diff old.orm.yaml new.orm.yaml --format json
 barwise diff old.orm.yaml new.orm.yaml --no-synonyms
+barwise diff old.orm.yaml new.orm.yaml --rename "fact-type:Customer places Order=Customer submits Order"
 ```
 
 Options:
 
 - `--format <text|json>` -- output format (default: text)
 - `--no-synonyms` -- hide synonym/rename candidates
+- `--matching <id-first|content>` -- how elements pair (default:
+  id-first). Under id-first a shared id is the same element, so a
+  rename that keeps the id is one change. Under content, ids say
+  nothing and elements pair by name and content: use it for two models
+  whose ids are unrelated but may coincide, such as two extractions
+  numbered from one counter. `barwise merge` has no such option; see
+  the capability matrix in the root `CLAUDE.md`.
+- `--rename <kind>:<old>=<new>` -- pair an element renamed in an edit
+  that also changed it, which the diff cannot recognize; `<kind>` is
+  `object-type` or `fact-type`. Repeatable. A name either model does
+  not hold, or an element already paired with another, is refused. The
+  value splits at the first `=`, so an old name holding `=` is declared
+  through MCP `diff_models` instead.
+
+An object type or fact type that ids and names leave unpaired is paired
+with the one element on the other side that says the same thing -- a fact
+type by its players, role names and constraints; an object type by the
+roles it plays, the subtype facts it is an end of, and a value type's
+value constraint and data type -- and reported as a possible rename, with
+the line "Possibly a rename: paired by what it says, not by its id or name."
+Two different elements of one shape pair the same way, so such a pair is
+rated no lower than the removal it stands in for.
+It matters for two models whose ids are unrelated, such as two imports of
+one schema; a rename within one file keeps its id and pairs by it. A shape
+two elements share pairs nothing, an object type that plays no role and
+ends no subtype fact is never paired this way, and an object type renamed
+together with a fact type it plays in is not recognized; `--rename`
+covers those.
 
 With `--format json`, each delta carries `changes` (what changed, as
 data) beside `changeDescriptions` (the same, as sentences). The shape is
-the MCP `diff_models` tool's; docs/MCP.md shows an example.
+the MCP `diff_models` tool's; docs/MCP.md shows an example and says how
+constraints are paired. A recognized or declared rename carries
+`pairedBy: "recognized"` or `"declared"`.
 
 ### merge
 
@@ -192,10 +258,144 @@ Neither input file is modified. The merged model goes to stdout unless
 nothing is written anywhere and the command exits 1 -- a broken model
 on disk is worse than no model.
 
+Merge never pairs elements by content. Its diff pairs by id and name
+only, so a new element of the same shape as one in the base (a
+`Supplier` beside a `Vendor`) is added beside it rather than folded
+into it, which `barwise diff` would report as a possible rename.
+
 Options:
 
 - `--output <file>` -- write the merged model to a file instead of stdout
 - `--format <yaml|json>` -- output format (default: yaml)
+
+### migrate
+
+Rewrite `.orm.yaml` files in place as the current format (4.0), or
+every domain of a project.
+
+```sh
+barwise migrate model.orm.yaml
+barwise migrate shop.orm-project.yaml
+barwise migrate --check models/*.orm.yaml
+```
+
+Every barwise build reads older files without this command: a 3.0 or 2.0
+file loads, its ids replayed into 4.0's local names (a UUID becomes the
+name the element's rule gives), and is written as 4.0 on its next save.
+`migrate` does that rewrite for every named file at once, and says what
+reading each one changed beyond the format. A 2.0 `is_preferred` flag that identifies
+no entity type is dropped, and of two flags that name one entity type,
+one is kept. Each is printed under its file. Run `barwise validate` with
+your 2.x build first if you want to see those cases before they are
+resolved. Until a file is migrated, `barwise validate` and the editor name
+its elements by their 4.0 ids, which the file does not state, and say so
+once, at the top of the file.
+
+Migrate a project's domains through its `.orm-project.yaml` rather than
+one at a time. A shadow (an object type another domain owns) takes its
+owner's 4.0 id, and a domain's own file cannot tell when the owner's id
+took a suffix (`Order_Line_2`, because another type in that domain already
+had `Order_Line`); alone, the shadow would name the other type. Given the
+manifest, `migrate` reads every domain first and gives each shadow the id
+its owner holds, then writes all the domains in one staged write. If any
+domain cannot be migrated, none is written. A domain file named in the same
+run as its manifest is migrated through the manifest only.
+
+A 4.0 file can also leave an id to the load: a constraint, subtype fact or
+objectification typed without one is given an id each time the file is
+read, and nothing else can refer to it by that id until the file states
+it. `migrate` writes those ids into such a file, each with the key it was
+named from, where a save would put them, and changes nothing else in the
+file; the editor's "Store ids" quick fix does the same for the open file. A 4.0 file that states every
+id is left untouched.
+
+This is one of the two commands that modify their inputs, with `rename`. A file before 4.0
+is written from the model, so YAML comments and hand layout in it are not kept. A file is not written, and is
+reported, when it cannot be read or does not load, when its 4.0 form would
+not load back, or when it
+names elements it does not define (a fragment) and carries `is_preferred`
+flags, which cannot be placed without the rest of the model. The rest are still migrated.
+A file is also refused when `<file>.migrating` already exists beside it:
+that is the staged copy an interrupted run left, and `migrate` neither
+writes over it nor removes it. Remove it by hand and run again.
+
+Exit codes: 0 when every file was migrated or already current; 1 under
+`--check` when a file would be rewritten; 2 when any file could not be
+migrated, or `--format` is unknown.
+
+Options:
+
+- `--check` -- write nothing; exit 1 if any file would be rewritten
+- `--format <text|json>` -- output format (default: text); json prints one
+  record per file
+
+### rename
+
+Rename an object type, a fact type or a role, in a model file or across a
+project.
+
+```sh
+barwise rename shop.orm.yaml --object-type Order --to Purchase
+barwise rename shop.orm.yaml --fact-type "Customer places Order" --role-position 1 --to "is placed by"
+barwise rename --project project.orm-project.yaml --domain crm --object-type Customer --to Client
+```
+
+In format 4.0 an element's id is its name, so a rename also gives the
+element the id its new name gives (`Order` becomes `Purchase`), and every
+id that embeds it follows: a renamed fact type's roles, populations and
+instances, and, through a project, each shadow's id in the other domains.
+Every reference to a changed id in the model files is rewritten, and each change is printed. So is
+the lineage manifest (`.barwise/lineage.yaml`) beside each changed file:
+the exports that model made name the new ids, in the same staged write.
+Their model hash is left as it was, so `barwise lineage status` reports
+them stale until they are re-exported. Exports made before format 4.0 are
+left as they are. A
+rename whose new id another element already holds is refused. A minted id,
+such as a constraint's, is kept, and `barwise validate` reports one whose
+element now says something else (`structural/stale-minted-name`). Beyond
+the element's own name it rewrites its definition,
+when the term is the element's alone and the new term is not already
+defined, and the reference mode of each entity whose key the relational
+mapper types from a renamed value type. Notes, aliases and other free text
+are left as written. Given a project, the rename follows an owned object
+type into its shadows in other domains, every domain's definitions, the
+reference modes of the entity's copies, and both sides of each mapping
+file, and writes exactly the files it changed.
+
+It refuses, and writes nothing, when the element does not exist or a role
+name is shared (name it by `--role-position`), when the new name or its
+local name is already taken, when another element holds an id the rename
+would give, when the element is a shadow (rename its
+owner, through the project), when the rename would change which value type
+keys an entity, when a project did not load cleanly, or when the file, or
+any domain of the project, is not at the current format (run `barwise
+migrate` on it first, which reports what migrating it changes). A model file that
+declares a `domain_context` gets a warning: if it is a project's domain,
+rename through `--project` so its shadows and mapping files follow.
+
+This is one of the two commands that modify their inputs, with `migrate`.
+Every changed file is staged before any is replaced, so a failure while
+staging changes nothing. If replacing them fails part-way (a full disk,
+a permission change), it exits 2 and the json output's `files` and
+`changes` name what was already replaced. Files are written from the
+model, so YAML comments in a rewritten file are lost, as with `migrate`.
+
+Exit codes: 0 when the rename was written; 1 under `--check` when a file
+would be rewritten; 2 when the rename was refused, a file could not be
+read, `--format` is unknown, or the write failed. A mistake commander
+itself rejects (an unknown option, an option missing its value) exits 1,
+as it does for every command; see barwise-o5y.
+
+Options:
+
+- `--object-type <name>` or `--fact-type <name>` -- the element to rename
+- `--role <name>` or `--role-position <n>` -- with `--fact-type`, the role
+  to rename (positions count from 0)
+- `--to <name>` -- the new name (required)
+- `--project <manifest>` and `--domain <context>` -- rename through a
+  project, in place of a model file
+- `--check` -- write nothing; exit 1 if any file would be rewritten
+- `--format <text|json>` -- output format (default: text)
 
 ### review
 
@@ -336,11 +536,17 @@ Import an ORM model from a text-based interop format.
 ```sh
 barwise import model schema.sql --format ddl
 barwise import model api.yaml --format openapi --output model.orm.yaml
+barwise import model flights.ontology.yaml --format ossie
 ```
 
 Options:
 
-- `--format <ddl|openapi|norma>` -- source format (required)
+- `--format <ddl|openapi|norma|ossie>` -- source format (required).
+  `ossie` reads an Apache Ossie ontology document at version
+  `0.2.0.dev0` and refuses any other version; each construct it cannot
+  carry is a warning (`docs/specs/ossie-ontology-format.spec.md`), and so
+  is each field the pinned schema does not define
+  (`docs/specs/ossie-unknown-fields.spec.md`)
 - `--output <file>` -- write .orm.yaml to file instead of stdout
 - `--name <name>` -- model name (defaults to filename)
 - `--infer-references` -- read a column with no declared foreign key
@@ -555,6 +761,52 @@ the DDL, dbt, OpenAPI and Avro formats trace through the relational
 mapping, and NORMA lists the model's own elements. An export in a
 format that records nothing still writes its manifest entry, but warns
 that `lineage impact` cannot see that artifact.
+
+One manifest serves every model in its directory (`project init` puts
+all domains in one `domains/` directory), so each export records the
+model file it came from, and `status` and `impact` read only the named
+model's exports. An export written before exports recorded their model
+belongs to the model if it is the only `.orm.yaml` in the directory, and
+otherwise to the model that holds every element it lists and owns at least
+one (a shadow type that `project split` leaves does not own). The next
+`barwise export` from that model records all of them, and says which on
+stderr. A copy of the model in the same directory would claim them too,
+and whichever exports first keeps them (barwise-wcg.t0i). An export that
+writes over another model's artifact path says so: that model's lineage no
+longer lists it.
+
+A manifest written before format 4.0 (`version: 1`) names elements by
+3.x ids. Each of its exports reads stale, with the reason "ids changed
+to 4.0", until it is re-exported, and the next export upgrades the
+manifest to `version: 2` and keeps the others marked. `lineage impact`
+lists such exports when they name no id the element is known by, rather
+than leaving them out, since they may depend on it under its old id.
+Given a 3.x model file, `impact` also finds an element by the id that file
+states. When the model does not load, `impact` says so (`modelDidNotLoad`
+with `--format json`), since the id is then read as a 4.0 id. A 3.x id the
+file stated for more than one element is reported as naming each of them:
+exports written under 3.x ids are not matched by it, while exports written
+under 4.0 ids still match the element that holds it now.
+
+`status` exits 1, as it does for a stale artifact, on two kinds of export
+it cannot check:
+
+- one that names no model and that this model does not own, in a
+  directory with other models: another domain's export not re-exported
+  since this change, one with no recorded elements, or one listing an
+  element the model no longer has. Upgrading a shared directory can turn
+  one CI run red until each model exports once; an entry whose model is
+  gone is removed from `.barwise/lineage.yaml` by hand.
+- one naming a model file that no longer exists, because the model was
+  renamed or moved; re-export it from the model where it now lives.
+  `impact` reads such an export, since it is likely the renamed model's.
+
+With `--format json`, `status` prints the report (`staleArtifacts`,
+`unattributedArtifacts`, `orphanedArtifacts`) and exits 0, as it always
+has; a gate on the JSON reads those fields.
+
+A model with no artifacts of its own prints that, rather than that all are
+fresh. `show` prints each export's model, and the model that exported last.
 
 Options:
 

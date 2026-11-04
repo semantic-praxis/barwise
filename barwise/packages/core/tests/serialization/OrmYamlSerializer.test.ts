@@ -26,7 +26,7 @@ describe("OrmYamlSerializer", () => {
       const model = new OrmModel({ name: "Empty Model" });
       const yaml = serializer.serialize(model);
 
-      expect(yaml).toContain('orm_version: "2.0"');
+      expect(yaml).toContain('orm_version: "4.0"');
       expect(yaml).toContain("name: Empty Model");
     });
 
@@ -47,7 +47,6 @@ describe("OrmYamlSerializer", () => {
         kind: "entity",
         referenceMode: "customer_id",
         definition: "A person who buys things.",
-        sourceContext: "crm",
       });
 
       const yaml = serializer.serialize(model);
@@ -56,7 +55,8 @@ describe("OrmYamlSerializer", () => {
       expect(yaml).toContain("kind: entity");
       expect(yaml).toContain("reference_mode: customer_id");
       expect(yaml).toContain("definition: A person who buys things.");
-      expect(yaml).toContain("source_context: crm");
+      // A shadow's owner is its id's alias in 4.0 (iri-identity 6d).
+      expect(yaml).not.toContain("source_context");
     });
 
     it("serializes value types with value constraints", () => {
@@ -104,14 +104,14 @@ describe("OrmYamlSerializer", () => {
       model.addFactType({
         name: "Person has Age",
         roles: [
-          { name: "has", playerId: person.id, id: "r1" },
-          { name: "of", playerId: age.id, id: "r2" },
+          { name: "has", playerId: person.id, id: "f.r1" },
+          { name: "of", playerId: age.id, id: "f.r2" },
         ],
         readings: ["{0} has {1}", "{1} of {0}"],
         constraints: [
           {
             type: "value_constraint",
-            roleId: "r2",
+            roleId: "f.r2",
             values: [],
             ranges: [{ min: "18", max: "65" }],
           },
@@ -119,11 +119,11 @@ describe("OrmYamlSerializer", () => {
       });
 
       const restored = serializer.deserialize(serializer.serialize(model));
-      const c = restored.getFactTypeByName("Person has Age")!.constraints
+      const c = restored.getFactTypeByName("Person has Age")!.internalConstraints
         .find((x) => x.type === "value_constraint");
       expect(c).toMatchObject({
         type: "value_constraint",
-        roleId: "r2",
+        roleId: "f.r2",
         values: [],
         ranges: [{ min: "18", max: "65" }],
       });
@@ -141,23 +141,23 @@ describe("OrmYamlSerializer", () => {
       model.addFactType({
         name: "Trip runs",
         roles: [
-          { name: "for", playerId: trip.id, id: "r0" },
-          { name: "from", playerId: start.id, id: "r1" },
-          { name: "to", playerId: end.id, id: "r2" },
+          { name: "for", playerId: trip.id, id: "f.r0" },
+          { name: "from", playerId: start.id, id: "f.r1" },
+          { name: "to", playerId: end.id, id: "f.r2" },
         ],
         readings: ["{0} runs from {1} to {2}"],
         constraints: [
-          { type: "value_comparison", roleId1: "r1", roleId2: "r2", operator: "<=" },
+          { type: "value_comparison", roleId1: "f.r1", roleId2: "f.r2", operator: "<=" },
         ],
       });
 
       const restored = serializer.deserialize(serializer.serialize(model));
-      const c = restored.getFactTypeByName("Trip runs")!.constraints
+      const c = restored.getFactTypeByName("Trip runs")!.internalConstraints
         .find((x) => x.type === "value_comparison");
       expect(c).toMatchObject({
         type: "value_comparison",
-        roleId1: "r1",
-        roleId2: "r2",
+        roleId1: "f.r1",
+        roleId2: "f.r2",
         operator: "<=",
       });
     });
@@ -206,8 +206,8 @@ describe("OrmYamlSerializer", () => {
       model.addFactType({
         name: "Customer has Name",
         roles: [
-          { name: "has", playerId: customer.id, id: "r1" },
-          { name: "of", playerId: name.id, id: "r2" },
+          { name: "has", playerId: customer.id, id: "f.r1" },
+          { name: "of", playerId: name.id, id: "f.r2" },
         ],
         readings: ["{0} has {1}"],
         note: "confirm cardinality with stakeholder",
@@ -232,13 +232,13 @@ describe("OrmYamlSerializer", () => {
       model.addFactType({
         name: "Person has Name",
         roles: [
-          { name: "has", playerId: person.id, id: "r1" },
-          { name: "of", playerId: name.id, id: "r2" },
+          { name: "has", playerId: person.id, id: "f.r1" },
+          { name: "of", playerId: name.id, id: "f.r2" },
         ],
         readings: ["{0} has {1}"],
         constraints: [
-          { type: "mandatory", roleId: "r1", modality: "deontic" },
-          { type: "internal_uniqueness", roleIds: ["r1"] }, // alethic default
+          { type: "mandatory", roleId: "f.r1", modality: "deontic" },
+          { type: "internal_uniqueness", roleIds: ["f.r1"] }, // alethic default
         ],
       });
 
@@ -248,7 +248,7 @@ describe("OrmYamlSerializer", () => {
       expect((yaml.match(/modality:/g) ?? []).length).toBe(1);
 
       const restored = serializer.deserialize(yaml);
-      const constraints = restored.getFactTypeByName("Person has Name")!.constraints;
+      const constraints = restored.getFactTypeByName("Person has Name")!.internalConstraints;
       expect(constraints.find((c) => c.type === "mandatory")!.modality).toBe("deontic");
       expect(constraints.find((c) => c.type === "internal_uniqueness")!.modality).toBeUndefined();
     });
@@ -269,9 +269,9 @@ describe("OrmYamlSerializer", () => {
       });
       model.addFactType({
         name: "Promotion is active",
-        roles: [{ name: "is active", playerId: promo.id, id: "r1" }],
+        roles: [{ name: "is active", playerId: promo.id, id: "f.r1" }],
         readings: ["{0} is active"],
-        constraints: [{ type: "cardinality", roleId: "r1", min: 0, max: 10 }],
+        constraints: [{ type: "cardinality", roleId: "f.r1", min: 0, max: 10 }],
       });
 
       const yaml = serializer.serialize(model);
@@ -287,9 +287,9 @@ describe("OrmYamlSerializer", () => {
         min: 2,
         max: "unbounded",
       });
-      const card = restored.getFactTypeByName("Promotion is active")!.constraints
+      const card = restored.getFactTypeByName("Promotion is active")!.internalConstraints
         .find((c) => c.type === "cardinality");
-      expect(card).toMatchObject({ type: "cardinality", roleId: "r1", min: 0, max: 10 });
+      expect(card).toMatchObject({ type: "cardinality", roleId: "f.r1", min: 0, max: 10 });
     });
 
     it("omits cardinality when the object type has none", () => {
@@ -309,8 +309,8 @@ describe("OrmYamlSerializer", () => {
       model.addFactType({
         name: "Order has TotalPrice",
         roles: [
-          { name: "has", playerId: order.id, id: "r1" },
-          { name: "of", playerId: total.id, id: "r2" },
+          { name: "has", playerId: order.id, id: "f.r1" },
+          { name: "of", playerId: total.id, id: "f.r2" },
         ],
         readings: ["{0} has {1}"],
         derivation: {
@@ -359,8 +359,8 @@ describe("OrmYamlSerializer", () => {
       model.addFactType({
         name: "A has B",
         roles: [
-          { name: "has", playerId: a.id, id: "r1" },
-          { name: "of", playerId: b.id, id: "r2" },
+          { name: "has", playerId: a.id, id: "f.r1" },
+          { name: "of", playerId: b.id, id: "f.r2" },
         ],
         readings: ["{0} has {1}"],
       });
@@ -404,7 +404,7 @@ describe("OrmYamlSerializer", () => {
       expect(yaml).not.toContain("data_type");
     });
 
-    it("serializes isPreferred on internal_uniqueness constraint", () => {
+    it("writes an entity's preferred identifier on the entity, by constraint id", () => {
       const model = new OrmModel({ name: "Test" });
       const customer = model.addObjectType({
         name: "Customer",
@@ -413,15 +413,16 @@ describe("OrmYamlSerializer", () => {
       });
       model.addFactType({
         name: "Customer has id",
-        roles: [{ id: "r1", name: "has", playerId: customer.id }],
+        roles: [{ id: "f.r1", name: "has", playerId: customer.id }],
         readings: ["{0} has id"],
-        constraints: [
-          { type: "internal_uniqueness", roleIds: ["r1"], isPreferred: true },
-        ],
+        constraints: [{ id: "u1", type: "internal_uniqueness", roleIds: ["f.r1"] }],
       });
+      model.setPreferredIdentifier(customer.id, "u1");
 
       const yaml = serializer.serialize(model);
-      expect(yaml).toContain("is_preferred: true");
+      expect(yaml).toContain("preferred_identifier: u1");
+      expect(yaml).not.toContain("is_preferred");
+      expect(serializer.deserialize(yaml).preferredIdentifierOf(customer.id)).toBe("u1");
     });
 
     it("omits is_preferred when false or undefined", () => {
@@ -433,10 +434,10 @@ describe("OrmYamlSerializer", () => {
       });
       model.addFactType({
         name: "Customer has id",
-        roles: [{ id: "r1", name: "has", playerId: customer.id }],
+        roles: [{ id: "f.r1", name: "has", playerId: customer.id }],
         readings: ["{0} has id"],
         constraints: [
-          { type: "internal_uniqueness", roleIds: ["r1"] },
+          { type: "internal_uniqueness", roleIds: ["f.r1"] },
         ],
       });
 
@@ -535,12 +536,16 @@ model:
 
       expect(model.objectTypes).toHaveLength(1);
       const ot = model.objectTypes[0]!;
-      expect(ot.id).toBe("ot-001");
+      // Read from a 1.0 file, so replayed into 4.0's ids: a shadow takes
+      // <context>:<local name>.
+      expect(ot.id).toBe("crm:Customer");
       expect(ot.name).toBe("Customer");
       expect(ot.kind).toBe("entity");
       expect(ot.referenceMode).toBe("customer_id");
       expect(ot.definition).toBe("A person who buys things.");
-      expect(ot.sourceContext).toBe("crm");
+      // The owner moves into the alias, and the model imports it.
+      expect(ot.sourceContext).toBeUndefined();
+      expect(model.imports.get("crm")).toBe("crm");
     });
 
     it("deserializes value types with value constraints", () => {
@@ -606,7 +611,7 @@ model:
       expect(ot.dataType!.scale).toBe(2);
     });
 
-    it("deserializes isPreferred on internal_uniqueness constraint", () => {
+    it("reads a 2.0-era is_preferred flag by Open decision 8's rule", () => {
       const yaml = `
 orm_version: "1.0"
 model:
@@ -632,14 +637,10 @@ model:
 `;
       const model = serializer.deserialize(yaml);
 
-      const ft = model.factTypes[0]!;
-      const uc = ft.constraints.find(
-        (c) => c.type === "internal_uniqueness",
-      );
-      expect(uc).toBeDefined();
-      if (uc?.type === "internal_uniqueness") {
-        expect(uc.isPreferred).toBe(true);
-      }
+      // A unary's uniqueness leaves no role uncovered, so the old flag
+      // names no entity (orm-format-3, Open decision 8) and is dropped.
+      expect(model.preferredIdentifierOf("ot-001")).toBeUndefined();
+      expect(model.factTypes[0]!.internalConstraints).toHaveLength(1);
     });
 
     it("deserializes internal_uniqueness without is_preferred", () => {
@@ -668,7 +669,7 @@ model:
       const model = serializer.deserialize(yaml);
 
       const ft = model.factTypes[0]!;
-      const uc = ft.constraints.find(
+      const uc = ft.internalConstraints.find(
         (c) => c.type === "internal_uniqueness",
       );
       expect(uc).toBeDefined();
@@ -714,18 +715,20 @@ model:
 
       expect(model.factTypes).toHaveLength(1);
       const ft = model.factTypes[0]!;
-      expect(ft.id).toBe("ft-001");
+      // Replayed into 4.0's ids, each minted from its name.
+      expect(ft.id).toBe("Customer_places_Order");
       expect(ft.name).toBe("Customer places Order");
       expect(ft.roles).toHaveLength(2);
       expect(ft.roles[0]!.name).toBe("places");
-      expect(ft.roles[0]!.playerId).toBe("ot-001");
+      expect(ft.roles[0]!.playerId).toBe("Customer");
       expect(ft.roles[1]!.name).toBe("is placed by");
-      expect(ft.roles[1]!.playerId).toBe("ot-002");
+      expect(ft.roles[1]!.playerId).toBe("Order");
       expect(ft.readings).toHaveLength(2);
       expect(ft.readings[0]!.template).toBe("{0} places {1}");
-      expect(ft.constraints).toHaveLength(2);
-      expect(ft.constraints[0]!.type).toBe("internal_uniqueness");
-      expect(ft.constraints[1]!.type).toBe("mandatory");
+      expect(ft.internalConstraints).toHaveLength(2);
+      expect(ft.internalConstraints[0]!.type).toBe("internal_uniqueness");
+      expect(ft.internalConstraints[1]!.type).toBe("mandatory");
+      expect(model.constraints).toEqual([]);
     });
 
     it("deserializes external_uniqueness constraints", () => {
@@ -752,10 +755,11 @@ model:
           roles: ["r-001", "r-999"]
 `;
       const model = serializer.deserialize(yaml);
-      const c = model.factTypes[0]!.constraints[0]!;
+      const c = model.constraints[0]!;
       expect(c.type).toBe("external_uniqueness");
       if (c.type === "external_uniqueness") {
-        expect(c.roleIds).toEqual(["r-001", "r-999"]);
+        // The role the file never defines still dangles, in a shape 4.0 reads.
+        expect(c.roleIds).toEqual(["Test_Fact.test", "unresolved.r-999"]);
       }
     });
 
@@ -784,10 +788,10 @@ model:
           values: ["X", "Y"]
 `;
       const model = serializer.deserialize(yaml);
-      const c = model.factTypes[0]!.constraints[0]!;
+      const c = model.factTypes[0]!.internalConstraints[0]!;
       expect(c.type).toBe("value_constraint");
       if (c.type === "value_constraint") {
-        expect(c.roleId).toBe("r-001");
+        expect(c.roleId).toBe("Test_Fact.test");
         expect(c.values).toEqual(["X", "Y"]);
       }
     });
@@ -821,7 +825,7 @@ model:
       const yaml = `
 orm_version: "3.0"
 model:
-  name: "Test"
+  domain_context: "no name"
 `;
       expect(() => serializer.deserialize(yaml)).toThrow(
         DeserializationError,
@@ -938,7 +942,6 @@ model:
         expect(rest!.kind).toBe(orig.kind);
         expect(rest!.referenceMode).toBe(orig.referenceMode);
         expect(rest!.definition).toBe(orig.definition);
-        expect(rest!.sourceContext).toBe(orig.sourceContext);
         if (orig.valueConstraint) {
           expect(rest!.valueConstraint?.values).toEqual(
             orig.valueConstraint.values,
@@ -971,9 +974,9 @@ model:
             orig.readings[j]!.template,
           );
         }
-        expect(rest!.constraints.length).toBe(orig.constraints.length);
-        for (let j = 0; j < orig.constraints.length; j++) {
-          expect(rest!.constraints[j]).toEqual(orig.constraints[j]);
+        expect(rest!.internalConstraints.length).toBe(orig.internalConstraints.length);
+        for (let j = 0; j < orig.internalConstraints.length; j++) {
+          expect(rest!.internalConstraints[j]).toEqual(orig.internalConstraints[j]);
         }
       }
 
@@ -997,27 +1000,30 @@ model:
       model.addFactType({
         name: "Widget has Color",
         roles: [
-          { name: "has", playerId: ot.id, id: "r1" },
-          { name: "of", playerId: ot.id, id: "r2" },
+          { name: "has", playerId: ot.id, id: "f.r1" },
+          { name: "of", playerId: ot.id, id: "f.r2" },
         ],
         readings: ["{0} has {1}"],
         constraints: [
-          { type: "internal_uniqueness", roleIds: ["r1"] },
-          { type: "mandatory", roleId: "r2" },
-          { type: "external_uniqueness", roleIds: ["r1", "r2"] },
-          { type: "value_constraint", roleId: "r1", values: ["Red", "Blue"] },
+          { type: "internal_uniqueness", roleIds: ["f.r1"] },
+          { type: "mandatory", roleId: "f.r2" },
+          { type: "value_constraint", roleId: "f.r1", values: ["Red", "Blue"] },
         ],
       });
+      model.addConstraint({ type: "external_uniqueness", roleIds: ["f.r1", "f.r2"] });
 
       const yaml = serializer.serialize(model);
       const restored = serializer.deserialize(yaml);
 
       const ft = restored.factTypes[0]!;
-      expect(ft.constraints).toHaveLength(4);
-      expect(ft.constraints[0]!.type).toBe("internal_uniqueness");
-      expect(ft.constraints[1]!.type).toBe("mandatory");
-      expect(ft.constraints[2]!.type).toBe("external_uniqueness");
-      expect(ft.constraints[3]!.type).toBe("value_constraint");
+      // The fact type keeps its own three; the constraint across fact types
+      // belongs to the model.
+      expect(ft.internalConstraints).toHaveLength(3);
+      expect(ft.internalConstraints[0]!.type).toBe("internal_uniqueness");
+      expect(ft.internalConstraints[1]!.type).toBe("mandatory");
+      expect(ft.internalConstraints[2]!.type).toBe("value_constraint");
+      expect(restored.constraints).toHaveLength(1);
+      expect(restored.constraints[0]!.type).toBe("external_uniqueness");
     });
 
     it("produces YAML that matches the architecture doc format", () => {
@@ -1031,13 +1037,12 @@ model:
         kind: "entity",
         referenceMode: "customer_id",
         definition: "A person or organization that has placed at least one order.",
-        sourceContext: "crm",
       });
 
       const yaml = serializer.serialize(model);
 
       // The YAML should be readable and match the documented format.
-      expect(yaml).toContain('orm_version: "2.0"');
+      expect(yaml).toContain('orm_version: "4.0"');
       expect(yaml).toContain("name: Order Management");
       expect(yaml).toContain("domain_context: ecommerce");
       expect(yaml).toContain("id: ot-001");

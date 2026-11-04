@@ -24,24 +24,31 @@
 
 import {
   claimValueTypeName,
-  type Constraint,
   type DataTypeDef,
   type FactType,
-  generateId,
+  type FactTypeConfig,
+  type FlaggedSubtypeFact,
   type ImportFormat,
   type ImportOptions,
   type ImportResult,
+  type InternalConstraint,
   type ObjectType,
   OrmModel,
+  resolvePreferredIdentifier,
+  type RoleConfig,
+  subtypeConstraintsFromFlags,
+  subtypeFactRef,
   type ValueConstraintDef,
 } from "@barwise/core";
-import { parseSqlDataType } from "@barwise/core/sql";
+import { objectificationGivesKey } from "@barwise/core/mapping";
+import { parseSqlDataType, parseValuePredicate } from "@barwise/core/sql";
 import {
   type ColumnAnnotation,
   columnKey,
   type ReadAnnotations,
   readAnnotations,
   type Relationship,
+  sameColumns,
   type SupertypeLink,
 } from "./barwiseAnnotation.js";
 import { bareName, headNoun, sameUpToNumber } from "./nameMatching.js";
@@ -55,7 +62,6 @@ import {
   QUALIFIED,
   unquote,
 } from "./sqlIdentifiers.js";
-import { parseValuePredicate } from "./valuePredicate.js";
 
 /**
  * A parsed CREATE TABLE statement.
@@ -291,11 +297,26 @@ export class DdlImportFormat implements ImportFormat {
       // a plain column in it, and is still the relationship (barwise-c65).
       // The older rule (a key made of two or more whole foreign keys) still
       // applies when the composite reading declines a table: requirement 4
-      // keeps that table as it was read before (PR #621 review).
-      const objectifies = reading !== undefined
-        || foreignKeysOfKey(table) !== undefined
-        || annotated?.objectifies !== undefined;
-      const referenceMode = annotated && (table.primaryKey.length === 1 || objectifies)
+      // keeps that table as it was read before (PR #621 review). A line
+      // with `supertypes` is the export's statement and is trusted: an
+      // entity identified by two references is keyed on its foreign keys
+      // and objectifies nothing (barwise-xgu). An older line, from before
+      // that field, keeps the guess, and so does a key with a supertype
+      // link's column in it: step 3 reads no key through a link, so the
+      // guess is what keeps such a table keyed.
+      const trusted = annotated?.supertypes !== undefined
+        && !annotated.supertypes.some((link) =>
+          link.columns.some((c) => table.primaryKey.includes(c))
+        );
+      const objectifies = trusted
+        ? annotated.objectifies !== undefined
+        : reading !== undefined
+          || foreignKeysOfKey(table) !== undefined
+          || annotated?.objectifies !== undefined;
+      // The line names the reference mode whatever the key's width; the
+      // restriction to one-column keys dates from when a wider key kept an
+      // invented column (barwise-9zm).
+      const referenceMode = annotated
         ? annotated.referenceMode
         : objectifies
         ? `${table.name}_id`
@@ -415,9 +436,18 @@ export class DdlImportFormat implements ImportFormat {
     // table key -> the columns a declared subtype link took, which step 3
     // must not read as a relationship as well.
     const subtypeLinks = new Map<string, Set<string>>();
+    // The v1 annotation's subtype flags, converted to constraints over the
+    // subtype facts once every table's are imported (orm-format-3 WS4b).
+    const flagged: FlaggedSubtypeFact[] = [];
     for (const table of accepted) {
       const entity = model.getObjectType(entityMap.get(tableKey(table.name)) ?? "");
       const found = annotations.tables.get(tableKey(table.name));
+      // A key the objectified relationship gives is that relationship's; a
+      // typed identifier or a subtype fact over it as well would give the
+      // entity a second key, which exports as a second column and a UNIQUE
+      // on it (barwise-i3r).
+      const objectifiedKey = entity !== undefined
+        && keyIdentifiedByObjectification(model, table, entity, consumed);
       const declared = entity && found?.kind === "table" && found.entity === entity.name
         ? found.supertypes
         : undefined;
@@ -426,15 +456,36 @@ export class DdlImportFormat implements ImportFormat {
       // list whose every entry no longer matches the DDL falls back to the
       // rule (requirements 4a, 4b).
       if (entity && declared) {
-        const kept = this.importSupertypes(model, entity, table, declared, entityMap, warnings);
+        const kept = this.importSupertypes(
+          model,
+          entity,
+          table,
+          declared,
+          entityMap,
+          flagged,
+          warnings,
+        );
         if (kept.size > 0 || declared.length === 0) {
           subtypeLinks.set(tableKey(table.name), kept.columns);
-          if (kept.identifiedByKey) continue;
-          const binary = this.createKeyIdentifier(model, entity, table, annotations, warnings);
+          // A key that is the identifying link and, by the line, the
+          // entity's own identifier as well: the source model stored both
+          // (annotation-preferred-identifier.spec.md).
+          const namesKey = found?.kind === "table" && found.identifiedBy !== undefined
+            && sameColumns(found.identifiedBy, table.primaryKey);
+          if (kept.identifiedByKey && !namesKey || objectifiedKey) continue;
+          const binary = this.createKeyIdentifier(
+            model,
+            entity,
+            table,
+            annotations,
+            warnings,
+            kept.identifiedByKey,
+          );
           if (binary) binaries.set(columnKey(table.name, table.primaryKey[0]!), binary);
           continue;
         }
       }
+      if (objectifiedKey) continue;
       const sub = entity ? subtypeReading(table, byKey) : undefined;
       if (sub && "candidates" in sub) {
         warnings.push(
@@ -465,6 +516,7 @@ export class DdlImportFormat implements ImportFormat {
         : undefined;
       if (binary) binaries.set(columnKey(table.name, table.primaryKey[0]!), binary);
     }
+    for (const c of subtypeConstraintsFromFlags(flagged)) model.addConstraint(c);
 
     // Step 3: Create value types and fact types for the other columns
     for (const table of accepted) {
@@ -481,6 +533,36 @@ export class DdlImportFormat implements ImportFormat {
       // below. They used to be skipped, so the key's values were lost
       // (barwise-1077).
       const compositeKey = table.primaryKey.length > 1 && taken === undefined;
+      const links = subtypeLinks.get(tableKey(table.name));
+      // A table-level PRIMARY KEY makes its columns NOT NULL.
+      const readColumn = (column: ParsedColumn): ParsedColumn =>
+        table.primaryKey.includes(column.name) ? { ...column, nullable: false } : column;
+
+      // Each foreign key is one reference, built once however many columns
+      // it has (composite-foreign-key-round-trip.spec.md). Read column by
+      // column, a foreign key over two columns became two references to the
+      // same table. Two stay out, as the column loop below keeps their
+      // columns out: one over a single-column key, which step 2 made the
+      // typed key (barwise-1078), and a declared subtype link, which is the
+      // subtype fact. A foreign key naming a column the table does not
+      // declare (in another case, say) is not one either: the per-column
+      // reading never matched it, and building it would read a column that
+      // is not there.
+      const columnNamed = (c: string) => table.columns.find((tc) => tc.name === c);
+      const references = table.foreignKeys.filter((fk) =>
+        !fk.columns.some((c) => taken?.has(c))
+        && !(table.primaryKey.length === 1 && fk.columns.includes(table.primaryKey[0]!))
+        && !(links && fk.columns.every((c) => links.has(c.toLowerCase())))
+        && fk.columns.every((c) => columnNamed(c) !== undefined)
+        && entityMap.has(tableKey(fk.referencedTable))
+      );
+      const referenceBinaries = new Map<ParsedForeignKey, Binary | undefined>();
+      // A column of two references stands for neither in step 3b.
+      const shared = new Set(
+        table.columns.map((c) => c.name).filter((c) =>
+          references.filter((fk) => fk.columns.includes(c)).length > 1
+        ),
+      );
 
       for (const column of table.columns) {
         // A single key column is the entity's identifier (step 2); a column a
@@ -488,50 +570,77 @@ export class DdlImportFormat implements ImportFormat {
         if (taken?.has(column.name)) continue;
         const inKey = table.primaryKey.includes(column.name);
         if (inKey && !compositeKey) continue;
-        // A table-level PRIMARY KEY makes its columns NOT NULL.
-        const read = inKey ? { ...column, nullable: false } : column;
+        const read = readColumn(column);
 
         // A declared subtype link is the subtype fact, not a relationship.
-        if (subtypeLinks.get(tableKey(table.name))?.has(column.name.toLowerCase())) continue;
+        if (links?.has(column.name.toLowerCase())) continue;
 
-        // Check if this column is a foreign key
-        const fk = table.foreignKeys.find((fk) => fk.columns.includes(column.name));
-
-        let binary: Binary | undefined;
-        if (fk) {
-          // Foreign key: create a fact type between entities
-          const referencedEntityId = entityMap.get(tableKey(fk.referencedTable));
-          if (referencedEntityId) {
-            binary = this.createForeignKeyFactType(
+        // The references this column is in, each built at its first column.
+        const own = references.filter((fk) => fk.columns.includes(column.name));
+        if (own.length > 0) {
+          for (const fk of own) {
+            if (referenceBinaries.has(fk)) continue;
+            const built = this.createForeignKeyFactType(
               model,
               entityType,
-              referencedEntityId,
-              read,
+              entityMap.get(tableKey(fk.referencedTable))!,
+              fk.columns.map((c) => readColumn(columnNamed(c)!)),
               table,
               annotations,
               warnings,
             );
-          } else if (fk.inferred) {
+            referenceBinaries.set(fk, built);
+            if (!built) continue;
+            for (const c of fk.columns) {
+              if (!shared.has(c)) binaries.set(columnKey(table.name, c), built);
+            }
+          }
+          continue;
+        }
+
+        // A column no reference reads. Among the foreign keys naming it,
+        // those to a table imported as no entity decide, whatever order they
+        // were declared in: a declared single-column one alone drops it, as
+        // before references were read whole; an inferred one, or one over
+        // several columns, keeps it as a column with a warning, so the dbt
+        // importer and this one keep the same columns.
+        const toNone = table.foreignKeys.filter((f) =>
+          f.columns.includes(column.name) && !entityMap.has(tableKey(f.referencedTable))
+        );
+        const kept = toNone.find((f) => f.inferred || f.columns.length > 1);
+
+        let binary: Binary | undefined;
+        if (toNone.length > 0 && !kept) {
+          // Dropped, as before.
+        } else if (kept) {
+          if (kept.inferred) {
             // Inference predicts which tables become entities; when it
             // predicted wrong (two table names that read as one entity, say)
             // the guess is withdrawn and the column kept, never dropped
             // (PR #628 review).
             warnings.push(
               `Table "${table.name}": the reference inferred for column "${column.name}" has no `
-                + `entity to point at ("${fk.referencedTable}" imported as none); it is kept as a `
+                + `entity to point at ("${kept.referencedTable}" imported as none); it is kept as a `
                 + `column instead.`,
             );
-            binary = this.createColumnFactType(
-              model,
-              entityType,
-              read,
-              table,
-              annotations,
-              warnings,
+          } else if (kept.columns[0] === column.name) {
+            warnings.push(
+              `Table "${table.name}": the foreign key (${kept.columns.join(", ")}) references `
+                + `"${kept.referencedTable}", imported as no entity; its columns are kept as `
+                + `columns instead (composite-foreign-key-round-trip.spec.md).`,
             );
           }
+          binary = this.createColumnFactType(
+            model,
+            entityType,
+            read,
+            table,
+            annotations,
+            warnings,
+          );
         } else {
-          // Regular column: create value type and fact type
+          // A regular column, or one of a foreign key no reference reads:
+          // one that shares a column with a relationship step 1b built.
           binary = this.createColumnFactType(
             model,
             entityType,
@@ -545,16 +654,22 @@ export class DdlImportFormat implements ImportFormat {
       }
 
       // Step 3b: a combination of columns that is unique is an external
-      // uniqueness over their binaries' other roles, stored on the first
-      // column's fact type as the kernels store it -- the shape the export
-      // writes a multi-column UNIQUE from (ddl-round-trip-fixed-point
-      // spec, workstream 6).
+      // uniqueness over their binaries' other roles, stored on the model,
+      // where every constraint across fact types lives (orm-format-3 WS3c);
+      // the export writes a multi-column UNIQUE from it
+      // (ddl-round-trip-fixed-point spec, workstream 6).
       // A column of the relationship the table objectifies stands for that
       // relationship's role; the columns of a composite foreign key all
-      // stand for one role, so a combination naming only some of them
-      // constrains less than the role and is refused rather than widened.
+      // stand for its one reference, so a combination naming only some of
+      // them constrains less than the role and is refused rather than
+      // widened. One naming exactly them is the reference's own one-to-one,
+      // which createForeignKeyFactType already stated
+      // (composite-foreign-key-round-trip.spec.md).
+      const partOf = (c: string) => taken?.get(c) ?? binaries.get(columnKey(table.name, c));
       const unexpressible = (cols: readonly string[]): string | undefined => {
-        const parts = cols.map((c) => taken?.get(c) ?? binaries.get(columnKey(table.name, c)));
+        const named = cols.find((c) => shared.has(c));
+        if (named) return `names "${named}", a column of two foreign keys`;
+        const parts = cols.map(partOf);
         if (parts.some((p) => p === undefined)) {
           return "spans a column that imported as no fact type of the table's entity";
         }
@@ -563,21 +678,38 @@ export class DdlImportFormat implements ImportFormat {
           ? `covers only part of the composite foreign key (${partial.roleColumns!.join(", ")})`
           : undefined;
       };
-      const external = (cols: readonly string[]): string | undefined => {
+      type External =
+        | { readonly kind: "imported"; }
+        | { readonly kind: "reference"; }
+        | { readonly kind: "refused"; readonly reason: string; };
+      const external = (cols: readonly string[]): External => {
+        // Asked first: a column of this reference may be in another too.
+        const own = [...referenceBinaries].some(([fk, built]) =>
+          built && fk.columns.length > 1 && sameColumns(fk.columns, cols)
+        );
+        if (own) return { kind: "reference" };
         const reason = unexpressible(cols);
-        if (reason) return reason;
-        const parts = cols.map((c) => (taken?.get(c) ?? binaries.get(columnKey(table.name, c)))!);
-        parts[0]!.factType.addConstraint({
+        if (reason) return { kind: "refused", reason };
+        const parts = cols.map((c) => partOf(c)!);
+        model.addConstraint({
           type: "external_uniqueness",
           roleIds: [...new Set(parts.map((p) => p.farRoleId))],
         });
-        return undefined;
+        return { kind: "imported" };
       };
       for (const cols of table.uniqueConstraints) {
-        if (cols.length < 2) continue;
+        // One column: its own fact type read it (a value's or a reference's
+        // uniqueness), unless it is one column of a composite foreign key,
+        // which no role stands for alone; that used to be dropped silently.
+        if (cols.length < 2 && !partOf(cols[0]!)?.roleColumns) continue;
         // Wholly inside the relationship: step 1b made it an internal
         // uniqueness when it falls on whole roles, and dropped it otherwise.
-        const reason = cols.every((c) => taken?.has(c)) ? unexpressible(cols) : external(cols);
+        let reason: string | undefined;
+        if (cols.every((c) => taken?.has(c))) reason = unexpressible(cols);
+        else {
+          const result = external(cols);
+          if (result.kind === "refused") reason = result.reason;
+        }
         if (reason) {
           warnings.push(
             `Table "${table.name}": UNIQUE (${cols.join(", ")}) ${reason}, and was not imported `
@@ -585,16 +717,68 @@ export class DdlImportFormat implements ImportFormat {
           );
         }
       }
-      if (compositeKey) {
+      const keyResult = compositeKey ? external(table.primaryKey) : undefined;
+
+      // The uniqueness a key of several columns reads as is the entity's
+      // preferred identifier, as createKeyIdentifier makes a one-column
+      // key's: the mapper keys a table on its entity's identifier
+      // (annotation-preferred-identifier.spec.md).
+      // A key that is one composite foreign key is not: the reference's
+      // one-to-one does not key the exported table, which takes an invented
+      // reference mode beside it.
+      const rolesOf = (cols: readonly string[]): { roles: string[]; } | { reason: string; } => {
+        const reason = unexpressible(cols);
+        return reason === undefined
+          ? { roles: [...new Set(cols.map((c) => partOf(c)!.farRoleId))] }
+          : { reason };
+      };
+      const keyRoles = table.primaryKey.length > 1 && keyResult?.kind !== "reference"
+        ? rolesOf(table.primaryKey)
+        : undefined;
+      const keyPreferred = keyRoles !== undefined && "roles" in keyRoles
+        && entityType.kind === "entity" && !model.preferredIdentifierOf(entityId)
+        && preferUniquenessOver(model, entityId, keyRoles.roles);
+      // An identifier the key does not state, named by the table line.
+      let overridden = false;
+      const line = annotations.tables.get(tableKey(table.name));
+      if (
+        line?.kind === "table" && line.entity === entityType.name && line.identifiedBy
+        && entityType.kind === "entity"
+      ) {
+        const cols = line.identifiedBy;
+        const read = rolesOf(cols);
+        if ("reason" in read || !preferUniquenessOver(model, entityId, read.roles)) {
+          warnings.push(
+            `Table "${table.name}": the annotation names the entity's identifier as (${
+              cols.join(", ")
+            }), which ${
+              "reason" in read ? read.reason : "reads as no uniqueness that identifies it"
+            }; the identifier is kept as imported (annotation-preferred-identifier.spec.md).`,
+          );
+        } else overridden = !sameColumns(cols, table.primaryKey);
+      }
+
+      if (keyResult) {
         const key = table.primaryKey.join(", ");
+        const result = keyResult;
+        const identified = `the entity is identified by "${
+          entityType.kind === "entity" ? entityType.referenceMode : ""
+        }"`;
         warnings.push(
-          external(table.primaryKey) === undefined
+          result.kind === "imported"
             ? `Table "${table.name}": composite PRIMARY KEY (${key}) is imported as an external `
-              + `uniqueness over its columns; the entity is identified by "${
-                entityType.kind === "entity" ? entityType.referenceMode : ""
-              }", since an external uniqueness cannot yet be preferred (barwise-ezn).`
-            : `Table "${table.name}": composite PRIMARY KEY (${key}) spans a column that imported as `
-              + `no fact type of the table's entity, and was not imported (barwise-1077).`,
+              + `uniqueness over its columns, ${
+                !keyPreferred
+                  ? "which does not identify the entity alone, so it is not its preferred identifier"
+                  : overridden
+                  ? "not its preferred identifier: the annotation names another"
+                  : "the entity's preferred identifier"
+              }.`
+            : result.kind === "reference"
+            ? `Table "${table.name}": composite PRIMARY KEY (${key}) is one foreign key, imported `
+              + `as a one-to-one reference; ${identified} (composite-foreign-key-round-trip.spec.md).`
+            : `Table "${table.name}": composite PRIMARY KEY (${key}) ${result.reason}, and was not `
+              + `imported (barwise-1077).`,
         );
       }
     }
@@ -913,6 +1097,7 @@ export class DdlImportFormat implements ImportFormat {
     table: ParsedTable,
     declared: readonly SupertypeLink[],
     entityMap: ReadonlyMap<string, string>,
+    flagged: FlaggedSubtypeFact[],
     warnings: string[],
   ): { size: number; columns: Set<string>; identifiedByKey: boolean; } {
     const columns = new Set<string>();
@@ -948,13 +1133,18 @@ export class DdlImportFormat implements ImportFormat {
         );
         continue;
       }
-      model.addSubtypeFact({
+      const sf = model.addSubtypeFact({
         subtypeId: entity.id,
         supertypeId: supertype.id,
         providesIdentification: link.providesIdentification,
-        isExclusive: link.isExclusive,
-        isExhaustive: link.isExhaustive,
         ...(link.definingRule ? { definingRule: link.definingRule } : {}),
+      });
+      flagged.push({
+        // Its ends are the entities just resolved, so the model named it.
+        id: subtypeFactRef(sf),
+        supertype: supertype.id,
+        is_exclusive: link.isExclusive,
+        is_exhaustive: link.isExhaustive,
       });
       size++;
       for (const c of link.columns) columns.add(c.toLowerCase());
@@ -980,6 +1170,8 @@ export class DdlImportFormat implements ImportFormat {
     table: ParsedTable,
     annotations: ReadAnnotations,
     warnings: string[],
+    /** The key's reference was imported, as the identifying subtype fact. */
+    linkedToSupertype = false,
   ): Binary | undefined {
     if (table.primaryKey.length !== 1) return undefined;
     const column = table.columns.find((c) => c.name === table.primaryKey[0]);
@@ -996,7 +1188,7 @@ export class DdlImportFormat implements ImportFormat {
     // well would add a second key column on export. Keep the typed key and
     // say what was not imported (barwise-1078).
     const fk = table.foreignKeys.find((f) => f.columns.includes(column.name));
-    if (fk) {
+    if (fk && !linkedToSupertype) {
       warnings.push(
         `Table "${table.name}": key column "${column.name}" also references "${fk.referencedTable}"; `
           + `the key is imported, the reference is not (barwise-1078).`,
@@ -1012,37 +1204,24 @@ export class DdlImportFormat implements ImportFormat {
       warnings,
       this.columnAnnotation(model, annotations, table, column, entity, undefined, warnings),
     );
-    // Minted, never built from names (importer-role-ids.spec.md).
-    const entityRoleId = generateId();
-    const valueRoleId = generateId();
-    const constraints: Constraint[] = [
-      { type: "internal_uniqueness", roleIds: [valueRoleId], isPreferred: true },
-      { type: "internal_uniqueness", roleIds: [entityRoleId] },
-      { type: "mandatory", roleId: entityRoleId },
-    ];
-    if (annotation) {
-      const factType = model.addFactType(
-        annotatedFactType(
-          annotation,
-          entity.id,
-          identifier.id,
-          entityRoleId,
-          valueRoleId,
-          constraints,
-        ),
-      );
-      return { factType, farRoleId: valueRoleId };
-    }
-    const factType = model.addFactType({
-      name: `${entity.name} has ${identifier.name}`,
-      roles: [
-        { id: entityRoleId, name: "has", playerId: entity.id },
-        { id: valueRoleId, name: "is of", playerId: identifier.id },
+    // The value role's uniqueness is the entity's preferred identifier,
+    // named on the entity by the id it was stored under (orm-format-3 WS4b).
+    const added = addBinary(
+      model,
+      annotation
+        ? annotatedFactType(annotation, entity.id, identifier.id)
+        : hasFactType(`${entity.name} has ${identifier.name}`, entity.id, identifier.id),
+      (row, value) => [
+        { type: "internal_uniqueness", roleIds: [value] },
+        { type: "internal_uniqueness", roleIds: [row] },
+        { type: "mandatory", roleId: row },
       ],
-      readings: ["{0} has {1}", "{1} is of {0}"],
-      constraints,
-    });
-    return { factType, farRoleId: valueRoleId };
+    );
+    model.setPreferredIdentifier(
+      entity.id,
+      added.factType.uniquenessOver([added.otherRoleId])!.id,
+    );
+    return { factType: added.factType, farRoleId: added.otherRoleId };
   }
 
   /**
@@ -1109,19 +1288,36 @@ export class DdlImportFormat implements ImportFormat {
   }
 
   /**
-   * Create a fact type for a foreign key relationship.
+   * Create the one fact type for a foreign key relationship, over all of
+   * its columns (composite-foreign-key-round-trip.spec.md). Its columns
+   * come read: a key column already NOT NULL.
    */
   private createForeignKeyFactType(
     model: OrmModel,
     entityType: { readonly id: string; readonly name: string; },
     referencedEntityId: string,
-    column: ParsedColumn,
+    fkColumns: readonly ParsedColumn[],
     table: ParsedTable,
     annotations: ReadAnnotations,
     warnings: string[],
   ): Binary | undefined {
     const referencedEntity = model.getObjectType(referencedEntityId);
     if (!referencedEntity) return undefined;
+    const names = fkColumns.map((c) => c.name);
+    const sameSet = (cols: readonly string[]) => sameColumns(cols, names);
+    // A foreign key whose columns are, by themselves, a UNIQUE of the table
+    // or its whole key: each referenced row appears at most once, the
+    // one-to-one the export writes for an absorbed binary
+    // (one-to-one-entity-uniqueness.spec.md). Step 3b then adds nothing for
+    // that combination.
+    const farUnique = table.uniqueConstraints.some(sameSet)
+      || (names.length > 1 && sameSet(table.primaryKey));
+    // The line for a reference over several columns is on its first column
+    // (barwiseAnnotation.ts); any of them is read, the first found winning.
+    const column = fkColumns.find((c) => annotations.columns.has(columnKey(table.name, c.name)))
+      ?? fkColumns[0]!;
+    const mandatory = fkColumns.every((c) => !c.nullable);
+    const roleColumns = names.length > 1 ? { roleColumns: names } : {};
 
     const annotation = this.columnAnnotation(
       model,
@@ -1132,22 +1328,20 @@ export class DdlImportFormat implements ImportFormat {
       referencedEntity.name,
       warnings,
     );
+    // Each row references at most one target; NOT NULL makes it mandatory;
+    // a UNIQUE on the reference makes it one-to-one.
+    const referenceConstraints = (row: string, far: string): InternalConstraint[] => [
+      { type: "internal_uniqueness", roleIds: [row] },
+      ...(mandatory ? [{ type: "mandatory" as const, roleId: row }] : []),
+      ...(farUnique ? [{ type: "internal_uniqueness" as const, roleIds: [far] }] : []),
+    ];
     if (annotation) {
-      const rowRoleId = generateId();
-      const constraints: Constraint[] = [{ type: "internal_uniqueness", roleIds: [rowRoleId] }];
-      if (!column.nullable) constraints.push({ type: "mandatory", roleId: rowRoleId });
-      const farRoleId = generateId();
-      const factType = model.addFactType(
-        annotatedFactType(
-          annotation,
-          entityType.id,
-          referencedEntity.id,
-          rowRoleId,
-          farRoleId,
-          constraints,
-        ),
+      const added = addBinary(
+        model,
+        annotatedFactType(annotation, entityType.id, referencedEntity.id),
+        referenceConstraints,
       );
-      return { factType, farRoleId };
+      return { factType: added.factType, farRoleId: added.otherRoleId, ...roleColumns };
     }
 
     // Infer a reading pattern from the column name
@@ -1156,39 +1350,21 @@ export class DdlImportFormat implements ImportFormat {
     const factTypeName = `${entityType.name} ${verb} ${referencedEntity.name}`;
 
     try {
-      const constraints: any[] = [];
-
-      // Add uniqueness constraint on the foreign key side (many-to-one)
-      // Role ids are minted, never built from names: `<entity id>-<verb>-role`
-      // collided for two foreign keys with the same inferred verb, and
-      // `<value type id>-has-role` for every table sharing a column name,
-      // producing models that fail validation (importer-role-ids.spec.md).
-      const role1Id = generateId();
-      const role2Id = generateId();
-      constraints.push({
-        type: "internal_uniqueness",
-        roleIds: [role2Id],
-        isPreferred: false,
-      });
-
-      // Add mandatory constraint if NOT NULL
-      if (!column.nullable) {
-        constraints.push({
-          type: "mandatory",
-          roleId: role2Id,
-        });
-      }
-
-      const factType = model.addFactType({
-        name: factTypeName,
-        roles: [
-          { name: verb, playerId: referencedEntity.id, id: role1Id },
-          { name: `is ${verb} by`, playerId: entityType.id, id: role2Id },
-        ],
-        readings: [`{0} ${verb} {1}`],
-        constraints,
-      });
-      return { factType, farRoleId: role1Id };
+      // The referenced entity's role first, so the row's is role 1.
+      const added = addBinary(
+        model,
+        {
+          name: factTypeName,
+          roles: [
+            { name: verb, playerId: referencedEntity.id },
+            { name: `is ${verb} by`, playerId: entityType.id },
+          ],
+          readings: [`{0} ${verb} {1}`],
+          rowRole: 1,
+        },
+        referenceConstraints,
+      );
+      return { factType: added.factType, farRoleId: added.otherRoleId, ...roleColumns };
     } catch (err) {
       warnings.push(
         `Failed to create fact type for foreign key ${column.name}: ${
@@ -1229,46 +1405,21 @@ export class DdlImportFormat implements ImportFormat {
         warnings,
         this.columnAnnotation(model, annotations, table, column, entityType, undefined, warnings),
       );
-      // Minted, not built from names; see createForeignKeyFactType.
-      const entityRoleId = generateId();
-      const valueRoleId = generateId();
-
-      const constraints: Constraint[] = [
-        { type: "internal_uniqueness", roleIds: [entityRoleId] },
-      ];
-      if (!column.nullable) {
-        constraints.push({ type: "mandatory", roleId: entityRoleId });
-      }
       const isUnique = table.uniqueConstraints.some(
         (cols) => cols.length === 1 && cols[0] === column.name,
       );
-      if (isUnique) {
-        constraints.push({ type: "internal_uniqueness", roleIds: [valueRoleId] });
-      }
-
-      if (annotation) {
-        const factType = model.addFactType(
-          annotatedFactType(
-            annotation,
-            entityType.id,
-            valueType.id,
-            entityRoleId,
-            valueRoleId,
-            constraints,
-          ),
-        );
-        return { factType, farRoleId: valueRoleId };
-      }
-      const factType = model.addFactType({
-        name: `${entityType.name} has ${valueType.name}`,
-        roles: [
-          { name: "has", playerId: entityType.id, id: entityRoleId },
-          { name: "is of", playerId: valueType.id, id: valueRoleId },
+      const added = addBinary(
+        model,
+        annotation
+          ? annotatedFactType(annotation, entityType.id, valueType.id)
+          : hasFactType(`${entityType.name} has ${valueType.name}`, entityType.id, valueType.id),
+        (row, value) => [
+          { type: "internal_uniqueness", roleIds: [row] },
+          ...(!column.nullable ? [{ type: "mandatory" as const, roleId: row }] : []),
+          ...(isUnique ? [{ type: "internal_uniqueness" as const, roleIds: [value] }] : []),
         ],
-        readings: ["{0} has {1}", "{1} is of {0}"],
-        constraints,
-      });
-      return { factType, farRoleId: valueRoleId };
+      );
+      return { factType: added.factType, farRoleId: added.otherRoleId };
     } catch (err) {
       warnings.push(
         `Failed to create fact type for column ${column.name}: ${
@@ -1366,16 +1517,15 @@ export class DdlImportFormat implements ImportFormat {
       return "its primary key does not fall on whole roles";
     }
 
-    const roleIds = relationship.roles.map(() => generateId());
-    const constraints: Constraint[] = [];
+    // Each uniqueness by the positions of the roles it spans, once each:
+    // the model names the roles when the fact type is added.
+    const uniqueness: number[][] = [];
     const uniqueOver = (idx: number[] | undefined) => {
       if (!idx) return;
-      const over = idx.map((i) => roleIds[i]!);
-      const key = [...over].sort().join();
-      const seen = constraints.some((c) =>
-        c.type === "internal_uniqueness" && [...c.roleIds].sort().join() === key
-      );
-      if (!seen) constraints.push({ type: "internal_uniqueness", roleIds: over });
+      const key = [...idx].sort((a, b) => a - b).join();
+      if (!uniqueness.some((u) => [...u].sort((a, b) => a - b).join() === key)) {
+        uniqueness.push(idx);
+      }
     };
     uniqueOver(keyRoles);
     for (const cols of table.uniqueConstraints) uniqueOver(rolesOver(cols));
@@ -1399,15 +1549,25 @@ export class DdlImportFormat implements ImportFormat {
             ...(role.valueDefinition ? { definition: role.valueDefinition } : {}),
           }).id;
       }
-      return { id: roleIds[i]!, name: role.name, playerId };
+      return { name: role.name, playerId };
     });
+    // A guessed relationship names every role "is in", so the ids take the
+    // suffix rule (`<ft>.is_in`, `<ft>.is_in_2`), as an import may
+    // (iri-identity, decision 5 as amended).
     const factType = model.addFactType({
       name: relationship.factType,
       roles,
       readings: [...relationship.readings],
-      constraints,
       ...(relationship.definition ? { definition: relationship.definition } : {}),
+    }, {
+      suffixRepeatedRoleNames: true,
+      constraintsOver: (ids) =>
+        uniqueness.map((idx) => ({
+          type: "internal_uniqueness" as const,
+          roleIds: idx.map((i) => ids[i]!),
+        })),
     });
+    const roleIds = factType.roles.map((r) => r.id);
     if (objectifier) {
       model.addObjectifiedFactType({ factTypeId: factType.id, objectTypeId: objectifier.id });
     }
@@ -1660,6 +1820,58 @@ interface CompositeReading {
   readonly objectified: boolean;
 }
 
+/**
+ * Whether the table's one key column is a role of the fact type its entity
+ * objectifies, built in step 1b, and that fact type gives the table its
+ * key, by the mapper's own rule (`objectificationGivesKey`). A fact type
+ * over values alone does not, so its table keeps its typed identifier.
+ * Asked of the model as well as `consumed`, which is keyed by unqualified
+ * table name.
+ */
+function keyIdentifiedByObjectification(
+  model: OrmModel,
+  table: ParsedTable,
+  entity: ObjectType,
+  consumed: ReadonlyMap<string, ReadonlyMap<string, Binary>>,
+): boolean {
+  if (table.primaryKey.length !== 1) return false;
+  const binary = consumed.get(tableKey(table.name))?.get(table.primaryKey[0]!);
+  if (!binary) return false;
+  const objectifies = model.objectifiedFactTypes.some((o) =>
+    o.objectTypeId === entity.id && o.factTypeId === binary.factType.id
+  );
+  return objectifies && objectificationGivesKey(binary.factType.id, model);
+}
+
+/**
+ * Make the first uniqueness over exactly `roleIds` that identifies the
+ * entity its preferred identifier: internal ones first, then external,
+ * each in model order. A uniqueness over the right roles can still not
+ * identify the entity (a single role of a ternary, say), and the model
+ * would store it without complaint, so each is checked as validation
+ * checks it. False, with the identifier unchanged, when none does.
+ */
+function preferUniquenessOver(
+  model: OrmModel,
+  entityId: string,
+  roleIds: readonly string[],
+): boolean {
+  const over = (ids: readonly string[]) => sameColumns(ids, roleIds);
+  const candidates = [
+    ...model.factTypes.flatMap((ft) =>
+      ft.internalConstraints.filter((c) => c.type === "internal_uniqueness" && over(c.roleIds))
+    ),
+    ...model.constraints.filter((c) => c.type === "external_uniqueness" && over(c.roleIds)),
+  ];
+  const before = model.preferredIdentifierOf(entityId);
+  for (const c of candidates) {
+    model.setPreferredIdentifier(entityId, c.id);
+    if (resolvePreferredIdentifier(model, entityId).ok) return true;
+  }
+  model.setPreferredIdentifier(entityId, before);
+  return false;
+}
+
 function compositeReading(table: ParsedTable, referenced: boolean): CompositeReading | undefined {
   const key = table.primaryKey;
   if (key.length < 2) return undefined;
@@ -1692,20 +1904,32 @@ function compositeReading(table: ParsedTable, referenced: boolean): CompositeRea
     table.uniqueConstraints.some((u) => u.length === 1 && u[0] === c);
   const others = table.columns.filter((c) => !inKey(c.name));
   const candidates = others.filter((c) => !uniqueAlone(c.name));
-  const lone = candidates.length === 1 ? candidates[0]! : undefined;
-  const loneFk = lone && table.foreignKeys.find((f) => f.columns.includes(lone.name));
+  // The units an extra role could be: a column, or all the columns of the
+  // one multi-column foreign key it is in, which is one reference
+  // (composite-foreign-key-round-trip.spec.md). A column in two such
+  // foreign keys belongs to no one unit.
+  const unitOf = (c: string): string | undefined => {
+    const fks = table.foreignKeys.filter((f) => f.columns.length > 1 && f.columns.includes(c));
+    return fks.length === 0 ? c : fks.length === 1 ? fks[0]!.columns.join("\0") : undefined;
+  };
+  const units = new Set(candidates.map((c) => unitOf(c.name)));
+  const lone = units.size === 1 && !units.has(undefined)
+    ? [...units][0]!.split("\0").map((n) => table.columns.find((c) => c.name === n))
+    : undefined;
   // A nullable extra column cannot widen the fact: a row without it still
   // states the key's combination (PR #620 review). Nor can one beside a
   // key another table references: that fact type must be objectified, and
-  // one unique over only some of its roles is not one to objectify.
-  const extra = !referenced && lone && !lone.nullable
-      && (!loneFk || loneFk.columns.length === 1)
-    ? [lone.name]
+  // one unique over only some of its roles is not one to objectify. A
+  // foreign key is the extra role only whole: each of its columns a
+  // candidate, each NOT NULL.
+  const extra = !referenced && lone
+      && lone.every((c) => c !== undefined && !c.nullable && candidates.includes(c))
+    ? lone.map((c) => c!.name)
     : undefined;
   const roles = extra ? [...keyRoles, extra] : keyRoles;
   const valueBinary = roles.length === 2
     && roles.filter((r) => table.foreignKeys.some((f) => f.columns.includes(r[0]!))).length === 1;
-  const remaining = others.length - (extra ? 1 : 0);
+  const remaining = others.length - (extra?.length ?? 0);
   return { roles, objectified: referenced || remaining > 0 || valueBinary };
 }
 
@@ -1886,29 +2110,66 @@ function foreignKeysOfKey(table: ParsedTable): ParsedForeignKey[] | undefined {
   return [...fks];
 }
 
+/** A binary fact type before the model names its roles, and which role is the row's. */
+interface BinaryConfig extends Omit<FactTypeConfig, "roles" | "constraints"> {
+  readonly roles: readonly [RoleConfig, RoleConfig];
+  readonly rowRole: 0 | 1;
+}
+
 /**
  * A binary fact type as its annotation names it: its name, readings,
  * definition and role names, with the roles in the annotation's order.
- * The players and the constraints come from the DDL, through the caller.
+ * The players come from the DDL, through the caller.
  */
 function annotatedFactType(
   annotation: ColumnAnnotation,
   rowPlayerId: string,
   otherPlayerId: string,
-  rowRoleId: string,
-  otherRoleId: string,
-  constraints: Constraint[],
-) {
-  const role = (i: 0 | 1) =>
-    i === annotation.rowRole
-      ? { id: rowRoleId, name: annotation.roles[i].name, playerId: rowPlayerId }
-      : { id: otherRoleId, name: annotation.roles[i].name, playerId: otherPlayerId };
+): BinaryConfig {
+  const role = (i: 0 | 1) => ({
+    name: annotation.roles[i].name,
+    playerId: i === annotation.rowRole ? rowPlayerId : otherPlayerId,
+  });
   return {
     name: annotation.factType,
     roles: [role(0), role(1)],
     readings: [...annotation.readings],
-    constraints,
+    rowRole: annotation.rowRole,
     ...(annotation.definition ? { definition: annotation.definition } : {}),
+  };
+}
+
+/** `<Entity> has <Value>`, the entity's role first. */
+function hasFactType(name: string, rowPlayerId: string, otherPlayerId: string): BinaryConfig {
+  return {
+    name,
+    roles: [{ name: "has", playerId: rowPlayerId }, { name: "is of", playerId: otherPlayerId }],
+    readings: ["{0} has {1}", "{1} is of {0}"],
+    rowRole: 0,
+  };
+}
+
+/**
+ * Add a binary fact type with its constraints, stated over the row's role
+ * and the other one. The model names the roles (`<fact type>.<role>`,
+ * iri-identity decision 17) and adds the constraints inside the same add,
+ * so a refused one leaves the model as it was. An annotation may name both
+ * roles alike, and an import takes the suffix rule for that (decision 5 as
+ * amended).
+ */
+function addBinary(
+  model: OrmModel,
+  { rowRole, roles, ...config }: BinaryConfig,
+  constraintsOver: (rowRoleId: string, otherRoleId: string) => InternalConstraint[],
+): { factType: FactType; rowRoleId: string; otherRoleId: string; } {
+  const factType = model.addFactType({ ...config, roles: [...roles] }, {
+    suffixRepeatedRoleNames: true,
+    constraintsOver: (ids) => constraintsOver(ids[rowRole]!, ids[1 - rowRole]!),
+  });
+  return {
+    factType,
+    rowRoleId: factType.roles[rowRole]!.id,
+    otherRoleId: factType.roles[1 - rowRole]!.id,
   };
 }
 

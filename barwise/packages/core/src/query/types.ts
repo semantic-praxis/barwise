@@ -7,6 +7,8 @@
  * DSL front-end that produces `ModelQuery` values.
  */
 
+import type { ConstraintReport } from "../verbalization/ConstraintVerbalizer.js";
+
 /**
  * A formal query over an ORM model. Discriminated by `kind`.
  *
@@ -53,16 +55,9 @@ export interface FactTypeRef {
 }
 
 /** A lightweight reference to a constraint. */
-export interface ConstraintRef {
-  readonly id: string;
+export interface ConstraintRef extends ConstraintReport {
   /** The metamodel constraint type (e.g. "internal_uniqueness"). */
   readonly constraintType: string;
-  /** FORML verbalization of the constraint. */
-  readonly verbalization: string;
-  /** Name of the fact type the constraint is attached to. */
-  readonly factType: string;
-  /** Id of the fact type the constraint is attached to. */
-  readonly factTypeId: string;
 }
 
 /** A lightweight reference to a role within a fact type. */
@@ -137,16 +132,24 @@ export interface EntityAnchors {
   readonly referenceMode?: string;
   /** The preferred-identifier uniqueness constraint, if present. */
   readonly preferredIdentifier?: {
-    /** The identifier fact type carrying the preferred uniqueness. */
-    readonly factType: string;
+    /**
+     * The identifier fact type carrying the preferred uniqueness, for an
+     * internal identifier; absent for an external one, which has several.
+     */
+    readonly factType?: string;
+    /** Every fact type the identifier spends: one internal, one per component external. */
+    readonly factTypes: readonly string[];
     /** The object type(s) that identify the entity. */
     readonly identifierTypes: readonly string[];
   };
   /** Names of fact types in which the entity plays a mandatory role. */
   readonly mandatoryRoles: readonly string[];
   /**
-   * True when the entity has no preferred-identifier uniqueness constraint
-   * -- its reference scheme is declared but not formalized into the model.
+   * True when the entity has no identifier at all (`isIdentified`): no
+   * preferred uniqueness that identifies it, no objectification and no
+   * identifying subtype -- its reference scheme is declared but not
+   * formalized into the model. An objectified or identifying-subtype
+   * entity is identified with `preferredIdentifier` absent.
    * (Entity types always have a reference mode, so this is the meaningful
    * missing-anchor signal.)
    */

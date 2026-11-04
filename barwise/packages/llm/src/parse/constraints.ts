@@ -2,18 +2,33 @@
  * Pass 3 of the draft-model parse: apply inferred constraints.
  */
 
-import { type Constraint, type FactType, type OrmModel, type RingType } from "@barwise/core";
+import {
+  type Constraint,
+  type ExternalConstraint,
+  type FactType,
+  type InternalConstraint,
+  isExternalConstraint,
+  type OrmModel,
+  type RingType,
+  roleIdsOf,
+  subtypeFactIdsOf,
+} from "@barwise/core";
 import type { ConstraintProvenance, InferredConstraint } from "../ExtractionTypes.js";
 import { resolveRolesByPlayerName, VALID_RING_TYPES } from "./helpers.js";
 
 /**
  * Apply inferred constraints to fact types in the model.
  * Mutates `model` and `warnings`; returns the constraint provenance.
+ *
+ * The extraction keeps 2.0's `is_preferred` flag (orm-format-3, Scope);
+ * the id of each uniqueness it flags is added to `preferred`, for the
+ * caller to place once objectifications exist (`storePreferredFlags`).
  */
 export function parseConstraints(
   section: readonly InferredConstraint[],
   model: OrmModel,
   warnings: string[],
+  preferred: Set<string> = new Set(),
 ): ConstraintProvenance[] {
   const constraintProvenance: ConstraintProvenance[] = [];
 
@@ -34,14 +49,19 @@ export function parseConstraints(
       // Find the role(s) by player name or role name.
       const roleIds = resolveRolesByPlayerName(ft, ic.roles, model, warnings, ic.description);
       if (roleIds.length > 0) {
-        const constraint: Constraint = ic.is_preferred
-          ? { type: "internal_uniqueness", roleIds, isPreferred: true }
-          : { type: "internal_uniqueness", roleIds };
+        // No id: the model names it from its sentence (iri-identity 6b),
+        // and the id it gives is read back from what was stored.
+        const constraint: InternalConstraint = { type: "internal_uniqueness", roleIds };
 
         // Skip duplicate constraints (LLMs often emit the same constraint
         // in multiple phrasings, e.g. "each X has at most one Y" and
         // "each Y identifies at most one X" both targeting the same role).
-        if (isDuplicateConstraint(ft, constraint)) {
+        // A flagged duplicate flags the uniqueness already present: the
+        // identifier it names is that one, and dropping the flag with the
+        // duplicate lost it.
+        const held = ft.uniquenessOver(roleIds);
+        if (held) {
+          if (ic.is_preferred && held.id !== undefined) preferred.add(held.id);
           constraintProvenance.push({
             description: ic.description,
             confidence: ic.confidence,
@@ -50,7 +70,16 @@ export function parseConstraints(
             skipReason: "Duplicate constraint (identical type and roles already present).",
           });
         } else {
-          ft.addConstraint(constraint);
+          const stored = ft.addConstraint(constraint);
+          if (ic.is_preferred && stored.id !== undefined) preferred.add(stored.id);
+          else if (ic.is_preferred) {
+            // A preferred identifier names a constraint by id, and one the
+            // model could not name (decision 19) has none to name it by.
+            warnings.push(
+              `Uniqueness "${ic.description}" was marked preferred, but the model could not name `
+                + `it from its sentence, so it is not set as the preferred identifier.`,
+            );
+          }
           constraintProvenance.push({
             description: ic.description,
             confidence: ic.confidence,
@@ -76,7 +105,7 @@ export function parseConstraints(
           type: "mandatory",
           roleId: roleIds[0],
         };
-        if (isDuplicateConstraint(ft, mandatoryConstraint)) {
+        if (isDuplicateConstraint(model, ft, mandatoryConstraint)) {
           constraintProvenance.push({
             description: ic.description,
             confidence: ic.confidence,
@@ -135,7 +164,7 @@ export function parseConstraints(
           roleId: roleIds[0]!,
           values: [...ic.values],
         };
-        if (isDuplicateConstraint(ft, vcConstraint)) {
+        if (isDuplicateConstraint(model, ft, vcConstraint)) {
           constraintProvenance.push({
             description: ic.description,
             confidence: ic.confidence,
@@ -160,7 +189,10 @@ export function parseConstraints(
       || ic.type === "exclusion"
       || ic.type === "exclusive_or"
     ) {
-      // Multi-role constraints within a single fact type.
+      // Multi-role constraints, stored on the model as every constraint
+      // across fact types is (orm-format-3 WS3c). The roles still resolve
+      // within the one fact type the draft names, so one spanning two is
+      // not yet reachable from a draft.
       // All four share the same structure: { type, roleIds }.
       const roleIds = resolveRolesByPlayerName(ft, ic.roles, model, warnings, ic.description);
       if (roleIds.length === 0) {
@@ -174,11 +206,11 @@ export function parseConstraints(
           }] in fact type "${ic.fact_type}".`,
         });
       } else {
-        const constraint: Constraint = {
+        const constraint: ExternalConstraint = {
           type: ic.type,
           roleIds,
         };
-        if (isDuplicateConstraint(ft, constraint)) {
+        if (isDuplicateConstraint(model, ft, constraint)) {
           constraintProvenance.push({
             description: ic.description,
             confidence: ic.confidence,
@@ -187,7 +219,7 @@ export function parseConstraints(
             skipReason: `Duplicate constraint (identical ${ic.type} already present).`,
           });
         } else {
-          ft.addConstraint(constraint);
+          model.addConstraint(constraint);
           constraintProvenance.push({
             description: ic.description,
             confidence: ic.confidence,
@@ -237,7 +269,7 @@ export function parseConstraints(
           min: ic.min,
           max: ic.max,
         };
-        if (isDuplicateConstraint(ft, freqConstraint)) {
+        if (isDuplicateConstraint(model, ft, freqConstraint)) {
           constraintProvenance.push({
             description: ic.description,
             confidence: ic.confidence,
@@ -286,7 +318,7 @@ export function parseConstraints(
           roleId2: roleIds[1]!,
           ringType: ic.ring_type as RingType,
         };
-        if (isDuplicateConstraint(ft, ringConstraint)) {
+        if (isDuplicateConstraint(model, ft, ringConstraint)) {
           constraintProvenance.push({
             description: ic.description,
             confidence: ic.confidence,
@@ -366,11 +398,11 @@ export function parseConstraints(
             `${ic.type} constraint requires matching arity: got ${subsetRoleIds.length} vs ${supersetRoleIds.length}.`,
         });
       } else {
-        const constraint: Constraint = ic.type === "subset"
+        const constraint: ExternalConstraint = ic.type === "subset"
           ? { type: "subset", subsetRoleIds, supersetRoleIds }
           : { type: "equality", roleIds1: subsetRoleIds, roleIds2: supersetRoleIds };
 
-        if (isDuplicateConstraint(ft, constraint)) {
+        if (isDuplicateConstraint(model, ft, constraint)) {
           constraintProvenance.push({
             description: ic.description,
             confidence: ic.confidence,
@@ -379,7 +411,7 @@ export function parseConstraints(
             skipReason: `Duplicate constraint (identical ${ic.type} already present).`,
           });
         } else {
-          ft.addConstraint(constraint);
+          model.addConstraint(constraint);
           constraintProvenance.push({
             description: ic.description,
             confidence: ic.confidence,
@@ -395,35 +427,29 @@ export function parseConstraints(
 }
 
 /**
- * Check whether a structurally identical constraint already exists on a fact type.
- * Two internal_uniqueness constraints are duplicates if they cover the same set
- * of role IDs. The isPreferred flag is promoted (if either is preferred, the
- * existing one wins).
+ * Check whether a structurally identical constraint already exists: on the
+ * fact type for one of its own, anywhere in the model for one across fact
+ * types (orm-format-3, Open decision 9), whichever fact type holds it.
+ * A uniqueness is not checked here but by `FactType.uniquenessOver`, so a flagged
+ * duplicate can flag the one already present.
  */
 function isDuplicateConstraint(
+  model: OrmModel,
   ft: FactType,
-  candidate: Constraint,
+  candidate: Exclude<Constraint, { type: "internal_uniqueness"; }>,
 ): boolean {
-  if (candidate.type === "internal_uniqueness") {
-    const candidateRoles = [...candidate.roleIds].sort();
-    return ft.constraints.some((existing) => {
-      if (existing.type !== "internal_uniqueness") return false;
-      const existingRoles = [...existing.roleIds].sort();
-      return (
-        existingRoles.length === candidateRoles.length
-        && existingRoles.every((id, i) => id === candidateRoles[i])
-      );
-    });
-  }
+  const held: readonly Constraint[] = isExternalConstraint(candidate)
+    ? model.constraints
+    : ft.internalConstraints;
   if (candidate.type === "mandatory") {
-    return ft.constraints.some(
+    return held.some(
       (existing) =>
         existing.type === "mandatory"
         && existing.roleId === candidate.roleId,
     );
   }
   if (candidate.type === "value_constraint") {
-    return ft.constraints.some(
+    return held.some(
       (existing) =>
         existing.type === "value_constraint"
         && existing.roleId === candidate.roleId,
@@ -436,10 +462,14 @@ function isDuplicateConstraint(
     || candidate.type === "exclusion"
     || candidate.type === "exclusive_or"
   ) {
-    const candidateRoles = [...candidate.roleIds].sort();
-    return ft.constraints.some((existing) => {
+    // The roles the parser builds every one of these over; one over
+    // subtypes names none, so it never matches one over roles.
+    const operand = (c: Constraint) =>
+      [...roleIdsOf(c), ...subtypeFactIdsOf(c).map((id) => `subtype:${id}`)].sort();
+    const candidateRoles = operand(candidate);
+    return held.some((existing) => {
       if (existing.type !== candidate.type) return false;
-      const existingRoles = [...(existing as typeof candidate).roleIds].sort();
+      const existingRoles = operand(existing);
       return (
         existingRoles.length === candidateRoles.length
         && existingRoles.every((id, i) => id === candidateRoles[i])
@@ -448,7 +478,7 @@ function isDuplicateConstraint(
   }
   if (candidate.type === "frequency") {
     const candRoles = [...candidate.roleIds].sort();
-    return ft.constraints.some(
+    return held.some(
       (existing) =>
         existing.type === "frequency"
         && existing.roleIds.length === candRoles.length
@@ -457,7 +487,7 @@ function isDuplicateConstraint(
   }
   if (candidate.type === "ring") {
     const roles = [candidate.roleId1, candidate.roleId2].sort();
-    return ft.constraints.some((existing) => {
+    return held.some((existing) => {
       if (existing.type !== "ring") return false;
       if (existing.ringType !== candidate.ringType) return false;
       const existingRoles = [existing.roleId1, existing.roleId2].sort();
@@ -465,7 +495,7 @@ function isDuplicateConstraint(
     });
   }
   if (candidate.type === "subset") {
-    return ft.constraints.some((existing) => {
+    return held.some((existing) => {
       if (existing.type !== "subset") return false;
       return (
         arraysEqual(existing.subsetRoleIds, candidate.subsetRoleIds)
@@ -474,11 +504,15 @@ function isDuplicateConstraint(
     });
   }
   if (candidate.type === "equality") {
-    return ft.constraints.some((existing) => {
+    return held.some((existing) => {
       if (existing.type !== "equality") return false;
+      // Symmetric: the same rule stated from the other fact type swaps the
+      // two sequences, and now that it is checked model-wide it is found.
       return (
-        arraysEqual(existing.roleIds1, candidate.roleIds1)
-        && arraysEqual(existing.roleIds2, candidate.roleIds2)
+        (arraysEqual(existing.roleIds1, candidate.roleIds1)
+          && arraysEqual(existing.roleIds2, candidate.roleIds2))
+        || (arraysEqual(existing.roleIds1, candidate.roleIds2)
+          && arraysEqual(existing.roleIds2, candidate.roleIds1))
       );
     });
   }

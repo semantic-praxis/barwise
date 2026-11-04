@@ -1,0 +1,49 @@
+orm_version: "3.0"
+model:
+  name: Malformed
+  object_types:
+    - id: ot-person
+      name: Person
+      kind: entity
+      reference_mode: person_id
+    - id: ot-age
+      name: Age
+      kind: value
+      data_type:
+        name: integer
+    - id: ot-employee
+      name: Employee
+      kind: entity
+      reference_mode: employee_id
+    - id: ot-student
+      name: Student
+      kind: entity
+      reference_mode: student_id
+  fact_types:
+    - id: ft-pass-has-age
+      name: Pass has Age
+      roles:
+        - id: r-pass-person
+          player: ot-person
+          role_name: has
+        - id: r-pass-age
+          player: ot-age
+          role_name: is of
+      readings:
+        - "{0} has {1}"
+  constraints:
+    - id: c-pass-exclusion
+      type: exclusion
+      roles:
+        - r-pass-person
+        - r-pass-age
+      subtype_facts:
+        - sf-employee
+        - sf-student
+  subtype_facts:
+    - id: sf-employee
+      subtype: ot-employee
+      supertype: ot-person
+    - id: sf-student
+      subtype: ot-student
+      supertype: ot-person

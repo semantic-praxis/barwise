@@ -47,7 +47,7 @@ export function checkValueComparisonViolations(model: OrmModel): Diagnostic[] {
     const ft = model.getFactType(pop.factTypeId);
     if (!ft) continue;
 
-    const constraints = ft.constraints.filter(isValueComparison);
+    const constraints = ft.internalConstraints.filter(isValueComparison);
     for (const vc of constraints) {
       for (const inst of pop.instances) {
         const a = inst.roleValues[vc.roleId1];

@@ -1,5 +1,5 @@
 import { annotateOrmYaml } from "@barwise/core/annotation";
-import { diffModels, mergeAndValidate } from "@barwise/core/diff";
+import { diffModels, MERGE_DIFF_OPTIONS, mergeAndValidate } from "@barwise/core/diff";
 import {
   buildReasoningTrail,
   createLlmClient,
@@ -128,7 +128,7 @@ export function addTranscriptSubcommand(importCmd: Command): void {
             try {
               const existingYaml = readFile(opts.output);
               const existingModel = serializer.deserialize(existingYaml);
-              const diff = diffModels(existingModel, result.model);
+              const diff = diffModels(existingModel, result.model, MERGE_DIFF_OPTIONS);
 
               if (diff.hasChanges) {
                 // Accept additions and modifications, reject removals.
@@ -143,7 +143,7 @@ export function addTranscriptSubcommand(importCmd: Command): void {
                 const mergeResult = mergeAndValidate(
                   existingModel,
                   result.model,
-                  diff.deltas,
+                  diff,
                   accepted,
                 );
 

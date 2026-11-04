@@ -18,12 +18,12 @@ function modelYaml(version: string): string {
 }
 
 describe("OrmYamlSerializer version handling", () => {
-  it("loads a document at the current version", () => {
+  it("loads a document at the current version [adr:schema-versioning#version-signal]", () => {
     const model = serializer.deserialize(modelYaml(CURRENT_ORM_VERSION));
     expect(model.name).toBe("T");
   });
 
-  it("migrates a 1.0 document forward to the current version", () => {
+  it("migrates a 1.0 document forward to the current version [adr:schema-versioning#load-forward]", () => {
     const model = serializer.deserialize(modelYaml("1.0"));
     expect(model.name).toBe("T");
     // The additive 1.0 -> 1.1 migration restamps the version; re-serializing
@@ -31,11 +31,11 @@ describe("OrmYamlSerializer version handling", () => {
     expect(serializer.serialize(model)).toContain(`orm_version: "${CURRENT_ORM_VERSION}"`);
   });
 
-  it("rejects a newer version with an upgrade message", () => {
-    expect(() => serializer.deserialize(modelYaml("3.0"))).toThrow(DeserializationError);
-    expect(() => serializer.deserialize(modelYaml("3.0"))).toThrow(/newer barwise/);
+  it("rejects a newer version with an upgrade message [adr:schema-versioning#version-signal]", () => {
+    expect(() => serializer.deserialize(modelYaml("5.0"))).toThrow(DeserializationError);
+    expect(() => serializer.deserialize(modelYaml("5.0"))).toThrow(/newer barwise/);
     // The old cryptic schema-const message must no longer surface.
-    expect(() => serializer.deserialize(modelYaml("3.0"))).not.toThrow(/must be equal to constant/);
+    expect(() => serializer.deserialize(modelYaml("5.0"))).not.toThrow(/must be equal to constant/);
   });
 
   it("rejects an unknown older version with a no-path message", () => {
@@ -46,7 +46,7 @@ describe("OrmYamlSerializer version handling", () => {
     expect(() => serializer.deserialize(modelYaml("9.9"))).toThrow(/orm_version "9\.9"/);
   });
 
-  it("stamps the current version on serialized output", () => {
+  it("stamps the current version on serialized output [adr:schema-versioning#version-signal]", () => {
     const model = serializer.deserialize(modelYaml(CURRENT_ORM_VERSION));
     expect(serializer.serialize(model)).toContain(`orm_version: "${CURRENT_ORM_VERSION}"`);
   });

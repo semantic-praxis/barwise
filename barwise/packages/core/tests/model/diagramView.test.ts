@@ -11,6 +11,7 @@ import {
 } from "../../src/model/diagramView.js";
 import { OrmModel } from "../../src/model/OrmModel.js";
 import { ModelBuilder } from "../helpers/ModelBuilder.js";
+import { placeFlags } from "../helpers/placeFlags.js";
 
 /** Person <- Employee subtype; Person works for Company; Company is listed. */
 function model() {
@@ -94,7 +95,7 @@ describe("absorbedReferenceModes", () => {
         readings: ["{0} is legacy"],
       });
     }
-    return m;
+    return placeFlags(m);
   }
 
   it("folds the identifying value type and fact type into the entity", () => {

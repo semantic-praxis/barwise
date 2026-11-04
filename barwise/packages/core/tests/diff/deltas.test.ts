@@ -113,6 +113,31 @@ const SAMPLES: ReadonlyArray<{ delta: ModelDelta; label: string; }> = [
     },
     label: "Population: sample tuples for EmployeeWorksInDepartment",
   },
+  {
+    delta: {
+      kind: "added",
+      elementType: "constraint",
+      constraintType: "external_uniqueness",
+      factTypes: ["Room is in Building", "Room has RoomNumber"],
+      roles: ["Room is in Building (houses)", "Room has RoomNumber (is of)"],
+      changes: [],
+      changeDescriptions: [],
+      breakingLevel: "caution",
+    },
+    label:
+      "Constraint: external uniqueness over Room is in Building (houses), Room has RoomNumber (is of)",
+  },
+  {
+    delta: {
+      kind: "modified",
+      elementType: "model_header",
+      name: "namespace",
+      changes: [{ change: "namespace", to: "https://a.example/" }],
+      changeDescriptions: [],
+      breakingLevel: "caution",
+    },
+    label: "Model header: namespace",
+  },
 ];
 
 describe("labelling a delta", () => {

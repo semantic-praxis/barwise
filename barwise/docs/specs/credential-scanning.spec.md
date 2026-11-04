@@ -4,7 +4,7 @@ Status: Implemented. The gate, its wiring and its tests landed with this
 spec, and the history reading was taken (1056 commits, 0 findings).
 
 Created: 2026-09-12
-Last-updated: 2026-09-12
+Last-updated: 2026-10-27
 Tracking: barwise-1021 (the gate); barwise-1022 (the history reading);
 barwise-1028 (send the Anthropic rule upstream). Triggered by the
 "Principles of AI Development" manifesto, whose "Trust the boundaries, not
@@ -55,6 +55,8 @@ see any of them. Two of the three are docs-only changes, which is why the CI
 step carries no docs-only skip.
 
 ## Should we write our own detectors? (resolved: no -- and the first draft of this spec said yes)
+
+Recorded as `docs/adr/credential-handling.md`.
 
 **No, and this is the spec's largest correction.** The first version of this
 gate shipped ten hand-written vendor-prefix regexes and an entropy argument
@@ -132,6 +134,8 @@ this repository:
 
 It also prints the rotation instruction, which is the one thing a reader
 needs and no scanner says.
+
+Recorded as `docs/adr/credential-handling.md`.
 
 ## Scope
 

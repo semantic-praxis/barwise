@@ -2,10 +2,13 @@
  * Lineage generation: traces exported artifacts back to source ORM elements.
  */
 
+import type { ConstraintPlacement } from "../mapping/constraintRouting.js";
 import type { RelationalSchema } from "../mapping/RelationalSchema.js";
-import type { Constraint } from "../model/Constraint.js";
-import type { OrmModel } from "../model/OrmModel.js";
+import { type Constraint, subtypeFactIdsOf } from "../model/Constraint.js";
+import type { FactType } from "../model/FactType.js";
+import type { ConstraintInView, OrmModel } from "../model/OrmModel.js";
 import type { SubtypeFact } from "../model/SubtypeFact.js";
+import { subtypeOperands } from "../model/subtypeOperands.js";
 import type { LineageEntry, SourceReference } from "./types.js";
 
 /**
@@ -16,13 +19,24 @@ import type { LineageEntry, SourceReference } from "./types.js";
  *
  * @param model - The source ORM model
  * @param schema - The relational schema produced by RelationalMapper
+ * @param placements - The constraints the DDL's routing wrote on each
+ *   table, as a clause or a spilled comment (`routeConstraints`): each is
+ *   a source of that table, since changing it changes the table's text
+ *   (barwise-20o). A format that writes no routed constraint passes none.
  * @returns Lineage entries, one per table artifact
  */
 export function generateDdlLineage(
   model: OrmModel,
   schema: RelationalSchema,
+  placements: readonly ConstraintPlacement[] = [],
 ): readonly LineageEntry[] {
   const entries: LineageEntry[] = [];
+  const placedOn = new Map<string, ConstraintInView[]>();
+  for (const { tableName, inView } of placements) {
+    const list = placedOn.get(tableName);
+    if (list) list.push(inView);
+    else placedOn.set(tableName, [inView]);
+  }
 
   for (const table of schema.tables) {
     const sources = new Map<string, SourceReference>();
@@ -50,38 +64,9 @@ export function generateDdlLineage(
         for (const ft of model.factTypes) {
           const role = ft.roles.find(r => r.id === column.sourceRoleId);
           if (role) {
-            // Add the fact type as a source
-            if (!sources.has(ft.id)) {
-              sources.set(ft.id, {
-                elementId: ft.id,
-                elementType: "FactType",
-                elementName: ft.name,
-              });
-            }
-
-            // Add all roles from this fact type (not just the sourceRoleId)
-            // This ensures we capture both entity and value type roles
-            for (const r of ft.roles) {
-              if (!sources.has(r.id)) {
-                sources.set(r.id, {
-                  elementId: r.id,
-                  elementType: "Role",
-                  elementName: r.name,
-                });
-              }
-
-              // Add the role's player (object type) as a source
-              const player = model.getObjectType(r.playerId);
-              if (player && !sources.has(player.id)) {
-                const playerType = player.kind === "entity" ? "EntityType" : "ValueType";
-                sources.set(player.id, {
-                  elementId: player.id,
-                  elementType: playerType,
-                  elementName: player.name,
-                });
-              }
-            }
-
+            // All roles, not just the sourceRoleId, so both the entity and
+            // the value type roles are captured.
+            addFactTypeSources(sources, model, ft);
             break;
           }
         }
@@ -104,50 +89,15 @@ export function generateDdlLineage(
       }
 
       if (fk.sourceConstraintId) {
-        // Find which fact type contains this constraint
-        for (const ft of model.factTypes) {
-          for (const constraint of ft.constraints) {
-            if (constraint.id === fk.sourceConstraintId) {
-              // Add the constraint as a source
-              sources.set(constraint.id, {
-                elementId: constraint.id,
-                elementType: "Constraint",
-                elementName: getConstraintName(constraint, ft),
-              });
-
-              // Also add the fact type if not already present
-              if (!sources.has(ft.id)) {
-                sources.set(ft.id, {
-                  elementId: ft.id,
-                  elementType: "FactType",
-                  elementName: ft.name,
-                });
-              }
-
-              // Add all roles and their players from this fact type
-              for (const r of ft.roles) {
-                if (!sources.has(r.id)) {
-                  sources.set(r.id, {
-                    elementId: r.id,
-                    elementType: "Role",
-                    elementName: r.name,
-                  });
-                }
-
-                const player = model.getObjectType(r.playerId);
-                if (player && !sources.has(player.id)) {
-                  const playerType = player.kind === "entity" ? "EntityType" : "ValueType";
-                  sources.set(player.id, {
-                    elementId: player.id,
-                    elementType: playerType,
-                    elementName: player.name,
-                  });
-                }
-              }
-
-              break;
-            }
-          }
+        const inView = model.getConstraintInView(fk.sourceConstraintId);
+        if (inView) {
+          // The fact types the constraint is named by (orm-format-3, Open
+          // decision 9): its own for an internal one, every one it spans
+          // for one across fact types. RelationalMapper sets this id to an
+          // internal uniqueness (or, below, a subtype fact or fact type)
+          // today, so the second case is the placement-correct reading,
+          // not one an export reaches yet.
+          addConstraintSources(sources, model, inView);
         }
 
         // RelationalMapper also stores a subtype fact id here (the subtype
@@ -155,7 +105,8 @@ export function generateDdlLineage(
         // for an objectification's key. Resolving only constraint ids left
         // a changed subtype relationship with no affected artifact.
         const sf = model.getSubtypeFact(fk.sourceConstraintId);
-        if (sf && !sources.has(sf.id)) {
+        // One the model left unnamed has no id an impact query could name.
+        if (sf?.id !== undefined && !sources.has(sf.id)) {
           sources.set(sf.id, {
             elementId: sf.id,
             elementType: "SubtypeFact",
@@ -171,6 +122,13 @@ export function generateDdlLineage(
           });
         }
       }
+    }
+
+    for (const inView of placedOn.get(table.name) ?? []) {
+      const id = inView[0].id;
+      // A source needs an id; one with none cannot be named in impact.
+      if (id === undefined || sources.has(id)) continue;
+      addConstraintSources(sources, model, inView);
     }
 
     // Create lineage entry for this table
@@ -197,6 +155,20 @@ export function generateModelLineage(
   model: OrmModel,
 ): readonly LineageEntry[] {
   const entries: LineageEntry[] = [];
+
+  // Each constraint over subtypes, as a source of its supertype and of every
+  // subtype it names, indexed once rather than per entity.
+  const subtypeConstraintSources = new Map<string, SourceReference[]>();
+  for (const c of model.constraints) {
+    const facts = subtypeFactIdsOf(c).flatMap((id) => model.getSubtypeFact(id) ?? []);
+    if (!c.id || facts.length === 0) continue;
+    const source = constraintSource(model, [c, undefined]);
+    for (const id of new Set(facts.flatMap((sf) => [sf.subtypeId, sf.supertypeId]))) {
+      const list = subtypeConstraintSources.get(id);
+      if (list) list.push(source);
+      else subtypeConstraintSources.set(id, [source]);
+    }
+  }
 
   for (const entity of model.objectTypes) {
     if (entity.kind !== "entity") continue;
@@ -239,17 +211,16 @@ export function generateModelLineage(
           });
         }
       }
+    }
 
-      // Add constraints from this fact type
-      for (const constraint of ft.constraints) {
-        if (constraint.id) {
-          sources.push({
-            elementId: constraint.id,
-            elementType: "Constraint",
-            elementName: getConstraintName(constraint, ft),
-          });
-        }
-      }
+    // The constraints touching the entity's fact types, each once even
+    // when it spans two of them. A constraint across fact types none of
+    // whose roles resolve touches no fact type, so no entity lists it.
+    // Validation reports one naming a role no fact type has; one with no
+    // roles at all, which only code can build, is reported for every kind
+    // but subset and equality, which have no role-count rule.
+    for (const inView of model.constraintsTouchingAny(relatedFactTypes.map((ft) => ft.id))) {
+      if (inView[0].id) sources.push(constraintSource(model, inView));
     }
 
     // Add subtype relationships
@@ -275,12 +246,18 @@ export function generateModelLineage(
     // impact on a subtype fact id must find this artifact too.
     for (const sf of model.subtypeFacts) {
       if (sf.subtypeId !== entity.id && sf.supertypeId !== entity.id) continue;
+      if (sf.id === undefined) continue;
       sources.push({
         elementId: sf.id,
         elementType: "SubtypeFact",
         elementName: subtypeFactName(model, sf),
       });
     }
+
+    // The constraints over those subtype facts (orm-format-3 WS4b): the
+    // NORMA writer and the DDL annotation emit them, so impact on one must
+    // find this artifact too.
+    for (const source of subtypeConstraintSources.get(entity.id) ?? []) sources.push(source);
 
     entries.push({
       artifact: entity.name,
@@ -300,7 +277,12 @@ export function generateModelLineage(
  * whether that was intended (barwise-869).
  */
 const GENERIC_LABELED: Record<
-  "value_comparison" | "cardinality" | "join_subset" | "join_equality" | "join_exclusion",
+  | "value_comparison"
+  | "cardinality"
+  | "join_subset"
+  | "join_equality"
+  | "join_exclusion"
+  | "join_ring",
   true
 > = {
   value_comparison: true,
@@ -308,46 +290,84 @@ const GENERIC_LABELED: Record<
   join_subset: true,
   join_equality: true,
   join_exclusion: true,
+  join_ring: true,
 };
 
 /**
- * Helper to generate a readable name for a constraint.
+ * A readable name for a constraint, by the fact types it is named by
+ * (`OrmModel.factTypesNaming`): one for an internal constraint, every
+ * one it spans for one across fact types, joined with "and".
  */
 function getConstraintName(
   constraint: { type: Constraint["type"]; id?: string; },
-  factType: { name: string; },
+  factTypes: readonly { name: string; }[],
 ): string {
+  // The span, joined; empty for a constraint none of whose roles resolve,
+  // which then reads as its label alone rather than "Label: ".
+  const span = factTypes.map((ft) => ft.name).join(" and ");
+  const of = (label: string) => (span ? `${label}: ${span}` : label);
   switch (constraint.type) {
     case "internal_uniqueness":
-      return `UC: ${factType.name}`;
+      return of("UC");
     case "mandatory":
-      return `Mandatory: ${factType.name}`;
+      return of("Mandatory");
     case "external_uniqueness":
-      return `External UC: ${factType.name}`;
+      return of("External UC");
     case "value_constraint":
-      return `Value: ${factType.name}`;
+      return of("Value");
     case "disjunctive_mandatory":
-      return `Disjunctive Mandatory`;
+      return of("Disjunctive Mandatory");
     case "exclusion":
-      return `Exclusion: ${factType.name}`;
+      return of("Exclusion");
     case "exclusive_or":
-      return `Exclusive-Or`;
+      return of("Exclusive-Or");
     case "frequency":
-      return `Frequency: ${factType.name}`;
+      return of("Frequency");
     case "ring":
-      return `Ring: ${factType.name}`;
+      return of("Ring");
     case "subset":
-      return `Subset`;
+      return of("Subset");
     case "equality":
-      return `Equality`;
+      return of("Equality");
     default: {
       // Narrowed to exactly the declared generic-labeled kinds; a new
       // member missing from GENERIC_LABELED fails to compile.
       const declared: true = GENERIC_LABELED[constraint.type];
       void declared;
-      return `Constraint: ${factType.name}`;
+      return of("Constraint");
     }
   }
+}
+
+/**
+ * A constraint as a lineage source, named by the fact types it names, or
+ * by its supertype for one over subtypes, which names no fact type. One
+ * helper, so every constraint source is named alike: a foreign key's, one
+ * the DDL routing placed, and the model lineage's.
+ */
+function constraintSource(model: OrmModel, inView: ConstraintInView): SourceReference {
+  const [c] = inView;
+  const subtypeFacts = subtypeFactIdsOf(c);
+  let named: readonly { readonly name: string; }[];
+  if (subtypeFacts.length > 0) {
+    const supertypeId = subtypeOperands(subtypeFacts, model).supertypeId;
+    const supertype = supertypeId && (model.getObjectType(supertypeId)?.name ?? supertypeId);
+    named = [{ name: `subtypes of ${supertype ?? "the supertype"}` }];
+  } else {
+    named = model.factTypesNaming(inView);
+  }
+  // Every caller has checked the id: a source with none cannot be matched.
+  return { elementId: c.id!, elementType: "Constraint", elementName: getConstraintName(c, named) };
+}
+
+/** A constraint source and the fact types it names, as a table lists them. */
+function addConstraintSources(
+  sources: Map<string, SourceReference>,
+  model: OrmModel,
+  inView: ConstraintInView,
+): void {
+  sources.set(inView[0].id!, constraintSource(model, inView));
+  for (const ft of model.factTypesNaming(inView)) addFactTypeSources(sources, model, ft);
 }
 
 /** "Customer is a subtype of Person", by the names of its two entities. */
@@ -355,4 +375,32 @@ function subtypeFactName(model: OrmModel, sf: SubtypeFact): string {
   const sub = model.getObjectType(sf.subtypeId)?.name ?? sf.subtypeId;
   const sup = model.getObjectType(sf.supertypeId)?.name ?? sf.supertypeId;
   return `${sub} is a subtype of ${sup}`;
+}
+
+/**
+ * Add a fact type, each of its roles, and each role's player to the sources,
+ * skipping any already there. A column's role and a foreign key's constraint
+ * both trace back through the whole fact type.
+ */
+function addFactTypeSources(
+  sources: Map<string, SourceReference>,
+  model: OrmModel,
+  ft: FactType,
+): void {
+  if (!sources.has(ft.id)) {
+    sources.set(ft.id, { elementId: ft.id, elementType: "FactType", elementName: ft.name });
+  }
+  for (const r of ft.roles) {
+    if (!sources.has(r.id)) {
+      sources.set(r.id, { elementId: r.id, elementType: "Role", elementName: r.name });
+    }
+    const player = model.getObjectType(r.playerId);
+    if (player && !sources.has(player.id)) {
+      sources.set(player.id, {
+        elementId: player.id,
+        elementType: player.kind === "entity" ? "EntityType" : "ValueType",
+        elementName: player.name,
+      });
+    }
+  }
 }

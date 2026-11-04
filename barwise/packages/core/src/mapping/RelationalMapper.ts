@@ -25,7 +25,14 @@
  */
 
 import type { FactType } from "../model/FactType.js";
-import { identificationOrder, preferredIdentifyingBinary } from "../model/identification.js";
+import {
+  identificationOrder,
+  identifyingFactTypes,
+  type IdentifyingUniqueness,
+  type PreferredIdentifiers,
+  preferredIdentifiers,
+  preferredIdentifyingBinary,
+} from "../model/identification.js";
 import type { ObjectifiedFactType } from "../model/ObjectifiedFactType.js";
 import {
   type DataTypeDef,
@@ -37,6 +44,7 @@ import {
 import type { OrmModel } from "../model/OrmModel.js";
 import type { PreferredIdentifierStrategy } from "../model/OrmProject.js";
 import type { SubtypeFact } from "../model/SubtypeFact.js";
+import { freeColumnName, toSnake } from "./columnNames.js";
 import type {
   Column,
   ForeignKey,
@@ -44,6 +52,7 @@ import type {
   RelationalSchema,
   Table,
 } from "./RelationalSchema.js";
+import { withSurrogateKeys } from "./surrogateKeys.js";
 
 /**
  * Options for relational mapping.
@@ -58,6 +67,26 @@ export interface RelationalMapperOptions {
    * - undefined -- falls back to TEXT (legacy behavior).
    */
   readonly preferredIdentifierStrategy?: PreferredIdentifierStrategy;
+  /**
+   * Give every table keyed on several columns a generated key, and make
+   * every reference to one a single column: a warehouse export's physical
+   * choice, applied last (`withSurrogateKeys`, surrogate-key-export.spec.md).
+   */
+  readonly surrogateKeys?: boolean;
+}
+
+/**
+ * Whether the table of the entity that objectifies this fact type is keyed
+ * on the fact type's roles: when an entity plays one of them, so the key
+ * is a reference the table absorbs. Otherwise the entity keeps its own
+ * reference-mode column. The DDL importer asks the same question of a
+ * table it reads back (objectified-key-identifier.spec.md, barwise-i3r),
+ * so it is one function both call.
+ */
+export function objectificationGivesKey(factTypeId: string, model: OrmModel): boolean {
+  const factType = model.getFactType(factTypeId);
+  return factType !== undefined
+    && factType.roles.some((role) => model.getObjectType(role.playerId)?.kind === "entity");
 }
 
 export class RelationalMapper {
@@ -78,7 +107,8 @@ export class RelationalMapper {
     // gives every entity its reference-mode key -- what the mapper did
     // before it had phases. The output is best-effort; the diagnostic is
     // where the answer lives.
-    const settlement = identificationOrder(model);
+    const identifiers = preferredIdentifiers(model);
+    const settlement = identificationOrder(model, identifiers);
     const settleable = "order" in settlement;
     const order = settleable
       ? settlement.order
@@ -103,6 +133,27 @@ export class RelationalMapper {
       // fact type over value types alone absorbs nothing -- because a
       // table with no key at all is worse than a redundant column.
       const absorbing = settleable && this.absorbsAKey(objectifiedByType.get(ot.id), model);
+      // An external identifier keys the table on its far roles, which phase
+      // 1 settles once every entity among them has its own key. Like an
+      // absorbing objectification, it takes no phase-0 column, and with
+      // the preferred identifier the authority, no reference-mode column
+      // either (external-preferred-identifier.spec.md, Open decision 2).
+      // An objectification it shares the entity with wins, as it wins over
+      // an identifying subtype fact below.
+      const external = settleable && !absorbing
+        ? externalIdentifier(identifiers, ot.id, model)
+        : undefined;
+      if (external) {
+        for (const ft of identifyingFactTypes(external)) identifyingFactTypeIds.add(ft.id);
+        settling.set(ot.id, {
+          name: toSnake(ot.name),
+          columns: [],
+          primaryKey: { columnNames: [] },
+          foreignKeys: [],
+          sourceElementId: ot.id,
+        });
+        continue;
+      }
 
       // The preferred identifying binary IS the identification; a
       // reference mode is shorthand for one. Where a model states both,
@@ -112,7 +163,7 @@ export class RelationalMapper {
       // entity. An entity that absorbs an objectification takes no
       // phase-0 column at all, so its binary is not spent and phase 2
       // maps it as an ordinary column.
-      const preferred = preferredIdentifyingBinary(model, ot);
+      const preferred = preferredIdentifyingBinary(model, ot, identifiers);
       // No fallback behind `ot.referenceMode`. There used to be one -- a
       // snake-cased "<name>_id" default for an entity type with no
       // reference mode -- for a state the constructor already refused, so
@@ -152,11 +203,11 @@ export class RelationalMapper {
       }
     }
 
-    const settledBySubtypeFact = new Set<string>();
+    const settledBySubtypeFact = new Set<SubtypeFact>();
     for (const entityId of order) {
       const oft = objectifiedByType.get(entityId);
       if (settleable && this.absorbsAKey(oft, model)) {
-        this.settleObjectifiedKey(oft!, model, settling);
+        this.settleObjectifiedKey(oft!, model, settling, identifiers);
         // An entity that both objectifies a fact type and is an
         // identified subtype declares its identity twice. Objectification
         // wins, being the more specific statement, and the subtype fact
@@ -166,10 +217,15 @@ export class RelationalMapper {
         // that key to be composite by the time it ran.
         continue;
       }
+      const external = settleable ? externalIdentifier(identifiers, entityId, model) : undefined;
+      if (external) {
+        this.settleExternalKey(external, model, settling, strategy);
+        continue;
+      }
       const sf = identifyingSubtypeFacts.get(entityId);
       if (sf) {
         this.settleSubtypeKey(sf, settling);
-        settledBySubtypeFact.add(sf.id);
+        settledBySubtypeFact.add(sf);
       }
     }
 
@@ -188,14 +244,14 @@ export class RelationalMapper {
       if (ft.arity === 1) {
         this.mapUnaryFactType(ft, model, entityTables);
       } else if (ft.arity === 2) {
-        this.mapBinaryFactType(ft, model, entityTables, associativeTables);
+        this.mapBinaryFactType(ft, model, entityTables, associativeTables, identifiers);
       } else {
-        this.mapNaryFactType(ft, model, entityTables, associativeTables);
+        this.mapNaryFactType(ft, model, entityTables, associativeTables, identifiers);
       }
     }
 
     for (const sf of model.subtypeFacts) {
-      if (settledBySubtypeFact.has(sf.id)) continue;
+      if (settledBySubtypeFact.has(sf)) continue;
       this.addSubtypeForeignKey(sf, entityTables);
     }
 
@@ -203,10 +259,8 @@ export class RelationalMapper {
       (t) => freezeTable(t),
     );
 
-    return {
-      tables: allTables,
-      sourceModelId: model.name,
-    };
+    const schema = { tables: allTables, sourceModelId: model.name };
+    return options?.surrogateKeys ? withSurrogateKeys(schema) : schema;
   }
 
   /**
@@ -215,10 +269,7 @@ export class RelationalMapper {
    * columns, so there would be nothing for the key to be.
    */
   private absorbsAKey(oft: ObjectifiedFactType | undefined, model: OrmModel): boolean {
-    if (!oft) return false;
-    const factType = model.getFactType(oft.factTypeId);
-    if (!factType) return false;
-    return factType.roles.some((role) => model.getObjectType(role.playerId)?.kind === "entity");
+    return oft !== undefined && objectificationGivesKey(oft.factTypeId, model);
   }
 
   /**
@@ -250,6 +301,7 @@ export class RelationalMapper {
     model: OrmModel,
     entityTables: Map<string, MutableTable>,
     associativeTables: MutableTable[],
+    identifiers: PreferredIdentifiers,
   ): void {
     const role1 = ft.roles[0]!;
     const role2 = ft.roles[1]!;
@@ -315,11 +367,11 @@ export class RelationalMapper {
         );
       } else {
         // Neither or both mandatory: separate associative table.
-        this.createAssociativeTable(ft, model, entityTables, associativeTables);
+        this.createAssociativeTable(ft, model, entityTables, associativeTables, identifiers);
       }
     } else {
       // No uniqueness (spanning or none): associative table.
-      this.createAssociativeTable(ft, model, entityTables, associativeTables);
+      this.createAssociativeTable(ft, model, entityTables, associativeTables, identifiers);
     }
   }
 
@@ -331,8 +383,9 @@ export class RelationalMapper {
     model: OrmModel,
     entityTables: Map<string, MutableTable>,
     associativeTables: MutableTable[],
+    identifiers: PreferredIdentifiers,
   ): void {
-    this.createAssociativeTable(ft, model, entityTables, associativeTables);
+    this.createAssociativeTable(ft, model, entityTables, associativeTables, identifiers);
   }
 
   /**
@@ -515,6 +568,7 @@ export class RelationalMapper {
     model: OrmModel,
     entityTables: Map<string, MutableTable>,
     associativeTables: MutableTable[],
+    identifiers: PreferredIdentifiers,
   ): void {
     const columns: Column[] = [];
     const foreignKeys: ForeignKey[] = [];
@@ -528,7 +582,7 @@ export class RelationalMapper {
       // uniqueness constraint (PR #580 review).
       primaryKey: {
         columnNames: ft.arity > 2
-          ? associativeKey(ft, roleColumns, columns)
+          ? associativeKey(ft, identifiers, roleColumns, columns)
           : columns.map((c) => c.name),
       },
       foreignKeys,
@@ -630,6 +684,55 @@ export class RelationalMapper {
   }
 
   /**
+   * Key an externally identified entity's table on its components' far
+   * roles: a value player's column, typed as an identifying value is, or
+   * a foreign key to an entity player's key, which the settlement order
+   * has already fixed. Each column carries the component's near role --
+   * the role the entity plays, as every column of an entity table does
+   * (an identifying binary's key column carries its entity role) -- so
+   * the DDL router and the annotation read it as they read any other.
+   */
+  private settleExternalKey(
+    at: Extract<IdentifyingUniqueness, { kind: "external"; }>,
+    model: OrmModel,
+    tables: Map<string, SettlingTable>,
+    strategy: PreferredIdentifierStrategy | undefined,
+  ): void {
+    const table = tables.get(at.entityId);
+    if (!table) return;
+    const keyColumns: string[] = [];
+    for (const { factType, nearRole, farRole } of at.components) {
+      const player = model.getObjectType(farRole.playerId);
+      if (player?.kind === "value") {
+        keyColumns.push(pushColumn(table.columns, {
+          name: toSnake(player.name),
+          ...keyTypeOf(player.dataType, strategy),
+          nullable: false,
+          sourceRoleId: nearRole.id,
+        }, `${toSnake(farRole.name)}_${toSnake(player.name)}`));
+        continue;
+      }
+      const target = player && tables.get(player.id);
+      if (!target) continue;
+      const cols = this.appendForeignKeyColumns(
+        table.columns,
+        target,
+        false,
+        nearRole.id,
+        (pkColName) => `${toSnake(farRole.name)}_${pkColName}`,
+      );
+      keyColumns.push(...cols);
+      table.foreignKeys.push({
+        columnNames: cols,
+        referencedTable: target.name,
+        referencedColumns: [...target.primaryKey.columnNames],
+        sourceConstraintId: factType.id,
+      });
+    }
+    table.primaryKey = { columnNames: keyColumns };
+  }
+
+  /**
    * Phase 1: an objectified entity's key is the composite of the columns
    * absorbed from its fact type's entity players.
    *
@@ -642,6 +745,7 @@ export class RelationalMapper {
     oft: ObjectifiedFactType,
     model: OrmModel,
     tables: Map<string, SettlingTable>,
+    identifiers: PreferredIdentifiers,
   ): void {
     const entityTable = tables.get(oft.objectTypeId);
     const factType = model.getFactType(oft.factTypeId);
@@ -664,6 +768,7 @@ export class RelationalMapper {
       entityTable.primaryKey = {
         columnNames: associativeKey(
           factType,
+          identifiers,
           roleColumns,
           entityTable.columns.filter((c) => absorbed.includes(c.name)),
         ),
@@ -685,7 +790,7 @@ export class RelationalMapper {
     const role1Id = ft.roles[0]!.id;
     const role2Id = ft.roles[1]!.id;
 
-    for (const c of ft.constraints) {
+    for (const c of ft.internalConstraints) {
       if (c.type === "internal_uniqueness") {
         if (c.roleIds.length === 1 && c.roleIds[0] === role1Id) {
           role1Unique = true;
@@ -720,7 +825,7 @@ export class RelationalMapper {
     const role1Id = ft.roles[0]!.id;
     const role2Id = ft.roles[1]!.id;
 
-    for (const c of ft.constraints) {
+    for (const c of ft.internalConstraints) {
       if (c.type === "mandatory") {
         if (c.roleId === role1Id) role1Mandatory = true;
         if (c.roleId === role2Id) role2Mandatory = true;
@@ -755,6 +860,22 @@ interface MutableTable {
 /** The same table during phase 1, where the key is still being decided. */
 type SettlingTable = Omit<MutableTable, "primaryKey"> & { primaryKey: PrimaryKey; };
 
+/**
+ * The entity's identifier when it is external and every far player
+ * resolves. One that does not -- a model that reached the mapper
+ * unvalidated -- keeps the reference-mode key, rather than spending a
+ * component fact type phase 1 could not map.
+ */
+function externalIdentifier(
+  identifiers: PreferredIdentifiers,
+  entityId: string,
+  model: OrmModel,
+): Extract<IdentifyingUniqueness, { kind: "external"; }> | undefined {
+  const at = identifiers.byEntity.get(entityId);
+  if (at?.kind !== "external") return undefined;
+  return at.components.every((c) => model.getObjectType(c.farRole.playerId)) ? at : undefined;
+}
+
 function freezeTable(t: MutableTable): Table {
   return {
     name: t.name,
@@ -780,21 +901,16 @@ function freezeTable(t: MutableTable): Table {
  * exactly as it did before (barwise-961).
  */
 function pushColumn(columns: Column[], column: Column, alternative?: string): string {
-  const taken = new Set(columns.map((c) => c.name));
-  let name = column.name;
-  if (taken.has(name)) {
-    const stem = alternative ?? name;
-    name = stem;
-    for (let i = 2; taken.has(name); i += 1) name = `${stem}_${i}`;
-  }
+  const name = freeColumnName(columns, column.name, alternative);
   columns.push({ ...column, name });
   return name;
 }
 
 /**
  * An associative table's primary key: the columns of the fact type's
- * preferred internal uniqueness constraint, else of its first one, else
- * of every role (a fact type with no uniqueness at all is a set of rows).
+ * uniqueness that is some entity's preferred identifier (an objectified
+ * fact type's, in practice), else of its first one, else of every role (a
+ * fact type with no uniqueness at all is a set of rows).
  * It used to be every entity role's columns, whatever the constraints
  * said, so "Encounter has Diagnosis at DiagnosisRank" -- unique on
  * (encounter, diagnosis) and on (encounter, rank) -- was keyed on
@@ -803,20 +919,15 @@ function pushColumn(columns: Column[], column: Column, alternative?: string): st
  */
 function associativeKey(
   ft: FactType,
+  { byConstraint }: PreferredIdentifiers,
   roleColumns: ReadonlyMap<string, readonly string[]>,
   columns: readonly Column[],
 ): string[] {
-  const uniqueness = ft.constraints.filter((c) => c.type === "internal_uniqueness");
-  const chosen = uniqueness.find((c) => c.isPreferred) ?? uniqueness[0];
+  const uniqueness = ft.internalConstraints.filter((c) => c.type === "internal_uniqueness");
+  const chosen = uniqueness.find((c) => c.id !== undefined && byConstraint.has(c.id))
+    ?? uniqueness[0];
   if (!chosen) return columns.map((c) => c.name);
   return chosen.roleIds.flatMap((id) => roleColumns.get(id) ?? []);
-}
-
-function toSnake(name: string): string {
-  return name
-    .replace(/([a-z])([A-Z])/g, "$1_$2")
-    .replace(/[\s-]+/g, "_")
-    .toLowerCase();
 }
 
 /**
@@ -925,19 +1036,48 @@ function referenceModePkType(
   model: OrmModel,
   strategy: PreferredIdentifierStrategy | undefined,
 ): SqlType & { readonly sourceRoleId?: string; } {
+  const key = referenceModeKey(ot, model);
+  if (!key) return keyTypeOf(undefined, strategy);
+  // The entity's role, as a preferred binary records it, so the key
+  // column traces to the value type that typed it -- the annotations
+  // read its definition through this (PR #567 review).
+  const entityRole = key.factType.roles.find((r) => r.playerId === ot.id);
+  return { ...keyTypeOf(key.valueType.dataType, strategy), sourceRoleId: entityRole?.id };
+}
+
+/**
+ * The value type an entity's reference mode names, and the binary that
+ * ties them: the first of `referenceModeCandidates`. The mapper types the
+ * key column from it for an entity with no preferred identifying binary
+ * (an entity that has one is keyed from that binary instead).
+ */
+function referenceModeKey(
+  ot: ObjectType,
+  model: OrmModel,
+): { readonly valueType: ValueType; readonly factType: FactType; } | undefined {
+  return referenceModeCandidates(ot, model)[0];
+}
+
+/**
+ * Every binary in which an entity plays a value type whose `toSnake` name is
+ * the entity's `reference_mode`, in fact type order; the mapper keys from the
+ * first. `renameInModel` asks it which reference modes a value-type rename
+ * must follow, and refuses a rename that changes the first or adds one, so
+ * the rename and the mapper read one rule. Like the mapper's use of it, this
+ * says nothing about an entity keyed from a preferred identifying binary.
+ */
+export function referenceModeCandidates(
+  ot: ObjectType,
+  model: OrmModel,
+): readonly { readonly valueType: ValueType; readonly factType: FactType; }[] {
+  if (ot.kind !== "entity") return [];
+  const found: { valueType: ValueType; factType: FactType; }[] = [];
   for (const ft of model.factTypes) {
     if (ft.arity !== 2) continue;
     const vp = findValuePlayer(ft, ot, model);
-    if (vp && toSnake(vp.name) === ot.referenceMode) {
-      // The entity's role, as a preferred binary records it, so the key
-      // column traces to the value type that typed it -- the annotations
-      // read its definition through this (PR #567 review).
-      const entityRole = ft.roles.find((r) => r.playerId === ot.id);
-      return { ...keyTypeOf(vp.dataType, strategy), sourceRoleId: entityRole?.id };
-    }
+    if (vp && toSnake(vp.name) === ot.referenceMode) found.push({ valueType: vp, factType: ft });
   }
-
-  return keyTypeOf(undefined, strategy);
+  return found;
 }
 
 /** A column's SQL type, whether it was declared or a fallback, and which fallback. */

@@ -1,0 +1,37 @@
+orm_version: "3.0"
+model:
+  name: Malformed
+  object_types:
+    - id: ot-person
+      name: Person
+      kind: entity
+      reference_mode: person_id
+    - id: ot-age
+      name: Age
+      kind: value
+      data_type:
+        name: integer
+  fact_types:
+    - id: ft-rent-has-age
+      name: Rent has Age
+      roles:
+        - id: r-rent-person
+          player: ot-person
+          role_name: has
+        - id: r-rent-age
+          player: ot-age
+          role_name: is of
+      readings:
+        - "{0} has {1}"
+  constraints:
+    - id: c-rent-join
+      type: join_equality
+      operands:
+        - path:
+            root: ot-person
+            steps:
+              - entry: r-rent-person
+                exit: r-rent-age
+          projection:
+            - 0
+            - 1

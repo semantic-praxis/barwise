@@ -27,6 +27,12 @@
 
 set -euo pipefail
 
+# The CLI runs here as probes that may fail (`if !`), and this script
+# reads each status itself, so the session's exit recorder must not
+# report them as hidden failures
+# (docs/specs/masked-exit-report.spec.md, the declared opt-out).
+unset BARWISE_EXIT_DIR
+
 # One stamp per round; a fresh one keeps two rounds from colliding.
 STAMP="${STAMP:-$(date '+%Y%m%d-%H%M')}"
 ROUND="eval-payloads/${STAMP}"

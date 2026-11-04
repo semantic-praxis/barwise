@@ -1,0 +1,2488 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "pii-redaction",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/document": {
+      "get": {
+        "summary": "List all Document resources",
+        "operationId": "listDocument",
+        "responses": {
+          "200": {
+            "description": "A list of Document resources",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Document"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create a Document",
+        "operationId": "createDocument",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Document"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Document created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Document"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/document/{document_id}": {
+      "get": {
+        "summary": "Get a Document by ID",
+        "operationId": "getDocument",
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A Document resource",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Document"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Document not found"
+          }
+        }
+      },
+      "put": {
+        "summary": "Update a Document",
+        "operationId": "updateDocument",
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Document"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Document updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Document"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Document not found"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete a Document",
+        "operationId": "deleteDocument",
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Document deleted"
+          },
+          "404": {
+            "description": "Document not found"
+          }
+        }
+      }
+    },
+    "/finding": {
+      "get": {
+        "summary": "List all Finding resources",
+        "operationId": "listFinding",
+        "responses": {
+          "200": {
+            "description": "A list of Finding resources",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Finding"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create a Finding",
+        "operationId": "createFinding",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Finding"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Finding created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Finding"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/finding/{_ambiguous_}": {
+      "get": {
+        "summary": "Get a Finding by ID",
+        "operationId": "getFinding",
+        "parameters": [
+          {
+            "name": "_ambiguous_",
+            "in": "path",
+            "required": true,
+            "description": "The key column \"(ambiguous)\".",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A Finding resource",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Finding"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Finding not found"
+          }
+        }
+      },
+      "put": {
+        "summary": "Update a Finding",
+        "operationId": "updateFinding",
+        "parameters": [
+          {
+            "name": "_ambiguous_",
+            "in": "path",
+            "required": true,
+            "description": "The key column \"(ambiguous)\".",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Finding"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Finding updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Finding"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Finding not found"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete a Finding",
+        "operationId": "deleteFinding",
+        "parameters": [
+          {
+            "name": "_ambiguous_",
+            "in": "path",
+            "required": true,
+            "description": "The key column \"(ambiguous)\".",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Finding deleted"
+          },
+          "404": {
+            "description": "Finding not found"
+          }
+        }
+      }
+    },
+    "/reviewer": {
+      "get": {
+        "summary": "List all Reviewer resources",
+        "operationId": "listReviewer",
+        "responses": {
+          "200": {
+            "description": "A list of Reviewer resources",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Reviewer"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create a Reviewer",
+        "operationId": "createReviewer",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Reviewer"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Reviewer created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Reviewer"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/reviewer/{employee_id}": {
+      "get": {
+        "summary": "Get a Reviewer by ID",
+        "operationId": "getReviewer",
+        "parameters": [
+          {
+            "name": "employee_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A Reviewer resource",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Reviewer"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Reviewer not found"
+          }
+        }
+      },
+      "put": {
+        "summary": "Update a Reviewer",
+        "operationId": "updateReviewer",
+        "parameters": [
+          {
+            "name": "employee_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Reviewer"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Reviewer updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Reviewer"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Reviewer not found"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete a Reviewer",
+        "operationId": "deleteReviewer",
+        "parameters": [
+          {
+            "name": "employee_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Reviewer deleted"
+          },
+          "404": {
+            "description": "Reviewer not found"
+          }
+        }
+      }
+    },
+    "/review-decision": {
+      "get": {
+        "summary": "List all ReviewDecision resources",
+        "operationId": "listReviewDecision",
+        "responses": {
+          "200": {
+            "description": "A list of ReviewDecision resources",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ReviewDecision"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create a ReviewDecision",
+        "operationId": "createReviewDecision",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewDecision"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "ReviewDecision created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewDecision"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/review-decision/{_ambiguous_}": {
+      "get": {
+        "summary": "Get a ReviewDecision by ID",
+        "operationId": "getReviewDecision",
+        "parameters": [
+          {
+            "name": "_ambiguous_",
+            "in": "path",
+            "required": true,
+            "description": "The key column \"(ambiguous)\".",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A ReviewDecision resource",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewDecision"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "ReviewDecision not found"
+          }
+        }
+      },
+      "put": {
+        "summary": "Update a ReviewDecision",
+        "operationId": "updateReviewDecision",
+        "parameters": [
+          {
+            "name": "_ambiguous_",
+            "in": "path",
+            "required": true,
+            "description": "The key column \"(ambiguous)\".",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewDecision"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "ReviewDecision updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewDecision"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "ReviewDecision not found"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete a ReviewDecision",
+        "operationId": "deleteReviewDecision",
+        "parameters": [
+          {
+            "name": "_ambiguous_",
+            "in": "path",
+            "required": true,
+            "description": "The key column \"(ambiguous)\".",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "ReviewDecision deleted"
+          },
+          "404": {
+            "description": "ReviewDecision not found"
+          }
+        }
+      }
+    },
+    "/audit-entry": {
+      "get": {
+        "summary": "List all AuditEntry resources",
+        "operationId": "listAuditEntry",
+        "responses": {
+          "200": {
+            "description": "A list of AuditEntry resources",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AuditEntry"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create a AuditEntry",
+        "operationId": "createAuditEntry",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AuditEntry"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "AuditEntry created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditEntry"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/audit-entry/{audit_id}": {
+      "get": {
+        "summary": "Get a AuditEntry by ID",
+        "operationId": "getAuditEntry",
+        "parameters": [
+          {
+            "name": "audit_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A AuditEntry resource",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditEntry"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "AuditEntry not found"
+          }
+        }
+      },
+      "put": {
+        "summary": "Update a AuditEntry",
+        "operationId": "updateAuditEntry",
+        "parameters": [
+          {
+            "name": "audit_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AuditEntry"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "AuditEntry updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditEntry"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "AuditEntry not found"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete a AuditEntry",
+        "operationId": "deleteAuditEntry",
+        "parameters": [
+          {
+            "name": "audit_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "AuditEntry deleted"
+          },
+          "404": {
+            "description": "AuditEntry not found"
+          }
+        }
+      }
+    },
+    "/scan": {
+      "get": {
+        "summary": "List all Scan resources",
+        "operationId": "listScan",
+        "responses": {
+          "200": {
+            "description": "A list of Scan resources",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Scan"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create a Scan",
+        "operationId": "createScan",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Scan"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Scan created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Scan"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/scan/{scan_version}": {
+      "get": {
+        "summary": "Get a Scan by ID",
+        "operationId": "getScan",
+        "parameters": [
+          {
+            "name": "scan_version",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A Scan resource",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Scan"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Scan not found"
+          }
+        }
+      },
+      "put": {
+        "summary": "Update a Scan",
+        "operationId": "updateScan",
+        "parameters": [
+          {
+            "name": "scan_version",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Scan"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Scan updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Scan"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Scan not found"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete a Scan",
+        "operationId": "deleteScan",
+        "parameters": [
+          {
+            "name": "scan_version",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Scan deleted"
+          },
+          "404": {
+            "description": "Scan not found"
+          }
+        }
+      }
+    },
+    "/release": {
+      "get": {
+        "summary": "List all Release resources",
+        "operationId": "listRelease",
+        "responses": {
+          "200": {
+            "description": "A list of Release resources",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Release"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create a Release",
+        "operationId": "createRelease",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Release"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Release created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Release"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/release/{document_id}/{downstream_system}": {
+      "get": {
+        "summary": "Get a Release by ID",
+        "operationId": "getRelease",
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "downstream_system",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A Release resource",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Release"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Release not found"
+          }
+        }
+      },
+      "put": {
+        "summary": "Update a Release",
+        "operationId": "updateRelease",
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "downstream_system",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Release"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Release updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Release"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Release not found"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete a Release",
+        "operationId": "deleteRelease",
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "downstream_system",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Release deleted"
+          },
+          "404": {
+            "description": "Release not found"
+          }
+        }
+      }
+    },
+    "/document-has-scan": {
+      "get": {
+        "summary": "List all DocumentHasScan resources",
+        "operationId": "listDocumentHasScan",
+        "responses": {
+          "200": {
+            "description": "A list of DocumentHasScan resources",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DocumentHasScan"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create a DocumentHasScan",
+        "operationId": "createDocumentHasScan",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DocumentHasScan"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "DocumentHasScan created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentHasScan"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/document-has-scan/{document_id}/{scan_version}": {
+      "get": {
+        "summary": "Get a DocumentHasScan by ID",
+        "operationId": "getDocumentHasScan",
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "scan_version",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A DocumentHasScan resource",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentHasScan"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "DocumentHasScan not found"
+          }
+        }
+      },
+      "put": {
+        "summary": "Update a DocumentHasScan",
+        "operationId": "updateDocumentHasScan",
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "scan_version",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DocumentHasScan"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "DocumentHasScan updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentHasScan"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "DocumentHasScan not found"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete a DocumentHasScan",
+        "operationId": "deleteDocumentHasScan",
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "scan_version",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "DocumentHasScan deleted"
+          },
+          "404": {
+            "description": "DocumentHasScan not found"
+          }
+        }
+      }
+    },
+    "/scan-produced-finding": {
+      "get": {
+        "summary": "List all ScanProducedFinding resources",
+        "operationId": "listScanProducedFinding",
+        "responses": {
+          "200": {
+            "description": "A list of ScanProducedFinding resources",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ScanProducedFinding"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create a ScanProducedFinding",
+        "operationId": "createScanProducedFinding",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScanProducedFinding"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "ScanProducedFinding created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScanProducedFinding"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/scan-produced-finding/{scan_version}/{_ambiguous_}": {
+      "get": {
+        "summary": "Get a ScanProducedFinding by ID",
+        "operationId": "getScanProducedFinding",
+        "parameters": [
+          {
+            "name": "scan_version",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "_ambiguous_",
+            "in": "path",
+            "required": true,
+            "description": "The key column \"(ambiguous)\".",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A ScanProducedFinding resource",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScanProducedFinding"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "ScanProducedFinding not found"
+          }
+        }
+      },
+      "put": {
+        "summary": "Update a ScanProducedFinding",
+        "operationId": "updateScanProducedFinding",
+        "parameters": [
+          {
+            "name": "scan_version",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "_ambiguous_",
+            "in": "path",
+            "required": true,
+            "description": "The key column \"(ambiguous)\".",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScanProducedFinding"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "ScanProducedFinding updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScanProducedFinding"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "ScanProducedFinding not found"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete a ScanProducedFinding",
+        "operationId": "deleteScanProducedFinding",
+        "parameters": [
+          {
+            "name": "scan_version",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "_ambiguous_",
+            "in": "path",
+            "required": true,
+            "description": "The key column \"(ambiguous)\".",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "ScanProducedFinding deleted"
+          },
+          "404": {
+            "description": "ScanProducedFinding not found"
+          }
+        }
+      }
+    },
+    "/finding-reviewed-by-reviewer": {
+      "get": {
+        "summary": "List all FindingReviewedByReviewer resources",
+        "operationId": "listFindingReviewedByReviewer",
+        "responses": {
+          "200": {
+            "description": "A list of FindingReviewedByReviewer resources",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/FindingReviewedByReviewer"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create a FindingReviewedByReviewer",
+        "operationId": "createFindingReviewedByReviewer",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FindingReviewedByReviewer"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "FindingReviewedByReviewer created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FindingReviewedByReviewer"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/finding-reviewed-by-reviewer/{_ambiguous_}/{employee_id}": {
+      "get": {
+        "summary": "Get a FindingReviewedByReviewer by ID",
+        "operationId": "getFindingReviewedByReviewer",
+        "parameters": [
+          {
+            "name": "_ambiguous_",
+            "in": "path",
+            "required": true,
+            "description": "The key column \"(ambiguous)\".",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "employee_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A FindingReviewedByReviewer resource",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FindingReviewedByReviewer"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "FindingReviewedByReviewer not found"
+          }
+        }
+      },
+      "put": {
+        "summary": "Update a FindingReviewedByReviewer",
+        "operationId": "updateFindingReviewedByReviewer",
+        "parameters": [
+          {
+            "name": "_ambiguous_",
+            "in": "path",
+            "required": true,
+            "description": "The key column \"(ambiguous)\".",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "employee_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FindingReviewedByReviewer"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "FindingReviewedByReviewer updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FindingReviewedByReviewer"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "FindingReviewedByReviewer not found"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete a FindingReviewedByReviewer",
+        "operationId": "deleteFindingReviewedByReviewer",
+        "parameters": [
+          {
+            "name": "_ambiguous_",
+            "in": "path",
+            "required": true,
+            "description": "The key column \"(ambiguous)\".",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "employee_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "FindingReviewedByReviewer deleted"
+          },
+          "404": {
+            "description": "FindingReviewedByReviewer not found"
+          }
+        }
+      }
+    },
+    "/review-decision-is-decision-of-finding": {
+      "get": {
+        "summary": "List all ReviewDecisionIsDecisionOfFinding resources",
+        "operationId": "listReviewDecisionIsDecisionOfFinding",
+        "responses": {
+          "200": {
+            "description": "A list of ReviewDecisionIsDecisionOfFinding resources",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ReviewDecisionIsDecisionOfFinding"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create a ReviewDecisionIsDecisionOfFinding",
+        "operationId": "createReviewDecisionIsDecisionOfFinding",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewDecisionIsDecisionOfFinding"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "ReviewDecisionIsDecisionOfFinding created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewDecisionIsDecisionOfFinding"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/review-decision-is-decision-of-finding/{_ambiguous_}/{has_decision_about__ambiguous_}": {
+      "get": {
+        "summary": "Get a ReviewDecisionIsDecisionOfFinding by ID",
+        "operationId": "getReviewDecisionIsDecisionOfFinding",
+        "parameters": [
+          {
+            "name": "_ambiguous_",
+            "in": "path",
+            "required": true,
+            "description": "The key column \"(ambiguous)\".",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "has_decision_about__ambiguous_",
+            "in": "path",
+            "required": true,
+            "description": "The key column \"has_decision_about_(ambiguous)\".",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A ReviewDecisionIsDecisionOfFinding resource",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewDecisionIsDecisionOfFinding"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "ReviewDecisionIsDecisionOfFinding not found"
+          }
+        }
+      },
+      "put": {
+        "summary": "Update a ReviewDecisionIsDecisionOfFinding",
+        "operationId": "updateReviewDecisionIsDecisionOfFinding",
+        "parameters": [
+          {
+            "name": "_ambiguous_",
+            "in": "path",
+            "required": true,
+            "description": "The key column \"(ambiguous)\".",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "has_decision_about__ambiguous_",
+            "in": "path",
+            "required": true,
+            "description": "The key column \"has_decision_about_(ambiguous)\".",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewDecisionIsDecisionOfFinding"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "ReviewDecisionIsDecisionOfFinding updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewDecisionIsDecisionOfFinding"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "ReviewDecisionIsDecisionOfFinding not found"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete a ReviewDecisionIsDecisionOfFinding",
+        "operationId": "deleteReviewDecisionIsDecisionOfFinding",
+        "parameters": [
+          {
+            "name": "_ambiguous_",
+            "in": "path",
+            "required": true,
+            "description": "The key column \"(ambiguous)\".",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "has_decision_about__ambiguous_",
+            "in": "path",
+            "required": true,
+            "description": "The key column \"has_decision_about_(ambiguous)\".",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "ReviewDecisionIsDecisionOfFinding deleted"
+          },
+          "404": {
+            "description": "ReviewDecisionIsDecisionOfFinding not found"
+          }
+        }
+      }
+    },
+    "/audit-entry-about-document": {
+      "get": {
+        "summary": "List all AuditEntryAboutDocument resources",
+        "operationId": "listAuditEntryAboutDocument",
+        "responses": {
+          "200": {
+            "description": "A list of AuditEntryAboutDocument resources",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AuditEntryAboutDocument"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create a AuditEntryAboutDocument",
+        "operationId": "createAuditEntryAboutDocument",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AuditEntryAboutDocument"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "AuditEntryAboutDocument created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditEntryAboutDocument"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/audit-entry-about-document/{audit_id}/{document_id}": {
+      "get": {
+        "summary": "Get a AuditEntryAboutDocument by ID",
+        "operationId": "getAuditEntryAboutDocument",
+        "parameters": [
+          {
+            "name": "audit_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A AuditEntryAboutDocument resource",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditEntryAboutDocument"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "AuditEntryAboutDocument not found"
+          }
+        }
+      },
+      "put": {
+        "summary": "Update a AuditEntryAboutDocument",
+        "operationId": "updateAuditEntryAboutDocument",
+        "parameters": [
+          {
+            "name": "audit_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AuditEntryAboutDocument"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "AuditEntryAboutDocument updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditEntryAboutDocument"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "AuditEntryAboutDocument not found"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete a AuditEntryAboutDocument",
+        "operationId": "deleteAuditEntryAboutDocument",
+        "parameters": [
+          {
+            "name": "audit_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "AuditEntryAboutDocument deleted"
+          },
+          "404": {
+            "description": "AuditEntryAboutDocument not found"
+          }
+        }
+      }
+    },
+    "/audit-entry-performed-by-reviewer": {
+      "get": {
+        "summary": "List all AuditEntryPerformedByReviewer resources",
+        "operationId": "listAuditEntryPerformedByReviewer",
+        "responses": {
+          "200": {
+            "description": "A list of AuditEntryPerformedByReviewer resources",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AuditEntryPerformedByReviewer"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create a AuditEntryPerformedByReviewer",
+        "operationId": "createAuditEntryPerformedByReviewer",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AuditEntryPerformedByReviewer"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "AuditEntryPerformedByReviewer created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditEntryPerformedByReviewer"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/audit-entry-performed-by-reviewer/{audit_id}/{employee_id}": {
+      "get": {
+        "summary": "Get a AuditEntryPerformedByReviewer by ID",
+        "operationId": "getAuditEntryPerformedByReviewer",
+        "parameters": [
+          {
+            "name": "audit_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "employee_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A AuditEntryPerformedByReviewer resource",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditEntryPerformedByReviewer"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "AuditEntryPerformedByReviewer not found"
+          }
+        }
+      },
+      "put": {
+        "summary": "Update a AuditEntryPerformedByReviewer",
+        "operationId": "updateAuditEntryPerformedByReviewer",
+        "parameters": [
+          {
+            "name": "audit_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "employee_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AuditEntryPerformedByReviewer"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "AuditEntryPerformedByReviewer updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditEntryPerformedByReviewer"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "AuditEntryPerformedByReviewer not found"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete a AuditEntryPerformedByReviewer",
+        "operationId": "deleteAuditEntryPerformedByReviewer",
+        "parameters": [
+          {
+            "name": "audit_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "employee_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "AuditEntryPerformedByReviewer deleted"
+          },
+          "404": {
+            "description": "AuditEntryPerformedByReviewer not found"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Document": {
+        "type": "object",
+        "properties": {
+          "document_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "source_system": {
+            "type": "string",
+            "nullable": true,
+            "x-barwise-annotations": [
+              {
+                "severity": "note",
+                "message": "Value constraint available: ['customer-support', 'lending', 'health-intake', 'survey']. Consider adding an accepted_values test."
+              }
+            ]
+          },
+          "received_timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "raw_text": {
+            "type": "string",
+            "nullable": true
+          },
+          "document_status": {
+            "type": "string",
+            "nullable": true,
+            "x-barwise-annotations": [
+              {
+                "severity": "note",
+                "message": "Value constraint available: ['queued', 'scanned', 'reviewed', 'redacted', 'failed', 'on-hold']. Consider adding an accepted_values test."
+              }
+            ]
+          },
+          "redacted_text": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "document_id",
+          "redacted_text"
+        ],
+        "x-barwise-annotations": [
+          {
+            "severity": "note",
+            "message": "Definition available from ORM model: \"An incoming document submitted from a source system that undergoes PII scanni...\""
+          }
+        ]
+      },
+      "Finding": {
+        "type": "object",
+        "properties": {
+          "(ambiguous)": {
+            "type": "string",
+            "x-barwise-annotations": [
+              {
+                "severity": "todo",
+                "message": "No column description. Add a definition to the value type."
+              },
+              {
+                "severity": "todo",
+                "message": "Data type was not declared; exported as TEXT. Add a data type to the value type."
+              }
+            ]
+          },
+          "start_position": {
+            "type": "integer"
+          },
+          "end_position": {
+            "type": "integer"
+          },
+          "piicategory": {
+            "type": "string",
+            "nullable": true,
+            "x-barwise-annotations": [
+              {
+                "severity": "note",
+                "message": "Value constraint available: ['full-name', 'email-address', 'phone-number', 'date-of-birth', 'social-security-number', 'credit-card-number', 'mailing-address', 'ip-address', 'passport-number', 'drivers-license-number']. Consider adding an accepted_values test."
+              }
+            ]
+          },
+          "confidence_score": {
+            "type": "number",
+            "nullable": true
+          }
+        },
+        "required": [
+          "(ambiguous)",
+          "start_position",
+          "end_position"
+        ],
+        "x-barwise-annotations": [
+          {
+            "severity": "note",
+            "message": "Definition available from ORM model: \"A detected PII occurrence within a specific document and scan version, identi...\""
+          }
+        ]
+      },
+      "Reviewer": {
+        "type": "object",
+        "properties": {
+          "employee_id": {
+            "type": "string"
+          },
+          "has_employee_id_employee_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "reviewer_name": {
+            "type": "string",
+            "nullable": true
+          },
+          "clearance_level": {
+            "type": "string",
+            "nullable": true,
+            "x-barwise-annotations": [
+              {
+                "severity": "note",
+                "message": "Value constraint available: ['standard', 'elevated', 'restricted']. Consider adding an accepted_values test."
+              }
+            ]
+          }
+        },
+        "required": [
+          "employee_id"
+        ],
+        "x-barwise-annotations": [
+          {
+            "severity": "note",
+            "message": "Definition available from ORM model: \"An employee who reviews findings in the compliance department.\""
+          }
+        ]
+      },
+      "ReviewDecision": {
+        "type": "object",
+        "properties": {
+          "(ambiguous)": {
+            "type": "string",
+            "x-barwise-annotations": [
+              {
+                "severity": "todo",
+                "message": "No column description. Add a definition to the value type."
+              },
+              {
+                "severity": "todo",
+                "message": "Data type was not declared; exported as TEXT. Add a data type to the value type."
+              }
+            ]
+          }
+        },
+        "required": [
+          "(ambiguous)"
+        ],
+        "x-barwise-annotations": [
+          {
+            "severity": "note",
+            "message": "Definition available from ORM model: \"A decision made by a reviewer on a single finding, recording the decision typ...\""
+          }
+        ]
+      },
+      "AuditEntry": {
+        "type": "object",
+        "properties": {
+          "audit_id": {
+            "type": "string",
+            "x-barwise-annotations": [
+              {
+                "severity": "todo",
+                "message": "No column description. Add a definition to the value type."
+              },
+              {
+                "severity": "todo",
+                "message": "Data type was not declared; exported as TEXT. Add a data type to the value type."
+              }
+            ]
+          },
+          "action_type": {
+            "type": "string",
+            "nullable": true,
+            "x-barwise-annotations": [
+              {
+                "severity": "note",
+                "message": "Value constraint available: ['scan-initiated', 'scan-completed', 'review-assigned', 'review-completed', 'redaction-applied', 'document-released', 'status-changed']. Consider adding an accepted_values test."
+              }
+            ]
+          }
+        },
+        "required": [
+          "audit_id"
+        ],
+        "x-barwise-annotations": [
+          {
+            "severity": "note",
+            "message": "Definition available from ORM model: \"A logged action on a document capturing who performed it, when, and details.\""
+          }
+        ]
+      },
+      "Scan": {
+        "type": "object",
+        "properties": {
+          "scan_version": {
+            "type": "string",
+            "x-barwise-annotations": [
+              {
+                "severity": "todo",
+                "message": "No column description. Add a definition to the value type."
+              },
+              {
+                "severity": "todo",
+                "message": "Data type was not declared; exported as TEXT. Add a data type to the value type."
+              }
+            ]
+          },
+          "model_version": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "scan_version",
+          "model_version"
+        ],
+        "x-barwise-annotations": [
+          {
+            "severity": "note",
+            "message": "Definition available from ORM model: \"A scan operation run over a document using a model version that produces find...\""
+          }
+        ]
+      },
+      "Release": {
+        "type": "object",
+        "properties": {
+          "document_id": {
+            "$ref": "#/components/schemas/Document",
+            "x-barwise-annotations": [
+              {
+                "severity": "note",
+                "message": "Value constraint available: ['analytics-warehouse', 'customer-portal', 'regulatory-filing', 'partner-api']. Consider adding an accepted_values test."
+              }
+            ]
+          },
+          "downstream_system": {
+            "type": "string",
+            "x-barwise-annotations": [
+              {
+                "severity": "note",
+                "message": "Value constraint available: ['analytics-warehouse', 'customer-portal', 'regulatory-filing', 'partner-api']. Consider adding an accepted_values test."
+              }
+            ]
+          },
+          "release_timestamp": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "redacted_content_hash": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "document_id",
+          "downstream_system",
+          "release_timestamp"
+        ],
+        "x-barwise-annotations": [
+          {
+            "severity": "note",
+            "message": "Definition available from ORM model: \"A record that a redacted document was released to a downstream system, identi...\""
+          },
+          {
+            "severity": "note",
+            "message": "Composite primary key (document_id, downstream_system): unique as a combination."
+          }
+        ]
+      },
+      "DocumentHasScan": {
+        "type": "object",
+        "properties": {
+          "document_id": {
+            "$ref": "#/components/schemas/Document"
+          },
+          "scan_version": {
+            "$ref": "#/components/schemas/Scan",
+            "x-barwise-annotations": [
+              {
+                "severity": "todo",
+                "message": "No column description. Add a definition to the value type."
+              },
+              {
+                "severity": "todo",
+                "message": "Data type was not declared; exported as TEXT. Add a data type to the value type."
+              }
+            ]
+          }
+        },
+        "required": [
+          "document_id",
+          "scan_version"
+        ],
+        "x-barwise-annotations": [
+          {
+            "severity": "note",
+            "message": "Composite primary key (document_id, scan_version): unique as a combination."
+          }
+        ]
+      },
+      "ScanProducedFinding": {
+        "type": "object",
+        "properties": {
+          "scan_version": {
+            "$ref": "#/components/schemas/Scan",
+            "x-barwise-annotations": [
+              {
+                "severity": "todo",
+                "message": "No column description. Add a definition to the value type."
+              },
+              {
+                "severity": "todo",
+                "message": "Data type was not declared; exported as TEXT. Add a data type to the value type."
+              }
+            ]
+          },
+          "(ambiguous)": {
+            "$ref": "#/components/schemas/Finding",
+            "x-barwise-annotations": [
+              {
+                "severity": "todo",
+                "message": "No column description. Add a definition to the value type."
+              },
+              {
+                "severity": "todo",
+                "message": "Data type was not declared; exported as TEXT. Add a data type to the value type."
+              }
+            ]
+          }
+        },
+        "required": [
+          "scan_version",
+          "(ambiguous)"
+        ],
+        "x-barwise-annotations": [
+          {
+            "severity": "note",
+            "message": "Composite primary key (scan_version, (ambiguous)): unique as a combination."
+          }
+        ]
+      },
+      "FindingReviewedByReviewer": {
+        "type": "object",
+        "properties": {
+          "(ambiguous)": {
+            "$ref": "#/components/schemas/Finding",
+            "x-barwise-annotations": [
+              {
+                "severity": "todo",
+                "message": "No column description. Add a definition to the value type."
+              },
+              {
+                "severity": "todo",
+                "message": "Data type was not declared; exported as TEXT. Add a data type to the value type."
+              }
+            ]
+          },
+          "employee_id": {
+            "$ref": "#/components/schemas/Reviewer"
+          }
+        },
+        "required": [
+          "(ambiguous)",
+          "employee_id"
+        ],
+        "x-barwise-annotations": [
+          {
+            "severity": "note",
+            "message": "Composite primary key ((ambiguous), employee_id): unique as a combination."
+          }
+        ]
+      },
+      "ReviewDecisionIsDecisionOfFinding": {
+        "type": "object",
+        "properties": {
+          "(ambiguous)": {
+            "$ref": "#/components/schemas/ReviewDecision",
+            "x-barwise-annotations": [
+              {
+                "severity": "todo",
+                "message": "No column description. Add a definition to the value type."
+              },
+              {
+                "severity": "todo",
+                "message": "Data type was not declared; exported as TEXT. Add a data type to the value type."
+              }
+            ]
+          },
+          "has_decision_about_(ambiguous)": {
+            "$ref": "#/components/schemas/Finding",
+            "x-barwise-annotations": [
+              {
+                "severity": "todo",
+                "message": "No column description. Add a definition to the value type."
+              },
+              {
+                "severity": "todo",
+                "message": "Data type was not declared; exported as TEXT. Add a data type to the value type."
+              }
+            ]
+          }
+        },
+        "required": [
+          "(ambiguous)",
+          "has_decision_about_(ambiguous)"
+        ],
+        "x-barwise-annotations": [
+          {
+            "severity": "note",
+            "message": "Composite primary key ((ambiguous), has_decision_about_(ambiguous)): unique as a combination."
+          }
+        ]
+      },
+      "AuditEntryAboutDocument": {
+        "type": "object",
+        "properties": {
+          "audit_id": {
+            "$ref": "#/components/schemas/AuditEntry",
+            "x-barwise-annotations": [
+              {
+                "severity": "todo",
+                "message": "No column description. Add a definition to the value type."
+              },
+              {
+                "severity": "todo",
+                "message": "Data type was not declared; exported as TEXT. Add a data type to the value type."
+              }
+            ]
+          },
+          "document_id": {
+            "$ref": "#/components/schemas/Document"
+          }
+        },
+        "required": [
+          "audit_id",
+          "document_id"
+        ],
+        "x-barwise-annotations": [
+          {
+            "severity": "note",
+            "message": "Composite primary key (audit_id, document_id): unique as a combination."
+          }
+        ]
+      },
+      "AuditEntryPerformedByReviewer": {
+        "type": "object",
+        "properties": {
+          "audit_id": {
+            "$ref": "#/components/schemas/AuditEntry",
+            "x-barwise-annotations": [
+              {
+                "severity": "todo",
+                "message": "No column description. Add a definition to the value type."
+              },
+              {
+                "severity": "todo",
+                "message": "Data type was not declared; exported as TEXT. Add a data type to the value type."
+              }
+            ]
+          },
+          "employee_id": {
+            "$ref": "#/components/schemas/Reviewer"
+          }
+        },
+        "required": [
+          "audit_id",
+          "employee_id"
+        ],
+        "x-barwise-annotations": [
+          {
+            "severity": "note",
+            "message": "Composite primary key (audit_id, employee_id): unique as a combination."
+          }
+        ]
+      }
+    }
+  }
+}

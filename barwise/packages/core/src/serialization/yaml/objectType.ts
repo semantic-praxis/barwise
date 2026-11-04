@@ -1,12 +1,5 @@
+import { isEntityType, isValueType, type ObjectType } from "../../model/ObjectType.js";
 import {
-  type ConceptualDataTypeName,
-  isEntityType,
-  isValueType,
-  type ObjectType,
-  type ObjectTypeConfig,
-} from "../../model/ObjectType.js";
-import {
-  deserializeValueConstraintBody,
   type OrmYamlValueConstraintBody,
   serializeValueConstraintBody,
 } from "./valueConstraint.js";
@@ -16,7 +9,10 @@ export interface OrmYamlObjectType {
   name: string;
   kind: "entity" | "value";
   reference_mode?: string;
+  /** An entity's preferred identifier: a uniqueness constraint's id (3.0). */
+  preferred_identifier?: string;
   definition?: string;
+  /** A 2.0 or 3.0 shadow's owner; 4.0 states it in the id's alias (iri-identity 6d). */
   source_context?: string;
   value_constraint?: OrmYamlValueConstraintBody;
   data_type?: { name: string; length?: number; scale?: number; };
@@ -27,7 +23,22 @@ export interface OrmYamlObjectType {
   cardinality?: { min: number; max: number | "unbounded"; };
 }
 
-export function serializeObjectType(ot: ObjectType): OrmYamlObjectType {
+/**
+ * An object type as the file states it. `preferredIdentifierId` is the
+ * model's (`OrmModel.preferredIdentifierOf`): the model holds the
+ * reference, the file states it on the entity.
+ */
+export function serializeObjectType(
+  ot: ObjectType,
+  preferredIdentifierId?: string,
+  options: {
+    /**
+     * Write a 3.x shadow's `source_context`: format 3.0 states the owner
+     * there, 4.0 in the id's alias and has no such field (iri-identity 6d).
+     */
+    readonly sourceContext?: boolean;
+  } = {},
+): OrmYamlObjectType {
   const result: OrmYamlObjectType = {
     id: ot.id,
     name: ot.name,
@@ -43,11 +54,12 @@ export function serializeObjectType(ot: ObjectType): OrmYamlObjectType {
 
   if (isEntityType(ot)) {
     result.reference_mode = ot.referenceMode;
+    if (preferredIdentifierId !== undefined) result.preferred_identifier = preferredIdentifierId;
   }
   if (ot.definition) {
     result.definition = ot.definition;
   }
-  if (ot.sourceContext) {
+  if (options.sourceContext && ot.sourceContext) {
     result.source_context = ot.sourceContext;
   }
   if (value?.valueConstraint) {
@@ -79,30 +91,4 @@ export function serializeObjectType(ot: ObjectType): OrmYamlObjectType {
   }
 
   return result;
-}
-
-export function deserializeObjectType(otDoc: OrmYamlObjectType): ObjectTypeConfig {
-  return {
-    id: otDoc.id,
-    name: otDoc.name,
-    kind: otDoc.kind,
-    referenceMode: otDoc.reference_mode,
-    definition: otDoc.definition,
-    sourceContext: otDoc.source_context,
-    valueConstraint: otDoc.value_constraint
-      ? deserializeValueConstraintBody(otDoc.value_constraint)
-      : undefined,
-    dataType: otDoc.data_type
-      ? {
-        name: otDoc.data_type.name as ConceptualDataTypeName,
-        length: otDoc.data_type.length,
-        scale: otDoc.data_type.scale,
-      }
-      : undefined,
-    aliases: otDoc.aliases,
-    independent: otDoc.independent,
-    defaultValue: otDoc.default_value,
-    note: otDoc.note,
-    cardinality: otDoc.cardinality,
-  };
 }

@@ -1,0 +1,1718 @@
+diff --git a/barwise/docs/specs/core-branching-load.spec.md b/barwise/docs/specs/core-branching-load.spec.md
+index 63391232..17ce6198 100644
+--- a/barwise/docs/specs/core-branching-load.spec.md
++++ b/barwise/docs/specs/core-branching-load.spec.md
+@@ -10,10 +10,11 @@ model-graph-and-id-spaces.spec.md (barwise-974). WS1
+ regrounded 2026-09-08 against main 96369f8 (barwise-973); its radius
+ was understated and two Evidenced sites have since closed -- see
+ Regrounding below. WS1 step 1 (`ObjectType` as a sealed union) shipped
+-2026-09-08; the remaining element kinds, `ModelBuilder` and `OrmModel`
++2026-09-08, and `SubtypeFact` as a sealed record, decoded by the same Effect
++Schema convention, 2026-10-15; the remaining element kinds, `ModelBuilder` and `OrmModel`
+ are not implemented.
+ Created: 2026-09-06
+-Last-updated: 2026-09-09
++Last-updated: 2026-10-15
+ Tracking: barwise-924 (this review), barwise-973 (WS1), barwise-x4z (the wider
+ functional/type analysis this partly answers), barwise-e8m (the
+ functional-core commitment), barwise-923 (the hashModel bug the same
+diff --git a/barwise/packages/core/src/diff/ModelMerge.ts b/barwise/packages/core/src/diff/ModelMerge.ts
+index b08ce5ef..ee33dc80 100644
+--- a/barwise/packages/core/src/diff/ModelMerge.ts
++++ b/barwise/packages/core/src/diff/ModelMerge.ts
+@@ -21,7 +21,6 @@ import { toObjectifiedFactTypeConfig } from "../model/ObjectifiedFactType.js";
+ import type { ObjectType } from "../model/ObjectType.js";
+ import { OrmModel } from "../model/OrmModel.js";
+ import { type PopulationConfig, toPopulationConfig } from "../model/Population.js";
+-import { toSubtypeFactConfig } from "../model/SubtypeFact.js";
+ import type { Diagnostic } from "../validation/Diagnostic.js";
+ import { referenceDiagnostics } from "../validation/referenceDiagnostics.js";
+ import { report, RULE_ID } from "../validation/ruleId.js";
+@@ -240,7 +239,7 @@ export function mergeModels(
+         || isDanglingPlayer(existing, incoming, chosen.supertypeId);
+       if (!dangling) continue;
+       merged.addSubtypeFact(
+-        { ...toSubtypeFactConfig(chosen), id: undefined, subtypeId, supertypeId },
++        { ...chosen, id: undefined, subtypeId, supertypeId },
+         { skipPlayerValidation: true },
+       );
+       continue;
+@@ -252,7 +251,7 @@ export function mergeModels(
+     // keyed by id and `set` overwrites without complaint.
+     const preferredId = delta.kind === "modified" && isAccepted ? delta.existing!.id : chosen.id;
+     const id = merged.subtypeFacts.some((sf) => sf.id === preferredId) ? undefined : preferredId;
+-    merged.addSubtypeFact({ ...toSubtypeFactConfig(chosen), id, subtypeId, supertypeId });
++    merged.addSubtypeFact({ ...chosen, id, subtypeId, supertypeId });
+   }
+ 
+   // Phase 5: objectified fact types. After fact types AND object types,
+diff --git a/barwise/packages/core/src/index.ts b/barwise/packages/core/src/index.ts
+index c894d350..325dac6b 100644
+--- a/barwise/packages/core/src/index.ts
++++ b/barwise/packages/core/src/index.ts
+@@ -137,7 +137,18 @@ export { type ProductConfig, ProductDependency } from "./model/ProductDependency
+ export { expandReading, type ReadingOrder, validateReadingTemplate } from "./model/ReadingOrder.js";
+ export { Role, type RoleConfig } from "./model/Role.js";
+ export { SemanticConflict, type SemanticConflictConfig } from "./model/SemanticConflict.js";
+-export { SubtypeFact, type SubtypeFactConfig } from "./model/SubtypeFact.js";
++export {
++  createSubtypeFact,
++  type SubtypeFact,
++  type SubtypeFactConfig,
++} from "./model/SubtypeFact.js";
++export {
++  decodeSubtypeFact,
++  decodeSubtypeFactConfig,
++  SubtypeFactError,
++  type SubtypeFactProblem,
++  SubtypeFactProblems,
++} from "./model/subtypeFactDecoder.js";
+ export { assertNever } from "./util/assertNever.js";
+ 
+ // Serialization
+diff --git a/barwise/packages/core/src/model/ObjectifiedFactType.ts b/barwise/packages/core/src/model/ObjectifiedFactType.ts
+index 047fcd0a..0ef871e2 100644
+--- a/barwise/packages/core/src/model/ObjectifiedFactType.ts
++++ b/barwise/packages/core/src/model/ObjectifiedFactType.ts
+@@ -49,7 +49,15 @@ export class ObjectifiedFactType extends ModelElement {
+   }
+ }
+ 
+-/** See {@link toSubtypeFactConfig}: the same projection, one kind over. */
++/**
++ * Project an ObjectifiedFactType back to the config shape that constructed
++ * it, listing every field once -- the `toObjectTypeConfig` convention
++ * (barwise-927) applied to the element kinds the merge started carrying
++ * through in barwise-937. A caller that rebuilds one spreads this instead of
++ * hand-copying its fields, and the `Complete<...>` annotation makes the next
++ * field added to the config a compile error here until it is listed. (A
++ * subtype fact needs no projection: as a record it is its own config.)
++ */
+ export function toObjectifiedFactTypeConfig(
+   oft: ObjectifiedFactType,
+ ): ObjectifiedFactTypeConfig {
+diff --git a/barwise/packages/core/src/model/OrmModel.ts b/barwise/packages/core/src/model/OrmModel.ts
+index bc5c3104..462d059e 100644
+--- a/barwise/packages/core/src/model/OrmModel.ts
++++ b/barwise/packages/core/src/model/OrmModel.ts
+@@ -7,7 +7,7 @@ import type { ObjectType, ObjectTypeConfig } from "./ObjectType.js";
+ import { decodeObjectTypeConfig, runObjectTypeDecode } from "./objectTypeDecoder.js";
+ import { Population, type PopulationConfig } from "./Population.js";
+ import type { Role } from "./Role.js";
+-import { SubtypeFact, type SubtypeFactConfig } from "./SubtypeFact.js";
++import { createSubtypeFact, type SubtypeFact, type SubtypeFactConfig } from "./SubtypeFact.js";
+ 
+ /**
+  * Configuration for creating a new OrmModel.
+@@ -270,6 +270,8 @@ export class OrmModel {
+    * @throws If subtype or supertype entity types don't exist (unless skipPlayerValidation).
+    * @throws If either referenced object type is not an entity type (unless skipPlayerValidation).
+    * @throws If a duplicate subtype relationship already exists.
++   * @throws {SubtypeFactError} Listing every problem with the config itself
++   *   (the same checks a file's subtype facts pass), whatever the options.
+    */
+   addSubtypeFact(
+     config: SubtypeFactConfig,
+@@ -313,7 +315,9 @@ export class OrmModel {
+       }
+     }
+ 
+-    const sf = new SubtypeFact(config);
++    // Decoded after the reference checks, as the class was constructed after
++    // them, so a refused config does not draw an id from the generator.
++    const sf = createSubtypeFact(config);
+     this._subtypeFacts.set(sf.id, sf);
+     return sf;
+   }
+diff --git a/barwise/packages/core/src/model/Population.ts b/barwise/packages/core/src/model/Population.ts
+index 33031dc4..3bb5df4f 100644
+--- a/barwise/packages/core/src/model/Population.ts
++++ b/barwise/packages/core/src/model/Population.ts
+@@ -147,7 +147,7 @@ function createInstance(config: FactInstanceConfig): FactInstance {
+ 
+ /**
+  * Project a Population, instances included, back to the config shape
+- * that constructed it. See {@link toSubtypeFactConfig} for why these
++ * that constructed it. See {@link toObjectifiedFactTypeConfig} for why these
+  * projections exist rather than a hand-copied literal at each caller.
+  */
+ export function toPopulationConfig(pop: Population): PopulationConfig {
+diff --git a/barwise/packages/core/src/model/SubtypeFact.ts b/barwise/packages/core/src/model/SubtypeFact.ts
+index 36c3cd86..dd0973b0 100644
+--- a/barwise/packages/core/src/model/SubtypeFact.ts
++++ b/barwise/packages/core/src/model/SubtypeFact.ts
+@@ -1,9 +1,18 @@
+-import type { Complete } from "../util/complete.js";
+ import type { DerivationRule } from "./FactType.js";
+-import { ModelElement } from "./ModelElement.js";
++import { generateId } from "./id.js";
++import type { KeysAgree } from "./objectTypeSchema.js";
++import { decodeSubtypeFactConfig, runSubtypeFactDecode } from "./subtypeFactDecoder.js";
++import type { SubtypeFact, SubtypeFactModelCodec } from "./subtypeFactSchema.js";
++
++export type { SubtypeFact } from "./subtypeFactSchema.js";
+ 
+ /**
+  * Configuration for creating a new SubtypeFact.
++ *
++ * Hand-written for its documentation; its keys are the decoder's all the
++ * same -- `_configKeysAgree` below fails to compile when either side gains
++ * or loses one. A `SubtypeFact` record is itself a valid config, so a
++ * caller that rebuilds one spreads the record and overrides what changes.
+  */
+ export interface SubtypeFactConfig {
+   /** Optional stable identifier. Generated if omitted. */
+@@ -46,69 +55,18 @@ export interface SubtypeFactConfig {
+   readonly definingRule?: DerivationRule;
+ }
+ 
+-/**
+- * A SubtypeFact represents a specialization relationship in ORM:
+- * entity type A is a subtype of entity type B.
+- *
+- * Every instance of the subtype is also an instance of the supertype.
+- * The subtype inherits all fact types and constraints of the supertype
+- * and may have additional ones of its own.
+- *
+- * Example: "Employee is a subtype of Person" means every Employee is
+- * a Person, but not every Person is necessarily an Employee.
+- *
+- * In relational mapping, subtype facts determine whether the subtype
+- * is absorbed into the supertype's table or gets its own table with
+- * a FK back to the supertype.
+- */
+-export class SubtypeFact extends ModelElement {
+-  readonly subtypeId: string;
+-  readonly supertypeId: string;
+-  readonly providesIdentification: boolean;
+-  readonly isExclusive: boolean;
+-  readonly isExhaustive: boolean;
+-  readonly definingRule: DerivationRule | undefined;
+-
+-  constructor(config: SubtypeFactConfig) {
+-    // Name is derived from the relationship for display purposes.
+-    // The actual subtype/supertype names are resolved by the model.
+-    super(
+-      `subtype:${config.subtypeId}:${config.supertypeId}`,
+-      config.id,
+-    );
+-    this.subtypeId = config.subtypeId;
+-    this.supertypeId = config.supertypeId;
+-    this.providesIdentification = config.providesIdentification ?? true;
+-    this.isExclusive = config.isExclusive ?? false;
+-    this.isExhaustive = config.isExhaustive ?? false;
+-    this.definingRule = config.definingRule;
+-
+-    if (config.subtypeId === config.supertypeId) {
+-      throw new Error(
+-        "A subtype fact cannot have the same entity as both subtype and supertype.",
+-      );
+-    }
+-  }
+-}
++const _configKeysAgree: KeysAgree<SubtypeFactConfig, typeof SubtypeFactModelCodec.Encoded> = true;
+ 
+ /**
+- * Project a SubtypeFact back to the config shape that constructed it,
+- * listing every field once -- the `toObjectTypeConfig` convention
+- * (barwise-927) applied to the element kinds the merge started carrying
+- * through in barwise-937. A caller that rebuilds a subtype fact spreads
+- * this instead of hand-copying its fields, and the `Complete<...>`
+- * annotation makes the next field added to `SubtypeFactConfig` a
+- * compile error here until it is listed.
++ * Build a subtype fact from a config, applying every default and refusing
++ * every malformed one -- all of them at once, as a `SubtypeFactError` whose
++ * `problems` list one per problem. The same checks a file's subtype facts
++ * pass through, so code and file refuse the same subtype facts. A config
++ * without an id gets one from the installed generator.
++ *
++ * Checks the subtype fact alone; whether its ends exist in a model is
++ * `OrmModel.addSubtypeFact`'s question.
+  */
+-export function toSubtypeFactConfig(sf: SubtypeFact): SubtypeFactConfig {
+-  const config: Complete<SubtypeFactConfig> = {
+-    id: sf.id,
+-    subtypeId: sf.subtypeId,
+-    supertypeId: sf.supertypeId,
+-    providesIdentification: sf.providesIdentification,
+-    isExclusive: sf.isExclusive,
+-    isExhaustive: sf.isExhaustive,
+-    definingRule: sf.definingRule,
+-  };
+-  return config;
++export function createSubtypeFact(config: SubtypeFactConfig): SubtypeFact {
++  return runSubtypeFactDecode(decodeSubtypeFactConfig(config), generateId);
+ }
+diff --git a/barwise/packages/core/src/model/objectTypeDecoder.ts b/barwise/packages/core/src/model/objectTypeDecoder.ts
+index 3126cc46..a7098c3d 100644
+--- a/barwise/packages/core/src/model/objectTypeDecoder.ts
++++ b/barwise/packages/core/src/model/objectTypeDecoder.ts
+@@ -14,8 +14,7 @@
+ import * as Effect from "effect/Effect";
+ import * as Result from "effect/Result";
+ import * as Schema from "effect/Schema";
+-import type * as SchemaAST from "effect/SchemaAST";
+-import * as SchemaIssue from "effect/SchemaIssue";
++import type * as SchemaIssue from "effect/SchemaIssue";
+ import {
+   type IdSource,
+   IdSource as IdSourceKey,
+@@ -25,6 +24,7 @@ import {
+   RANGE_YAML_KEYS,
+   YAML_KEYS,
+ } from "./objectTypeSchema.js";
++import { PARSE_OPTIONS, problemsOf, withoutUndefined } from "./schemaProblems.js";
+ 
+ /** One thing wrong with one object type. */
+ export interface ObjectTypeProblem {
+@@ -54,8 +54,6 @@ export class ObjectTypeError extends Error {
+   }
+ }
+ 
+-const PARSE_OPTIONS: SchemaAST.ParseOptions = { errors: "all", onExcessProperty: "error" };
+-
+ const decodeYaml = Schema.decodeUnknownEffect(ObjectTypeYamlCodec, PARSE_OPTIONS);
+ const decodeModel = Schema.decodeUnknownEffect(ObjectTypeModelCodec, PARSE_OPTIONS);
+ 
+@@ -119,7 +117,7 @@ function decodeWith(
+ ): Effect.Effect<ObjectType, ObjectTypeProblems, IdSource> {
+   return decode(input).pipe(
+     Effect.map(seal),
+-    Effect.mapError((error) => new ObjectTypeProblems(problemsOf(error.issue, input))),
++    Effect.mapError((error) => new ObjectTypeProblems(problemsOfObjectType(error.issue, input))),
+   );
+ }
+ 
+@@ -130,87 +128,19 @@ function seal(ot: ObjectType): ObjectType {
+ 
+ // -- Issues to problems -----------------------------------------------------
+ 
+-/** One failure in the issue tree, with the path that leads to it. */
+-interface Located {
+-  readonly path: readonly PropertyKey[];
+-  readonly issue: SchemaIssue.Issue;
+-}
+-
+-/**
+- * The failures in an issue tree, one per problem.
+- *
+- * A union is descended only when one member was tried: that is the
+- * discriminated object-type union picking its variant by `kind`, and the
+- * problems are that variant's. A union none of whose members applied, or
+- * several, is one problem at its own position -- `max: "lots"` is one bad
+- * value, not one per member it failed to match.
+- */
+-function locate(issue: SchemaIssue.Issue, path: readonly PropertyKey[]): Located[] {
+-  switch (issue._tag) {
+-    case "Pointer":
+-      return locate(issue.issue, [...path, ...issue.path]);
+-    case "Composite":
+-      return issue.issues.flatMap((child) => locate(child, path));
+-    case "Encoding":
+-      return locate(issue.issue, path);
+-    case "AnyOf":
+-      return issue.issues.length === 1 ? locate(issue.issues[0]!, path) : [{ path, issue }];
+-    default:
+-      return [{ path, issue }];
+-  }
+-}
++const FILE_SPELLING: Readonly<Record<string, string>> = { ...YAML_KEYS, ...RANGE_YAML_KEYS };
+ 
+-function problemsOf(
++function problemsOfObjectType(
+   issue: SchemaIssue.Issue,
+   raw: unknown,
+ ): [ObjectTypeProblem, ...ObjectTypeProblem[]] {
+-  const subject = subjectOf(raw);
+-  const located = locate(issue, []);
+-  const problems = located.map(({ path: decodedPath, issue: leaf }) => {
+-    const path = spelledAs(raw, decodedPath);
+-    const field = path.length > 0 ? String(path[0]) : "kind";
+-    return {
+-      objectType: subject.identity,
+-      field,
+-      message: `${subject.label} ${predicateOf(leaf, path)}`,
+-    };
+-  });
+-  // A decode that failed always carries at least one leaf; the fallback only
+-  // keeps the type honest if Effect ever hands back an empty composite.
+-  return problems.length > 0
+-    ? (problems as [ObjectTypeProblem, ...ObjectTypeProblem[]])
+-    : [{ objectType: subject.identity, field: "", message: `${subject.label} is malformed.` }];
+-}
+-
+-const FILE_SPELLING: Readonly<Record<string, string>> = { ...YAML_KEYS, ...RANGE_YAML_KEYS };
+-
+-/**
+- * A path in the spelling of the input it points into.
+- *
+- * Effect reports a check on a decoded struct at the decoded key, so a file's
+- * empty value constraint comes back at `valueConstraint` -- a key the file
+- * does not have. Each segment the input lacks is replaced by its file
+- * spelling when the input has that instead; an unknown key the input does
+- * have, even a camelCase one, is left as written.
+- */
+-function spelledAs(raw: unknown, path: readonly PropertyKey[]): PropertyKey[] {
+-  const spelled: PropertyKey[] = [];
+-  let node = raw;
+-  for (const segment of path) {
+-    let key = segment;
+-    if (node !== null && typeof node === "object") {
+-      const record = node as Record<PropertyKey, unknown>;
+-      if (typeof segment === "string" && !(segment in record)) {
+-        const fileKey = FILE_SPELLING[segment];
+-        if (fileKey !== undefined && fileKey in record) key = fileKey;
+-      }
+-      node = record[key];
+-    } else {
+-      node = undefined;
+-    }
+-    spelled.push(key);
+-  }
+-  return spelled;
++  const [first, ...rest] = problemsOf(issue, raw, {
++    subject: subjectOf(raw),
++    fileSpelling: FILE_SPELLING,
++    rootField: "kind",
++    rootUnion: `must have kind "entity" or "value".`,
++  }).map(({ identity, field, message }) => ({ objectType: identity, field, message }));
++  return [first!, ...rest];
+ }
+ 
+ /**
+@@ -231,58 +161,3 @@ function subjectOf(raw: unknown): { readonly label: string; readonly identity: s
+   }
+   return { label: `${kind} with no name or id`, identity: "" };
+ }
+-
+-const defaultFormat = SchemaIssue.makeFormatterDefault();
+-
+-/**
+- * The rest of the sentence after the subject.
+- *
+- * Every rule the schema states carries its own predicate as a `message`
+- * annotation; those are used as they are. What is left is Effect's own
+- * structural refusals -- a wrong type, a missing key, an unknown key -- which
+- * are phrased here around the path, because Effect's text names neither the
+- * object type nor, for a key, the field.
+- */
+-function predicateOf(issue: SchemaIssue.Issue, path: readonly PropertyKey[]): string {
+-  const at = path.map(String).join(".");
+-  switch (issue._tag) {
+-    case "UnexpectedKey":
+-      return `has an unknown field "${at}".`;
+-    case "MissingKey":
+-      return issue.annotations?.messageMissingKey ?? `is missing "${at}".`;
+-    case "AnyOf": {
+-      if (path.length === 0) return `must have kind "entity" or "value".`;
+-      const message = issue.ast.annotations?.message;
+-      if (typeof message === "string") return message;
+-      break;
+-    }
+-    case "Filter": {
+-      const message = issue.filter.annotations?.message;
+-      if (typeof message === "string") return message;
+-      break;
+-    }
+-    case "InvalidType":
+-    case "InvalidValue": {
+-      const message = issue._tag === "InvalidType"
+-        ? issue.ast.annotations?.message
+-        : issue.annotations?.message;
+-      if (typeof message === "string") return message;
+-      break;
+-    }
+-  }
+-  return `has an invalid ${at}: ${defaultFormat(issue)}.`;
+-}
+-
+-/** A copy with every `undefined`-valued key removed, at any depth. */
+-function withoutUndefined(value: unknown): unknown {
+-  if (Array.isArray(value)) return value.map(withoutUndefined);
+-  if (value === null || typeof value !== "object") return value;
+-  if (Object.getPrototypeOf(value) !== Object.prototype && Object.getPrototypeOf(value) !== null) {
+-    return value;
+-  }
+-  return Object.fromEntries(
+-    Object.entries(value)
+-      .filter(([, v]) => v !== undefined)
+-      .map(([k, v]) => [k, withoutUndefined(v)]),
+-  );
+-}
+diff --git a/barwise/packages/core/src/model/schemaProblems.ts b/barwise/packages/core/src/model/schemaProblems.ts
+new file mode 100644
+index 00000000..8eaea755
+--- /dev/null
++++ b/barwise/packages/core/src/model/schemaProblems.ts
+@@ -0,0 +1,193 @@
++/**
++ * Effect's issue tree as one problem per entry, for the element decoders
++ * (`objectTypeDecoder.ts`, `subtypeFactDecoder.ts`).
++ *
++ * Each decoder states its own subject -- what a message calls the element --
++ * and its own YAML spelling; walking the tree, locating each failure in the
++ * input's spelling and phrasing Effect's structural refusals is the same for
++ * every element kind, so it lives once, here.
++ */
++import type * as SchemaAST from "effect/SchemaAST";
++import * as SchemaIssue from "effect/SchemaIssue";
++
++/** The decode options every element decoder runs with. */
++export const PARSE_OPTIONS: SchemaAST.ParseOptions = { errors: "all", onExcessProperty: "error" };
++
++/** One thing wrong with one element. */
++export interface ElementProblem {
++  /** What identifies the element in the input: its name, its id, or "" when it has neither. */
++  readonly identity: string;
++  /** The top-level field at fault, in the spelling of the input. */
++  readonly field: string;
++  /** A sentence naming the element and the field. */
++  readonly message: string;
++}
++
++/** What a message calls the element, and how a problem identifies it. */
++export interface ProblemSubject {
++  readonly label: string;
++  readonly identity: string;
++}
++
++export interface ProblemOptions {
++  /** The subject every message opens with. */
++  readonly subject: ProblemSubject;
++  /** The file spelling of every decoded key that is not spelled the same. */
++  readonly fileSpelling: Readonly<Record<string, string>>;
++  /** The field a problem with no path is reported at. */
++  readonly rootField: string;
++  /** The predicate for a root union none of whose members applied. */
++  readonly rootUnion?: string;
++}
++
++/** One failure in the issue tree, with the path that leads to it. */
++interface Located {
++  readonly path: readonly PropertyKey[];
++  readonly issue: SchemaIssue.Issue;
++}
++
++/**
++ * The failures in an issue tree, one per problem.
++ *
++ * A union is descended only when one member was tried: that is a
++ * discriminated union picking its variant, and the problems are that
++ * variant's. A union none of whose members applied, or several, is one
++ * problem at its own position -- `max: "lots"` is one bad value, not one per
++ * member it failed to match.
++ */
++function locate(issue: SchemaIssue.Issue, path: readonly PropertyKey[]): Located[] {
++  switch (issue._tag) {
++    case "Pointer":
++      return locate(issue.issue, [...path, ...issue.path]);
++    case "Composite":
++      return issue.issues.flatMap((child) => locate(child, path));
++    case "Encoding":
++      return locate(issue.issue, path);
++    case "AnyOf":
++      return issue.issues.length === 1 ? locate(issue.issues[0]!, path) : [{ path, issue }];
++    default:
++      return [{ path, issue }];
++  }
++}
++
++/** Every problem in an issue tree, each a sentence about the subject. */
++export function problemsOf(
++  issue: SchemaIssue.Issue,
++  raw: unknown,
++  options: ProblemOptions,
++): [ElementProblem, ...ElementProblem[]] {
++  const { subject } = options;
++  const problems = locate(issue, []).map(({ path: decodedPath, issue: leaf }) => {
++    const path = spelledAs(raw, decodedPath, options.fileSpelling);
++    const field = path.length > 0 ? String(path[0]) : options.rootField;
++    return {
++      identity: subject.identity,
++      field,
++      message: `${subject.label} ${predicateOf(leaf, path, options.rootUnion)}`,
++    };
++  });
++  // A decode that failed always carries at least one leaf; the fallback only
++  // keeps the type honest if Effect ever hands back an empty composite.
++  return problems.length > 0
++    ? (problems as [ElementProblem, ...ElementProblem[]])
++    : [{ identity: subject.identity, field: "", message: `${subject.label} is malformed.` }];
++}
++
++/**
++ * A path in the spelling of the input it points into.
++ *
++ * Effect reports a check on a decoded struct at the decoded key, so a file's
++ * empty value constraint comes back at `valueConstraint` -- a key the file
++ * does not have. Each segment the input lacks is replaced by its file
++ * spelling when the input has that instead; an unknown key the input does
++ * have, even a camelCase one, is left as written.
++ */
++function spelledAs(
++  raw: unknown,
++  path: readonly PropertyKey[],
++  fileSpelling: Readonly<Record<string, string>>,
++): PropertyKey[] {
++  const spelled: PropertyKey[] = [];
++  let node = raw;
++  for (const segment of path) {
++    let key = segment;
++    if (node !== null && typeof node === "object") {
++      const record = node as Record<PropertyKey, unknown>;
++      if (typeof segment === "string" && !(segment in record)) {
++        const fileKey = fileSpelling[segment];
++        if (fileKey !== undefined && fileKey in record) key = fileKey;
++      }
++      node = record[key];
++    } else {
++      node = undefined;
++    }
++    spelled.push(key);
++  }
++  return spelled;
++}
++
++const defaultFormat = SchemaIssue.makeFormatterDefault();
++
++/**
++ * The rest of the sentence after the subject.
++ *
++ * Every rule a schema states carries its own predicate as a `message`
++ * annotation; those are used as they are. What is left is Effect's own
++ * structural refusals -- a wrong type, a missing key, an unknown key -- which
++ * are phrased here around the path, because Effect's text names neither the
++ * element nor, for a key, the field.
++ */
++function predicateOf(
++  issue: SchemaIssue.Issue,
++  path: readonly PropertyKey[],
++  rootUnion: string | undefined,
++): string {
++  const at = path.map(String).join(".");
++  switch (issue._tag) {
++    case "UnexpectedKey":
++      return `has an unknown field "${at}".`;
++    case "MissingKey":
++      return issue.annotations?.messageMissingKey ?? `is missing "${at}".`;
++    case "AnyOf": {
++      if (path.length === 0 && rootUnion !== undefined) return rootUnion;
++      const message = issue.ast.annotations?.message;
++      if (typeof message === "string") return message;
++      break;
++    }
++    case "Filter": {
++      const message = issue.filter.annotations?.message;
++      if (typeof message === "string") return message;
++      break;
++    }
++    case "InvalidType":
++    case "InvalidValue": {
++      const message = issue._tag === "InvalidType"
++        ? issue.ast.annotations?.message
++        : issue.annotations?.message;
++      if (typeof message === "string") return message;
++      break;
++    }
++  }
++  return `has an invalid ${at}: ${defaultFormat(issue)}.`;
++}
++
++/**
++ * A copy with every `undefined`-valued key removed, at any depth.
++ *
++ * A config key holding `undefined` is treated as absent, because that is what
++ * it has always meant to a caller: configs are routinely built as
++ * `{ referenceMode: other.referenceMode, ... }`, and a schema's optional keys
++ * refuse an explicit `undefined`.
++ */
++export function withoutUndefined(value: unknown): unknown {
++  if (Array.isArray(value)) return value.map(withoutUndefined);
++  if (value === null || typeof value !== "object") return value;
++  if (Object.getPrototypeOf(value) !== Object.prototype && Object.getPrototypeOf(value) !== null) {
++    return value;
++  }
++  return Object.fromEntries(
++    Object.entries(value)
++      .filter(([, v]) => v !== undefined)
++      .map(([k, v]) => [k, withoutUndefined(v)]),
++  );
++}
+diff --git a/barwise/packages/core/src/model/subtypeFactDecoder.ts b/barwise/packages/core/src/model/subtypeFactDecoder.ts
+new file mode 100644
+index 00000000..b74777c7
+--- /dev/null
++++ b/barwise/packages/core/src/model/subtypeFactDecoder.ts
+@@ -0,0 +1,137 @@
++/**
++ * Decoding one subtype fact into its record, or into every problem with it --
++ * the object type decoder's contract (`objectTypeDecoder.ts`) for the next
++ * element kind: every problem at once, unknown fields refused, one problem
++ * per entry, and fresh ids only from the declared `IdSource`.
++ */
++import * as Effect from "effect/Effect";
++import * as Result from "effect/Result";
++import * as Schema from "effect/Schema";
++import { runWithIds } from "./objectTypeDecoder.js";
++import type { IdSource } from "./objectTypeSchema.js";
++import {
++  PARSE_OPTIONS,
++  problemsOf,
++  type ProblemSubject,
++  withoutUndefined,
++} from "./schemaProblems.js";
++import {
++  DERIVATION_YAML_KEYS,
++  SUBTYPE_YAML_KEYS,
++  type SubtypeFact,
++  SubtypeFactModelCodec,
++  SubtypeFactYamlCodec,
++} from "./subtypeFactSchema.js";
++
++/** One thing wrong with one subtype fact. */
++export interface SubtypeFactProblem {
++  /** The subtype fact's id, or `""` when it has none. */
++  readonly subtypeFact: string;
++  /** The top-level field at fault, in the spelling of the input. */
++  readonly field: string;
++  /** A sentence naming the subtype fact and the field. */
++  readonly message: string;
++}
++
++/** Every problem one decode found; never empty. */
++export class SubtypeFactProblems {
++  readonly _tag = "SubtypeFactProblems";
++  constructor(readonly problems: readonly [SubtypeFactProblem, ...SubtypeFactProblem[]]) {}
++}
++
++/** Thrown at the synchronous boundaries, carrying the list as well as the text. */
++export class SubtypeFactError extends Error {
++  constructor(readonly problems: readonly [SubtypeFactProblem, ...SubtypeFactProblem[]]) {
++    super(problems.map((p) => p.message).join("\n"));
++    this.name = "SubtypeFactError";
++  }
++}
++
++const decodeYaml = Schema.decodeUnknownEffect(SubtypeFactYamlCodec, PARSE_OPTIONS);
++const decodeModel = Schema.decodeUnknownEffect(SubtypeFactModelCodec, PARSE_OPTIONS);
++
++/** Decode one subtype fact as an `.orm.yaml` file spells it. */
++export function decodeSubtypeFact(
++  doc: unknown,
++): Effect.Effect<SubtypeFact, SubtypeFactProblems, IdSource> {
++  return decodeWith(decodeYaml, doc);
++}
++
++/**
++ * Decode one subtype fact as `SubtypeFactConfig` spells it. A key holding
++ * `undefined` is absent, as for an object type config.
++ */
++export function decodeSubtypeFactConfig(
++  config: unknown,
++): Effect.Effect<SubtypeFact, SubtypeFactProblems, IdSource> {
++  const input = withoutUndefined(config);
++  return decodeWith(decodeModel, input);
++}
++
++/** Decode a file's subtype facts, each to its record or its problems. */
++export function decodeSubtypeFacts(
++  docs: readonly unknown[],
++): Effect.Effect<readonly Result.Result<SubtypeFact, SubtypeFactProblems>[], never, IdSource> {
++  return Effect.forEach(docs, (doc) => Effect.result(decodeSubtypeFact(doc)));
++}
++
++/**
++ * Run one decode with ids from `newId`, returning the record or throwing
++ * every problem at once as a `SubtypeFactError`.
++ */
++export function runSubtypeFactDecode(
++  decoded: Effect.Effect<SubtypeFact, SubtypeFactProblems, IdSource>,
++  newId: () => string,
++): SubtypeFact {
++  const result = runWithIds(Effect.result(decoded), newId);
++  if (Result.isFailure(result)) throw new SubtypeFactError(result.failure.problems);
++  return result.success;
++}
++
++function decodeWith(
++  decode: (input: unknown) => Effect.Effect<SubtypeFact, Schema.SchemaError, IdSource>,
++  input: unknown,
++): Effect.Effect<SubtypeFact, SubtypeFactProblems, IdSource> {
++  return decode(input).pipe(
++    Effect.map(seal),
++    Effect.mapError((error) => {
++      const [first, ...rest] = problemsOf(error.issue, input, {
++        subject: subjectOf(input),
++        fileSpelling: FILE_SPELLING,
++        rootField: "",
++      }).map(({ identity, field, message }) => ({ subtypeFact: identity, field, message }));
++      return new SubtypeFactProblems([first!, ...rest]);
++    }),
++  );
++}
++
++/** Frozen, rule included: a record is a value. */
++function seal(sf: SubtypeFact): SubtypeFact {
++  return Object.freeze(
++    sf.definingRule === undefined
++      ? { ...sf }
++      : { ...sf, definingRule: Object.freeze({ ...sf.definingRule }) },
++  );
++}
++
++const FILE_SPELLING: Readonly<Record<string, string>> = {
++  ...SUBTYPE_YAML_KEYS,
++  ...DERIVATION_YAML_KEYS,
++};
++
++/**
++ * What a message calls the subtype fact: by its id, or by its two ends when
++ * it has none -- which is the usual case for a config built in code.
++ */
++function subjectOf(raw: unknown): ProblemSubject {
++  const doc = raw !== null && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
++  if (typeof doc.id === "string" && doc.id !== "") {
++    return { label: `Subtype fact "${doc.id}"`, identity: doc.id };
++  }
++  const sub = doc.subtypeId ?? doc.subtype;
++  const sup = doc.supertypeId ?? doc.supertype;
++  if (typeof sub === "string" && typeof sup === "string") {
++    return { label: `Subtype fact from "${sub}" to "${sup}"`, identity: "" };
++  }
++  return { label: "Subtype fact with no id", identity: "" };
++}
+diff --git a/barwise/packages/core/src/model/subtypeFactSchema.ts b/barwise/packages/core/src/model/subtypeFactSchema.ts
+new file mode 100644
+index 00000000..e9320575
+--- /dev/null
++++ b/barwise/packages/core/src/model/subtypeFactSchema.ts
+@@ -0,0 +1,123 @@
++/**
++ * The subtype fact, stated once: the record type, the rules a model and a
++ * file must satisfy, and the YAML spelling, as one Effect Schema definition --
++ * the object type's convention (`objectTypeSchema.ts`) applied to the next
++ * element kind (docs/specs/core-branching-load.spec.md, WS1).
++ *
++ * `SubtypeFact` is the struct's decoded type, the refusals the old class
++ * constructor made are its checks, and the YAML codec renames its keys. The
++ * JSON Schema stays hand-written, and `tests/model/subtypeFactSchemaDrift.test.ts`
++ * compares it with this one.
++ *
++ * Unlike the object type, the two spellings check exactly the same things:
++ * a subtype fact has no field whose file check was ever stricter than its
++ * code check, so a subtype fact built in code is refused exactly when the
++ * same subtype fact in a file is. The one difference is the id, which a file
++ * must carry (the JSON Schema requires it) and a caller may leave to
++ * `IdSource`.
++ */
++import * as Effect from "effect/Effect";
++import * as Schema from "effect/Schema";
++import type { DerivationRule } from "./FactType.js";
++import { IdSource } from "./objectTypeSchema.js";
++
++// Every `message` below is the predicate of a sentence whose subject the
++// decoder supplies ("Subtype fact "sf-1" cannot have ..."), as for the object
++// type.
++
++function nonEmptyString(what: string) {
++  return Schema.String.check(Schema.isMinLength(1, { message: `must have a non-empty ${what}.` }));
++}
++
++/**
++ * A derivation rule: how a derived element's population is defined. The
++ * record type stays `DerivationRule` in `FactType.ts`, which fact types share;
++ * `_ruleAgrees` below fails to compile when the two disagree.
++ */
++const DerivationRuleSchema = Schema.Struct({
++  kind: Schema.Literals(["derived", "semiderived"]),
++  storage: Schema.optionalKey(Schema.Literals(["derive_on_request", "derived_and_stored"])),
++  expression: Schema.String,
++  isFormal: Schema.optionalKey(Schema.Boolean),
++});
++
++type Same<A, B> = [A] extends [B] ? [B] extends [A] ? true : never : never;
++const _ruleAgrees: Same<typeof DerivationRuleSchema.Type, DerivationRule> = true;
++
++/** The YAML key of every derivation rule key that is not spelled the same. */
++export const DERIVATION_YAML_KEYS = { isFormal: "is_formal" } as const;
++
++function subtypeFactSchema(definingRule: Schema.Codec<DerivationRule, unknown>) {
++  return Schema.Struct({
++    /** Minted from `IdSource` when absent. */
++    id: nonEmptyString("id").pipe(
++      Schema.withDecodingDefaultKey(IdSource.useSync((ids) => ids.newId())),
++    ),
++    /** The id of the subtype (child) entity type. */
++    subtypeId: nonEmptyString("subtype"),
++    /** The id of the supertype (parent) entity type. */
++    supertypeId: nonEmptyString("supertype"),
++    /**
++     * Whether the subtype uses the supertype's reference scheme for
++     * identification. Always present; true unless stated otherwise.
++     */
++    providesIdentification: Schema.Boolean.pipe(
++      Schema.withDecodingDefaultKey(Effect.succeed(true)),
++    ),
++    /** Whether the subtypes of the supertype are mutually exclusive. Always present. */
++    isExclusive: Schema.Boolean.pipe(Schema.withDecodingDefaultKey(Effect.succeed(false))),
++    /** Whether the subtypes of the supertype cover all its instances. Always present. */
++    isExhaustive: Schema.Boolean.pipe(Schema.withDecodingDefaultKey(Effect.succeed(false))),
++    /** Absent for an asserted subtype. */
++    definingRule: Schema.optionalKey(definingRule),
++  }).check(
++    Schema.makeFilter(
++      (sf: { readonly subtypeId: string; readonly supertypeId: string; }) =>
++        sf.subtypeId !== sf.supertypeId,
++      { message: "cannot have the same entity as both subtype and supertype." },
++    ),
++  );
++}
++
++/** The YAML key of every subtype fact key that is not spelled the same. */
++export const SUBTYPE_YAML_KEYS = {
++  subtypeId: "subtype",
++  supertypeId: "supertype",
++  providesIdentification: "provides_identification",
++  isExclusive: "is_exclusive",
++  isExhaustive: "is_exhaustive",
++  definingRule: "defining_rule",
++} as const;
++
++/**
++ * A subtype fact as a caller of `OrmModel.addSubtypeFact` spells it, decoded
++ * into the record.
++ */
++export const SubtypeFactModelCodec = subtypeFactSchema(DerivationRuleSchema);
++
++/**
++ * A subtype fact as an `.orm.yaml` file spells it (snake_case keys), decoded
++ * into the same record.
++ */
++export const SubtypeFactYamlCodec = subtypeFactSchema(
++  DerivationRuleSchema.pipe(Schema.encodeKeys(DERIVATION_YAML_KEYS)),
++).pipe(Schema.encodeKeys(SUBTYPE_YAML_KEYS));
++
++/**
++ * A SubtypeFact represents a specialization relationship in ORM: entity type
++ * A is a subtype of entity type B. Every instance of the subtype is also an
++ * instance of the supertype; the subtype inherits all fact types and
++ * constraints of the supertype and may have additional ones of its own.
++ *
++ * Example: "Employee is a subtype of Person" means every Employee is a
++ * Person, but not every Person is necessarily an Employee.
++ *
++ * In relational mapping, subtype facts determine whether the subtype is
++ * absorbed into the supertype's table or gets its own table with a FK back
++ * to the supertype.
++ *
++ * A plain, frozen record: no class, no methods, and no name -- the class
++ * derived one (`subtype:<sub>:<super>`) that nothing displayed. Its
++ * `definingRule` is absent, never `undefined`, for an asserted subtype.
++ */
++export type SubtypeFact = typeof SubtypeFactModelCodec.Type;
+diff --git a/barwise/packages/core/src/serialization/OrmYamlSerializer.ts b/barwise/packages/core/src/serialization/OrmYamlSerializer.ts
+index 61e2dfd1..c1012433 100644
+--- a/barwise/packages/core/src/serialization/OrmYamlSerializer.ts
++++ b/barwise/packages/core/src/serialization/OrmYamlSerializer.ts
+@@ -1,8 +1,13 @@
++import type * as Effect from "effect/Effect";
++import * as Result from "effect/Result";
+ import { parse, stringify } from "yaml";
+ import { generateId } from "../model/id.js";
+ import type { ObjectType } from "../model/ObjectType.js";
+ import { decodeObjectTypes, runWithIds } from "../model/objectTypeDecoder.js";
++import type { IdSource } from "../model/objectTypeSchema.js";
+ import { OrmModel } from "../model/OrmModel.js";
++import type { SubtypeFact } from "../model/SubtypeFact.js";
++import { decodeSubtypeFacts } from "../model/subtypeFactDecoder.js";
+ import {
+   type SchemaError,
+   type SchemaValidationResult,
+@@ -28,7 +33,7 @@ import {
+   deserializePopulation,
+   serializePopulation,
+ } from "./yaml/population.js";
+-import { deserializeSubtypeFact, serializeSubtypeFact } from "./yaml/subtype.js";
++import { serializeSubtypeFact } from "./yaml/subtype.js";
+ 
+ /**
+  * Error thrown when deserialization fails due to schema validation
+@@ -61,58 +66,68 @@ function versionErrorMessage(
+   return `${head} ${advice[plan.reason]}`;
+ }
+ 
+-/** One object type's problem, located by its position in the file. */
++/** One element's problem, located by its list and position in the file. */
+ interface LocatedProblem {
++  readonly list: string;
+   readonly index: number;
+   readonly error: SchemaError;
+ }
+ 
++/** What a decoder hands back for one element: its record, or its problems. */
++type Decoded<A> = Result.Result<
++  A,
++  { readonly problems: readonly { readonly field: string; readonly message: string; }[]; }
++>;
++
+ /**
+- * Decode every object type in a parsed document, whatever the JSON Schema
+- * said about the document. Before, a schema error stopped the load before
+- * any object type was built, so a cardinality with `max < min` was reported
+- * only once the schema errors elsewhere were fixed. A document without an
+- * `object_types` list has nothing to decode, and the schema check says why.
++ * Decode every element of one list in a parsed document, whatever the JSON
++ * Schema said about the document. Before, a schema error stopped the load
++ * before any object type was built, so a cardinality with `max < min` was
++ * reported only once the schema errors elsewhere were fixed. A document
++ * without the list has nothing to decode, and the schema check says why.
+  */
+-function decodeObjectTypesOf(
++function decodeListOf<A>(
+   doc: unknown,
+-): { readonly decoded: ObjectType[]; readonly problems: LocatedProblem[]; } {
+-  const list = (doc as { model?: { object_types?: unknown; }; } | null)?.model?.object_types;
+-  if (!Array.isArray(list)) return { decoded: [], problems: [] };
+-  const decoded: ObjectType[] = [];
++  list: "object_types" | "subtype_facts",
++  decodeAll: (docs: readonly unknown[]) => Effect.Effect<readonly Decoded<A>[], never, IdSource>,
++): { readonly decoded: A[]; readonly problems: LocatedProblem[]; } {
++  const docs = (doc as { model?: Record<string, unknown>; } | null)?.model?.[list];
++  if (!Array.isArray(docs)) return { decoded: [], problems: [] };
++  const decoded: A[] = [];
+   const problems: LocatedProblem[] = [];
+-  runWithIds(decodeObjectTypes(list), generateId).forEach((result, index) => {
+-    if (result._tag === "Success") {
++  runWithIds(decodeAll(docs), generateId).forEach((result, index) => {
++    if (Result.isSuccess(result)) {
+       decoded.push(result.success);
+       return;
+     }
+     for (const problem of result.failure.problems) {
+-      const path = `/model/object_types/${index}${problem.field ? `/${problem.field}` : ""}`;
+-      problems.push({ index, error: { path, message: problem.message } });
++      const path = `/model/${list}/${index}${problem.field ? `/${problem.field}` : ""}`;
++      problems.push({ list, index, error: { path, message: problem.message } });
+     }
+   });
+   return { decoded, problems };
+ }
+ 
+ /**
+- * The schema's errors and the decoder's problems as one list.
++ * The schema's errors and the decoders' problems as one list.
+  *
+- * For an object type the decoder refused, its problems replace the schema's
++ * For an element a decoder refused, its problems replace the schema's
+  * errors there: they say the same things, but by name and one per problem,
+  * where the schema reports an entity without a reference mode three times
+- * (the missing property, the failed `if`, the failed `then`). For an object
+- * type the decoder accepted, the schema's errors stand -- the file format
+- * asks a few things the decoder does not (an `id` in every object type, a
+- * bound in every range), and those must still refuse the file.
++ * (the missing property, the failed `if`, the failed `then`). For an
++ * element the decoder accepted, the schema's errors stand -- the file format
++ * asks a few things the decoders do not (an `id` in every object type and
++ * subtype fact, a bound in every range), and those must still refuse the
++ * file.
+  */
+-function mergeObjectTypeProblems(
++function mergeDecoderProblems(
+   schemaErrors: readonly SchemaError[],
+   problems: readonly LocatedProblem[],
+ ): SchemaError[] {
+-  const refused = new Set(problems.map((p) => p.index));
++  const refused = new Set(problems.map((p) => `${p.list}/${p.index}`));
+   const covered = (path: string) => {
+-    const match = /^\/model\/object_types\/(\d+)(\/|$)/.exec(path);
+-    return match !== null && refused.has(Number(match[1]));
++    const match = /^\/model\/(object_types|subtype_facts)\/(\d+)(\/|$)/.exec(path);
++    return match !== null && refused.has(`${match[1]}/${match[2]}`);
+   };
+   return [...schemaErrors.filter((e) => !covered(e.path)), ...problems.map((p) => p.error)];
+ }
+@@ -191,11 +206,17 @@ export class OrmYamlSerializer {
+     const migrated = this.migrateToCurrentVersion(raw);
+ 
+     const result = this.validator.validateModel(migrated);
+-    const objectTypes = decodeObjectTypesOf(migrated);
+-    const errors = mergeObjectTypeProblems(result.errors, objectTypes.problems);
++    const objectTypes = decodeListOf(migrated, "object_types", decodeObjectTypes);
++    const subtypeFacts = decodeListOf(migrated, "subtype_facts", decodeSubtypeFacts);
++    const errors = mergeDecoderProblems(result.errors, [
++      ...objectTypes.problems,
++      ...subtypeFacts.problems,
++    ]);
+     if (errors.length > 0) {
+       const head = result.valid
+-        ? "YAML holds malformed object types"
++        ? objectTypes.problems.length > 0
++          ? "YAML holds malformed object types"
++          : "YAML holds malformed subtype facts"
+         : "YAML does not conform to orm-model schema";
+       throw new DeserializationError(
+         `${head}: ${errors.map((e) => `${e.path}: ${e.message}`).join("; ")}`,
+@@ -204,7 +225,7 @@ export class OrmYamlSerializer {
+     }
+ 
+     const doc = migrated as OrmYamlDocument;
+-    return this.fromDocument(doc, objectTypes.decoded, options);
++    return this.fromDocument(doc, objectTypes.decoded, subtypeFacts.decoded, options);
+   }
+ 
+   /**
+@@ -295,6 +316,7 @@ export class OrmYamlSerializer {
+   private fromDocument(
+     doc: OrmYamlDocument,
+     objectTypes: readonly ObjectType[],
++    subtypeFacts: readonly SubtypeFact[],
+     options?: { lenient?: boolean; },
+   ): OrmModel {
+     const model = new OrmModel({
+@@ -319,11 +341,9 @@ export class OrmYamlSerializer {
+     }
+ 
+     // Add subtype facts (after object types and fact types).
+-    for (const sfDoc of doc.model.subtype_facts ?? []) {
+-      model.addSubtypeFact(
+-        deserializeSubtypeFact(sfDoc),
+-        { skipPlayerValidation: options?.lenient },
+-      );
++    // Already decoded, like the object types; the record is its own config.
++    for (const sf of subtypeFacts) {
++      model.addSubtypeFact(sf, { skipPlayerValidation: options?.lenient });
+     }
+ 
+     // Add objectified fact types (after object types and fact types).
+diff --git a/barwise/packages/core/src/serialization/yaml/subtype.ts b/barwise/packages/core/src/serialization/yaml/subtype.ts
+index 23fe18da..d9985a7a 100644
+--- a/barwise/packages/core/src/serialization/yaml/subtype.ts
++++ b/barwise/packages/core/src/serialization/yaml/subtype.ts
+@@ -1,10 +1,14 @@
+-import type { SubtypeFact, SubtypeFactConfig } from "../../model/SubtypeFact.js";
+-import {
+-  deserializeDerivation,
+-  type OrmYamlDerivation,
+-  serializeDerivation,
+-} from "./derivation.js";
++import type { KeysAgree } from "../../model/objectTypeSchema.js";
++import type { SubtypeFact } from "../../model/SubtypeFact.js";
++import type { SubtypeFactYamlCodec } from "../../model/subtypeFactSchema.js";
++import { type OrmYamlDerivation, serializeDerivation } from "./derivation.js";
+ 
++/**
++ * A subtype fact as a file spells it, for the serializer to build. Reading
++ * one is the decoder's job (`SubtypeFactYamlCodec` in
++ * `model/subtypeFactSchema.ts`); the keys are held to the decoder's at
++ * compile time (`_yamlKeysAgree` below).
++ */
+ export interface OrmYamlSubtypeFact {
+   id: string;
+   subtype: string;
+@@ -15,6 +19,8 @@ export interface OrmYamlSubtypeFact {
+   defining_rule?: OrmYamlDerivation;
+ }
+ 
++const _yamlKeysAgree: KeysAgree<OrmYamlSubtypeFact, typeof SubtypeFactYamlCodec.Encoded> = true;
++
+ export function serializeSubtypeFact(sf: SubtypeFact): OrmYamlSubtypeFact {
+   const result: OrmYamlSubtypeFact = {
+     id: sf.id,
+@@ -35,17 +41,3 @@ export function serializeSubtypeFact(sf: SubtypeFact): OrmYamlSubtypeFact {
+   }
+   return result;
+ }
+-
+-export function deserializeSubtypeFact(sfDoc: OrmYamlSubtypeFact): SubtypeFactConfig {
+-  return {
+-    id: sfDoc.id,
+-    subtypeId: sfDoc.subtype,
+-    supertypeId: sfDoc.supertype,
+-    providesIdentification: sfDoc.provides_identification ?? true,
+-    isExclusive: sfDoc.is_exclusive ?? false,
+-    isExhaustive: sfDoc.is_exhaustive ?? false,
+-    definingRule: sfDoc.defining_rule
+-      ? deserializeDerivation(sfDoc.defining_rule)
+-      : undefined,
+-  };
+-}
+diff --git a/barwise/packages/core/tests/model/SubtypeFact.test.ts b/barwise/packages/core/tests/model/SubtypeFact.test.ts
+index 01684769..bdfe21e7 100644
+--- a/barwise/packages/core/tests/model/SubtypeFact.test.ts
++++ b/barwise/packages/core/tests/model/SubtypeFact.test.ts
+@@ -1,5 +1,5 @@
+ /**
+- * Tests for SubtypeFact model class and OrmModel subtype management.
++ * Tests for the SubtypeFact record and OrmModel subtype management.
+  *
+  * SubtypeFact represents a specialization relationship between entity
+  * types (e.g., "Employee is a subtype of Person"). These tests verify:
+@@ -14,12 +14,12 @@
+  */
+ import { describe, expect, it } from "vitest";
+ import { OrmModel } from "../../src/model/OrmModel.js";
+-import { SubtypeFact } from "../../src/model/SubtypeFact.js";
++import { createSubtypeFact } from "../../src/model/SubtypeFact.js";
+ 
+ describe("SubtypeFact", () => {
+   describe("construction", () => {
+     it("creates with required properties", () => {
+-      const sf = new SubtypeFact({
++      const sf = createSubtypeFact({
+         subtypeId: "sub-1",
+         supertypeId: "super-1",
+       });
+@@ -30,7 +30,7 @@ describe("SubtypeFact", () => {
+     });
+ 
+     it("accepts custom id", () => {
+-      const sf = new SubtypeFact({
++      const sf = createSubtypeFact({
+         id: "custom-id",
+         subtypeId: "sub-1",
+         supertypeId: "super-1",
+@@ -39,7 +39,7 @@ describe("SubtypeFact", () => {
+     });
+ 
+     it("accepts providesIdentification = false", () => {
+-      const sf = new SubtypeFact({
++      const sf = createSubtypeFact({
+         subtypeId: "sub-1",
+         supertypeId: "super-1",
+         providesIdentification: false,
+@@ -48,7 +48,7 @@ describe("SubtypeFact", () => {
+     });
+ 
+     it("defaults providesIdentification to true", () => {
+-      const sf = new SubtypeFact({
++      const sf = createSubtypeFact({
+         subtypeId: "sub-1",
+         supertypeId: "super-1",
+       });
+@@ -58,7 +58,7 @@ describe("SubtypeFact", () => {
+     it("throws when subtype equals supertype", () => {
+       expect(
+         () =>
+-          new SubtypeFact({
++          createSubtypeFact({
+             subtypeId: "same-id",
+             supertypeId: "same-id",
+           }),
+@@ -66,7 +66,7 @@ describe("SubtypeFact", () => {
+     });
+ 
+     it("defaults isExclusive to false", () => {
+-      const sf = new SubtypeFact({
++      const sf = createSubtypeFact({
+         subtypeId: "sub-1",
+         supertypeId: "super-1",
+       });
+@@ -74,7 +74,7 @@ describe("SubtypeFact", () => {
+     });
+ 
+     it("defaults isExhaustive to false", () => {
+-      const sf = new SubtypeFact({
++      const sf = createSubtypeFact({
+         subtypeId: "sub-1",
+         supertypeId: "super-1",
+       });
+@@ -82,7 +82,7 @@ describe("SubtypeFact", () => {
+     });
+ 
+     it("accepts isExclusive = true", () => {
+-      const sf = new SubtypeFact({
++      const sf = createSubtypeFact({
+         subtypeId: "sub-1",
+         supertypeId: "super-1",
+         isExclusive: true,
+@@ -91,7 +91,7 @@ describe("SubtypeFact", () => {
+     });
+ 
+     it("accepts isExhaustive = true", () => {
+-      const sf = new SubtypeFact({
++      const sf = createSubtypeFact({
+         subtypeId: "sub-1",
+         supertypeId: "super-1",
+         isExhaustive: true,
+@@ -100,7 +100,7 @@ describe("SubtypeFact", () => {
+     });
+ 
+     it("accepts both exclusive and exhaustive (partition)", () => {
+-      const sf = new SubtypeFact({
++      const sf = createSubtypeFact({
+         subtypeId: "sub-1",
+         supertypeId: "super-1",
+         isExclusive: true,
+@@ -132,7 +132,8 @@ describe("OrmModel subtype facts", () => {
+         supertypeId: person.id,
+       });
+ 
+-      expect(sf).toBeInstanceOf(SubtypeFact);
++      expect(Object.isFrozen(sf)).toBe(true);
++      expect(Object.getPrototypeOf(sf)).toBe(Object.prototype);
+       expect(sf.subtypeId).toBe(employee.id);
+       expect(sf.supertypeId).toBe(person.id);
+       expect(model.subtypeFacts).toHaveLength(1);
+diff --git a/barwise/packages/core/tests/model/subtypeFactDecoder.test.ts b/barwise/packages/core/tests/model/subtypeFactDecoder.test.ts
+new file mode 100644
+index 00000000..95eaa6f5
+--- /dev/null
++++ b/barwise/packages/core/tests/model/subtypeFactDecoder.test.ts
+@@ -0,0 +1,286 @@
++/**
++ * The subtype fact as a sealed record (docs/specs/core-branching-load.spec.md
++ * WS1): one Effect Schema decodes a config and a file's entry into the same
++ * frozen record, refusing exactly the same subtype facts, every problem at
++ * once.
++ */
++import * as Effect from "effect/Effect";
++import * as Result from "effect/Result";
++import fc from "fast-check";
++import { afterEach, describe, expect, it } from "vitest";
++import { stringify } from "yaml";
++import { setIdGenerator } from "../../src/model/id.js";
++import { IdSource } from "../../src/model/objectTypeSchema.js";
++import { OrmModel } from "../../src/model/OrmModel.js";
++import { createSubtypeFact, type SubtypeFact } from "../../src/model/SubtypeFact.js";
++import {
++  decodeSubtypeFact,
++  decodeSubtypeFactConfig,
++  SubtypeFactError,
++  type SubtypeFactProblem,
++  type SubtypeFactProblems,
++} from "../../src/model/subtypeFactDecoder.js";
++import {
++  DeserializationError,
++  OrmYamlSerializer,
++} from "../../src/serialization/OrmYamlSerializer.js";
++
++afterEach(() => {
++  setIdGenerator(undefined);
++});
++
++function run(
++  decoded: Effect.Effect<SubtypeFact, SubtypeFactProblems, IdSource>,
++): Result.Result<SubtypeFact, readonly SubtypeFactProblem[]> {
++  let n = 0;
++  return Effect.runSync(
++    decoded.pipe(
++      Effect.mapError((e) => e.problems),
++      Effect.result,
++      Effect.provideService(IdSource, { newId: () => `minted-${++n}` }),
++    ),
++  );
++}
++
++function problems(decoded: Effect.Effect<SubtypeFact, SubtypeFactProblems, IdSource>) {
++  const result = run(decoded);
++  if (Result.isSuccess(result)) throw new Error("expected the decode to fail");
++  return result.failure;
++}
++
++describe("the subtype fact record", () => {
++  it("is a frozen plain record with every default applied and no derived name", () => {
++    const sf = createSubtypeFact({ subtypeId: "sub", supertypeId: "super" });
++    expect(Object.getPrototypeOf(sf)).toBe(Object.prototype);
++    expect(Object.isFrozen(sf)).toBe(true);
++    expect(Object.keys(sf).sort()).toEqual([
++      "id",
++      "isExclusive",
++      "isExhaustive",
++      "providesIdentification",
++      "subtypeId",
++      "supertypeId",
++    ]);
++    expect(sf).toMatchObject({ providesIdentification: true, isExclusive: false });
++  });
++
++  it("leaves an absent defining rule absent, not undefined, even when a config says undefined", () => {
++    const sf = createSubtypeFact({
++      subtypeId: "sub",
++      supertypeId: "super",
++      definingRule: undefined,
++    });
++    expect("definingRule" in sf).toBe(false);
++  });
++
++  it("freezes a defining rule with the record", () => {
++    const sf = createSubtypeFact({
++      subtypeId: "sub",
++      supertypeId: "super",
++      definingRule: { kind: "derived", expression: "each Employee is paid" },
++    });
++    expect(Object.isFrozen(sf.definingRule)).toBe(true);
++  });
++
++  it("decodes a file's entry into the same record a config gives", () => {
++    const fromFile = run(decodeSubtypeFact({
++      id: "sf-1",
++      subtype: "sub",
++      supertype: "super",
++      is_exclusive: true,
++      defining_rule: { kind: "semiderived", expression: "x", is_formal: true },
++    }));
++    const fromConfig = run(decodeSubtypeFactConfig({
++      id: "sf-1",
++      subtypeId: "sub",
++      supertypeId: "super",
++      isExclusive: true,
++      definingRule: { kind: "semiderived", expression: "x", isFormal: true },
++    }));
++    expect(Result.isSuccess(fromFile) && fromFile.success).toEqual(
++      Result.isSuccess(fromConfig) && fromConfig.success,
++    );
++  });
++
++  it("mints a missing id from IdSource and from nothing else", () => {
++    setIdGenerator(() => "from-the-installed-generator");
++    const result = run(decodeSubtypeFactConfig({ subtypeId: "sub", supertypeId: "super" }));
++    expect(Result.isSuccess(result) && result.success.id).toBe("minted-1");
++  });
++});
++
++describe("refusals", () => {
++  it("reports every field problem at once, each at its field", () => {
++    const found = problems(decodeSubtypeFactConfig({
++      id: "sf-1",
++      subtypeId: "",
++      supertypeId: "b",
++      isExclusive: "yes",
++      colour: "red",
++    }));
++    expect(found.map((p) => p.field).sort()).toEqual(["colour", "isExclusive", "subtypeId"]);
++    expect(found.every((p) => p.message.startsWith('Subtype fact "sf-1" '))).toBe(true);
++  });
++
++  it("refuses a subtype fact from an entity to itself, at no one field", () => {
++    // A check across two fields, so Effect runs it once the fields decode:
++    // it is reported with the field problems when there are none.
++    const found = problems(decodeSubtypeFactConfig({ subtypeId: "a", supertypeId: "a" }));
++    expect(found).toEqual([{
++      subtypeFact: "",
++      field: "",
++      message:
++        'Subtype fact from "a" to "a" cannot have the same entity as both subtype and supertype.',
++    }]);
++  });
++
++  it("names a file's problems in the file's spelling", () => {
++    const found = problems(decodeSubtypeFact({
++      id: "sf-1",
++      subtype: "",
++      supertype: "b",
++      defining_rule: { kind: "guessed", expression: "x" },
++    }));
++    expect(found.map((p) => p.field).sort()).toEqual(["defining_rule", "subtype"]);
++  });
++
++  it("is thrown by createSubtypeFact as one SubtypeFactError carrying every problem", () => {
++    let caught: unknown;
++    try {
++      createSubtypeFact({ subtypeId: "", supertypeId: "a", isExhaustive: 1 as never });
++    } catch (e) {
++      caught = e;
++    }
++    expect(caught).toBeInstanceOf(SubtypeFactError);
++    expect((caught as SubtypeFactError).problems).toHaveLength(2);
++  });
++
++  it("refuses a malformed config even when a lenient caller skips the reference checks", () => {
++    const model = new OrmModel({ name: "M" });
++    expect(() =>
++      model.addSubtypeFact({ subtypeId: "x", supertypeId: "x" }, { skipPlayerValidation: true })
++    ).toThrow(SubtypeFactError);
++  });
++});
++
++describe("a subtype fact in code and the same subtype fact in a file", () => {
++  // Entities `a` and `b`, value type `v`: enough to reach every reference
++  // refusal addSubtypeFact makes as well as every refusal the schema makes.
++  const objectTypes = [
++    { id: "a", name: "A", kind: "entity" as const, reference_mode: "a_id" },
++    { id: "b", name: "B", kind: "entity" as const, reference_mode: "b_id" },
++    { id: "v", name: "V", kind: "value" as const },
++  ];
++
++  function codeRefuses(config: Record<string, unknown>): boolean {
++    const model = new OrmModel({ name: "M" });
++    model.addObjectType({ id: "a", name: "A", kind: "entity", referenceMode: "a_id" });
++    model.addObjectType({ id: "b", name: "B", kind: "entity", referenceMode: "b_id" });
++    model.addObjectType({ id: "v", name: "V", kind: "value" });
++    try {
++      model.addSubtypeFact(config as never);
++      return false;
++    } catch {
++      return true;
++    }
++  }
++
++  const serializer = new OrmYamlSerializer();
++
++  function fileRefuses(entry: Record<string, unknown>): boolean {
++    const yaml = stringify({
++      orm_version: "2.0",
++      model: { name: "M", object_types: objectTypes, subtype_facts: [entry] },
++    });
++    try {
++      serializer.deserialize(yaml);
++      return false;
++    } catch {
++      return true;
++    }
++  }
++
++  const end = fc.constantFrom("a", "b", "v", "missing", "");
++  const flag = fc.option(fc.constantFrom<unknown>(true, false, "yes"), { nil: undefined });
++  const rule = fc.option(
++    fc.record({
++      kind: fc.constantFrom("derived", "semiderived", "guessed"),
++      expression: fc.constantFrom("x", 3),
++      isFormal: fc.option(fc.constantFrom<unknown>(true, false, "no"), { nil: undefined }),
++    }),
++    { nil: undefined },
++  );
++  const candidate = fc.record({
++    id: fc.constantFrom("sf-1", ""),
++    subtypeId: end,
++    supertypeId: end,
++    providesIdentification: flag,
++    isExclusive: flag,
++    isExhaustive: flag,
++    definingRule: rule,
++    colour: fc.option(fc.constant("red"), { nil: undefined }),
++  });
++
++  function present(o: Record<string, unknown>): Record<string, unknown> {
++    return Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined));
++  }
++
++  function inFileSpelling(config: Record<string, unknown>): Record<string, unknown> {
++    const rule = config.definingRule as Record<string, unknown> | undefined;
++    return present({
++      id: config.id,
++      subtype: config.subtypeId,
++      supertype: config.supertypeId,
++      provides_identification: config.providesIdentification,
++      is_exclusive: config.isExclusive,
++      is_exhaustive: config.isExhaustive,
++      defining_rule: rule === undefined
++        ? undefined
++        : present({ kind: rule.kind, expression: rule.expression, is_formal: rule.isFormal }),
++      colour: config.colour,
++    });
++  }
++
++  it("are refused together or not at all", () => {
++    fc.assert(
++      fc.property(candidate, (raw) => {
++        const config = present(raw);
++        if (config.definingRule !== undefined) {
++          config.definingRule = present(config.definingRule as Record<string, unknown>);
++        }
++        expect(codeRefuses(config)).toBe(fileRefuses(inFileSpelling(config)));
++      }),
++      { numRuns: 300 },
++    );
++  });
++});
++
++describe("OrmYamlSerializer.deserialize", () => {
++  it("reports subtype fact problems beside schema errors elsewhere in the file", () => {
++    let errors: readonly { path: string; message: string; }[] = [];
++    try {
++      new OrmYamlSerializer().deserialize(`
++orm_version: "2.0"
++model:
++  name: M
++  object_types:
++    - id: a
++      name: A
++      kind: entity
++      reference_mode: a_id
++  subtype_facts:
++    - id: sf-1
++      subtype: a
++      supertype: a
++  fact_types:
++    - id: ft-1
++`);
++    } catch (e) {
++      expect(e).toBeInstanceOf(DeserializationError);
++      errors = (e as DeserializationError).validationResult!.errors;
++    }
++    expect(errors.map((e) => e.path)).toContain("/model/subtype_facts/0");
++    expect(errors.some((e) => e.message.includes("same entity"))).toBe(true);
++    expect(errors.some((e) => e.path.startsWith("/model/fact_types/0"))).toBe(true);
++  });
++});
+diff --git a/barwise/packages/core/tests/model/subtypeFactSchemaDrift.test.ts b/barwise/packages/core/tests/model/subtypeFactSchemaDrift.test.ts
+new file mode 100644
+index 00000000..66dcbb23
+--- /dev/null
++++ b/barwise/packages/core/tests/model/subtypeFactSchemaDrift.test.ts
+@@ -0,0 +1,107 @@
++/**
++ * The JSON Schema's `subtype_fact` against the decoder's schema, as
++ * `objectTypeSchemaDrift.test.ts` compares the object type: both reduced to
++ * the facts a file is held to (which fields it may and must carry, and each
++ * field's type and enum, the defining rule's included), with the differences
++ * required to be exactly the ones listed below.
++ *
++ * Not compared, as there: `description`, `minLength` (the decoder states it
++ * as a check, pinned by the decoder's tests), `additionalProperties` (a parse
++ * option there, not the schema), and `default` (the decoder applies the
++ * defaults; `serializeSubtypeFact` omits them).
++ */
++import * as Schema from "effect/Schema";
++import { readFileSync } from "node:fs";
++import { describe, expect, it } from "vitest";
++import { SubtypeFactYamlCodec } from "../../src/model/subtypeFactSchema.js";
++
++type Node = Record<string, unknown> | boolean;
++
++const fileSchema = JSON.parse(
++  readFileSync(new URL("../../schemas/orm-model.schema.json", import.meta.url), "utf8"),
++) as { definitions: Record<string, Record<string, unknown>>; };
++
++/** The comparable facts of one schema node. */
++function facts(node: Node, defs: Record<string, Record<string, unknown>>): unknown {
++  if (node === false) return "forbidden";
++  if (node === true) return "anything";
++  if (typeof node.$ref === "string") {
++    return facts(defs[node.$ref.replace(/^#\/(definitions|\$defs)\//, "")]!, defs);
++  }
++  const alternatives = (node.anyOf ?? node.oneOf) as Node[] | undefined;
++  if (alternatives && node.type === undefined) {
++    return { anyOf: alternatives.map((a) => facts(a, defs)).sort(byJson) };
++  }
++  if (node.type === "object") {
++    const properties = (node.properties ?? {}) as Record<string, Node>;
++    return {
++      type: "object",
++      properties: Object.fromEntries(
++        Object.keys(properties).sort().map((k) => [k, facts(properties[k]!, defs)]),
++      ),
++      required: [...((node.required ?? []) as string[])].sort(),
++    };
++  }
++  const out: Record<string, unknown> = { type: node.type };
++  const values = node.enum ?? (node.const !== undefined ? [node.const] : undefined);
++  if (values !== undefined) out.enum = [...(values as unknown[])].sort();
++  return out;
++}
++
++const byJson = (a: unknown, b: unknown) => JSON.stringify(a).localeCompare(JSON.stringify(b));
++
++function fileFacts() {
++  return facts(fileSchema.definitions.subtype_fact!, fileSchema.definitions);
++}
++
++function decoderFacts() {
++  const doc = Schema.toJsonSchemaDocument(SubtypeFactYamlCodec);
++  const defs = (doc.definitions ?? {}) as Record<string, Record<string, unknown>>;
++  return facts(doc.schema as Node, defs);
++}
++
++/** Every path at which two fact trees differ. */
++function differences(a: unknown, b: unknown, path: string): string[] {
++  if (JSON.stringify(a) === JSON.stringify(b)) return [];
++  const isObject = (v: unknown) => v !== null && typeof v === "object" && !Array.isArray(v);
++  if (!isObject(a) || !isObject(b)) return [path];
++  const keys = new Set([...Object.keys(a as object), ...Object.keys(b as object)]);
++  return [...keys].sort().flatMap((k) =>
++    differences(
++      (a as Record<string, unknown>)[k],
++      (b as Record<string, unknown>)[k],
++      `${path}.${k}`,
++    )
++  );
++}
++
++/**
++ * Where the two are meant to differ. Each entry must still be a difference:
++ * one that closes fails the test until it is removed here.
++ */
++const KNOWN: Record<string, string> = {
++  "subtype_fact.required":
++    "a file must carry an id; the decoder mints a missing one from IdSource, and the loader keeps the schema's refusal",
++};
++
++describe("the JSON Schema's subtype_fact and the decoder's", () => {
++  it("hold a subtype fact to the same facts, but for the known differences", () => {
++    const found = differences(fileFacts(), decoderFacts(), "subtype_fact");
++    expect(found.sort()).toEqual(Object.keys(KNOWN).sort());
++  });
++
++  it("sees a derivation kind dropped from the file schema", () => {
++    const rule = fileSchema.definitions.derivation_rule_def as {
++      properties: { kind: { enum: string[]; }; };
++    };
++    const original = rule.properties.kind.enum;
++    rule.properties.kind.enum = original.filter((k) => k !== "semiderived");
++    try {
++      expect(differences(fileFacts(), decoderFacts(), "subtype_fact")).toContain(
++        "subtype_fact.properties.defining_rule.properties.kind.enum",
++      );
++    } finally {
++      rule.properties.kind.enum = original;
++    }
++  });
++});
+diff --git a/barwise/packages/core/tests/validation/subtypeRules.test.ts b/barwise/packages/core/tests/validation/subtypeRules.test.ts
+index 26899d08..a8601ceb 100644
+--- a/barwise/packages/core/tests/validation/subtypeRules.test.ts
++++ b/barwise/packages/core/tests/validation/subtypeRules.test.ts
+@@ -9,7 +9,7 @@
+  */
+ import { describe, expect, it } from "vitest";
+ import { OrmModel } from "../../src/model/OrmModel.js";
+-import { SubtypeFact } from "../../src/model/SubtypeFact.js";
++import { createSubtypeFact } from "../../src/model/SubtypeFact.js";
+ import {
+   structuralRules,
+   structuralWellFormedness,
+@@ -47,7 +47,7 @@ describe("subtype structural rules", () => {
+     });
+ 
+     // Inject a subtype fact with a nonexistent supertype.
+-    const badSf = new SubtypeFact({
++    const badSf = createSubtypeFact({
+       subtypeId: employee.id,
+       supertypeId: "nonexistent-id",
+     });
+@@ -70,7 +70,7 @@ describe("subtype structural rules", () => {
+     });
+ 
+     // Inject a subtype fact with a nonexistent subtype.
+-    const badSf = new SubtypeFact({
++    const badSf = createSubtypeFact({
+       subtypeId: "nonexistent-id",
+       supertypeId: person.id,
+     });
+@@ -92,7 +92,7 @@ describe("subtype structural rules", () => {
+     const name = model.addObjectType({ name: "Name", kind: "value" });
+ 
+     // Inject a subtype fact with a value type as the subtype.
+-    const badSf = new SubtypeFact({
++    const badSf = createSubtypeFact({
+       subtypeId: name.id,
+       supertypeId: person.id,
+     });
+@@ -116,7 +116,7 @@ describe("subtype structural rules", () => {
+     const rating = model.addObjectType({ name: "Rating", kind: "value" });
+ 
+     // Inject a subtype fact with a value type as the supertype.
+-    const badSf = new SubtypeFact({
++    const badSf = createSubtypeFact({
+       subtypeId: employee.id,
+       supertypeId: rating.id,
+     });
+@@ -140,7 +140,7 @@ describe("subtype structural rules", () => {
+     model.addSubtypeFact({ subtypeId: b.id, supertypeId: c.id });
+ 
+     // Inject cycle: C -> A (bypasses addSubtypeFact which doesn't detect cycles)
+-    const cycleSf = new SubtypeFact({
++    const cycleSf = createSubtypeFact({
+       subtypeId: c.id,
+       supertypeId: a.id,
+     });

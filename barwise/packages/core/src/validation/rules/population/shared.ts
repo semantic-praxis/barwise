@@ -148,8 +148,16 @@ export function tuplesForRoleSeq(model: OrmModel, roleIds: readonly string[]): S
  * Used for uniqueness checking.
  */
 export function makeCompositeKey(
-  inst: FactInstance,
+  inst: Pick<FactInstance, "roleValues">,
   roleIds: readonly string[],
 ): string {
-  return roleIds.map((rid) => inst.roleValues[rid] ?? "").join("\0");
+  return roleIds.map((rid) => inst.roleValues[rid] ?? "").join(KEY_SEPARATOR);
 }
+
+/** The values a composite key joins, in role order. */
+export function compositeKeyParts(key: string): string[] {
+  return key.split(KEY_SEPARATOR);
+}
+
+/** One owner for the separator, so a key and its parts cannot disagree. */
+const KEY_SEPARATOR = "\0";

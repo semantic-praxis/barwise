@@ -16,7 +16,7 @@
  * gets its plain name ahead of a non-key column that happens to share it.
  */
 
-import { type Constraint, generateId, type ObjectType } from "@barwise/core";
+import type { ObjectType } from "@barwise/core";
 import type { DbtColumn } from "../DbtSchemaTypes.js";
 import {
   claimValueType,
@@ -58,24 +58,28 @@ export function createIdentifierTypes(ctx: DbtMapperContext): void {
     identifierOwner.set(identifier.id, identifierOwner.get(identifier.id) ?? m.name);
 
     const factName = `${entityName} has ${identifier.name}`;
-    // Minted, never built from names (importer-role-ids.spec.md).
-    const entityRoleId = generateId();
-    const valueRoleId = generateId();
-    ctx.columnRoleIdMap.set(`${m.name}::${col.name}`, entityRoleId);
-    const constraints: Constraint[] = [
-      { type: "internal_uniqueness", roleIds: [valueRoleId], isPreferred: true },
-      { type: "internal_uniqueness", roleIds: [entityRoleId] },
-      { type: "mandatory", roleId: entityRoleId },
-    ];
-    ctx.model.addFactType({
+    // The model names the roles and constraints (iri-identity decision 17);
+    // the constraints are stated over the role ids it gives.
+    const ft = ctx.model.addFactType({
       name: factName,
       roles: [
-        { id: entityRoleId, name: "has", playerId: entityId },
-        { id: valueRoleId, name: "is of", playerId: identifier.id },
+        { name: "has", playerId: entityId },
+        { name: "is of", playerId: identifier.id },
       ],
       readings: ["{0} has {1}", "{1} is of {0}"],
-      constraints,
+    }, {
+      constraintsOver: ([entityRole, valueRole]) => [
+        { type: "internal_uniqueness", roleIds: [valueRole!] },
+        { type: "internal_uniqueness", roleIds: [entityRole!] },
+        { type: "mandatory", roleId: entityRole! },
+      ],
     });
+    const [entityRoleId, valueRoleId] = ft.roles.map((r) => r.id) as [string, string];
+    ctx.columnRoleIdMap.set(`${m.name}::${col.name}`, entityRoleId);
+    ctx.farRoleIdMap.set(`${m.name}::${col.name}`, valueRoleId);
+    // The value role's uniqueness is the entity's preferred identifier,
+    // named on the entity by the id it was stored under (orm-format-3 WS4b).
+    ctx.model.setPreferredIdentifier(entityId, ft.uniquenessOver([valueRoleId])!.id);
   }
 }
 

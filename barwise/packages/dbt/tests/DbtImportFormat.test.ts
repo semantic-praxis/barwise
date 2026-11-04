@@ -204,7 +204,7 @@ describe("DbtImportFormat", () => {
       // Value constraint from accepted_values.
       const typeFt = result.model.getFactTypeByName("Customers has CustomerType");
       expect(typeFt).toBeDefined();
-      const vc = typeFt!.constraints.find((c) => c.type === "value_constraint");
+      const vc = typeFt!.internalConstraints.find((c) => c.type === "value_constraint");
       expect(vc).toBeDefined();
     });
 
@@ -317,12 +317,12 @@ WHERE customer_name IS NOT NULL
       // WHERE guard -> mandatory on Customers has CustomerName.
       const nameFt = result.model.getFactTypeByName("Customers has CustomerName");
       expect(nameFt).toBeDefined();
-      expect(nameFt!.constraints.some((c) => c.type === "mandatory")).toBe(true);
+      expect(nameFt!.internalConstraints.some((c) => c.type === "mandatory")).toBe(true);
 
       // The YAML accepted_values already covers customer_type; the CASE
       // enumeration must not duplicate it.
       const typeFt = result.model.getFactTypeByName("Customers has CustomerType");
-      const valueConstraints = typeFt!.constraints.filter(
+      const valueConstraints = typeFt!.internalConstraints.filter(
         (c) => c.type === "value_constraint",
       );
       expect(valueConstraints).toHaveLength(1);

@@ -173,6 +173,7 @@ function proseFiles() {
   };
   addIf("../CLAUDE.md");
   addIf("../AGENTS.md");
+  addIf("../REVIEW.md");
   addIf("../README.md");
   for (const pkg of readdirSync(join(root, "packages")).sort()) {
     addIf(`packages/${pkg}/CLAUDE.md`);

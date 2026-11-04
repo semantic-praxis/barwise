@@ -11,8 +11,10 @@ per-tool integration work.
 This package may depend on any internal package except
 `barwise-vscode`, `@barwise/cli`, and `@barwise/promptlab`; the MCP
 SDK and `zod` are the externals. It has ZERO dependencies on VS Code.
-The authoritative internal list is the root CLAUDE.md dependency
-graph (and this package's `package.json`).
+The authoritative internal list is `INTENDED` in
+`barwise/scripts/lib/intended.cjs`; the root CLAUDE.md graph and this
+package's `package.json` are checked against it
+(`npm run check:architecture`).
 
 ## Package Layout
 
@@ -23,6 +25,8 @@ src/
   workspace/
     resolve.ts          Source resolution (file path / inline YAML / project)
     projectLoader.ts    Filesystem walk for a .orm-project.yaml manifest
+    stagedWrite.ts      Staged multi-file write (a copy of the CLI's, paired in
+                        parity.manifest.json)
   llm/
     SamplingLlmClient.ts  LlmClient over MCP sampling -- the host's model, no key
     resolveClient.ts      Prefer sampling, fall back to a key, report which
@@ -40,6 +44,7 @@ src/
     gym.ts              gym_list / gym_check tools (modeling gym)
     import.ts           import_transcript tool
     merge.ts            merge_models tool
+    rename.ts           rename_element tool (writes a file or project source back)
     split.ts            split_model tool (preview, or write a multi-domain project)
     review.ts           review_model tool (exports formatReview, shared with vscode)
     queryModel.ts       query_model tool
@@ -102,13 +107,13 @@ npx tsc --noEmit            # type-check only
 
 ## Dependencies
 
-| Direction | Package                  | What is used                                                           |
-| --------- | ------------------------ | ---------------------------------------------------------------------- |
-| Upstream  | `@barwise/core`          | Model, validation, verbalization, mapping, diff, merge, query, lineage |
-| Upstream  | `@barwise/diagram`       | Diagram layout for SVG output                                          |
-| Upstream  | `@barwise/diagram-ui`    | Headless SVG rendering of the positioned graph                         |
-| Upstream  | `@barwise/llm`           | `processTranscript`, `reviewModel`, `createLlmClient`, providers       |
-| Upstream  | `@barwise/code-analysis` | `registerCodeFormats`; repo analysis for analyze_repository            |
-| Upstream  | `@barwise/dbt`           | `registerDbtFormats` for dbt import/export                             |
-| Upstream  | `@barwise/formats`       | `registerStandardFormats` (DDL/OpenAPI/Avro/NORMA/SQL descriptors)     |
-| Upstream  | `@barwise/learn`         | Modeling gym (exercise catalog, evaluator) for gym_list / gym_check    |
+| Direction | Package                  | What is used                                                             |
+| --------- | ------------------------ | ------------------------------------------------------------------------ |
+| Upstream  | `@barwise/core`          | Model, validation, verbalization, mapping, diff, merge, query, lineage   |
+| Upstream  | `@barwise/diagram`       | Diagram layout for SVG output                                            |
+| Upstream  | `@barwise/diagram-ui`    | Headless SVG rendering of the positioned graph                           |
+| Upstream  | `@barwise/llm`           | `processTranscript`, `reviewModel`, `createLlmClient`, providers         |
+| Upstream  | `@barwise/code-analysis` | `registerCodeFormats`; repo analysis for analyze_repository              |
+| Upstream  | `@barwise/dbt`           | `registerDbtFormats` for dbt import/export                               |
+| Upstream  | `@barwise/formats`       | `registerStandardFormats` (DDL/OpenAPI/Avro/NORMA/SQL/Ossie descriptors) |
+| Upstream  | `@barwise/learn`         | Modeling gym (exercise catalog, evaluator) for gym_list / gym_check      |

@@ -1,34 +1,35 @@
-orm_version: "2.0"
+orm_version: "4.0"
 model:
   name: vendor-onboarding
   object_types:
-    - id: 00000000-0000-7001-ad34-3b424950575e
+    - id: Vendor
       name: Vendor
       kind: entity
       reference_mode: vendor_number
+      preferred_identifier: Each_VendorNumber_identifies_at_most_one_Vendor
       definition: A supplier of goods or services to the organization, identified by a unique vendor number assigned at record creation.
-    - id: 00000000-0000-7002-8c53-5a61686f767d
+    - id: VendorNumber
       name: VendorNumber
       kind: value
       definition: The unique identifier assigned to a vendor record at creation.
       data_type:
         name: text
         length: 20
-    - id: 00000000-0000-7003-ab72-7980878e959c
+    - id: LegalName
       name: LegalName
       kind: value
       definition: The registered legal business name of a vendor.
       data_type:
         name: text
         length: 200
-    - id: 00000000-0000-7004-8a91-989fa6adb4bb
+    - id: TaxID
       name: TaxID
       kind: value
       definition: The tax identifier of a vendor, which is not guaranteed to be unique due to parent-subsidiary structures and duplicate records.
       data_type:
         name: text
         length: 20
-    - id: 00000000-0000-7005-a9b0-b7bec5ccd3da
+    - id: VendorStatus
       name: VendorStatus
       kind: value
       definition: "The operational status of a vendor: draft (not yet approved), active (approved and transactable), or suspended (temporarily inactive)."
@@ -40,7 +41,7 @@ model:
       data_type:
         name: text
         length: 20
-    - id: 00000000-0000-7006-88cf-d6dde4ebf2f9
+    - id: SpendTier
       name: SpendTier
       kind: value
       definition: A classification of vendor based on annual spending level. Bronze (default), silver, or gold.
@@ -52,7 +53,7 @@ model:
       data_type:
         name: text
         length: 20
-    - id: 00000000-0000-7007-a7ee-f5fc030a1118
+    - id: RiskTier
       name: RiskTier
       kind: value
       definition: "A classification of vendor based on compliance risk: low, medium, or high. Assigned by the risk review process."
@@ -64,40 +65,41 @@ model:
       data_type:
         name: text
         length: 20
-    - id: 00000000-0000-7008-860d-141b22293037
+    - id: VendorAddress
       name: VendorAddress
       kind: value
       definition: A mailing or operational address associated with a vendor.
       data_type:
         name: text
         length: 300
-    - id: 00000000-0000-7009-a52c-333a41484f56
+    - id: ContactName
       name: ContactName
       kind: value
       definition: The name of a contact person associated with a vendor in a specific region.
       data_type:
         name: text
         length: 100
-    - id: 00000000-0000-700a-844b-525960676e75
+    - id: ContactEmail
       name: ContactEmail
       kind: value
       definition: The email address of a vendor contact.
       data_type:
         name: text
         length: 100
-    - id: 00000000-0000-700b-a36a-71787f868d94
+    - id: ContactPhone
       name: ContactPhone
       kind: value
       definition: The phone number of a vendor contact.
       data_type:
         name: text
         length: 20
-    - id: 00000000-0000-700c-8289-90979ea5acb3
+    - id: Region
       name: Region
       kind: entity
       reference_mode: region_code
+      preferred_identifier: Each_RegionCode_identifies_at_most_one_Region
       definition: "A geographic region served by vendors: EMEA, APAC, NA, or LATAM."
-    - id: 00000000-0000-700d-a1a8-afb6bdc4cbd2
+    - id: RegionCode
       name: RegionCode
       kind: value
       definition: The code identifying a geographic region.
@@ -110,51 +112,53 @@ model:
       data_type:
         name: text
         length: 10
-    - id: 00000000-0000-700e-80c7-ced5dce3eaf1
+    - id: RiskReview
       name: RiskReview
       kind: entity
       reference_mode: review_id
+      preferred_identifier: Each_ReviewID_identifies_at_most_one_RiskReview
       definition: A compliance risk assessment of a vendor, completed and signed off before the vendor can be activated.
-    - id: 00000000-0000-700f-9fe6-edf4fb020910
+    - id: ReviewID
       name: ReviewID
       kind: value
       definition: The unique identifier for a risk review record.
       data_type:
         name: text
         length: 20
-    - id: 00000000-0000-7010-be05-0c131a21282f
+    - id: PurchaseOrder
       name: PurchaseOrder
       kind: entity
       reference_mode: po_number
+      preferred_identifier: Each_PONumber_identifies_at_most_one_PurchaseOrder
       definition: A request to purchase goods or services from a vendor, identified by a unique PO number.
-    - id: 00000000-0000-7011-9d24-2b323940474e
+    - id: PONumber
       name: PONumber
       kind: value
       definition: The unique identifier for a purchase order.
       data_type:
         name: text
         length: 20
-    - id: 00000000-0000-7012-bc43-4a51585f666d
+    - id: Amount
       name: Amount
       kind: value
       definition: The monetary value of a purchase order.
       data_type:
         name: money
-    - id: 00000000-0000-7013-9b62-6970777e858c
+    - id: RaisedDate
       name: RaisedDate
       kind: value
       definition: The date on which a purchase order was created.
       data_type:
         name: date
   fact_types:
-    - id: 00000000-0000-7014-ba81-888f969da4ab
+    - id: Vendor_has_VendorNumber
       name: Vendor has VendorNumber
       roles:
-        - id: 00000000-0000-7015-99a0-a7aeb5bcc3ca
-          player: 00000000-0000-7001-ad34-3b424950575e
+        - id: Vendor_has_VendorNumber.has
+          player: Vendor
           role_name: has
-        - id: 00000000-0000-7016-b8bf-c6cdd4dbe2e9
-          player: 00000000-0000-7002-8c53-5a61686f767d
+        - id: Vendor_has_VendorNumber.identifies
+          player: VendorNumber
           role_name: identifies
       readings:
         - "{0} has {1}"
@@ -162,21 +166,26 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - 00000000-0000-7015-99a0-a7aeb5bcc3ca
-          is_preferred: true
+            - Vendor_has_VendorNumber.has
+          id: Each_Vendor_has_at_most_one_VendorNumber
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"has",{"name":"Vendor has VendorNumber","readings":["{0} has {1}","{1} identifies {0}"],"players":["Vendor","VendorNumber"]}]],"fact_type":{"name":"Vendor has VendorNumber","readings":["{0} has {1}","{1} identifies {0}"],"players":["Vendor","VendorNumber"]}}'
         - type: internal_uniqueness
           roles:
-            - 00000000-0000-7016-b8bf-c6cdd4dbe2e9
+            - Vendor_has_VendorNumber.identifies
+          id: Each_VendorNumber_identifies_at_most_one_Vendor
+          minted_from: '{"type":"internal_uniqueness","roles":[[1,"identifies",{"name":"Vendor has VendorNumber","readings":["{0} has {1}","{1} identifies {0}"],"players":["Vendor","VendorNumber"]}]],"fact_type":{"name":"Vendor has VendorNumber","readings":["{0} has {1}","{1} identifies {0}"],"players":["Vendor","VendorNumber"]}}'
         - type: mandatory
-          role: 00000000-0000-7015-99a0-a7aeb5bcc3ca
-    - id: 00000000-0000-7017-97de-e5ecf3fa0108
+          role: Vendor_has_VendorNumber.has
+          id: Each_Vendor_has_at_least_one_VendorNumber
+          minted_from: '{"type":"mandatory","role":[0,"has",{"name":"Vendor has VendorNumber","readings":["{0} has {1}","{1} identifies {0}"],"players":["Vendor","VendorNumber"]}],"fact_type":{"name":"Vendor has VendorNumber","readings":["{0} has {1}","{1} identifies {0}"],"players":["Vendor","VendorNumber"]}}'
+    - id: Vendor_has_LegalName
       name: Vendor has LegalName
       roles:
-        - id: 00000000-0000-7018-b6fd-040b12192027
-          player: 00000000-0000-7001-ad34-3b424950575e
+        - id: Vendor_has_LegalName.has
+          player: Vendor
           role_name: has
-        - id: 00000000-0000-7019-951c-232a31383f46
-          player: 00000000-0000-7003-ab72-7980878e959c
+        - id: Vendor_has_LegalName.is_of
+          player: LegalName
           role_name: is of
       readings:
         - "{0} has {1}"
@@ -184,17 +193,21 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - 00000000-0000-7018-b6fd-040b12192027
+            - Vendor_has_LegalName.has
+          id: Each_Vendor_has_at_most_one_LegalName
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"has",{"name":"Vendor has LegalName","readings":["{0} has {1}","{1} is of {0}"],"players":["Vendor","LegalName"]}]],"fact_type":{"name":"Vendor has LegalName","readings":["{0} has {1}","{1} is of {0}"],"players":["Vendor","LegalName"]}}'
         - type: mandatory
-          role: 00000000-0000-7018-b6fd-040b12192027
-    - id: 00000000-0000-701a-b43b-424950575e65
+          role: Vendor_has_LegalName.has
+          id: Each_Vendor_has_at_least_one_LegalName
+          minted_from: '{"type":"mandatory","role":[0,"has",{"name":"Vendor has LegalName","readings":["{0} has {1}","{1} is of {0}"],"players":["Vendor","LegalName"]}],"fact_type":{"name":"Vendor has LegalName","readings":["{0} has {1}","{1} is of {0}"],"players":["Vendor","LegalName"]}}'
+    - id: Vendor_has_TaxID
       name: Vendor has TaxID
       roles:
-        - id: 00000000-0000-701b-935a-61686f767d84
-          player: 00000000-0000-7001-ad34-3b424950575e
+        - id: Vendor_has_TaxID.has
+          player: Vendor
           role_name: has
-        - id: 00000000-0000-701c-b279-80878e959ca3
-          player: 00000000-0000-7004-8a91-989fa6adb4bb
+        - id: Vendor_has_TaxID.is_of
+          player: TaxID
           role_name: is of
       readings:
         - "{0} has {1}"
@@ -202,17 +215,21 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - 00000000-0000-701b-935a-61686f767d84
+            - Vendor_has_TaxID.has
+          id: Each_Vendor_has_at_most_one_TaxID
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"has",{"name":"Vendor has TaxID","readings":["{0} has {1}","{1} is of {0}"],"players":["Vendor","TaxID"]}]],"fact_type":{"name":"Vendor has TaxID","readings":["{0} has {1}","{1} is of {0}"],"players":["Vendor","TaxID"]}}'
         - type: mandatory
-          role: 00000000-0000-701b-935a-61686f767d84
-    - id: 00000000-0000-701d-9198-9fa6adb4bbc2
+          role: Vendor_has_TaxID.has
+          id: Each_Vendor_has_at_least_one_TaxID
+          minted_from: '{"type":"mandatory","role":[0,"has",{"name":"Vendor has TaxID","readings":["{0} has {1}","{1} is of {0}"],"players":["Vendor","TaxID"]}],"fact_type":{"name":"Vendor has TaxID","readings":["{0} has {1}","{1} is of {0}"],"players":["Vendor","TaxID"]}}'
+    - id: Vendor_has_VendorStatus
       name: Vendor has VendorStatus
       roles:
-        - id: 00000000-0000-701e-b0b7-bec5ccd3dae1
-          player: 00000000-0000-7001-ad34-3b424950575e
+        - id: Vendor_has_VendorStatus.has
+          player: Vendor
           role_name: has
-        - id: 00000000-0000-701f-8fd6-dde4ebf2f900
-          player: 00000000-0000-7005-a9b0-b7bec5ccd3da
+        - id: Vendor_has_VendorStatus.is_of
+          player: VendorStatus
           role_name: is of
       readings:
         - "{0} has {1}"
@@ -220,17 +237,21 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - 00000000-0000-701e-b0b7-bec5ccd3dae1
+            - Vendor_has_VendorStatus.has
+          id: Each_Vendor_has_at_most_one_VendorStatus
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"has",{"name":"Vendor has VendorStatus","readings":["{0} has {1}","{1} is of {0}"],"players":["Vendor","VendorStatus"]}]],"fact_type":{"name":"Vendor has VendorStatus","readings":["{0} has {1}","{1} is of {0}"],"players":["Vendor","VendorStatus"]}}'
         - type: mandatory
-          role: 00000000-0000-701e-b0b7-bec5ccd3dae1
-    - id: 00000000-0000-7020-aef5-fc030a11181f
+          role: Vendor_has_VendorStatus.has
+          id: Each_Vendor_has_at_least_one_VendorStatus
+          minted_from: '{"type":"mandatory","role":[0,"has",{"name":"Vendor has VendorStatus","readings":["{0} has {1}","{1} is of {0}"],"players":["Vendor","VendorStatus"]}],"fact_type":{"name":"Vendor has VendorStatus","readings":["{0} has {1}","{1} is of {0}"],"players":["Vendor","VendorStatus"]}}'
+    - id: Vendor_has_SpendTier
       name: Vendor has SpendTier
       roles:
-        - id: 00000000-0000-7021-8d14-1b222930373e
-          player: 00000000-0000-7001-ad34-3b424950575e
+        - id: Vendor_has_SpendTier.has
+          player: Vendor
           role_name: has
-        - id: 00000000-0000-7022-ac33-3a41484f565d
-          player: 00000000-0000-7006-88cf-d6dde4ebf2f9
+        - id: Vendor_has_SpendTier.is_of
+          player: SpendTier
           role_name: is of
       readings:
         - "{0} has {1}"
@@ -238,17 +259,21 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - 00000000-0000-7021-8d14-1b222930373e
+            - Vendor_has_SpendTier.has
+          id: Each_Vendor_has_at_most_one_SpendTier
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"has",{"name":"Vendor has SpendTier","readings":["{0} has {1}","{1} is of {0}"],"players":["Vendor","SpendTier"]}]],"fact_type":{"name":"Vendor has SpendTier","readings":["{0} has {1}","{1} is of {0}"],"players":["Vendor","SpendTier"]}}'
         - type: mandatory
-          role: 00000000-0000-7021-8d14-1b222930373e
-    - id: 00000000-0000-7023-8b52-5960676e757c
+          role: Vendor_has_SpendTier.has
+          id: Each_Vendor_has_at_least_one_SpendTier
+          minted_from: '{"type":"mandatory","role":[0,"has",{"name":"Vendor has SpendTier","readings":["{0} has {1}","{1} is of {0}"],"players":["Vendor","SpendTier"]}],"fact_type":{"name":"Vendor has SpendTier","readings":["{0} has {1}","{1} is of {0}"],"players":["Vendor","SpendTier"]}}'
+    - id: Vendor_has_RiskTier
       name: Vendor has RiskTier
       roles:
-        - id: 00000000-0000-7024-aa71-787f868d949b
-          player: 00000000-0000-7001-ad34-3b424950575e
+        - id: Vendor_has_RiskTier.has
+          player: Vendor
           role_name: has
-        - id: 00000000-0000-7025-8990-979ea5acb3ba
-          player: 00000000-0000-7007-a7ee-f5fc030a1118
+        - id: Vendor_has_RiskTier.is_of
+          player: RiskTier
           role_name: is of
       readings:
         - "{0} has {1}"
@@ -256,15 +281,17 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - 00000000-0000-7024-aa71-787f868d949b
-    - id: 00000000-0000-7026-a8af-b6bdc4cbd2d9
+            - Vendor_has_RiskTier.has
+          id: Each_Vendor_has_at_most_one_RiskTier
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"has",{"name":"Vendor has RiskTier","readings":["{0} has {1}","{1} is of {0}"],"players":["Vendor","RiskTier"]}]],"fact_type":{"name":"Vendor has RiskTier","readings":["{0} has {1}","{1} is of {0}"],"players":["Vendor","RiskTier"]}}'
+    - id: Region_has_RegionCode
       name: Region has RegionCode
       roles:
-        - id: 00000000-0000-7027-87ce-d5dce3eaf1f8
-          player: 00000000-0000-700c-8289-90979ea5acb3
+        - id: Region_has_RegionCode.has
+          player: Region
           role_name: has
-        - id: 00000000-0000-7028-a6ed-f4fb02091017
-          player: 00000000-0000-700d-a1a8-afb6bdc4cbd2
+        - id: Region_has_RegionCode.identifies
+          player: RegionCode
           role_name: identifies
       readings:
         - "{0} has {1}"
@@ -272,46 +299,53 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - 00000000-0000-7027-87ce-d5dce3eaf1f8
-          is_preferred: true
+            - Region_has_RegionCode.has
+          id: Each_Region_has_at_most_one_RegionCode
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"has",{"name":"Region has RegionCode","readings":["{0} has {1}","{1} identifies {0}"],"players":["Region","RegionCode"]}]],"fact_type":{"name":"Region has RegionCode","readings":["{0} has {1}","{1} identifies {0}"],"players":["Region","RegionCode"]}}'
         - type: internal_uniqueness
           roles:
-            - 00000000-0000-7028-a6ed-f4fb02091017
+            - Region_has_RegionCode.identifies
+          id: Each_RegionCode_identifies_at_most_one_Region
+          minted_from: '{"type":"internal_uniqueness","roles":[[1,"identifies",{"name":"Region has RegionCode","readings":["{0} has {1}","{1} identifies {0}"],"players":["Region","RegionCode"]}]],"fact_type":{"name":"Region has RegionCode","readings":["{0} has {1}","{1} identifies {0}"],"players":["Region","RegionCode"]}}'
         - type: mandatory
-          role: 00000000-0000-7027-87ce-d5dce3eaf1f8
-    - id: 00000000-0000-7029-850c-131a21282f36
+          role: Region_has_RegionCode.has
+          id: Each_Region_has_at_least_one_RegionCode
+          minted_from: '{"type":"mandatory","role":[0,"has",{"name":"Region has RegionCode","readings":["{0} has {1}","{1} identifies {0}"],"players":["Region","RegionCode"]}],"fact_type":{"name":"Region has RegionCode","readings":["{0} has {1}","{1} identifies {0}"],"players":["Region","RegionCode"]}}'
+    - id: Vendor_operates_in_Region_with_Contact
       name: Vendor operates in Region with Contact
       roles:
-        - id: 00000000-0000-702a-a42b-323940474e55
-          player: 00000000-0000-7001-ad34-3b424950575e
+        - id: Vendor_operates_in_Region_with_Contact.operates_in
+          player: Vendor
           role_name: operates in
-        - id: 00000000-0000-702b-834a-51585f666d74
-          player: 00000000-0000-700c-8289-90979ea5acb3
+        - id: Vendor_operates_in_Region_with_Contact.has_vendor
+          player: Region
           role_name: has vendor
-        - id: 00000000-0000-702c-a269-70777e858c93
-          player: 00000000-0000-7009-a52c-333a41484f56
+        - id: Vendor_operates_in_Region_with_Contact.is_primary_contact
+          player: ContactName
           role_name: is primary contact
-        - id: 00000000-0000-702d-8188-8f969da4abb2
-          player: 00000000-0000-700a-844b-525960676e75
+        - id: Vendor_operates_in_Region_with_Contact.email
+          player: ContactEmail
           role_name: email
-        - id: 00000000-0000-702e-a0a7-aeb5bcc3cad1
-          player: 00000000-0000-700b-a36a-71787f868d94
+        - id: Vendor_operates_in_Region_with_Contact.phone
+          player: ContactPhone
           role_name: phone
       readings:
         - "{0} in {1} has primary contact {2}, email {3}, phone {4}"
       constraints:
         - type: internal_uniqueness
           roles:
-            - 00000000-0000-702a-a42b-323940474e55
-            - 00000000-0000-702b-834a-51585f666d74
-    - id: 00000000-0000-702f-bfc6-cdd4dbe2e9f0
+            - Vendor_operates_in_Region_with_Contact.operates_in
+            - Vendor_operates_in_Region_with_Contact.has_vendor
+          id: For_each_Vendor_and_Region_combination,_at_most_one_ContactName_and_ContactEmail_and_ContactPhone_applies
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"operates in",{"name":"Vendor operates in Region with Contact","readings":["{0} in {1} has primary contact {2}, email {3}, phone {4}"],"players":["Vendor","Region","ContactName","ContactEmail","ContactPhone"]}],[1,"has vendor",{"name":"Vendor operates in Region with Contact","readings":["{0} in {1} has primary contact {2}, email {3}, phone {4}"],"players":["Vendor","Region","ContactName","ContactEmail","ContactPhone"]}]],"fact_type":{"name":"Vendor operates in Region with Contact","readings":["{0} in {1} has primary contact {2}, email {3}, phone {4}"],"players":["Vendor","Region","ContactName","ContactEmail","ContactPhone"]}}'
+    - id: RiskReview_has_ReviewID
       name: RiskReview has ReviewID
       roles:
-        - id: 00000000-0000-7030-9ee5-ecf3fa01080f
-          player: 00000000-0000-700e-80c7-ced5dce3eaf1
+        - id: RiskReview_has_ReviewID.has
+          player: RiskReview
           role_name: has
-        - id: 00000000-0000-7031-bd04-0b121920272e
-          player: 00000000-0000-700f-9fe6-edf4fb020910
+        - id: RiskReview_has_ReviewID.identifies
+          player: ReviewID
           role_name: identifies
       readings:
         - "{0} has {1}"
@@ -319,21 +353,26 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - 00000000-0000-7030-9ee5-ecf3fa01080f
-          is_preferred: true
+            - RiskReview_has_ReviewID.has
+          id: Each_RiskReview_has_at_most_one_ReviewID
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"has",{"name":"RiskReview has ReviewID","readings":["{0} has {1}","{1} identifies {0}"],"players":["RiskReview","ReviewID"]}]],"fact_type":{"name":"RiskReview has ReviewID","readings":["{0} has {1}","{1} identifies {0}"],"players":["RiskReview","ReviewID"]}}'
         - type: internal_uniqueness
           roles:
-            - 00000000-0000-7031-bd04-0b121920272e
+            - RiskReview_has_ReviewID.identifies
+          id: Each_ReviewID_identifies_at_most_one_RiskReview
+          minted_from: '{"type":"internal_uniqueness","roles":[[1,"identifies",{"name":"RiskReview has ReviewID","readings":["{0} has {1}","{1} identifies {0}"],"players":["RiskReview","ReviewID"]}]],"fact_type":{"name":"RiskReview has ReviewID","readings":["{0} has {1}","{1} identifies {0}"],"players":["RiskReview","ReviewID"]}}'
         - type: mandatory
-          role: 00000000-0000-7030-9ee5-ecf3fa01080f
-    - id: 00000000-0000-7032-9c23-2a31383f464d
+          role: RiskReview_has_ReviewID.has
+          id: Each_RiskReview_has_at_least_one_ReviewID
+          minted_from: '{"type":"mandatory","role":[0,"has",{"name":"RiskReview has ReviewID","readings":["{0} has {1}","{1} identifies {0}"],"players":["RiskReview","ReviewID"]}],"fact_type":{"name":"RiskReview has ReviewID","readings":["{0} has {1}","{1} identifies {0}"],"players":["RiskReview","ReviewID"]}}'
+    - id: RiskReview_is_for_Vendor
       name: RiskReview is for Vendor
       roles:
-        - id: 00000000-0000-7033-bb42-4950575e656c
-          player: 00000000-0000-700e-80c7-ced5dce3eaf1
+        - id: RiskReview_is_for_Vendor.is_for
+          player: RiskReview
           role_name: is for
-        - id: 00000000-0000-7034-9a61-686f767d848b
-          player: 00000000-0000-7001-ad34-3b424950575e
+        - id: RiskReview_is_for_Vendor.has
+          player: Vendor
           role_name: has
       readings:
         - "{0} is for {1}"
@@ -341,15 +380,17 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - 00000000-0000-7033-bb42-4950575e656c
-    - id: 00000000-0000-7035-b980-878e959ca3aa
+            - RiskReview_is_for_Vendor.is_for
+          id: Each_RiskReview_is_for_at_most_one_Vendor
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"is for",{"name":"RiskReview is for Vendor","readings":["{0} is for {1}","{1} has {0}"],"players":["RiskReview","Vendor"]}]],"fact_type":{"name":"RiskReview is for Vendor","readings":["{0} is for {1}","{1} has {0}"],"players":["RiskReview","Vendor"]}}'
+    - id: PurchaseOrder_has_PONumber
       name: PurchaseOrder has PONumber
       roles:
-        - id: 00000000-0000-7036-989f-a6adb4bbc2c9
-          player: 00000000-0000-7010-be05-0c131a21282f
+        - id: PurchaseOrder_has_PONumber.has
+          player: PurchaseOrder
           role_name: has
-        - id: 00000000-0000-7037-b7be-c5ccd3dae1e8
-          player: 00000000-0000-7011-9d24-2b323940474e
+        - id: PurchaseOrder_has_PONumber.identifies
+          player: PONumber
           role_name: identifies
       readings:
         - "{0} has {1}"
@@ -357,21 +398,26 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - 00000000-0000-7036-989f-a6adb4bbc2c9
-          is_preferred: true
+            - PurchaseOrder_has_PONumber.has
+          id: Each_PurchaseOrder_has_at_most_one_PONumber
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"has",{"name":"PurchaseOrder has PONumber","readings":["{0} has {1}","{1} identifies {0}"],"players":["PurchaseOrder","PONumber"]}]],"fact_type":{"name":"PurchaseOrder has PONumber","readings":["{0} has {1}","{1} identifies {0}"],"players":["PurchaseOrder","PONumber"]}}'
         - type: internal_uniqueness
           roles:
-            - 00000000-0000-7037-b7be-c5ccd3dae1e8
+            - PurchaseOrder_has_PONumber.identifies
+          id: Each_PONumber_identifies_at_most_one_PurchaseOrder
+          minted_from: '{"type":"internal_uniqueness","roles":[[1,"identifies",{"name":"PurchaseOrder has PONumber","readings":["{0} has {1}","{1} identifies {0}"],"players":["PurchaseOrder","PONumber"]}]],"fact_type":{"name":"PurchaseOrder has PONumber","readings":["{0} has {1}","{1} identifies {0}"],"players":["PurchaseOrder","PONumber"]}}'
         - type: mandatory
-          role: 00000000-0000-7036-989f-a6adb4bbc2c9
-    - id: 00000000-0000-7038-96dd-e4ebf2f90007
+          role: PurchaseOrder_has_PONumber.has
+          id: Each_PurchaseOrder_has_at_least_one_PONumber
+          minted_from: '{"type":"mandatory","role":[0,"has",{"name":"PurchaseOrder has PONumber","readings":["{0} has {1}","{1} identifies {0}"],"players":["PurchaseOrder","PONumber"]}],"fact_type":{"name":"PurchaseOrder has PONumber","readings":["{0} has {1}","{1} identifies {0}"],"players":["PurchaseOrder","PONumber"]}}'
+    - id: PurchaseOrder_is_raised_against_Vendor
       name: PurchaseOrder is raised against Vendor
       roles:
-        - id: 00000000-0000-7039-b5fc-030a11181f26
-          player: 00000000-0000-7010-be05-0c131a21282f
+        - id: PurchaseOrder_is_raised_against_Vendor.is_raised_against
+          player: PurchaseOrder
           role_name: is raised against
-        - id: 00000000-0000-703a-941b-222930373e45
-          player: 00000000-0000-7001-ad34-3b424950575e
+        - id: PurchaseOrder_is_raised_against_Vendor.has
+          player: Vendor
           role_name: has
       readings:
         - "{0} is raised against {1}"
@@ -379,22 +425,21 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - 00000000-0000-7039-b5fc-030a11181f26
+            - PurchaseOrder_is_raised_against_Vendor.is_raised_against
+          id: Each_PurchaseOrder_is_raised_against_at_most_one_Vendor
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"is raised against",{"name":"PurchaseOrder is raised against Vendor","readings":["{0} is raised against {1}","{1} has {0}"],"players":["PurchaseOrder","Vendor"]}]],"fact_type":{"name":"PurchaseOrder is raised against Vendor","readings":["{0} is raised against {1}","{1} has {0}"],"players":["PurchaseOrder","Vendor"]}}'
         - type: mandatory
-          role: 00000000-0000-7039-b5fc-030a11181f26
-        - type: subset
-          subset_roles:
-            - 00000000-0000-703a-941b-222930373e45
-          superset_roles:
-            - 00000000-0000-701e-b0b7-bec5ccd3dae1
-    - id: 00000000-0000-703b-b33a-41484f565d64
+          role: PurchaseOrder_is_raised_against_Vendor.is_raised_against
+          id: Each_PurchaseOrder_is_raised_against_at_least_one_Vendor
+          minted_from: '{"type":"mandatory","role":[0,"is raised against",{"name":"PurchaseOrder is raised against Vendor","readings":["{0} is raised against {1}","{1} has {0}"],"players":["PurchaseOrder","Vendor"]}],"fact_type":{"name":"PurchaseOrder is raised against Vendor","readings":["{0} is raised against {1}","{1} has {0}"],"players":["PurchaseOrder","Vendor"]}}'
+    - id: PurchaseOrder_has_Amount
       name: PurchaseOrder has Amount
       roles:
-        - id: 00000000-0000-703c-9259-60676e757c83
-          player: 00000000-0000-7010-be05-0c131a21282f
+        - id: PurchaseOrder_has_Amount.has
+          player: PurchaseOrder
           role_name: has
-        - id: 00000000-0000-703d-b178-7f868d949ba2
-          player: 00000000-0000-7012-bc43-4a51585f666d
+        - id: PurchaseOrder_has_Amount.is_of
+          player: Amount
           role_name: is of
       readings:
         - "{0} has {1}"
@@ -402,17 +447,21 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - 00000000-0000-703c-9259-60676e757c83
+            - PurchaseOrder_has_Amount.has
+          id: Each_PurchaseOrder_has_at_most_one_Amount
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"has",{"name":"PurchaseOrder has Amount","readings":["{0} has {1}","{1} is of {0}"],"players":["PurchaseOrder","Amount"]}]],"fact_type":{"name":"PurchaseOrder has Amount","readings":["{0} has {1}","{1} is of {0}"],"players":["PurchaseOrder","Amount"]}}'
         - type: mandatory
-          role: 00000000-0000-703c-9259-60676e757c83
-    - id: 00000000-0000-703e-9097-9ea5acb3bac1
+          role: PurchaseOrder_has_Amount.has
+          id: Each_PurchaseOrder_has_at_least_one_Amount
+          minted_from: '{"type":"mandatory","role":[0,"has",{"name":"PurchaseOrder has Amount","readings":["{0} has {1}","{1} is of {0}"],"players":["PurchaseOrder","Amount"]}],"fact_type":{"name":"PurchaseOrder has Amount","readings":["{0} has {1}","{1} is of {0}"],"players":["PurchaseOrder","Amount"]}}'
+    - id: PurchaseOrder_has_RaisedDate
       name: PurchaseOrder has RaisedDate
       roles:
-        - id: 00000000-0000-703f-afb6-bdc4cbd2d9e0
-          player: 00000000-0000-7010-be05-0c131a21282f
+        - id: PurchaseOrder_has_RaisedDate.has
+          player: PurchaseOrder
           role_name: has
-        - id: 00000000-0000-7040-8ed5-dce3eaf1f8ff
-          player: 00000000-0000-7013-9b62-6970777e858c
+        - id: PurchaseOrder_has_RaisedDate.is_of
+          player: RaisedDate
           role_name: is of
       readings:
         - "{0} has {1}"
@@ -420,6 +469,18 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - 00000000-0000-703f-afb6-bdc4cbd2d9e0
+            - PurchaseOrder_has_RaisedDate.has
+          id: Each_PurchaseOrder_has_at_most_one_RaisedDate
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"has",{"name":"PurchaseOrder has RaisedDate","readings":["{0} has {1}","{1} is of {0}"],"players":["PurchaseOrder","RaisedDate"]}]],"fact_type":{"name":"PurchaseOrder has RaisedDate","readings":["{0} has {1}","{1} is of {0}"],"players":["PurchaseOrder","RaisedDate"]}}'
         - type: mandatory
-          role: 00000000-0000-703f-afb6-bdc4cbd2d9e0
+          role: PurchaseOrder_has_RaisedDate.has
+          id: Each_PurchaseOrder_has_at_least_one_RaisedDate
+          minted_from: '{"type":"mandatory","role":[0,"has",{"name":"PurchaseOrder has RaisedDate","readings":["{0} has {1}","{1} is of {0}"],"players":["PurchaseOrder","RaisedDate"]}],"fact_type":{"name":"PurchaseOrder has RaisedDate","readings":["{0} has {1}","{1} is of {0}"],"players":["PurchaseOrder","RaisedDate"]}}'
+  constraints:
+    - type: subset
+      subset_roles:
+        - PurchaseOrder_is_raised_against_Vendor.has
+      superset_roles:
+        - Vendor_has_VendorStatus.has
+      id: If_Vendor_in_PurchaseOrder_is_raised_against_Vendor_then_Vendor_in_Vendor_has_VendorStatus
+      minted_from: '{"type":"subset","subset_roles":[[1,"has",{"name":"PurchaseOrder is raised against Vendor","readings":["{0} is raised against {1}","{1} has {0}"],"players":["PurchaseOrder","Vendor"]}]],"superset_roles":[[0,"has",{"name":"Vendor has VendorStatus","readings":["{0} has {1}","{1} is of {0}"],"players":["Vendor","VendorStatus"]}]]}'

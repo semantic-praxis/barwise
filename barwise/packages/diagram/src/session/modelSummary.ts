@@ -9,7 +9,13 @@
  * display-ready readings and constraint labels, and subtype links.
  * Pure and deterministic; order follows model declaration order.
  */
-import { dataTypeOf, type OrmModel, referenceModeOf } from "@barwise/core";
+import {
+  dataTypeOf,
+  expandReading,
+  type OrmModel,
+  referenceModeOf,
+  subtypeFactRef,
+} from "@barwise/core";
 
 export interface SummaryRole {
   readonly id: string;
@@ -71,13 +77,6 @@ function dataTypeLabel(model: OrmModel, objectTypeId: string): string | undefine
   return name;
 }
 
-/** Substitute player names into a reading template ("{0} has {1}"). */
-function renderReading(template: string, playerNames: readonly string[]): string {
-  return template.replace(/\{(\d+)\}/g, (match, index: string) => {
-    return playerNames[Number(index)] ?? match;
-  });
-}
-
 /** Derive the serializable model summary a diagram front end renders. */
 export function buildModelSummary(model: OrmModel): ModelSummary {
   const playedIn = new Map<string, string[]>();
@@ -113,8 +112,11 @@ export function buildModelSummary(model: OrmModel): ModelSummary {
         playerId: r.playerId,
         playerName: playerNames[i]!,
       })),
-      readings: ft.readings.map((reading) => renderReading(reading.template, playerNames)),
-      constraints: ft.constraints.map((c) => ({
+      readings: ft.readings.map((reading) => expandReading(reading.template, playerNames)),
+      // Every constraint that applies to the fact type, as the sidebar and
+      // describe list them: a constraint across fact types under each
+      // fact type it spans, not under the one a 2.0 file nests it in.
+      constraints: model.constraintsTouching(ft.id).map((c) => ({
         ...(c.id !== undefined && { id: c.id }),
         type: c.type,
       })),
@@ -122,7 +124,7 @@ export function buildModelSummary(model: OrmModel): ModelSummary {
   });
 
   const subtypes: SummarySubtype[] = model.subtypeFacts.map((sf) => ({
-    id: sf.id,
+    id: subtypeFactRef(sf),
     subtypeId: sf.subtypeId,
     subtypeName: model.getObjectType(sf.subtypeId)?.name ?? sf.subtypeId,
     supertypeId: sf.supertypeId,

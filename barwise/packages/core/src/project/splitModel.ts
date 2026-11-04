@@ -10,14 +10,17 @@
  * and each output document is re-checked by deserializing it.
  */
 
-import { parse, stringify } from "yaml";
-import { roleIdsOf } from "../model/Constraint.js";
+import { stringify } from "yaml";
+import { type ConstraintFileValue, constraintRecord } from "../decode/constraint.js";
+import { roleIdsOf, subtypeFactIdsOf } from "../model/Constraint.js";
 import { ContextMapping } from "../model/ContextMapping.js";
+import { IRI_BASE_PATTERN } from "../model/iri.js";
+import { aliasForContext, aliasOf } from "../model/namespace.js";
+import type { OrmModel } from "../model/OrmModel.js";
 import { OrmProject } from "../model/OrmProject.js";
 import { MappingSerializer } from "../serialization/MappingSerializer.js";
-import { OrmYamlSerializer } from "../serialization/OrmYamlSerializer.js";
+import { OrmYamlSerializer, writeDocument40 } from "../serialization/OrmYamlSerializer.js";
 import { ProjectSerializer } from "../serialization/ProjectSerializer.js";
-import { deserializeConstraint, type OrmYamlConstraint } from "../serialization/yaml/constraint.js";
 
 // ---------------------------------------------------------------------------
 // Public API
@@ -119,7 +122,7 @@ interface RawObjectType {
   id: string;
   name: string;
   kind: string;
-  source_context?: string;
+  preferred_identifier?: string;
   [key: string]: unknown;
 }
 
@@ -173,6 +176,7 @@ interface RawModelDoc {
     name: string;
     object_types?: RawObjectType[];
     fact_types?: RawFactType[];
+    constraints?: RawConstraint[];
     subtype_facts?: RawSubtypeFact[];
     objectified_fact_types?: RawObjectified[];
     populations?: RawPopulation[];
@@ -217,17 +221,22 @@ export function splitModel(modelYaml: string, config: SplitConfig): SplitResult 
     }
   }
 
-  // Fail fast if the input is not a valid model.
+  // Fail fast if the input is not a valid model, and split the current
+  // version's document: a 2.0 source is read into the model and written as
+  // 3.0, so a constraint across fact types is found in one list and an
+  // entity's identifier by its reference (orm-format-3 WS4b).
+  let source: OrmModel;
   try {
-    new OrmYamlSerializer().deserialize(modelYaml);
+    source = new OrmYamlSerializer().deserialize(modelYaml);
   } catch (err) {
     throw new ModelSplitError(
       `Source is not a valid ORM model: ${(err as Error).message}`,
     );
   }
 
-  const doc = parse(modelYaml) as RawModelDoc;
+  const doc = writeDocument40(source) as unknown as RawModelDoc;
   const model = doc.model;
+  const modelConstraints = model.constraints ?? [];
   const objectTypes = model.object_types ?? [];
   const factTypes = model.fact_types ?? [];
   const subtypeFacts = model.subtype_facts ?? [];
@@ -328,14 +337,37 @@ export function splitModel(modelYaml: string, config: SplitConfig): SplitResult 
     }
     for (const obj of homedObjd) referenced.add(obj.object_type);
 
-    // Foreign references become shadows; record the seam.
+    // Foreign references become shadows; record the seam. A shadow is
+    // identified in its owner's domain, so it names no identifier here.
+    // Its id is `<alias>:<the owner's id>`, the alias bound to the owner
+    // by an import, so the id says whose element it is and `source_context`
+    // goes (iri-identity 6d). The alias is the 3.x reader's for the owner
+    // (`aliasForContext`); the owner's id, not its name's local name, since
+    // the two differ for a suffixed id or a name edited without a rename.
+    // An id the source already holds behind an alias is another domain's
+    // shadow: it keeps its id, and the domain keeps the source's import.
     const shadows: RawObjectType[] = [];
+    const shadowIdOf = new Map<string, string>();
+    const imports: Record<string, string> = {};
+    for (const id of [...homedOts.map((o) => o.id), ...referenced]) {
+      const alias = aliasOf(id);
+      const bound = alias === undefined ? undefined : source.imports.get(alias);
+      if (alias !== undefined && bound !== undefined) imports[alias] = bound;
+    }
     for (const id of referenced) {
       const owner = home.get(id);
       if (!owner || owner === ctx) continue;
       const ot = otById.get(id);
       if (!ot) continue;
-      shadows.push({ ...ot, source_context: owner });
+      const { preferred_identifier: _owned, ...shadow } = ot;
+      if (aliasOf(id) !== undefined) {
+        shadows.push(shadow as RawObjectType);
+      } else {
+        const alias = aliasForContext(owner, (a) => imports[a]);
+        imports[alias] = owner;
+        shadowIdOf.set(id, `${alias}:${id}`);
+        shadows.push({ ...shadow, id: `${alias}:${id}` });
+      }
       let byShadow = seams.get(owner);
       if (!byShadow) {
         byShadow = new Map();
@@ -367,19 +399,84 @@ export function splitModel(modelYaml: string, config: SplitConfig): SplitResult 
       return { ...ft, constraints: kept };
     });
 
+    // A constraint of the model goes to the domain holding every role and
+    // subtype fact it names; one spanning domains is dropped, as a fact
+    // type's constraint reaching another domain is above.
+    const homedSubtypeIds = new Set(homedSubtypes.map((sf) => sf.id));
+    const keptConstraints = modelConstraints.filter((constraint) => {
+      const subtypeFactIds = subtypeFactIdsOf(
+        constraintRecord(constraint as unknown as ConstraintFileValue),
+      );
+      const here = subtypeFactIds.every((id) => homedSubtypeIds.has(id))
+        && constraintIsLocal(constraint, ctx, roleToFt, ftHome);
+      const touches = subtypeFactIds.some((id) => homedSubtypeIds.has(id))
+        || constraintRoleIds(constraint).some((r) => ftHome.get(roleToFt.get(r) ?? "") === ctx);
+      if (!here && touches) {
+        warnings.push(
+          `Dropped a "${constraint.type}" constraint from domain "${ctx}": it references `
+            + "roles or subtype facts owned by another domain.",
+        );
+      }
+      return here && (constraintRoleIds(constraint).length > 0 || subtypeFactIds.length > 0);
+    });
+
+    // An entity's identifier must be a constraint this domain holds.
+    const heldIds = new Set([
+      ...cleanedFts.flatMap((ft) => (ft.constraints ?? []).map((c) => c["id"])),
+      ...keptConstraints.map((c) => c["id"]),
+    ]);
+    const identifiedOts = homedOts.map((ot) => {
+      const ref = ot["preferred_identifier"];
+      if (ref === undefined || heldIds.has(ref)) return ot;
+      warnings.push(
+        `Dropped object type "${ot.name}"'s preferred identifier in domain "${ctx}": `
+          + `its constraint "${String(ref)}" is not in that domain.`,
+      );
+      const { preferred_identifier: _dropped, ...rest } = ot;
+      return rest as RawObjectType;
+    });
+
     if (homedOts.length === 0 && cleanedFts.length === 0) {
       warnings.push(`Domain "${ctx}" has no object types or fact types.`);
     }
 
-    const domainModel: RawModelDoc["model"] & { domain_context: string; } = {
+    const domainModel: RawModelDoc["model"] & {
+      domain_context: string;
+      imports?: Record<string, string>;
+    } = {
       name: ctx,
       domain_context: ctx,
+      ...(Object.keys(imports).length > 0 ? { imports } : {}),
     };
-    const allOts = [...homedOts, ...shadows];
+    // Every reference to a shadowed type names the shadow: a role's player,
+    // a subtype fact's ends, an objectification's object type, and a join
+    // path's root.
+    const local = (id: string) => shadowIdOf.get(id) ?? id;
+    const withShadowRoots = (c: RawConstraint): RawConstraint =>
+      shadowIdOf.size === 0 ? c : rootsThrough(c, local) as RawConstraint;
+    const allOts = [...identifiedOts, ...shadows];
     if (allOts.length > 0) domainModel.object_types = allOts;
-    if (cleanedFts.length > 0) domainModel.fact_types = cleanedFts;
-    if (homedSubtypes.length > 0) domainModel.subtype_facts = homedSubtypes;
-    if (homedObjd.length > 0) domainModel.objectified_fact_types = homedObjd;
+    if (cleanedFts.length > 0) {
+      domainModel.fact_types = cleanedFts.map((ft) => ({
+        ...ft,
+        roles: ft.roles.map((r) => ({ ...r, player: local(r.player) })),
+        ...(ft.constraints ? { constraints: ft.constraints.map(withShadowRoots) } : {}),
+      }));
+    }
+    if (keptConstraints.length > 0) domainModel.constraints = keptConstraints.map(withShadowRoots);
+    if (homedSubtypes.length > 0) {
+      domainModel.subtype_facts = homedSubtypes.map((sf) => ({
+        ...sf,
+        subtype: local(sf.subtype),
+        supertype: local(sf.supertype),
+      }));
+    }
+    if (homedObjd.length > 0) {
+      domainModel.objectified_fact_types = homedObjd.map((o) => ({
+        ...o,
+        object_type: local(o.object_type),
+      }));
+    }
     if (homedPops.length > 0) domainModel.populations = homedPops;
     // Glossary definitions are not element-scoped; keep them with the
     // first domain so they are not lost.
@@ -420,7 +517,23 @@ export function splitModel(modelYaml: string, config: SplitConfig): SplitResult 
   // -- Build mapping files ------------------------------------------------
   const mappingSerializer = new MappingSerializer();
   const mappings: SplitMappingFile[] = [];
-  const project = new OrmProject({ name: config.projectName.trim() });
+  // The domains get the project's namespace, not the source's: a domain
+  // that kept the source's `namespace` would be overridden by any
+  // `iri_base` (iri-identity WS4). A `/`-ending source namespace is a
+  // valid base, so it becomes the project's and each domain's namespace is
+  // that plus its context; a `#`-ending one cannot be a base.
+  const sourceNamespace = source.namespace;
+  const iriBase = sourceNamespace !== undefined && IRI_BASE_PATTERN.test(sourceNamespace)
+    ? sourceNamespace
+    : undefined;
+  if (sourceNamespace !== undefined && iriBase === undefined) {
+    warnings.push(
+      `The source's namespace "${sourceNamespace}" ends in "#", so it cannot be the `
+        + `project's iri_base and is not carried into the split; declare an iri_base `
+        + `ending in "/" in the manifest.`,
+    );
+  }
+  const project = new OrmProject({ name: config.projectName.trim(), iriBase });
   for (const ctx of contexts) {
     project.addDomain({ path: `domains/${ctx}.orm.yaml`, context: ctx });
   }
@@ -617,8 +730,9 @@ function pickWinner(votes: ReadonlyMap<string, number>): string | undefined {
  * compile here until it is classified rather than falling through as
  * "no roles."
  */
+
 function constraintRoleIds(constraint: RawConstraint): string[] {
-  return roleIdsOf(deserializeConstraint(constraint as unknown as OrmYamlConstraint));
+  return roleIdsOf(constraintRecord(constraint as unknown as ConstraintFileValue));
 }
 
 /**
@@ -636,4 +750,18 @@ function constraintIsLocal(
     if (!ftId || ftHome.get(ftId) !== ctx) return false;
   }
   return true;
+}
+
+/**
+ * A constraint with each join path's `root` read through `local`, at any
+ * depth: the root is the one object type reference a constraint holds.
+ */
+function rootsThrough(value: unknown, local: (id: string) => string): unknown {
+  if (Array.isArray(value)) return value.map((v) => rootsThrough(v, local));
+  if (value === null || typeof value !== "object") return value;
+  return Object.fromEntries(
+    Object.entries(value).map((
+      [k, v],
+    ) => [k, k === "root" && typeof v === "string" ? local(v) : rootsThrough(v, local)]),
+  );
 }

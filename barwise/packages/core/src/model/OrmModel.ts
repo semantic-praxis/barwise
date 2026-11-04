@@ -1,11 +1,59 @@
+import { groupRepeats } from "../util/groupRepeats.js";
+import {
+  type Constraint,
+  type ExternalConstraint,
+  type InternalConstraint,
+  isOverSubtypes,
+  roleIdsOf,
+  subtypeFactIdsOf,
+  withoutSubtypeFacts,
+} from "./Constraint.js";
 import type { Definition } from "./Definition.js";
 import { type DiagramLayout, withoutDiagramReferences } from "./DiagramLayout.js";
-import { FactType, type FactTypeConfig } from "./FactType.js";
-import { ObjectifiedFactType, type ObjectifiedFactTypeConfig } from "./ObjectifiedFactType.js";
+import { checkInternalConstraint, FactType, type FactTypeConfig } from "./FactType.js";
+import { IdIndex, type IdKeyedKind, IdKeyedStore, type IdKind } from "./idIndex.js";
+import { nameIdBase, populationIdBase, roleIdBase, suffixed } from "./idRules.js";
+import { checkedIri, NAMESPACE_PATTERN } from "./iri.js";
+import { mint, type Mintable } from "./mint.js";
+import { LOCAL_NAME_PATTERN, localName } from "./name.js";
+import {
+  objectificationRef,
+  ObjectifiedFactType,
+  type ObjectifiedFactTypeConfig,
+} from "./ObjectifiedFactType.js";
 import { createObjectType, type ObjectType, type ObjectTypeConfig } from "./ObjectType.js";
 import { Population, type PopulationConfig } from "./Population.js";
+import { expandReading } from "./ReadingOrder.js";
 import type { Role } from "./Role.js";
-import { SubtypeFact, type SubtypeFactConfig } from "./SubtypeFact.js";
+import {
+  SubtypeFact,
+  type SubtypeFactConfig,
+  subtypeFactRef,
+  subtypePairKey,
+} from "./SubtypeFact.js";
+
+import type { ConstraintAdmission } from "./constraintAdmission.js";
+import type { ConstraintInView, ConstraintModel } from "./constraintModel.js";
+
+/** A map read backwards, leaving out a value two keys share. */
+function invertUnique(map: ReadonlyMap<string, string>): ReadonlyMap<string, string> {
+  const out = new Map<string, string>();
+  const shared = new Set<string>();
+  for (const [key, value] of map) {
+    if (out.has(value)) shared.add(value);
+    out.set(value, key);
+  }
+  for (const value of shared) out.delete(value);
+  return out;
+}
+
+/** The id an element the model names takes, and the key it was minted from. */
+interface Named {
+  readonly id: string | undefined;
+  readonly key?: string;
+}
+
+export type { ConstraintInView } from "./constraintModel.js";
 
 /**
  * Configuration for creating a new OrmModel.
@@ -16,6 +64,83 @@ export interface OrmModelConfig {
   readonly domainContext?: string;
   /** Free-text note: informal model-level commentary. */
   readonly note?: string;
+  /**
+   * The absolute IRI this model's element IRIs start with, for a model
+   * outside a project that declares `iri_base` (`namespaceOf`,
+   * iri-identity WS4). Ends in `/` or `#`.
+   */
+  readonly namespace?: string;
+  /**
+   * Each alias this model's references may use, bound to the context it
+   * names or to an absolute namespace IRI (format 4.0's `imports`). A
+   * shadow's id is `<alias>:<local name>`, and its alias must be here.
+   */
+  readonly imports?: Readonly<Record<string, string>>;
+  /**
+   * Refuse a stated id any element holds, of any kind: format 4.0's rule,
+   * where every id is a local name and names one element (iri-identity
+   * WS6). Off for a 3.x model, whose file may give an object type and a
+   * fact type one id.
+   */
+  readonly idsAcrossKinds?: boolean;
+}
+
+const quoted = (text: string): string => JSON.stringify(text);
+
+/**
+ * The ids within a fact type: its roles' and its constraints' (its own is
+ * the store's to hold). One list for the add and the removal, so the
+ * index takes and gives back the same ids.
+ */
+export function idsWithin(ft: FactType): [string | undefined, IdKind][] {
+  return [
+    ...ft.roles.map((r): [string, IdKind] => [r.id, "role"]),
+    ...ft.internalConstraints.map((c): [string | undefined, IdKind] => [c.id, "constraint"]),
+  ];
+}
+
+/**
+ * Whether a fact type holds any of these roles: the one touch test behind
+ * `constraintsTouchingAny`, `constraintsTouchingNone` and
+ * `factTypesHolding` (so `factTypesOf` and `factTypesNaming`), so where a
+ * constraint is listed and which fact types name it cannot disagree.
+ */
+function holdsAny(ft: FactType, roleIds: readonly string[]): boolean {
+  return roleIds.some((rid) => ft.hasRole(rid));
+}
+
+export type { IdKeyedKind, IdKind } from "./idIndex.js";
+
+/**
+ * An `add*` was given an id its store already holds.
+ *
+ * Each store is a `Map` keyed by id, and `set` overwrites without a word,
+ * so before this check a second element under a held id silently replaced
+ * the first: an objectification evicted another in a merge, and a file
+ * stating two fact types under one id loaded as one (model invariants,
+ * WS3). The model cannot represent two elements under one id, so it
+ * refuses rather than reports, whatever `skipPlayerValidation` says: that
+ * option skips checks on what an element references, and this is a check
+ * on the store itself. Both readers turn it into a `DeserializationError`.
+ */
+export class DuplicateIdError extends Error {
+  constructor(
+    readonly id: string,
+    readonly kind: IdKind,
+    held: string,
+    adding: string,
+  ) {
+    super(`Id ${JSON.stringify(id)} is held by ${held}, so ${adding} cannot be added.`);
+    this.name = "DuplicateIdError";
+  }
+}
+
+/** How `OrmModel.addFactType` adds a fact type; see its parameters. */
+export interface AddFactTypeOptions {
+  readonly skipPlayerValidation?: boolean;
+  readonly suffixRepeatedRoleNames?: boolean;
+  readonly constraintsOver?: (roleIds: readonly string[]) => readonly InternalConstraint[];
+  readonly idFromFirstReading?: boolean;
 }
 
 /**
@@ -25,18 +150,80 @@ export interface OrmModelConfig {
  * The OrmModel enforces referential integrity: roles in fact types must
  * reference object types that exist in the model.
  */
-export class OrmModel {
+export class OrmModel implements ConstraintModel {
   private _name: string;
   private _domainContext: string | undefined;
   private _note: string | undefined;
+  private _namespace: string | undefined;
 
-  private readonly _objectTypes: Map<string, ObjectType> = new Map();
-  private readonly _factTypes: Map<string, FactType> = new Map();
-  private readonly _subtypeFacts: Map<string, SubtypeFact> = new Map();
-  private readonly _objectifiedFactTypes: Map<string, ObjectifiedFactType> = new Map();
-  private readonly _populations: Map<string, Population> = new Map();
+  /**
+   * The key each minted id was minted from (`mintedFromOf`), dropped when
+   * the last element holding the id goes or a second one takes it.
+   */
+  private readonly _mintedFrom = new Map<string, string>();
+  /** Every id the stores hold, across kinds (`idIndex.ts`); each store keeps it. */
+  private readonly _ids = new IdIndex((id) => this._mintedFrom.delete(id));
+  private readonly _objectTypes = new IdKeyedStore<ObjectType>("object type", this._ids);
+  private readonly _factTypes = new IdKeyedStore<FactType>("fact type", this._ids);
+  private readonly _subtypeFacts = new IdKeyedStore<SubtypeFact>("subtype fact", this._ids);
+  private readonly _objectifiedFactTypes = new IdKeyedStore<ObjectifiedFactType>(
+    "objectification",
+    this._ids,
+  );
+  private readonly _populations = new IdKeyedStore<Population>("population", this._ids);
+  /**
+   * How a fact type in this model hands it a later constraint. Held here,
+   * not exposed, so only a fact type this model added reaches the index.
+   */
+  private readonly _admission: ConstraintAdmission = {
+    admitConstraint: <C extends InternalConstraint>(constraint: C, hostId: string): C => {
+      // Only a fact type this model stores holds this admission; a host the
+      // store does not map would be named as a constraint across fact types.
+      const host = this._factTypes.get(hostId);
+      if (host === undefined) {
+        throw new Error(
+          `Model "${this._name}" holds no fact type "${hostId}" to admit a constraint to.`,
+        );
+      }
+      const named = constraint.id === undefined
+        ? this.constraintIdFor({
+          kind: "constraint",
+          inView: [constraint, host] as ConstraintInView,
+        })
+        : undefined;
+      const stored = named?.id === undefined ? constraint : { ...constraint, id: named.id };
+      if (!this._addingFactType) {
+        this.refuseAcrossKinds(constraint.id, "constraint", `a constraint of ${quoted(host.name)}`);
+      }
+      this._ids.hold(stored.id, "constraint");
+      this.keepMinted(named);
+      return stored;
+    },
+  };
+  /**
+   * The ids a load states, held back from minting while it runs
+   * (`withReserved`), so a stated id wins wherever it sits in the file.
+   */
+  private _reserved: ReadonlySet<string> = new Set();
+  private readonly _idsAcrossKinds: boolean;
+  /**
+   * True while `addFactType` adds a fact type's own constraints, whose
+   * stated ids it checked across kinds before holding them.
+   */
+  private _addingFactType = false;
+  /** See `imports`. */
+  private readonly _imports = new Map<string, string>();
+  /** See `unstoredIds`. */
+  private _unstored: ReadonlySet<string> = new Set();
+  /** See `priorIds`. */
+  private _priorIds: ReadonlyMap<string, string> | undefined;
+  /** `priorIds` backwards, built on first use by `idFromPrior`. */
+  private _fromPrior: ReadonlyMap<string, string> | undefined;
   private readonly _definitions: Definition[] = [];
   private readonly _diagramLayouts: DiagramLayout[] = [];
+  private readonly _constraints: ExternalConstraint[] = [];
+  /** Each entity's preferred identifier, by constraint id (orm-format-3 WS4b). */
+  private readonly _preferredIdentifiers: Map<string, string> = new Map();
 
   constructor(config: OrmModelConfig) {
     if (!config.name || config.name.trim().length === 0) {
@@ -45,10 +232,96 @@ export class OrmModel {
     this._name = config.name.trim();
     this._domainContext = config.domainContext;
     this._note = config.note;
+    this._namespace = checkedIri(config.namespace, NAMESPACE_PATTERN, "namespace");
+    this._idsAcrossKinds = config.idsAcrossKinds ?? false;
+    for (const [alias, target] of Object.entries(config.imports ?? {})) {
+      this.setImport(alias, target);
+    }
   }
 
   get name(): string {
     return this._name;
+  }
+
+  /**
+   * For a model replayed from a 3.x file, each element's id in that file,
+   * by its id here (iri-identity WS6, the 3.x replay). Held in memory and
+   * never written, so diff can pair two replayed revisions of one file by
+   * their old ids. Undefined for any other model.
+   */
+  get priorIds(): ReadonlyMap<string, string> | undefined {
+    return this._priorIds;
+  }
+
+  /**
+   * The content key the element holding `id` was named from: the one its
+   * name was minted from here, or the one the 4.0 file it was read from
+   * states beside it (`minted_from`, iri-identity decision 14). Undefined
+   * for an id a person or a tool chose, which is never stale. It goes with
+   * the id when the last element holding it does, and when a second element
+   * states the id, as a model that admits a repeat allows, so it never
+   * passes to the element that stated it.
+   */
+  mintedFromOf(id: string): string | undefined {
+    return this._mintedFrom.get(id);
+  }
+
+  /** Record the key a held id was minted from, as a 4.0 file states it. */
+  recordMintedFrom(id: string, key: string): void {
+    if (!this._ids.holds(id)) {
+      throw new Error(`No element holds "${id}" to record what it was minted from.`);
+    }
+    this._mintedFrom.set(id, key);
+  }
+
+  /** Keep the key an element was just named from, once it holds its id. */
+  private keepMinted(named: Named | undefined): void {
+    if (named?.id !== undefined && named.key !== undefined) {
+      this._mintedFrom.set(named.id, named.key);
+    }
+  }
+
+  /**
+   * The ids the 4.0 file this model was read from does not state, which
+   * the load minted and every load of that file will mint again (decision
+   * 17). Until the file states one, nothing outside the model can refer to
+   * it by id, and decision 14's stale check cannot fire on it, because
+   * there is no stored key to compare. An id goes from the list when its
+   * element does. Empty for any model not read from a 4.0 file.
+   */
+  get unstoredIds(): readonly string[] {
+    return [...this._unstored].filter((id) => this._mintedFrom.has(id));
+  }
+
+  /**
+   * Set by the 4.0 reader once every element is added and before the keys
+   * the file states are recorded: every id with a key then was minted by
+   * the load.
+   */
+  recordUnstoredIds(): void {
+    this._unstored = new Set(this._mintedFrom.keys());
+  }
+
+  /** Set once, by the replay that built this model. */
+  recordPriorIds(ids: ReadonlyMap<string, string>): void {
+    if (this._priorIds !== undefined) throw new Error("A model's prior ids are recorded once.");
+    this._priorIds = ids;
+  }
+
+  /**
+   * The id an element holds now, given the id the 3.x file this model was
+   * replayed from stated for it (`priorIds`, read backwards). For a
+   * reference another 3.x-era file makes into this one -- a tutorial step
+   * naming a constraint in its model snapshot -- until those files are
+   * migrated too (iri-identity WS7). Undefined for a model that was not
+   * replayed, for an id the file did not state, and for one it stated for
+   * two elements of different kinds, which 3.x allowed and no lookup by id
+   * alone can tell apart.
+   */
+  idFromPrior(prior: string): string | undefined {
+    if (this._priorIds === undefined) return undefined;
+    this._fromPrior ??= invertUnique(this._priorIds);
+    return this._fromPrior.get(prior);
   }
 
   set name(value: string) {
@@ -74,6 +347,35 @@ export class OrmModel {
     this._domainContext = value;
   }
 
+  get namespace(): string | undefined {
+    return this._namespace;
+  }
+
+  set namespace(value: string | undefined) {
+    this._namespace = checkedIri(value, NAMESPACE_PATTERN, "namespace");
+  }
+
+  /**
+   * Each alias this model imports, bound to a context name or an absolute
+   * namespace IRI (`OrmModelConfig.imports`), in the order they were given.
+   */
+  get imports(): ReadonlyMap<string, string> {
+    return this._imports;
+  }
+
+  /** Bind an alias, replacing what it was bound to. */
+  setImport(alias: string, target: string): void {
+    if (!LOCAL_NAME_PATTERN.test(alias)) {
+      throw new Error(`The alias "${alias}" is not a local name.`);
+    }
+    // Empty, as the 4.0 decoder refuses it (`nonEmpty`), so a file it
+    // accepts always builds.
+    if (target.length === 0) {
+      throw new Error(`The alias "${alias}" is bound to nothing.`);
+    }
+    this._imports.set(alias, target);
+  }
+
   // ---- Object Types ----
 
   /** All object types in the model. */
@@ -92,18 +394,125 @@ export class OrmModel {
   }
 
   /**
+   * Throw `DuplicateIdError` when the store already holds the id a config
+   * states. A config with no id gets a fresh one, which nothing holds.
+   * `describe` reads both the held element and the config, so the message
+   * names the two the same way.
+   */
+  private refuseHeldId<E, C extends { readonly id?: string; }>(
+    store: { get(id: string): E | undefined; },
+    config: C,
+    kind: IdKeyedKind,
+    describe: (element: E | C) => string,
+  ): void {
+    // Within the kind only: across kinds is format 4.0's rule, where
+    // every id is a local name, and reads the id index (iri-identity 6b).
+    const held = config.id === undefined ? undefined : store.get(config.id);
+    if (held !== undefined) {
+      throw new DuplicateIdError(config.id!, kind, describe(held), describe(config));
+    }
+    this.refuseAcrossKinds(config.id, kind, describe(config));
+  }
+
+  /**
+   * In a model that refuses across kinds, throw `DuplicateIdError` when any
+   * element of any kind holds a stated id.
+   */
+  private refuseAcrossKinds(id: string | undefined, kind: IdKind, adding: string): void {
+    if (!this._idsAcrossKinds || id === undefined || !this._ids.holds(id)) return;
+    const holders = this._ids.kindsHolding(id)
+      .map((k) => `${/^[aeiou]/.test(k) ? "an" : "a"} ${k}`)
+      .join(" and ");
+    throw new DuplicateIdError(id, kind, holders, adding);
+  }
+
+  /**
+   * Run a load with the ids its file states reserved: a name minted while
+   * it runs, for an element the file gives no id, skips them as it skips a
+   * held id, so the element that states one takes it whether it comes
+   * before or after (iri-identity WS6, "Mint at the add, with the file's
+   * stated ids reserved for the load"). A stated id is still refused at
+   * its own add if something already holds it. Reservations nest, and end
+   * with the load, thrown or not.
+   */
+  withReserved<T>(ids: Iterable<string>, load: () => T): T {
+    const before = this._reserved;
+    this._reserved = new Set([...before, ...ids]);
+    try {
+      return load();
+    } finally {
+      this._reserved = before;
+    }
+  }
+
+  /**
+   * `base` when nothing in the model holds it, else the first of
+   * `base_2`, `base_3`, ... that nothing holds: the suffix rule, across
+   * every kind, because in format 4.0 a local name is unique in its model
+   * (iri-identity WS6, 6b). The add order is the caller's, so the names a
+   * load gives are a function of its input.
+   */
+  private mintedId(base: string, taken: ReadonlySet<string> = new Set()): string {
+    return suffixed(
+      base,
+      (id) => !this._ids.holds(id) && !this._reserved.has(id) && !taken.has(id),
+    );
+  }
+
+  /**
+   * The id a subtype fact or objectification its sentence names takes: the
+   * minted name, under the suffix rule (`mint.ts`). One whose sentence
+   * would not be of it -- a reference that dangles -- is left unnamed
+   * (decisions 17 and 19), and validation reports the dangling reference.
+   */
+  private nameFor(element: Mintable): Named | undefined {
+    const minted = mint(element, this);
+    return minted ? { id: this.mintedId(minted.name), key: minted.key } : undefined;
+  }
+
+  /**
+   * The id a constraint takes: its minted name. One whose sentence cannot
+   * be built (a malformed constraint, a ring over two players) is left
+   * unnamed, as a subtype fact or objectification is (decision 19), and
+   * validation reports what is wrong with it; format 4.0 writes it without
+   * an id.
+   */
+  private constraintIdFor(element: Mintable): Named {
+    return this.nameFor(element) ?? { id: undefined };
+  }
+
+  /** An object type by name where the model holds it, else by its id. */
+  private objectTypeLabel(id: string): string {
+    return quoted(this._objectTypes.get(id)?.name ?? id);
+  }
+
+  /** A fact type by name where the model holds it, else by its id. */
+  private factTypeLabel(id: string): string {
+    return quoted(this._factTypes.get(id)?.name ?? id);
+  }
+
+  /**
    * Add an object type to the model.
+   * @throws DuplicateIdError if an object type with the same id already exists.
    * @throws If an object type with the same name already exists.
    */
   addObjectType(config: ObjectTypeConfig): ObjectType {
+    this.refuseHeldId(
+      this._objectTypes,
+      config,
+      "object type",
+      (e) => `object type ${quoted(e.name)}`,
+    );
     const existing = this.getObjectTypeByName(config.name);
     if (existing) {
       throw new Error(
         `Object type "${config.name}" already exists in model "${this._name}".`,
       );
     }
-    const ot = createObjectType(config);
-    this._objectTypes.set(ot.id, ot);
+    const ot = createObjectType(
+      config.id === undefined ? { ...config, id: this.mintedId(nameIdBase(config.name)) } : config,
+    );
+    this._objectTypes.set(ot);
     return ot;
   }
 
@@ -148,7 +557,51 @@ export class OrmModel {
     }
 
     this._objectTypes.delete(id);
+    this._preferredIdentifiers.delete(id);
     this.pruneDiagramReferences(id);
+  }
+
+  // ---- Preferred identifiers ----
+
+  /**
+   * The id of the uniqueness constraint an entity names as its preferred
+   * identifier, if it names one (orm-format-3, Open decision 3). Stored,
+   * not inferred: `preferredIdentifiers` reads it, checks the constraint
+   * identifies the entity, and every reader takes its answer from there.
+   */
+  preferredIdentifierOf(entityId: string): string | undefined {
+    return this._preferredIdentifiers.get(entityId);
+  }
+
+  /**
+   * Name an entity's preferred identifier, or clear it with `undefined`.
+   * The constraint is not looked up: one that does not exist, or does not
+   * identify the entity, is validation's to report, as a dangling role
+   * is, so a merge or a lenient load can carry one through.
+   * @throws If the object type does not exist or is not an entity type.
+   */
+  setPreferredIdentifier(entityId: string, constraintId: string | undefined): void {
+    const ot = this._objectTypes.get(entityId);
+    if (!ot) throw new Error(`Object type with id "${entityId}" not found.`);
+    if (ot.kind !== "entity") {
+      throw new Error(
+        `"${ot.name}" is a ${ot.kind} type; only an entity type has a preferred identifier.`,
+      );
+    }
+    if (constraintId === undefined) this._preferredIdentifiers.delete(entityId);
+    else this._preferredIdentifiers.set(entityId, constraintId);
+  }
+
+  /** Every stored preferred identifier, as [entity id, constraint id], in insertion order. */
+  get preferredIdentifierRefs(): readonly (readonly [string, string])[] {
+    return [...this._preferredIdentifiers];
+  }
+
+  /** Clear every reference to a constraint that is gone. */
+  private dropPreferredIdentifiersTo(constraintIds: ReadonlySet<string>): void {
+    for (const [entityId, constraintId] of this._preferredIdentifiers) {
+      if (constraintIds.has(constraintId)) this._preferredIdentifiers.delete(entityId);
+    }
   }
 
   // ---- Fact Types ----
@@ -161,6 +614,214 @@ export class OrmModel {
   /** Look up a fact type by id. */
   getFactType(id: string): FactType | undefined {
     return this._factTypes.get(id);
+  }
+
+  // ---- Constraints ----
+
+  /**
+   * The constraints that live in the model: the external kinds, whose roles
+   * may span fact types (orm-format-3, placement by kind), in the order they
+   * were added. The 2.0 loader adds a file's after every fact type, in file
+   * order: by the fact type nesting each, then by position.
+   */
+  get constraints(): readonly ExternalConstraint[] {
+    return this._constraints;
+  }
+
+  /**
+   * Add a constraint across fact types to the model, naming it by its
+   * minted sentence when it has no id, as the model does for a fact type's
+   * own (iri-identity, decision 17). Its roles are not checked: a lenient
+   * load or a fragment can name a role the model does not hold, and
+   * validation reports it.
+   */
+  addConstraint(constraint: ExternalConstraint): ExternalConstraint {
+    this.refuseAcrossKinds(constraint.id, "constraint", "a constraint across fact types");
+    const named = constraint.id === undefined
+      ? this.constraintIdFor({ kind: "constraint", inView: [constraint, undefined] })
+      : undefined;
+    const stored = named?.id === undefined ? constraint : { ...constraint, id: named.id };
+    this._constraints.push(stored);
+    this._ids.hold(stored.id, "constraint");
+    this.keepMinted(named);
+    return stored;
+  }
+
+  /**
+   * Remove a constraint across fact types by identity, as merge and the
+   * fact type removal below need.
+   */
+  removeConstraint(constraint: ExternalConstraint): void {
+    const i = this._constraints.indexOf(constraint);
+    if (i >= 0) this.dropConstraintAt(i);
+    if (constraint.id !== undefined) this.dropPreferredIdentifiersTo(new Set([constraint.id]));
+  }
+
+  /** Drop the constraint across fact types at `i`, and its id from the index. */
+  private dropConstraintAt(i: number): void {
+    const [dropped] = this._constraints.splice(i, 1);
+    this._ids.release(dropped!.id, "constraint");
+  }
+
+  /**
+   * The kinds whose elements hold `id`, sorted; empty when nothing does.
+   * One id across kinds is allowed in format 3.0 and is a collision in
+   * 4.0, where every id is a local name.
+   */
+  idKindsHolding(id: string): readonly IdKind[] {
+    return this._ids.kindsHolding(id);
+  }
+
+  /**
+   * Every constraint that applies to one fact type: its internal
+   * constraints, then each model-level constraint naming one of its roles.
+   * A constraint across fact types therefore appears under every fact type
+   * it touches; a whole-model reader wants each fact type's
+   * `internalConstraints` plus `constraints` once instead.
+   *
+   * Verbalization and counterexamples ask here by id, and query and
+   * describe ask `constraintsTouchingAny`, which this is the one fact type
+   * case of, so their views of one fact type cannot disagree. The answer is
+   * about this model's fact type: a fact type it does not have touches
+   * nothing here.
+   */
+  constraintsTouching(factTypeId: string): readonly Constraint[] {
+    return this.constraintsTouchingAny([factTypeId]).map(([c]) => c);
+  }
+
+  /**
+   * Each constraint id more than one constraint holds, with its holders in
+   * `everyConstraint` order. A constraint id is model-wide -- another
+   * element, another file, a diff or a merge names a constraint by it -- so
+   * `structural/duplicate-constraint-id` reports these. The 3.0 loader
+   * asks the same `groupRepeats` of the constraints the file states,
+   * before building, since the id-keyed stores can drop a holder.
+   */
+  constraintsSharingAnId(): ReadonlyMap<string, readonly ConstraintInView[]> {
+    return groupRepeats(this.everyConstraint(), ([c]) => c.id);
+  }
+
+  /**
+   * Every constraint in the model, each once: each fact type's own
+   * constraints in fact type order, then the constraints across fact types
+   * (`constraints`). The whole-model view query and describe both list; a
+   * view of some fact types is `constraintsTouchingAny`.
+   */
+  everyConstraint(): readonly ConstraintInView[] {
+    return [
+      ...this.factTypes.flatMap((ft) =>
+        ft.internalConstraints.map((c): ConstraintInView => [c, ft])
+      ),
+      ...this.constraints.map((c): ConstraintInView => [c, undefined]),
+    ];
+  }
+
+  /**
+   * Every constraint touching any of these fact types, each once, in the
+   * order given: each fact type's own constraints, then each constraint
+   * across fact types touching it that an earlier one did not. The view of
+   * an entity or of several fact types, so a constraint spanning two of
+   * them is said once; `constraintsTouching` is the one fact type case.
+   * Ids this model does not have touch nothing, and an id given twice adds
+   * nothing the second time.
+   */
+  constraintsTouchingAny(factTypeIds: readonly string[]): readonly ConstraintInView[] {
+    const across = this.constraints;
+    const seen = new Set<Constraint>();
+    const touching: ConstraintInView[] = [];
+    for (const id of factTypeIds) {
+      const ft = this._factTypes.get(id);
+      if (!ft) continue;
+      for (const c of ft.internalConstraints) {
+        if (seen.has(c)) continue;
+        seen.add(c);
+        touching.push([c, ft]);
+      }
+      for (const c of across) {
+        if (seen.has(c) || !holdsAny(ft, roleIdsOf(c))) continue;
+        seen.add(c);
+        touching.push([c, undefined]);
+      }
+    }
+    return touching;
+  }
+
+  /**
+   * The constraints across fact types that touch no fact type: none of
+   * their roles resolve. No `constraintsTouchingAny` view lists them, so a
+   * reader that shows constraints by fact type reads these too, or a
+   * constraint left dangling by a renamed or deleted role disappears.
+   * Both read the one `holdsAny` test, so a constraint is in exactly one
+   * of this and some fact type's view. A constraint over subtypes names no
+   * role; it is here only when none of its subtype facts resolve either,
+   * since otherwise it belongs with the subtype facts it names
+   * (orm-format-3 WS4b).
+   */
+  constraintsTouchingNone(): readonly ExternalConstraint[] {
+    const factTypes = this.factTypes;
+    return this.constraints.filter((c) => {
+      if (isOverSubtypes(c)) {
+        return !subtypeFactIdsOf(c).some((id) => this._subtypeFacts.has(id));
+      }
+      const roleIds = roleIdsOf(c);
+      return !factTypes.some((ft) => holdsAny(ft, roleIds));
+    });
+  }
+
+  /**
+   * The fact types holding a constraint's roles, in model order: every
+   * fact type a constraint across fact types spans. For an internal
+   * constraint this is its own fact type only while its role ids resolve;
+   * a stale one names nothing, which is why a constraint in a view is
+   * named by `factTypesNaming` instead. Validation messages read this
+   * directly, since they report what the roles say.
+   */
+  factTypesOf(constraint: Constraint): readonly FactType[] {
+    return this.factTypesHolding(roleIdsOf(constraint));
+  }
+
+  /**
+   * The fact types a constraint in a view is named by (orm-format-3, Open
+   * decision 9): an internal constraint by the fact type it lives in, as
+   * `constraintsTouching` lists it, and one across fact types by the fact
+   * types it spans. The one answer verbalization rows and counterexamples
+   * name a constraint by, so the two cannot disagree for one constraint.
+   */
+  factTypesNaming([constraint, factType]: ConstraintInView): readonly FactType[] {
+    return factType ? [factType] : this.factTypesOf(constraint);
+  }
+
+  /**
+   * The fact types holding any of these roles, in model order. A dangling
+   * role id holds no fact type and adds none. `factTypesOf` is the answer
+   * for a whole constraint; this is the one for some of its roles, as the
+   * verbalizer's role labels need.
+   */
+  factTypesHolding(roleIds: readonly string[]): readonly FactType[] {
+    return this.factTypes.filter((ft) => holdsAny(ft, roleIds));
+  }
+
+  /** Look up a constraint of either placement by id. */
+  getConstraint(id: string): Constraint | undefined {
+    return this.getConstraintInView(id)?.[0];
+  }
+
+  /**
+   * Look up a constraint by id, with the fact type it lives in when it is
+   * internal and none when it spans fact types: the pair a view names it
+   * by (`factTypesNaming`), never the fact type a 2.0 file nests it under.
+   */
+  getConstraintInView(id: string): ConstraintInView | undefined {
+    // A fact type's own constraints first, then the model's, stopping at
+    // the first match. With an id given twice (barwise-b2s) an internal
+    // constraint now wins over an external one, where file order used to
+    // decide; the two placements are stored apart since WS3c.
+    for (const ft of this._factTypes.values()) {
+      const c = ft.internalConstraints.find((c) => c.id === id);
+      if (c) return [c, ft];
+    }
+    const c = this._constraints.find((c) => c.id === id);
+    return c ? [c, undefined] : undefined;
   }
 
   /** Look up a fact type by name. */
@@ -188,13 +849,29 @@ export class OrmModel {
    * @param options.skipPlayerValidation - When true, skip the check that
    *   all role player IDs exist in the model.  Used when deserializing
    *   merge fragments that reference types from a base model.
+   * @param options.suffixRepeatedRoleNames - When true, roles given one
+   *   name and no ids take the suffix rule (`<ft>.is_in`, `<ft>.is_in_2`)
+   *   instead of being refused: a migration or an import translating a
+   *   source that names its roles alike (iri-identity, decision 5).
+   * @param options.constraintsOver - Constraints over the roles' ids, given
+   *   them once the model has named the roles: for a caller whose roles have
+   *   no ids yet (an importer). Added after the config's constraints, and
+   *   inside the same rollback, so a refused one leaves the model as it was.
+   * @param options.idFromFirstReading - When true, a fact type given no id
+   *   mints it from its first reading, rendered with its players' names,
+   *   instead of from its name: decision 20, for an objectified fact type
+   *   whose name's local name is its objectifying type's id, so the two do
+   *   not collide. Only the id; the name stays as written.
    * @throws If any role references a nonexistent object type (unless skipPlayerValidation).
+   * @throws If two roles without ids share a name (unless suffixRepeatedRoleNames).
+   * @throws DuplicateIdError if a fact type with the same id already exists.
    * @throws If a fact type with the same name already exists.
    */
   addFactType(
     config: FactTypeConfig,
-    options?: { skipPlayerValidation?: boolean; },
+    options?: AddFactTypeOptions,
   ): FactType {
+    this.refuseHeldId(this._factTypes, config, "fact type", (e) => `fact type ${quoted(e.name)}`);
     const existing = this.getFactTypeByName(config.name);
     if (existing) {
       throw new Error(
@@ -215,9 +892,118 @@ export class OrmModel {
       }
     }
 
-    const ft = new FactType(config);
-    this._factTypes.set(ft.id, ft);
+    // Refused before anything is stored, as the constructor refused them.
+    const constraints = (config.constraints ?? []).map((c) =>
+      checkInternalConstraint(c, config.name)
+    );
+    // Every id the config states wins over a name minted in the same add
+    // (decision 17): the fact type's and its roles' minted ids skip them,
+    // and the stated constraint ids are held while the unnamed constraints
+    // are named, then released for the admission's own hold.
+    const statedConstraints = constraints.flatMap((c) => (c.id === undefined ? [] : [c.id]));
+    if (this._idsAcrossKinds) {
+      // One config stating an id twice -- the fact type and a role, two
+      // constraints -- is refused too: nothing holds them yet to refuse by.
+      const own: [string | undefined, IdKind][] = [
+        [config.id, "fact type"],
+        ...config.roles.map((r): [string | undefined, IdKind] => [r.id, "role"]),
+        ...statedConstraints.map((c): [string | undefined, IdKind] => [c, "constraint"]),
+      ];
+      const [repeat] = groupRepeats(own, ([held]) => held);
+      if (repeat !== undefined) {
+        const [id, holders] = repeat;
+        throw new DuplicateIdError(
+          id,
+          holders[1]![1],
+          `its own ${holders[0]![1]}`,
+          `fact type ${quoted(config.name)}`,
+        );
+      }
+    }
+    for (const r of config.roles) {
+      this.refuseAcrossKinds(r.id, "role", `role ${quoted(r.name)} of ${quoted(config.name)}`);
+    }
+    for (const held of statedConstraints) {
+      this.refuseAcrossKinds(held, "constraint", `a constraint of ${quoted(config.name)}`);
+    }
+    const stated = new Set([
+      ...config.roles.flatMap((r) => (r.id === undefined ? [] : [r.id])),
+      ...statedConstraints,
+    ]);
+    const base = options?.idFromFirstReading && config.readings[0] !== undefined
+      ? expandReading(
+        config.readings[0],
+        config.roles.map((r) => this._objectTypes.get(r.playerId)?.name ?? r.playerId),
+      )
+      : config.name;
+    const id = config.id ?? this.mintedId(nameIdBase(base), stated);
+    const ft = new FactType({
+      ...config,
+      id,
+      roles: this.namedRoles(
+        config,
+        id,
+        new Set([...stated, id]),
+        options?.suffixRepeatedRoleNames ?? false,
+      ),
+      constraints: [],
+    });
+    this._factTypes.set(ft);
+    for (const [held, kind] of idsWithin(ft)) this._ids.hold(held, kind);
+    ft.joinModel(this._admission);
+    for (const held of statedConstraints) this._ids.hold(held, "constraint");
+    // After the fact type is in, so each is named from its sentence, which
+    // reads the fact type's players and readings.
+    // Anything that throws here -- a constraint whose type was asserted and
+    // is missing a field the sentence reads -- takes the fact type back out,
+    // so a refused add leaves the model as it was, as it did when the
+    // constructor refused it.
+    try {
+      // Checked across kinds above, before their ids were held.
+      this._addingFactType = true;
+      for (const c of constraints) ft.addConstraint(c);
+      this._addingFactType = false;
+      const over = options?.constraintsOver?.(ft.roles.map((r) => r.id)) ?? [];
+      for (const c of over) ft.addConstraint(c);
+    } catch (err) {
+      this.removeFactType(ft.id);
+      throw err;
+    } finally {
+      this._addingFactType = false;
+      for (const held of statedConstraints) this._ids.release(held, "constraint");
+    }
     return ft;
+  }
+
+  /**
+   * The roles with their ids: each its own, or `<fact type>.<role>`
+   * (iri-identity, the role id rule). Two roles given without ids under one
+   * name are refused, because neither id could say which role it is
+   * (decision 5, for hand authoring); a file that repeats a name states its
+   * role ids, and a migration or import asks for the suffix rule.
+   */
+  private namedRoles(
+    config: FactTypeConfig,
+    factTypeId: string,
+    stated: ReadonlySet<string>,
+    suffixRepeats: boolean,
+  ): FactTypeConfig["roles"] {
+    const unnamed = config.roles.filter((r) => r.id === undefined);
+    const [repeat] = suffixRepeats ? [] : groupRepeats(unnamed, (r) => localName(r.name));
+    if (repeat !== undefined) {
+      const [local, roles] = repeat;
+      throw new Error(
+        `Fact type "${config.name}" has ${roles.length} roles named "${roles[0]!.name}" `
+          + `(${local}): give each role a name of its own, or state the role ids.`,
+      );
+    }
+    const taken = new Set(stated);
+    return config.roles.map((r) => {
+      if (r.id !== undefined) return r;
+      const id = this.mintedId(roleIdBase(factTypeId, r.name), taken);
+      taken.add(id);
+      return { ...r, id };
+    });
   }
 
   /**
@@ -240,6 +1026,26 @@ export class OrmModel {
     }
 
     this._factTypes.delete(id);
+    for (const [held, kind] of idsWithin(ft)) this._ids.release(held, kind);
+    ft.leaveModel(this._admission);
+    // An entity identified by one of its constraints is no longer: the
+    // reference goes with the constraint, so a saved model does not name a
+    // constraint that does not exist.
+    this.dropPreferredIdentifiersTo(
+      new Set(ft.internalConstraints.flatMap((c) => (c.id === undefined ? [] : [c.id]))),
+    );
+    // A constraint across fact types every role of which was here goes with
+    // it. One that also spans another fact type stays, its roles here now
+    // dangling, so validation reports it rather than a rule over the fact
+    // types still present disappearing without a word; it used to go only
+    // when a 2.0 file nested it here.
+    // (A merge drops one it would leave dangling: there the removal is a
+    // reviewed decision, and a dangling role would fail the merged model.)
+    const within = (c: ExternalConstraint) => {
+      const roles = roleIdsOf(c);
+      return roles.length > 0 && roles.every((r) => ft.hasRole(r));
+    };
+    for (const c of this._constraints.filter(within)) this.removeConstraint(c);
     this.pruneDiagramReferences(id);
   }
 
@@ -263,61 +1069,106 @@ export class OrmModel {
    *   subtype/supertype IDs exist. Used for merge fragments.
    * @throws If subtype or supertype entity types don't exist (unless skipPlayerValidation).
    * @throws If either referenced object type is not an entity type (unless skipPlayerValidation).
+   * @throws DuplicateIdError if a subtype fact with the same id already exists.
    * @throws If a duplicate subtype relationship already exists.
    */
   addSubtypeFact(
     config: SubtypeFactConfig,
     options?: { skipPlayerValidation?: boolean; },
   ): SubtypeFact {
-    if (!options?.skipPlayerValidation) {
-      const subtype = this._objectTypes.get(config.subtypeId);
-      if (!subtype) {
-        throw new Error(
-          `Subtype entity type id "${config.subtypeId}" does not exist in the model.`,
-        );
-      }
-      if (subtype.kind !== "entity") {
-        throw new Error(
-          `Subtype "${subtype.name}" must be an entity type, not a ${subtype.kind} type.`,
-        );
-      }
+    this.refuseHeldId(
+      this._subtypeFacts,
+      config,
+      "subtype fact",
+      (e) =>
+        `subtype fact ${this.objectTypeLabel(e.subtypeId)} -> ${
+          this.objectTypeLabel(e.supertypeId)
+        }`,
+    );
+    const refusal = this.subtypeFactRefusal(config, options);
+    if (refusal !== undefined) throw new Error(refusal);
 
-      const supertype = this._objectTypes.get(config.supertypeId);
-      if (!supertype) {
-        throw new Error(
-          `Supertype entity type id "${config.supertypeId}" does not exist in the model.`,
-        );
-      }
-      if (supertype.kind !== "entity") {
-        throw new Error(
-          `Supertype "${supertype.name}" must be an entity type, not a ${supertype.kind} type.`,
-        );
-      }
-
-      // Check for duplicate subtype relationship.
-      for (const existing of this._subtypeFacts.values()) {
-        if (
-          existing.subtypeId === config.subtypeId
-          && existing.supertypeId === config.supertypeId
-        ) {
-          throw new Error(
-            `Subtype relationship from "${subtype.name}" to "${supertype.name}" already exists.`,
-          );
-        }
-      }
-    }
-
-    const sf = new SubtypeFact(config);
-    this._subtypeFacts.set(sf.id, sf);
+    const named = config.id === undefined
+      ? this.nameFor({
+        kind: "subtypeFact",
+        subtypeFact: {
+          id: "",
+          subtypeId: config.subtypeId,
+          supertypeId: config.supertypeId,
+          definingRule: config.definingRule,
+        },
+      })
+      : undefined;
+    const sf = new SubtypeFact(config.id === undefined ? { ...config, id: named?.id } : config);
+    this._subtypeFacts.set(sf);
+    this.keepMinted(named);
     return sf;
   }
 
-  /** Remove a subtype fact from the model. */
-  removeSubtypeFact(id: string): void {
-    if (!this._subtypeFacts.has(id)) {
-      throw new Error(`Subtype fact with id "${id}" not found.`);
+  /**
+   * Whether `addSubtypeFact` would accept this pair with every check on,
+   * including the one `SubtypeFact`'s constructor makes (the two ends
+   * differ). Merge asks it before adding, so its pre-check and the store
+   * read one predicate rather than two copies of it.
+   */
+  canAddSubtypeFact(config: Pick<SubtypeFactConfig, "subtypeId" | "supertypeId">): boolean {
+    return config.subtypeId !== config.supertypeId
+      && this.subtypeFactRefusal(config) === undefined;
+  }
+
+  /** Why `addSubtypeFact` refuses this pair, or nothing. */
+  private subtypeFactRefusal(
+    config: Pick<SubtypeFactConfig, "subtypeId" | "supertypeId">,
+    options?: { skipPlayerValidation?: boolean; },
+  ): string | undefined {
+    if (options?.skipPlayerValidation) return undefined;
+    const subtype = this._objectTypes.get(config.subtypeId);
+    if (!subtype) {
+      return `Subtype entity type id "${config.subtypeId}" does not exist in the model.`;
     }
-    this._subtypeFacts.delete(id);
+    if (subtype.kind !== "entity") {
+      return `Subtype "${subtype.name}" must be an entity type, not a ${subtype.kind} type.`;
+    }
+    const supertype = this._objectTypes.get(config.supertypeId);
+    if (!supertype) {
+      return `Supertype entity type id "${config.supertypeId}" does not exist in the model.`;
+    }
+    if (supertype.kind !== "entity") {
+      return `Supertype "${supertype.name}" must be an entity type, not a ${supertype.kind} type.`;
+    }
+    const pair = subtypePairKey(config);
+    for (const existing of this._subtypeFacts.values()) {
+      if (subtypePairKey(existing) === pair) {
+        return `Subtype relationship from "${subtype.name}" to "${supertype.name}" already exists.`;
+      }
+    }
+    return undefined;
+  }
+
+  /**
+   * Remove a subtype fact from the model, and keep of each constraint over
+   * subtypes naming it only what still holds without it
+   * (`withoutSubtypeFacts`). Not left dangling, as `removeFactType` leaves
+   * a constraint's roles: a model holding an id that names nothing does not
+   * load after its next save.
+   */
+  removeSubtypeFact(target: string | SubtypeFact): void {
+    // By element too: one the model left unnamed (decision 19) has no id.
+    const sf = typeof target === "string" ? this._subtypeFacts.get(target) : target;
+    if (sf === undefined || !this._subtypeFacts.remove(sf)) {
+      throw new Error(
+        `Subtype fact ${
+          JSON.stringify(typeof target === "string" ? target : subtypeFactRef(target))
+        } not found.`,
+      );
+    }
+    const id = sf.id;
+    if (id === undefined) return;
+    for (let i = this._constraints.length - 1; i >= 0; i--) {
+      const kept = withoutSubtypeFacts(this._constraints[i]!, (sf) => sf === id);
+      if (kept === undefined) this.dropConstraintAt(i);
+      else this._constraints[i] = kept;
+    }
   }
 
   /**
@@ -372,66 +1223,98 @@ export class OrmModel {
    *   `addSubtypeFact`.
    * @throws If the referenced fact type does not exist (unless skipPlayerValidation).
    * @throws If the referenced object type does not exist or is not an entity (unless skipPlayerValidation).
+   * @throws DuplicateIdError if an objectification with the same id already exists.
    * @throws If the fact type is already objectified.
    */
   addObjectifiedFactType(
     config: ObjectifiedFactTypeConfig,
     options?: { skipPlayerValidation?: boolean; },
   ): ObjectifiedFactType {
+    this.refuseHeldId(
+      this._objectifiedFactTypes,
+      config,
+      "objectification",
+      (e) => `objectification of ${this.factTypeLabel(e.factTypeId)}`,
+    );
+    const refusal = this.objectificationRefusal(config, options);
+    if (refusal !== undefined) throw new Error(refusal);
+
+    const named = config.id === undefined
+      ? this.nameFor({
+        kind: "objectification",
+        objectification: {
+          id: "",
+          factTypeId: config.factTypeId,
+          objectTypeId: config.objectTypeId,
+        },
+      })
+      : undefined;
+    const oft = new ObjectifiedFactType(
+      config.id === undefined ? { ...config, id: named?.id } : config,
+    );
+    this._objectifiedFactTypes.set(oft);
+    this.keepMinted(named);
+    return oft;
+  }
+
+  /**
+   * Whether `addObjectifiedFactType` would accept this pair with every
+   * check on, including the one `ObjectifiedFactType`'s constructor makes
+   * (the two ids differ). Merge asks it before adding, as for subtype facts.
+   */
+  canAddObjectifiedFactType(
+    config: Pick<ObjectifiedFactTypeConfig, "factTypeId" | "objectTypeId">,
+  ): boolean {
+    return config.factTypeId !== config.objectTypeId
+      && this.objectificationRefusal(config) === undefined;
+  }
+
+  /** Why `addObjectifiedFactType` refuses this pair, or nothing. */
+  private objectificationRefusal(
+    config: Pick<ObjectifiedFactTypeConfig, "factTypeId" | "objectTypeId">,
+    options?: { skipPlayerValidation?: boolean; },
+  ): string | undefined {
     const factType = this._factTypes.get(config.factTypeId);
     const objectType = this._objectTypes.get(config.objectTypeId);
-
     if (!options?.skipPlayerValidation) {
-      if (!factType) {
-        throw new Error(
-          `Fact type id "${config.factTypeId}" does not exist in the model.`,
-        );
-      }
+      if (!factType) return `Fact type id "${config.factTypeId}" does not exist in the model.`;
       if (!objectType) {
-        throw new Error(
-          `Object type id "${config.objectTypeId}" does not exist in the model.`,
-        );
+        return `Object type id "${config.objectTypeId}" does not exist in the model.`;
       }
       if (objectType.kind !== "entity") {
-        throw new Error(
-          `Object type "${objectType.name}" must be an entity type, not a ${objectType.kind} type.`,
-        );
+        return `Object type "${objectType.name}" must be an entity type, not a ${objectType.kind} type.`;
       }
     }
-
     // Duplicate objectification is a property of THIS model's own
     // records, not of what they reference, so it is checked either way.
     // The names fall back to the ids because a skipped load may not have
     // the elements to name.
     for (const existing of this._objectifiedFactTypes.values()) {
       if (existing.factTypeId === config.factTypeId) {
-        throw new Error(
-          `Fact type "${factType?.name ?? config.factTypeId}" is already objectified.`,
-        );
+        return `Fact type "${factType?.name ?? config.factTypeId}" is already objectified.`;
       }
     }
-
     for (const existing of this._objectifiedFactTypes.values()) {
       if (existing.objectTypeId === config.objectTypeId) {
-        throw new Error(
-          `Object type "${
-            objectType?.name ?? config.objectTypeId
-          }" is already used as an objectification.`,
-        );
+        return `Object type "${
+          objectType?.name ?? config.objectTypeId
+        }" is already used as an objectification.`;
       }
     }
-
-    const oft = new ObjectifiedFactType(config);
-    this._objectifiedFactTypes.set(oft.id, oft);
-    return oft;
+    return undefined;
   }
 
   /** Remove an objectified fact type from the model. */
-  removeObjectifiedFactType(id: string): void {
-    if (!this._objectifiedFactTypes.has(id)) {
-      throw new Error(`Objectified fact type with id "${id}" not found.`);
+  removeObjectifiedFactType(target: string | ObjectifiedFactType): void {
+    // By element too: one the model left unnamed (decision 19) has no id.
+    const oft = typeof target === "string" ? this._objectifiedFactTypes.get(target) : target;
+    if (oft === undefined || !this._objectifiedFactTypes.remove(oft)) {
+      throw new Error(
+        `Objectified fact type ${
+          JSON.stringify(typeof target === "string" ? target : objectificationRef(target))
+        } not found.`,
+      );
     }
-    this._objectifiedFactTypes.delete(id);
   }
 
   /**
@@ -485,19 +1368,31 @@ export class OrmModel {
    * @param options.skipPlayerValidation - When true, skip the check that
    *   the referenced fact type exists. Used for lenient loads, as on
    *   `addFactType` and `addSubtypeFact`.
+   * @throws DuplicateIdError if a population with the same id already exists.
    * @throws If the referenced fact type does not exist (unless skipPlayerValidation).
    */
   addPopulation(
     config: PopulationConfig,
     options?: { skipPlayerValidation?: boolean; },
   ): Population {
+    this.refuseHeldId(
+      this._populations,
+      config,
+      "population",
+      (e) => `population of fact type ${this.factTypeLabel(e.factTypeId)}`,
+    );
     if (!options?.skipPlayerValidation && !this._factTypes.get(config.factTypeId)) {
       throw new Error(
         `Fact type id "${config.factTypeId}" does not exist in the model.`,
       );
     }
-    const pop = new Population(config);
-    this._populations.set(pop.id, pop);
+    // Its fact type's id and `.population`, under the suffix rule (decision 7).
+    const pop = new Population(
+      config.id === undefined
+        ? { ...config, id: this.mintedId(populationIdBase(config.factTypeId)) }
+        : config,
+    );
+    this._populations.set(pop);
     return pop;
   }
 

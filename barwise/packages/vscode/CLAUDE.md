@@ -25,7 +25,8 @@ src/
   client/
     extension.ts              VS Code activate/deactivate entry point
   server/
-    OrmLanguageServer.ts      LSP server (diagnostics, completion, hover)
+    OrmLanguageServer.ts      LSP server (diagnostics, completion, hover, code actions)
+    CodeActionProvider.ts     "Store ids" quick fix for ids a 4.0 file leaves to the load
     CompletionProvider.ts     Autocomplete for .orm.yaml files
     DiagnosticsProvider.ts    Maps validation diagnostics to LSP
     HoverProvider.ts          Hover info for object type references
@@ -41,12 +42,19 @@ src/
     ExportCommand.ts          barwise.export -- quick-pick router over the exporters below
     ExportDbtCommand.ts         dbt project export (via barwise.export)
     ExportDdlCommand.ts         DDL export (via barwise.export)
-    ExportAvroCommand.ts        Avro schema export (via barwise.export)
+    ExportAvroCommand.ts        Avro schema export (via barwise.export); all three write
+                                export/registeredExport's result
+    exportReport.ts             What the three export commands tell the user: the summary,
+                                or the constraint report and its warning
     AnalyzeRepositoryCommand.ts barwise.analyzeRepository -- repo-wide code analysis
                               Diagram-side commands (barwise.highlightInDiagram,
                               copyElementName, addToView, createView, loadView) are
                               registered in client/extension.ts; the authoritative
                               user-facing list is contributes.commands in package.json
+  export/
+    registeredExport.ts       exportWith(format, model, options): the registered exporter
+                              call the palette commands and the diagram DDL tab share;
+                              no vscode import
   diagram/
     DiagramPanel.ts           Webview host; thin adapter over @barwise/diagram DiagramSession
     protocol.ts               Webview message types (envelopes over the diagram contract)
@@ -157,7 +165,7 @@ Test fixtures live in `tests/fixtures/` (`.orm.yaml` files).
 | Upstream  | `@barwise/dbt`                 | `registerDbtFormats` for dbt project import/export                                 |
 | Upstream  | `@barwise/diagram`             | Diagram layout/session for the webview                                             |
 | Upstream  | `@barwise/diagram-ui`          | React diagram renderer used by the webview app                                     |
-| Upstream  | `@barwise/formats`             | `registerStandardFormats` for DDL/OpenAPI/Avro/NORMA/SQL interop                   |
+| Upstream  | `@barwise/formats`             | `registerStandardFormats` for DDL/OpenAPI/Avro/NORMA/SQL/Ossie interop             |
 | Upstream  | `@barwise/llm`                 | `processTranscript`, `reviewModel`, `LlmClient` interface, extraction types        |
 | Upstream  | `@barwise/mcp`                 | `createServer` for MCP stdio server; `execute*` functions for Language Model Tools |
 | External  | `vscode`                       | Editor API (provided at runtime, not bundled)                                      |

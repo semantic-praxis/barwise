@@ -1,0 +1,30 @@
+orm_version: "2.0"
+model:
+  name: Malformed
+  object_types:
+    - id: ot-person
+      name: Person
+      kind: entity
+      reference_mode: person_id
+    - id: ot-age
+      name: Age
+      kind: value
+      data_type:
+        name: integer
+  fact_types:
+    - id: ft-tariff-has-age
+      name: Tariff has Age
+      roles:
+        - id: r-tariff-person
+          player: ot-person
+          role_name: has
+        - id: r-tariff-age
+          player: ot-age
+          role_name: is of
+      readings:
+        - "{0} has {1}"
+      constraints:
+        - type: frequency
+          role: r-tariff-person
+          min: 3
+          max: 2

@@ -7,6 +7,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { DdlExportFormat } from "../src/ddl/DdlExportFormat.js";
 import { DdlImportFormat } from "../src/ddl/DdlImportFormat.js";
+import { ModelBuilder } from "./helpers/ModelBuilder.js";
 
 const ddl = new DdlImportFormat();
 const valueType = (model: OrmModel, name: string) => {
@@ -140,7 +141,7 @@ describe("an identity clause reads back as auto_counter", () => {
     const ft = model.factTypes.find((f) =>
       f.roles.some((r) => model.getObjectType(r.playerId)?.name === "SeqNo")
     );
-    expect(ft?.constraints.some((c) => c.type === "mandatory"), "NOT NULL read").toBe(true);
+    expect(ft?.internalConstraints.some((c) => c.type === "mandatory"), "NOT NULL read").toBe(true);
     expect(valueType(model, "Qty")?.dataType).toEqual({ name: "integer" });
   });
 
@@ -234,7 +235,11 @@ describe("a table keyed on its foreign keys is an objectified relationship", () 
       "Student",
       "Course",
     ]);
-    expect(ft?.constraints.map((c) => [c.type, "roleIds" in c ? c.roleIds.length : 0])).toEqual([
+    expect(
+      (ft ? model.constraintsTouching(ft.id) : undefined)?.map((
+        c,
+      ) => [c.type, "roleIds" in c ? c.roleIds.length : 0]),
+    ).toEqual([
       ["internal_uniqueness", 2],
     ]);
     const enrollment = model.getObjectTypeByName("Enrollment");
@@ -278,7 +283,7 @@ describe("a table keyed on its foreign keys is an objectified relationship", () 
     expect(model.objectifiedFactTypes.map((o) => model.getObjectType(o.objectTypeId)?.name))
       .toEqual(["Enrollment"]);
     expect(
-      model.factTypes.flatMap((f) => f.constraints).filter((c) => c.type === "external_uniqueness"),
+      model.everyConstraint().map(([c]) => c).filter((c) => c.type === "external_uniqueness"),
     )
       .toEqual([]);
   });
@@ -301,7 +306,7 @@ describe("a table keyed on its foreign keys is an objectified relationship", () 
     const where = new Map(
       model.factTypes.flatMap((f) => f.roles.map((r, i) => [r.id, `${f.name}#${i}`] as const)),
     );
-    const external = model.factTypes.flatMap((f) => f.constraints)
+    const external = model.everyConstraint().map(([c]) => c)
       .filter((c) => c.type === "external_uniqueness")
       .map((c) => c.roleIds.map((id) => where.get(id)));
     expect(external).toEqual([[
@@ -333,7 +338,7 @@ describe("a table keyed on its foreign keys is an objectified relationship", () 
           )
           .flatMap((f) => f.roles.map((r) => r.id)),
       );
-      return model.factTypes.flatMap((f) => f.constraints)
+      return model.everyConstraint().map(([c]) => c)
         .filter((c) => c.type === "external_uniqueness" && c.roleIds.some((id) => ofLink.has(id)));
     };
     const linkWarnings = (warnings: string[]) =>
@@ -352,7 +357,9 @@ describe("a table keyed on its foreign keys is an objectified relationship", () 
     it("wholly inside the relationship", () => {
       const { model, warnings } = ddl.parse(schema("UNIQUE (parent_a, child_id)"));
       const ft = model.getFactTypeByName("Parent and Child link");
-      expect(ft?.constraints.filter((c) => c.type === "internal_uniqueness")).toHaveLength(1);
+      expect(ft?.internalConstraints.filter((c) => c.type === "internal_uniqueness")).toHaveLength(
+        1,
+      );
       expect(warnings).toContain(
         `Table "link": UNIQUE (parent_a, child_id) covers only part of the composite foreign key `
           + `(parent_a, parent_b), and was not imported (barwise-1077).`,
@@ -381,5 +388,138 @@ describe("a table keyed on its foreign keys is an objectified relationship", () 
         FOREIGN KEY ("(ambiguous)") REFERENCES finding ("(ambiguous)"));`);
     expect(warnings).toEqual([]);
     expect(model.getFactTypeByName("Scan and Finding scan found")).toBeDefined();
+  });
+});
+
+/**
+ * A one-to-one between two entities keeps both uniqueness constraints
+ * through export and import (one-to-one-entity-uniqueness.spec.md): the
+ * export writes UNIQUE on the column that stores the fact, and the import
+ * reads it back as the uniqueness on the referenced side.
+ */
+describe("a one-to-one between two entities", () => {
+  function places(mandatory: "role1" | "role2" | "both" | undefined) {
+    return new ModelBuilder("Test")
+      .withEntityType("Customer", { referenceMode: "customer_id" })
+      .withEntityType("Order", { referenceMode: "order_nr" })
+      .withBinaryFactType("Customer places Order", {
+        role1: { player: "Customer", name: "places" },
+        role2: { player: "Order", name: "is placed by" },
+        uniqueness: "both",
+        ...(mandatory ? { mandatory } : {}),
+      })
+      .build();
+  }
+
+  it.each(
+    [
+      [undefined, true],
+      [undefined, false],
+      ["role1", true],
+      ["role1", false],
+      ["role2", true],
+      ["role2", false],
+      ["both", true],
+      ["both", false],
+    ] as const,
+  )("keeps both with mandatory %s (annotate %s)", (mandatory, annotate) => {
+    const { text } = new DdlExportFormat().export(places(mandatory), { annotate });
+    const { model } = ddl.parse(text);
+    const customer = model.getObjectTypeByName("Customer")!;
+    const order = model.getObjectTypeByName("Order")!;
+    const between = model.factTypes.find((ft) =>
+      ft.arity === 2
+      && ft.roles.some((r) => r.playerId === customer.id)
+      && ft.roles.some((r) => r.playerId === order.id)
+    );
+    expect(between, text).toBeDefined();
+    const unique = between!.internalConstraints
+      .filter((c) => c.type === "internal_uniqueness" && c.roleIds.length === 1)
+      .map((c) => between!.getRoleById((c as { roleIds: string[]; }).roleIds[0]!)!.playerId)
+      .sort();
+    expect(unique, text).toEqual([customer.id, order.id].sort());
+    // And nothing more: no external uniqueness read from the same clause.
+    expect(model.constraints.filter((c) => c.type === "external_uniqueness"), text).toEqual([]);
+  });
+
+  it("reads a UNIQUE on a single foreign key column as the referenced side's uniqueness", () => {
+    const { model } = ddl.parse(`
+      CREATE TABLE customer (customer_id INTEGER NOT NULL, PRIMARY KEY (customer_id));
+      CREATE TABLE "order" (
+        order_nr INTEGER NOT NULL,
+        customer_id INTEGER NOT NULL,
+        PRIMARY KEY (order_nr),
+        FOREIGN KEY (customer_id) REFERENCES customer (customer_id),
+        UNIQUE (customer_id)
+      );`);
+    const customer = model.getObjectTypeByName("Customer")!;
+    const order = model.getObjectTypeByName("Order")!;
+    const ft = model.factTypes.find((f) =>
+      f.roles.some((r) => r.playerId === customer.id)
+      && f.roles.some((r) => r.playerId === order.id)
+    )!;
+    const customerRole = ft.roles.find((r) => r.playerId === customer.id)!;
+    expect(
+      ft.internalConstraints.some((c) =>
+        c.type === "internal_uniqueness" && c.roleIds.length === 1
+        && c.roleIds[0] === customerRole.id
+      ),
+    ).toBe(true);
+  });
+
+  it("adds no far uniqueness for a UNIQUE over the foreign key and another column", () => {
+    const { model } = ddl.parse(`
+      CREATE TABLE customer (customer_id INTEGER NOT NULL, PRIMARY KEY (customer_id));
+      CREATE TABLE "order" (
+        order_nr INTEGER NOT NULL,
+        customer_id INTEGER NOT NULL,
+        placed_on DATE NOT NULL,
+        PRIMARY KEY (order_nr),
+        FOREIGN KEY (customer_id) REFERENCES customer (customer_id),
+        UNIQUE (customer_id, placed_on)
+      );`);
+    const customer = model.getObjectTypeByName("Customer")!;
+    const order = model.getObjectTypeByName("Order")!;
+    const ft = model.factTypes.find((f) =>
+      f.roles.some((r) => r.playerId === customer.id)
+      && f.roles.some((r) => r.playerId === order.id)
+    )!;
+    const customerRole = ft.roles.find((r) => r.playerId === customer.id)!;
+    expect(
+      ft.internalConstraints.some((c) =>
+        c.type === "internal_uniqueness" && c.roleIds.includes(customerRole.id)
+      ),
+    ).toBe(false);
+  });
+
+  it("reads a UNIQUE over a composite foreign key as its one reference's one-to-one", () => {
+    const { model } = ddl.parse(`
+      CREATE TABLE assignment (seat_id INTEGER NOT NULL, flight_id INTEGER NOT NULL, PRIMARY KEY (seat_id, flight_id));
+      CREATE TABLE ticket (
+        ticket_nr INTEGER NOT NULL,
+        seat_id INTEGER NOT NULL,
+        flight_id INTEGER NOT NULL,
+        PRIMARY KEY (ticket_nr),
+        FOREIGN KEY (seat_id, flight_id) REFERENCES assignment (seat_id, flight_id),
+        UNIQUE (seat_id, flight_id)
+      );`);
+    const ticket = model.getObjectTypeByName("Ticket")!;
+    const assignment = model.getObjectTypeByName("Assignment")!;
+    const farUniques = model.factTypes
+      .filter((f) =>
+        f.roles.some((r) => r.playerId === ticket.id)
+        && f.roles.some((r) => r.playerId === assignment.id)
+      )
+      .flatMap((f) =>
+        f.internalConstraints.filter((c) =>
+          c.type === "internal_uniqueness" && c.roleIds.length === 1
+          && f.getRoleById(c.roleIds[0]!)!.playerId !== ticket.id
+        )
+      );
+    // One reference over both columns, unique on the assignment side, and
+    // no external uniqueness beside it (composite-foreign-key-round-trip.spec.md).
+    expect(farUniques).toHaveLength(1);
+    expect(model.everyConstraint().filter(([c]) => c.type === "external_uniqueness"))
+      .toHaveLength(1); // assignment's own key
   });
 });

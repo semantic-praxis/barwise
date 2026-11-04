@@ -45,6 +45,9 @@ import fc from "fast-check";
 import {
   type Constraint,
   CONSTRAINT_TYPES,
+  type ExternalConstraint,
+  isExternalConstraint,
+  isInternalConstraint,
   type RingType,
   type ValueComparisonOperator,
 } from "../../src/model/Constraint.js";
@@ -56,6 +59,7 @@ import type {
   FactTypeConfig,
   RoleConfig,
 } from "../../src/model/FactType.js";
+import { storePreferredFlags } from "../../src/model/identification.js";
 import type { ObjectifiedFactTypeConfig } from "../../src/model/ObjectifiedFactType.js";
 import type {
   CardinalityRange,
@@ -68,6 +72,10 @@ import type {
 import { OrmModel, type OrmModelConfig } from "../../src/model/OrmModel.js";
 import type { FactInstanceConfig, PopulationConfig } from "../../src/model/Population.js";
 import type { SubtypeFactConfig } from "../../src/model/SubtypeFact.js";
+import {
+  type FlaggedSubtypeFact,
+  subtypeConstraintsFromFlags,
+} from "../../src/serialization/subtypeFlags.js";
 
 /**
  * The seed every law runs at, and the number of models each generates.
@@ -151,6 +159,11 @@ interface RawObjectType {
   readonly entity: boolean;
   readonly independent: boolean;
   readonly definition: string | null;
+  /**
+   * Drawn and not used: a 4.0 model states a shadow by its id's alias, not a
+   * field (iri-identity 6d). Kept so every other draw, and so each law's
+   * seeded corpus, stays what it was.
+   */
   readonly sourceContext: string | null;
   readonly note: string | null;
   readonly values: readonly string[] | null;
@@ -375,6 +388,13 @@ export interface ModelPlan {
   readonly model: OrmModelConfig;
   readonly objectTypes: readonly ObjectTypeConfig[];
   readonly factTypes: readonly FactTypeConfig[];
+  /** Constraints across fact types, which the model holds (orm-format-3 WS3c). */
+  readonly constraints: readonly ExternalConstraint[];
+  /**
+   * The uniquenesses a 2.0 file would flag `is_preferred`, by id; `buildModel`
+   * places each on the entity it identifies (orm-format-3 WS4b).
+   */
+  readonly preferredFlags: readonly string[];
   readonly subtypeFacts: readonly SubtypeFactConfig[];
   readonly objectifiedFactTypes: readonly ObjectifiedFactTypeConfig[];
   readonly populations: readonly PopulationConfig[];
@@ -450,15 +470,21 @@ function toObjectTypes(raws: readonly RawObjectType[]): ObjectTypeConfig[] {
       // must; both are constructor invariants, not generator choices.
       ...(raw.entity ? { referenceMode: `t${i}_id` } : {}),
       ...(raw.definition !== null ? { definition: raw.definition } : {}),
-      ...(raw.sourceContext !== null ? { sourceContext: raw.sourceContext } : {}),
       ...(raw.note !== null ? { note: raw.note } : {}),
-      ...(toValueConstraint(raw.values, raw.range) !== undefined
+      // Value-only fields go on value types only: core refuses them on an
+      // entity (barwise-5fg). Before that it dropped them, so this generator
+      // handed entities fields that vanished at construction -- and the
+      // serialization law, comparing a built model with its round trip,
+      // could not see the loss, because both sides had already lost them.
+      ...(!raw.entity && toValueConstraint(raw.values, raw.range) !== undefined
         ? { valueConstraint: toValueConstraint(raw.values, raw.range) }
         : {}),
-      ...(toDataType(raw.dataType) !== undefined ? { dataType: toDataType(raw.dataType) } : {}),
+      ...(!raw.entity && toDataType(raw.dataType) !== undefined
+        ? { dataType: toDataType(raw.dataType) }
+        : {}),
       ...(raw.aliases.length > 0 ? { aliases: [...raw.aliases] } : {}),
       independent: raw.independent,
-      ...(raw.defaultValue !== null ? { defaultValue: raw.defaultValue } : {}),
+      ...(!raw.entity && raw.defaultValue !== null ? { defaultValue: raw.defaultValue } : {}),
       ...(toCardinality(raw.cardinality) !== undefined
         ? { cardinality: toCardinality(raw.cardinality) }
         : {}),
@@ -487,7 +513,7 @@ function toFactTypeSkeletons(
       const player = raw.reflexive && k === 1
         ? pick(objectTypes, raw.playerPicks[0]!)
         : pick(objectTypes, raw.playerPicks[k]!);
-      roles.push({ id: `ft${j}r${k}`, name: `plays${k}`, playerId: player.id! });
+      roles.push({ id: `ft${j}.r${k}`, name: `plays${k}`, playerId: player.id! });
     }
 
     // A binary fact type with one reading is a structural warning, so
@@ -532,7 +558,7 @@ function toConstraint(
   raw: RawConstraint,
   skeletons: readonly FactTypeSkeleton[],
   index: number,
-): { ownerIndex: number; constraint: Constraint; } | null {
+): { ownerIndex: number; constraint: Constraint; flagged?: boolean; } | null {
   const ownerIndex = raw.ownerPick % skeletons.length;
   const owner = skeletons[ownerIndex]!;
   const roles = owner.roles;
@@ -554,11 +580,10 @@ function toConstraint(
           type: "internal_uniqueness",
           id,
           roleIds: ids,
-          // Never `false`: the serializer omits it, so a generated false
-          // would read back as absent.
-          ...(raw.flag ? { isPreferred: true } : {}),
           ...modality,
         },
+        // A 2.0 `is_preferred` flag, placed when the model is built.
+        ...(raw.flag ? { flagged: true } : {}),
       };
     }
     case "mandatory":
@@ -637,7 +662,20 @@ function toConstraint(
         },
       };
     }
-    case "external_uniqueness":
+    case "external_uniqueness": {
+      // An external uniqueness needs a join key the generator can infer:
+      // one player in an unconstrained role of each fact type. A blind
+      // pick reached that only by luck of the seeded stream, which every
+      // added constraint kind reshuffles (join-ring-constraint WS1), so
+      // look for a keyed pair first and fall back to the blind one.
+      const keyed = keyedPair(skeletons, ownerIndex, raw.factTypePick);
+      if (keyed) {
+        return { ownerIndex, constraint: { type: raw.kind, id, roleIds: keyed, ...modality } };
+      }
+      if (!otherFactType) return null;
+      const roleIds = [roles[0]!.id!, otherFactType.roles[0]!.id!];
+      return { ownerIndex, constraint: { type: raw.kind, id, roleIds, ...modality } };
+    }
     case "disjunctive_mandatory":
     case "exclusion":
     case "exclusive_or": {
@@ -683,7 +721,63 @@ function toConstraint(
         constraint: { type: raw.kind, id, operands: [operand, operand], ...modality },
       };
     }
+    case "join_ring": {
+      // A ring needs both projected ends played by one type, so the hop
+      // is a reflexive pair, taken twice: a self-join projecting [0, 2],
+      // the two-hop shape the one-hop warning must not fire on.
+      for (const skeleton of skeletons) {
+        const pair = reflexivePair(skeleton);
+        if (!pair) continue;
+        const root = skeleton.roles.find((r) => r.id === pair[0])!.playerId;
+        const step = { entry: pair[0], exit: pair[1] };
+        return {
+          ownerIndex,
+          constraint: {
+            type: "join_ring",
+            id,
+            operand: { path: { root, steps: [step, step] }, projection: [0, 2] },
+            ringType: raw.ringType,
+            ...modality,
+          },
+        };
+      }
+      return null;
+    }
   }
+}
+
+/**
+ * A constrained role of the owner and of another binary fact type whose
+ * other roles share a player that neither constrained role has: the
+ * standard external uniqueness pattern `inferExternalUniquenessJoin` reads.
+ */
+function keyedPair(
+  skeletons: readonly FactTypeSkeleton[],
+  ownerIndex: number,
+  start: number,
+): string[] | null {
+  const owner = skeletons[ownerIndex]!;
+  if (owner.roles.length !== 2) return null;
+  // From the draw's own fact-type pick, so two draws on one model need not
+  // name the same pair.
+  for (let n = 0; n < skeletons.length; n++) {
+    const i = (start + n) % skeletons.length;
+    const other = skeletons[i]!;
+    if (i === ownerIndex || other.roles.length !== 2) continue;
+    for (const [c1, k1] of [[0, 1], [1, 0]] as const) {
+      for (const [c2, k2] of [[0, 1], [1, 0]] as const) {
+        const key = owner.roles[k1]!.playerId;
+        if (
+          other.roles[k2]!.playerId === key
+          && owner.roles[c1]!.playerId !== key
+          && other.roles[c2]!.playerId !== key
+        ) {
+          return [owner.roles[c1]!.id!, other.roles[c2]!.id!];
+        }
+      }
+    }
+  }
+  return null;
 }
 
 /** Two roles of one fact type sharing a player, if the skeleton has them. */
@@ -710,14 +804,21 @@ function firstHop(
   return null;
 }
 
+/**
+ * The subtype facts, and the constraints over them their raw flags state.
+ * The flags are drawn as a 2.0 file states them and converted by step 3
+ * (orm-format-3 WS4b), so every generated subtype constraint is one a 2.0
+ * file can hold, and the 2.0 round trip is lossless over them.
+ */
 function toSubtypeFacts(
   raws: readonly RawSubtypeFact[],
   objectTypes: readonly ObjectTypeConfig[],
-): SubtypeFactConfig[] {
+): { configs: SubtypeFactConfig[]; constraints: ExternalConstraint[]; } {
   const entities = objectTypes.filter((ot) => ot.kind === "entity");
-  if (entities.length < 2) return [];
+  if (entities.length < 2) return { configs: [], constraints: [] };
 
   const out: SubtypeFactConfig[] = [];
+  const flagged: FlaggedSubtypeFact[] = [];
   const seen = new Set<string>();
   for (const [i, raw] of raws.entries()) {
     const a = raw.pickA % entities.length;
@@ -737,12 +838,16 @@ function toSubtypeFacts(
       subtypeId: sub.id!,
       supertypeId: sup.id!,
       providesIdentification: raw.providesIdentification,
-      isExclusive: raw.isExclusive,
-      isExhaustive: raw.isExhaustive,
       ...(definingRule !== undefined ? { definingRule } : {}),
     });
+    flagged.push({
+      id: `sf${i}`,
+      supertype: sup.id!,
+      is_exclusive: raw.isExclusive,
+      is_exhaustive: raw.isExhaustive,
+    });
   }
-  return out;
+  return { configs: out, constraints: subtypeConstraintsFromFlags(flagged) };
 }
 
 function toObjectified(
@@ -828,10 +933,10 @@ function toPopulations(
       for (const [r, role] of ft.roles.entries()) {
         roleValues[role.id!] = values[r] ?? "v1";
       }
-      return { id: `p${i}i${k}`, roleValues };
+      return { id: `pop.${i}.${k}`, roleValues };
     });
     return {
-      id: `pop${i}`,
+      id: `pop.${i}`,
       factTypeId: ft.id,
       ...(raw.description !== null ? { description: raw.description } : {}),
       sample: raw.sample,
@@ -883,6 +988,7 @@ function withPreferredIdentifier(
   raw: RawModel,
   factTypes: readonly FactTypeConfig[],
   objectTypes: readonly ObjectTypeConfig[],
+  flagged: Set<string>,
 ): FactTypeConfig[] {
   const unchanged = [...factTypes];
   if (!raw.preferredIdentifier) return unchanged;
@@ -905,15 +1011,24 @@ function withPreferredIdentifier(
     // manufacturing the diagnostic rather than the shape.
     const alreadyPreferred = factTypes.some((other) =>
       other.roles.some((r) => r.playerId === entityRole.playerId)
-      && (other.constraints ?? []).some((c) => c.type === "internal_uniqueness" && c.isPreferred)
+      && (other.constraints ?? []).some((c) => c.id !== undefined && flagged.has(c.id))
     );
     if (alreadyPreferred) return unchanged;
 
+    // The value's role needs its own uniqueness: without one a value
+    // could belong to two entities and identify neither, and
+    // `preferredIdentifiers` reads the flag as naming nothing.
+    const valueRole = entityRole === r1 ? r2 : r1;
+    const onValue = (ft.constraints ?? []).some((c) =>
+      c.type === "internal_uniqueness" && c.roleIds.length === 1 && c.roleIds[0] === valueRole.id
+    );
+    flagged.add(`pref${j}`);
     unchanged[j] = {
       ...ft,
       constraints: [
         ...(ft.constraints ?? []),
-        { type: "internal_uniqueness", roleIds: [entityRole.id!], isPreferred: true },
+        { type: "internal_uniqueness", id: `pref${j}`, roleIds: [entityRole.id!] },
+        ...(onValue ? [] : [{ type: "internal_uniqueness" as const, roleIds: [valueRole.id!] }]),
       ],
     };
     return unchanged;
@@ -927,9 +1042,13 @@ function toPlan(raw: RawModel): ModelPlan {
   const skeletons = toFactTypeSkeletons(raw.factTypes, objectTypes);
 
   const constraintsByOwner = new Map<number, Constraint[]>();
+  const flagged = new Set<string>();
   for (const [i, rawConstraint] of raw.constraints.entries()) {
     const materialised = toConstraint(rawConstraint, skeletons, i);
     if (!materialised) continue;
+    if (materialised.flagged && materialised.constraint.id !== undefined) {
+      flagged.add(materialised.constraint.id);
+    }
     const bucket = constraintsByOwner.get(materialised.ownerIndex) ?? [];
     bucket.push(materialised.constraint);
     constraintsByOwner.set(materialised.ownerIndex, bucket);
@@ -939,12 +1058,21 @@ function toPlan(raw: RawModel): ModelPlan {
     raw,
     skeletons.map((skeleton, j) => ({
       ...skeleton,
-      constraints: constraintsByOwner.get(j) ?? [],
+      constraints: (constraintsByOwner.get(j) ?? []).filter(isInternalConstraint),
     })),
     objectTypes,
+    flagged,
+  );
+  // Owner by owner, as each fact type once handed its own to the model, so
+  // a seed draws the same model it did.
+  const constraints = skeletons.flatMap((_, j) =>
+    (constraintsByOwner.get(j) ?? []).filter(isExternalConstraint)
   );
 
-  const subtypeFacts = toSubtypeFacts(raw.subtypeFacts, objectTypes);
+  const { configs: subtypeFacts, constraints: overSubtypes } = toSubtypeFacts(
+    raw.subtypeFacts,
+    objectTypes,
+  );
 
   return {
     model: {
@@ -954,6 +1082,9 @@ function toPlan(raw: RawModel): ModelPlan {
     },
     objectTypes,
     factTypes,
+    preferredFlags: [...flagged],
+    // After the constraints across fact types, as a 2.0 load orders them.
+    constraints: [...constraints, ...overSubtypes],
     subtypeFacts,
     objectifiedFactTypes: toObjectified(raw.objectified, objectTypes, skeletons, subtypeFacts),
     populations: toPopulations(raw.populations, skeletons),
@@ -984,11 +1115,16 @@ export function buildModel(plan: ModelPlan): OrmModel {
   const model = new OrmModel(plan.model);
   for (const config of plan.objectTypes) model.addObjectType(config);
   for (const config of plan.factTypes) model.addFactType(config);
+  for (const constraint of plan.constraints) model.addConstraint(constraint);
   for (const config of plan.subtypeFacts) model.addSubtypeFact(config);
   for (const config of plan.objectifiedFactTypes) model.addObjectifiedFactType(config);
   for (const config of plan.populations) model.addPopulation(config);
   for (const definition of plan.definitions) model.addDefinition(definition);
   for (const layout of plan.diagramLayouts) model.addDiagramLayout(layout);
+  // Last, as the 2.0 loader places them: an objectified fact type's flag
+  // names the objectifying type.
+  const flagged = new Set(plan.preferredFlags);
+  storePreferredFlags(model, (c) => c.id !== undefined && flagged.has(c.id));
   return model;
 }
 

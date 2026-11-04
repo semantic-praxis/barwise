@@ -1,0 +1,26 @@
+orm_version: "2.0"
+model:
+  name: Malformed
+  object_types:
+    - id: ot-person
+      name: Person
+      kind: entity
+      reference_mode: person_id
+    - id: ot-age
+      name: Age
+      kind: value
+      data_type:
+        name: integer
+  fact_types:
+    - id: ft-loan-has-age
+      name: Loan has Age
+      roles:
+        - id: r-loan-person
+          player: ot-person
+          role_name: has
+          colour: red
+        - id: r-loan-age
+          player: ot-age
+          role_name: is of
+      readings:
+        - "{0} has {1}"
