@@ -43,6 +43,22 @@ test("adr-facts: each input is read only when asked for, and at most once", asyn
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+  // A read that succeeded is not repeated either: the file can go and the
+  // answer stays.
+  const ok = tree({ "barwise/package.json": PKG, ".beads/issues.jsonl": TRACKER });
+  try {
+    const refusals = [];
+    const reader = await createGovernanceReader(ok, { needsWorkflow: false, refusals });
+    const first = reader.scripts();
+    const tracker = reader.issues();
+    rmSync(join(ok, "barwise", "package.json"));
+    rmSync(join(ok, ".beads", "issues.jsonl"));
+    assert.equal(reader.scripts(), first);
+    assert.equal(reader.issues(), tracker);
+    assert.deepEqual(refusals, []);
+  } finally {
+    rmSync(ok, { recursive: true, force: true });
+  }
 });
 
 test("adr-facts: refusals are listed in the order the inputs are asked for", async () => {
@@ -128,7 +144,9 @@ test("adr-facts: a step is found by its full command, and the answers are what t
   }
 });
 
-test("adr-facts: the reports are counted unread before anything is judged", () => {
+test("adr-facts: the reports' unread count is fixed when they are read", () => {
+  // The judge appends its refusals after these and must not recount them;
+  // that half is pinned end to end in check-adr-tests.test.mjs.
   const dir = tree({
     "barwise/packages/core/package.json": JSON.stringify({
       scripts: { "test:coverage": "vitest" },
