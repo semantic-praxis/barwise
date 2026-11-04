@@ -24,9 +24,10 @@ export interface ImpactReport {
   readonly changedElement: string;
   readonly affectedArtifacts: readonly AffectedArtifact[];
   /**
-   * Exports written under 3.x ids that named no id this one is known by
-   * (iri-identity 6e): they may depend on the element under its old id, so
-   * they are listed rather than left out. Re-exporting answers it.
+   * Exports written under 3.x ids that impact could not match, because the
+   * element's 3.x id is unknown (a 4.0 model, or none) (iri-identity 6e):
+   * they may depend on it under its old id, so they are listed rather than
+   * left out. Re-exporting answers it.
    */
   readonly exportsBefore40: readonly string[];
 }

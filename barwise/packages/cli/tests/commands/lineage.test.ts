@@ -470,6 +470,17 @@ model:
       });
       const result = await runCli(["lineage", "impact", modelPath, "--element", "ot-1"]);
       expect(result.stdout).toContain("The model did not load");
+      // The export does depend on ot-1 (Customer's 3.x id), so the answer
+      // must not read as "nothing depends" (the pr-review on 6e).
+      expect(result.stdout).not.toContain("No artifacts depend");
+      expect(result.stdout).toContain("No artifact recorded under 4.0 ids depends on this element");
+    });
+
+    it("says nothing about loading when there is no manifest, since no model is read", async () => {
+      const modelPath = path.join(tempDir, "shop.orm.yaml");
+      fs.writeFileSync(modelPath, SHOP_3X);
+      const result = await runCli(["lineage", "impact", modelPath, "--element", "ot-1"]);
+      expect(result.stdout).not.toContain("did not load");
       expect(result.stdout).toContain("No artifacts depend on this element");
     });
 

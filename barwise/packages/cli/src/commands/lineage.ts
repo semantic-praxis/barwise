@@ -148,7 +148,8 @@ export function registerLineageCommand(program: Command): void {
           );
           // Without the model a 3.x id cannot be read, which changes the
           // answer; say so rather than let a load error pass silently.
-          if (manifest !== undefined && model === undefined) {
+          const modelDidNotLoad = manifest !== undefined && model === undefined;
+          if (modelDidNotLoad) {
             process.stdout.write(
               `The model did not load (run barwise validate ${source}), so the element's `
                 + "id is read as a 4.0 id.\n\n",
@@ -164,9 +165,10 @@ export function registerLineageCommand(program: Command): void {
             );
           };
           if (report.affectedArtifacts.length === 0) {
-            // With 3.x exports unaccounted for, "none" would read as safe.
+            // With 3.x exports unaccounted for, or a 3.x id unread because
+            // the model did not load, "none" would read as safe.
             process.stdout.write(
-              report.exportsBefore40.length === 0
+              report.exportsBefore40.length === 0 && !modelDidNotLoad
                 ? "No artifacts depend on this element.\n"
                 : "No artifact recorded under 4.0 ids depends on this element.\n",
             );
