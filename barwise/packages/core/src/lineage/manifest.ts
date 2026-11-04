@@ -138,7 +138,8 @@ export function hashModel(model: OrmModel): string {
  * lineage it can see. The hash is never restamped, because the artifacts
  * really are stale. Undefined when no source changes, so the caller writes
  * nothing. An export that names another model, or none, is left: whose it
- * is is `attribution.ts`'s question, and a rename does not answer it.
+ * is is `attribution.ts`'s question, and a rename does not answer it. So is
+ * one marked `idsBefore40`: its 3.x ids can collide with a 4.0 map.
  */
 export function renameInManifest(
   manifest: LineageManifest,

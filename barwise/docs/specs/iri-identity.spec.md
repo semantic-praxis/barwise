@@ -1565,7 +1565,8 @@ version-1 manifest would go silently empty for impact analysis.
       because one 3.x id can be another element's 4.0 id (Copilot, on 6e).
       An id the 3.x file states is read as that (`idFromPrior`), else as a
       4.0 id (`priorIds`). A 4.0 model knows no 3.x id, so a marked export
-      is listed as unknown; with no model the id is tried in both.
+      is listed as unknown, and so it is with no model (inline MCP, or a
+      file that does not load), where the id is taken as a 4.0 id.
       The CLI passes it, and MCP does given a path; inline, every model's
       exports are read, and one model's ids say nothing of another's.
     - `ProjectRenameResult.ids` is a map per domain context. The lineage

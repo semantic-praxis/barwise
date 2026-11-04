@@ -105,16 +105,16 @@ export function analyzeImpact(
  * `idFromPrior`), else as a 4.0 id (its 3.x id from `priorIds`); the
  * file's reading wins where an id is both, since the file is what the
  * caller is looking at. A 4.0 model knows no 3.x id, so a marked export
- * cannot be matched and is listed as unknown. With no model there is no
- * telling which generation the id is, so it is tried in both, and a marked
- * export it misses is still listed.
+ * cannot be matched and is listed as unknown. With no model (inline MCP, or
+ * a file that does not load) the id is taken as a 4.0 id, as a 4.0 model's
+ * is: trying it as a 3.x id too would pool the generations, and could name
+ * another element's export.
  */
 function idsByGeneration(
   elementId: string,
   model: OrmModel | undefined,
 ): { now: string; before: string | undefined; beforeKnown: boolean; } {
-  if (model === undefined) return { now: elementId, before: elementId, beforeKnown: false };
-  if (model.priorIds === undefined) {
+  if (model?.priorIds === undefined) {
     return { now: elementId, before: undefined, beforeKnown: false };
   }
   const fromFile = model.idFromPrior(elementId);

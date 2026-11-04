@@ -301,9 +301,18 @@ describe("impact_analysis tool", () => {
       "a.sql",
     ]);
 
-    writeManifest(ws.dir(), manifest);
+    // Inline there is no model to read 3.x ids through, so the id is a 4.0
+    // id, held by exports a 4.0 build wrote (version 2).
+    writeManifest(ws.dir(), {
+      ...manifest,
+      version: 2,
+      exports: manifest.exports.map((e) => ({
+        ...e,
+        sources: e.sources.map((s) => ({ ...s, elementId: "Customer" })),
+      })),
+    });
     const yaml = fs.readFileSync(`${fixtures}/simple.orm.yaml`, "utf-8");
-    const inline = JSON.parse(executeImpactAnalysis(yaml, "ot-customer").content[0]!.text);
+    const inline = JSON.parse(executeImpactAnalysis(yaml, "Customer").content[0]!.text);
     expect(inline.affectedArtifacts.map((a: { sourceModel: string; }) => a.sourceModel)).toEqual([
       "a.orm.yaml",
       "b.orm.yaml",

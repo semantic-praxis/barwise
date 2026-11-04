@@ -115,6 +115,16 @@ describe("an export written under 3.x ids", () => {
     expect(report.affectedArtifacts).toEqual([]);
     expect(report.exportsBefore40).toEqual(["a.sql"]);
   });
+
+  it("is never matched by a 4.0 id, with a 4.0 model or none: it is listed as unknown", () => {
+    // The 3.x id Customer may have named another element (the pr-review on 6e).
+    const m = version1(exported("a.sql", "Customer", "h"));
+    for (const model of [shop(), undefined]) {
+      const report = analyzeImpact(m, "Customer", undefined, model);
+      expect(report.affectedArtifacts).toEqual([]);
+      expect(report.exportsBefore40).toEqual(["a.sql"]);
+    }
+  });
 });
 
 describe("impact by an id a 3.x file states (barwise-wcg.v5k)", () => {
