@@ -10,6 +10,7 @@ import { describe, expect, it } from "vitest";
 import { parse } from "yaml";
 import { OssieExportFormat } from "../src/ossie/OssieExportFormat.js";
 import { OssieImportFormat } from "../src/ossie/OssieImportFormat.js";
+import { namespaceOfIris } from "../src/ossie/ossieNamespace.js";
 import { compileOssieSchema } from "../src/ossie/ossieSchema.js";
 import type { OssieDocument } from "../src/ossie/OssieTypes.js";
 
@@ -55,6 +56,28 @@ describe("an Ossie export's iri", () => {
 
   it("carries the namespace, which reads back and leaves the loss block", () => {
     const { text, losses } = exportOf(shop(NS));
+    expect(losses.filter((l) => l.includes("namespace"))).toEqual([]);
+    const { model, warnings } = new OssieImportFormat().parse(text);
+    expect(model.namespace).toBe(NS);
+    // The concepts' IRIs are kept; a relationship's is not, since the
+    // importer names its fact type from the Ossie name (/code-review, 6f).
+    expect(warnings.filter((w) => w.includes("iri"))).toEqual([
+      "Customer.customer_places_order: iri https://data.acme.com/sales/Customer_places_Order "
+      + "dropped; barwise keeps an IRI only as the model's namespace followed by the element's id.",
+    ]);
+  });
+
+  it("sits beside the name it identifies, before a concept's relationships", () => {
+    const { text } = exportOf(shop(NS));
+    expect(text).toContain(`  - concept: Customer\n    iri: ${NS}Customer\n`);
+  });
+
+  it("carries the namespace though one concept's old id ends in another's name", () => {
+    // Item's id LineItem ends in "Item" with no boundary (/code-review, 6f).
+    const m = new OrmModel({ name: "Shop", namespace: NS });
+    m.addObjectType({ name: "Order", kind: "entity", referenceMode: "nr" });
+    m.addObjectType({ id: "LineItem", name: "Item", kind: "entity", referenceMode: "nr" });
+    const { text, losses } = exportOf(m);
     expect(losses.filter((l) => l.includes("namespace"))).toEqual([]);
     expect(new OssieImportFormat().parse(text).model.namespace).toBe(NS);
   });
@@ -117,6 +140,21 @@ ontology:
     expect(warnings.filter((w) => w.includes("iri"))).toHaveLength(2);
   });
 
+  it("keeps the namespace most concepts agree on, naming an outside IRI dropped", () => {
+    const { model, warnings } = new OssieImportFormat().parse(`version: 0.2.0.dev0
+name: Shop
+ontology:
+  - { concept: Customer, type: EntityType, iri: "http://schema.org/Customer" }
+  - { concept: Order, type: EntityType, iri: "https://ex.org/shop#Order" }
+  - { concept: Item, type: EntityType, iri: "https://ex.org/shop#Item" }
+`);
+    expect(model.namespace).toBe("https://ex.org/shop#");
+    expect(warnings.filter((w) => w.includes("iri"))).toEqual([
+      "Customer: iri http://schema.org/Customer dropped; barwise keeps an IRI only as the model's "
+      + "namespace followed by the element's id.",
+    ]);
+  });
+
   it("names an IRI outside the namespace it takes", () => {
     const { model, warnings } = new OssieImportFormat().parse(
       doc("https://ex.org/shop#Customer", "https://ex.org/shop#Purchase"),
@@ -126,5 +164,34 @@ ontology:
       "Order: iri https://ex.org/shop#Purchase dropped; barwise keeps an IRI only as the model's "
       + "namespace followed by the element's id.",
     ]);
+  });
+});
+
+describe("the namespace a set of concept IRIs states", () => {
+  it("is the one most agree on, at a / or # boundary, and none on a tie", () => {
+    const ns = (...pairs: [string, string][]) =>
+      namespaceOfIris(pairs.map(([iri, id]) => ({ iri, id })));
+    expect(ns(["https://e/a/X", "X"], ["https://e/a/Y", "Y"], ["https://f/Z", "Z"])).toBe(
+      "https://e/a/",
+    );
+    expect(ns(["https://e/a/X", "X"], ["https://f/Y", "Y"])).toBeUndefined();
+    expect(ns(["https://e/LineItem", "Item"])).toBeUndefined();
+    expect(ns(["https://e/a/X", "Y"])).toBeUndefined();
+    expect(ns()).toBeUndefined();
+  });
+
+  it("is refused, with the reason named, when it is not one barwise can hold", () => {
+    const { model, warnings } = new OssieImportFormat().parse(`version: 0.2.0.dev0
+name: Shop
+ontology:
+  - { concept: Customer, type: EntityType, iri: "https://ex ample/Customer" }
+`);
+    expect(model.namespace).toBeUndefined();
+    expect(
+      warnings.some((w) =>
+        w.startsWith("namespace https://ex ample/, which the concept IRIs state,")
+      ),
+    )
+      .toBe(true);
   });
 });

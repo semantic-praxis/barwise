@@ -43,6 +43,7 @@ import {
   ossieFactTypeName,
   REQUIRES_NOTE_PREFIX,
 } from "./mapOssieToOrm.js";
+import { type ConceptIri, namespaceOfIris } from "./ossieNamespace.js";
 import {
   isOssieBuiltinValueType,
   OSSIE_ANY,
@@ -338,10 +339,9 @@ export function writeOssie(model: OrmModel): OssieWriteResult {
 
   const ontology: OssieConcept[] = [];
   const played = new Set(written.flatMap((w) => w.ft.roles.map((r) => r.playerId)));
-  // Whether the importer reads the namespace back: it does from a concept
-  // IRI that is the namespace and the id it gives that concept, which is
-  // the local name of the concept's written name.
-  let namespaceCarried = false;
+  // Each concept IRI written, with the id the importer will give that
+  // concept (the local name of its written name), for `namespaceOfIris`.
+  const conceptIris: ConceptIri[] = [];
   for (const ot of model.objectTypes) {
     if (isBuiltin(ot.id) && !played.has(ot.id)) {
       lose(ot.name, "a built-in no role uses is not written; Ossie declares none", {
@@ -351,7 +351,7 @@ export function writeOssie(model: OrmModel): OssieWriteResult {
     }
     if (isBuiltin(ot.id)) continue;
     const iri = iriOf(model, ot.id);
-    if (iri !== undefined && ot.id === localName(nameOf(ot.id))) namespaceCarried = true;
+    if (iri !== undefined) conceptIris.push({ iri, id: localName(nameOf(ot.id)) });
     ontology.push(withIri(
       writeConcept(ot, {
         model,
@@ -381,12 +381,12 @@ export function writeOssie(model: OrmModel): OssieWriteResult {
   if (model.domainContext) {
     lose("model", `domain context ${model.domainContext} not written`, { kind: "model" });
   }
-  // The namespace is carried by each element's identity IRI (iri-identity
-  // 6f), which the importer reads back from a concept whose id is its
-  // name's local name. It is still a loss where no concept is one: every
-  // concept a shadow (whose IRI names its owner's namespace, which only the
-  // project knows), or every id other than its name's (`id-not-from-name`).
-  if (model.namespace && !namespaceCarried) {
+  // The namespace is carried by the elements' identity IRIs (iri-identity
+  // 6f) where the importer reads it back, which it does by the rule
+  // predicted here. It is still a loss where it does not: every concept a
+  // shadow (whose namespace is its owner's, which only the project knows),
+  // or too few ids that are their names' (`id-not-from-name`).
+  if (model.namespace && namespaceOfIris(conceptIris) !== model.namespace) {
     lose("model", `namespace ${model.namespace} not written`, { kind: "model_header" }, [
       "namespace",
     ]);
@@ -822,7 +822,10 @@ function withIri<T extends OssieConcept | OssieRelationship>(
   element: T,
   iri: string | undefined,
 ): T {
-  return iri === undefined ? element : { ...element, iri };
+  if (iri === undefined) return element;
+  // Beside the name it identifies, not after a concept's relationships.
+  const [first, ...rest] = Object.entries(element);
+  return Object.fromEntries([first!, ["iri", iri], ...rest]) as T;
 }
 
 // ---------------------------------------------------------------------------

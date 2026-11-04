@@ -30,6 +30,7 @@ import {
   type ValueConstraintDef,
 } from "@barwise/core";
 import { snakeCase } from "../naming.js";
+import { namespaceOfIris } from "./ossieNamespace.js";
 import {
   isOssieBuiltinValueType,
   OSSIE_ANY,
@@ -332,37 +333,38 @@ function reportDropped(
 }
 
 /**
- * The model's namespace, from the IRIs the ontology states (iri-identity
- * 6f): an element's identity IRI is the namespace followed by its id, so
- * when every IRI that ends in its element's id leaves one namespace before
- * it, the model takes that namespace. Each IRI that is not that namespace
+ * The model's namespace, from the concept IRIs the ontology states
+ * (iri-identity 6f), by `namespaceOfIris`, the rule the export predicts
+ * with. Each IRI, a relationship's included, that is not that namespace
  * followed by its element's id is named in `warnings` and dropped: barwise
- * keeps one namespace per model, and no IRI per element.
+ * keeps one namespace per model, and no IRI per element. A relationship's
+ * IRI from a barwise export is always one of those, since the fact type
+ * this importer builds takes its id from its Ossie name.
  */
 function readNamespace(doc: OssieDocument, model: OrmModel, warnings: string[]): void {
-  const stated: { readonly name: string; readonly iri: string; readonly id: string; }[] = [];
+  const concepts: { readonly name: string; readonly iri: string; readonly id: string; }[] = [];
+  const relationships: typeof concepts = [];
   for (const c of doc.ontology) {
-    if (c.iri) stated.push({ name: c.concept, iri: c.iri, id: conceptId(model, c.concept) });
+    if (c.iri) concepts.push({ name: c.concept, iri: c.iri, id: conceptId(model, c.concept) });
     for (const r of c.relationships ?? []) {
       if (!r.iri) continue;
       const ft = relationshipFact(model, c.concept, r.name);
-      stated.push({ name: ft.name, iri: r.iri, id: ft.id });
+      relationships.push({ name: ft.name, iri: r.iri, id: ft.id });
     }
   }
-  const candidates = new Set(
-    stated
-      .filter((s) => s.iri.length > s.id.length && s.iri.endsWith(s.id))
-      .map((s) => s.iri.slice(0, -s.id.length)),
-  );
-  let namespace = candidates.size === 1 ? [...candidates][0] : undefined;
+  let namespace = namespaceOfIris(concepts);
   if (namespace !== undefined) {
     try {
       model.namespace = namespace;
-    } catch {
-      namespace = undefined; // not a namespace barwise can hold
+    } catch (e) {
+      warnings.push(
+        `namespace ${namespace}, which the concept IRIs state, is not one barwise can hold: `
+          + (e instanceof Error ? e.message : String(e)),
+      );
+      namespace = undefined;
     }
   }
-  for (const s of stated) {
+  for (const s of [...concepts, ...relationships]) {
     if (namespace !== undefined && s.iri === `${namespace}${s.id}`) continue;
     warnings.push(
       `${s.name}: iri ${s.iri} dropped; barwise keeps an IRI only as the model's namespace `

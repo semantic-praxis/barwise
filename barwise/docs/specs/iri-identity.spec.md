@@ -1605,16 +1605,20 @@ version-1 manifest would go silently empty for impact analysis.
       namespace is its owner's, which only the project knows. Decision 1's
       `equivalent_iri` is a field no model, schema or decoder holds yet,
       so the identity IRI is always the one written; adding the field is
-      filed as its own item.
-    - The namespace leaves the loss block only where it comes back. The
-      importer reads it from the IRIs: where every IRI that ends in its
-      element's id leaves one namespace before it, the model takes that
-      namespace, if it is one barwise can hold, and each other IRI is named in the
-      warnings and dropped. The writer predicts that, so a model whose
-      every concept is a shadow, or whose every id differs from its
-      name's (`id-not-from-name`), still names its namespace as not
-      written. The same rule applies to an Ossie document from elsewhere:
-      one whose IRIs agree on a namespace now imports with it.
+      filed as barwise-wcg.vn2.
+    - The namespace leaves the loss block only where it comes back. One
+      rule, `namespaceOfIris` (`formats/src/ossie/ossieNamespace.ts`), is
+      shared by the importer, which reads it, and the writer, which
+      predicts it: the namespace most concept IRIs agree on, each IRI that
+      ends in its concept's id at a `/` or `#` boundary, and none on a
+      tie. The model takes it if barwise can hold it (a warning says why
+      not), and each other IRI is named in the warnings and dropped. So a
+      model whose every concept is a shadow, or with too few ids that are
+      their names' (`id-not-from-name`), still names its namespace as not
+      written. A relationship's IRI is always dropped on import, since the
+      importer names its fact type from the Ossie name. The same rule
+      applies to an Ossie document from elsewhere: one whose concept IRIs
+      mostly agree on a namespace now imports with it.
     - DDL comments and SVG `data-id` print local names with no change, as
       planned (their goldens were regenerated in 6b).
 

@@ -198,7 +198,10 @@ Out of scope:
 - **IRIs and prefixes as model fields.** barwise has no field for them
   today. `docs/adr/ossie-interchange.md` decision 5 makes barwise's own
   identity an IRI (barwise-wcg), whose spec decides where an outside IRI
-  such as `foaf:Agent` goes.
+  such as `foaf:Agent` goes. (Since iri-identity 6f the export writes each
+  element's identity IRI as `iri`, and the importer reads the model's
+  namespace back from the concepts' IRIs; an element's own IRI is still
+  dropped with a warning.)
 - **Hyphen binding in verbalization** (`has average- departure {Delay}`),
   which barwise's verbalizer did not implement for any source:
   barwise-iiw (Open decision 4), since implemented in core
