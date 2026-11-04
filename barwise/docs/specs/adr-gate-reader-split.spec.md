@@ -43,25 +43,44 @@ found an eager reader would break:
   `npm run <script> -- <args>`, and the meta rule by the declaring ADR and
   the script. The reader's step question takes the command string.
 
+What counts as reading and what as judging follows one line: the reader
+answers what an input says, the judge decides what that means. So the
+reader returns the steps whose `run:` is the command, as `ci.yml` states
+them, and `guard` (a step counts only if it runs on every code change for
+both optimizer values) stays in the judge, with the working-directory and
+`continue-on-error` filters.
+
 ## Scope
 
 In scope:
 
 - When `check:architecture` runs, its declaration pass shall read the root
-  scripts, `ci.yml` and the tracker only through loaders created by
-  `createGovernanceReader(root, adrs, refusals)` in `adr-facts.mjs`, and
-  judge each ADR in `judgeDeclarations(adrs, reader)` in `adr-judge.mjs`,
-  with the loop, its short-circuits and its messages unchanged.
+  scripts, `ci.yml` and the tracker only through
+  `await createGovernanceReader(root, adrs, refusals)` in `adr-facts.mjs`,
+  and judge each ADR in `judgeDeclarations(adrs, reader, refusals)` in
+  `adr-judge.mjs`, which returns `{ problems, declaring }`, with the loop,
+  its short-circuits and its messages unchanged. The reader is async
+  because the `ci-occurrences.mjs` import is; `refusals` is the gate's
+  one list, which the loaders and the judge both push to, so the order is
+  today's. The import refusal keeps its label,
+  `scripts/lib/ci-occurrences.mjs: ...`, though the specifier moves.
+- When the reader is asked for the steps of a command and `ci.yml` could
+  not be read, it shall answer `null`, not an empty list, so the judge
+  skips the entry as today rather than reporting no matching step.
 - When `check:adr-tests` runs, it shall read the expected reports through
-  `readTestReports(root)` in `adr-facts.mjs`, which returns the tests that
-  ran and the unread-report refusals, and judge them in
-  `judgeTestedDecisions(adrs, reports)` in `adr-judge.mjs`.
+  `readTestReports(root)` in `adr-facts.mjs`, which returns
+  `{ expected, ran, refusals }` (the unread-report refusals), and judge in
+  `judgeTestedDecisions(adrs, reports, refusals)`, which parses the
+  declaring ADRs, appends its refusals after the report refusals in the
+  same list, and returns `{ findings, declaring, tested, skipOnly }`. An
+  unreadable report list stays an exit 2 in the gate.
 - When either gate runs on any tree the existing tests build, its stdout,
   stderr and exit code shall be what they are before this change.
 - When `adr-facts.test.mjs` runs, it shall show the reader alone reads an
   input only when its loader is first called, reads it at most once,
-  records an unreadable input as one refusal in call order, and answers the
-  step question by the full command.
+  records an unreadable input as one refusal in call order, answers the
+  step question by the full command, and answers `null` for an unreadable
+  `ci.yml`.
 
 Out of scope:
 
@@ -73,13 +92,13 @@ Out of scope:
 
 ## Inventory
 
-| Code today                                                                                      | Moves to                                   | Note                                                                                            |
-| ----------------------------------------------------------------------------------------------- | ------------------------------------------ | ----------------------------------------------------------------------------------------------- |
-| `lazily`, `rootScripts`, the `needsWorkflow` import, `steps`, `issues` (check-architecture.mjs) | `createGovernanceReader`                   | the `refusals` list stays the gate's, passed in                                                 |
-| `guard` and the step filter (`matching`, `inBarwise`, `judged`)                                 | `createGovernanceReader`'s `step(command)` | returns the matched, in-barwise and judged steps; the verdict and its message stay in the judge |
-| the per-ADR loop                                                                                | `judgeDeclarations`                        | unchanged, reading only through the reader                                                      |
-| `readVitest`, `readNodeTest`, the expected-report list and its reading (check-adr-tests.mjs)    | `readTestReports`                          | an unreadable list stays an exit 2 in the gate                                                  |
-| stale tags and the per-decision verdicts                                                        | `judgeTestedDecisions`                     | unchanged                                                                                       |
+| Code today                                                                                               | Moves to                 | Note                                                                                                                                                                        |
+| -------------------------------------------------------------------------------------------------------- | ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `lazily`, `rootScripts`, the `needsWorkflow` import, `steps`, `issues` (check-architecture.mjs)          | `createGovernanceReader` | the `refusals` list stays the gate's, passed in                                                                                                                             |
+| the step lookup (`all.filter((s) => s.run === want)`)                                                    | `reader.steps(command)`  | the steps as `ci.yml` states them, or `null` when it cannot be read; `guard`, the `barwise/` and `continue-on-error` filters, the verdict and its message stay in the judge |
+| the per-ADR loop, `guard`, `declaring`, `enforcementProblems`                                            | `judgeDeclarations`      | unchanged; it returns the problems and the count the gate prints                                                                                                            |
+| `readVitest`, `readNodeTest`, the expected-report list and its reading (check-adr-tests.mjs)             | `readTestReports`        | an unreadable list stays an exit 2 in the gate                                                                                                                              |
+| the declaring-ADR parse (`declaring`, `testedIds`), stale tags, the per-decision verdicts and `skipOnly` | `judgeTestedDecisions`   | unchanged; `unreadableReports` is `reports.refusals.length`                                                                                                                 |
 
 ## Alternatives considered
 
@@ -98,8 +117,11 @@ One PR. `adr-facts.mjs` and `adr-judge.mjs` take the code in the
 Inventory, moved, not rewritten; both gates import them. `adr-facts.test.mjs`
 covers the reader as Scope says, and `expected-counts.json` records it. The
 acceptance evidence, in the PR body: both gates' existing tests pass
-unchanged, and the real tree's output from both gates is byte-identical
-before and after (diffed from the two runs).
+unchanged, and the real tree's output from both gates is identical before
+and after (diffed from the two runs) but for one expected difference:
+registering `adr-facts.test.mjs` adds its report to `check:adr-tests`'s
+list, so that gate's OK line counts one more report and that file's tests.
+Any other difference is a regression.
 
 ## API and migration impact
 
