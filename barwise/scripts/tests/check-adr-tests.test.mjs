@@ -102,10 +102,44 @@ test("check:adr-tests passes when each tested decision has a passing tagged test
 });
 
 test("check:adr-tests: a tagged test that did not pass is not evidence", () => {
-  for (const status of ["skipped", "todo", "failed"]) {
+  for (
+    const [status, why] of [["todo", /no test carrying \[adr:a-concern#one\] passed/], [
+      "failed",
+      /a test carrying \[adr:a-concern#one\] failed/,
+    ]]
+  ) {
     withFixture({ core: vitest([["pins one [adr:a-concern#one]", status]]) }, (_, r) => {
       assert.equal(r.status, 1, `${status}\n${r.stdout}${r.stderr}`);
-      assert.match(r.stderr, /tests \(one\): no test carrying \[adr:a-concern#one\] passed/);
+      assert.match(r.stderr, why);
+    });
+  }
+});
+
+test("check:adr-tests: a decision whose tagged tests all skipped cannot be answered, unless one failed", () => {
+  // A skip is a test that could not answer: the gitleaks probes skip where
+  // gitleaks is absent, and that run cannot tell whether the decision holds.
+  const T = "pins one [adr:a-concern#one]";
+  for (
+    const [label, rows, want] of [
+      ["skip only", [[T, "skipped"]], 2],
+      ["skip and a pass", [[T, "skipped"], [`${T} too`, "passed"]], 0],
+      ["skip and a failure", [[T, "skipped"], [`${T} too`, "failed"]], 1],
+      ["skip and a todo", [[T, "skipped"], [`${T} too`, "todo"]], 2],
+    ]
+  ) {
+    withFixture({ core: vitest(rows) }, (_, r) => {
+      assert.equal(r.status, want, `${label}\n${r.stdout}${r.stderr}`);
+      if (want === 2) {
+        assert.match(
+          r.stderr,
+          /every test carrying \[adr:a-concern#one\] skipped, so this run cannot tell: "pins one/,
+        );
+        assert.match(
+          r.stderr,
+          /0 report\(s\) not read, 0 decision\(s\) left unproven by them, 1 decision\(s\) whose tagged tests all skipped/,
+        );
+        assert.doesNotMatch(r.stderr, /FAIL/);
+      }
     });
   }
 });

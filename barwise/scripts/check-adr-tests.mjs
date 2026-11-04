@@ -9,16 +9,24 @@
  * status, and this check reads those reports. A skipped or todo test, a
  * test inside a skipped suite, a loop-built title and a tag quoted in a
  * fixture all settle themselves: none reaches a report as a passed test.
+ * A skip is a test that could not answer, so a decision whose tagged tests
+ * all skipped is a refusal, not a finding: the gitleaks probe tests skip in
+ * a container without gitleaks, which cannot tell whether the decision
+ * holds (docs/specs/enforceable-adr-practice.spec.md, WS1). A failed tagged
+ * test is an answer, so it stays a finding.
  *
  * Findings, exit 1:
- *   - a `tests` entry lists an id with no passed test carrying its tag,
- *     when every report was read (with one unread, that is a refusal);
+ *   - a `tests` entry lists an id with a failed tagged test, or with no
+ *     tagged test that passed or skipped, when every report was read (with
+ *     one unread, that is a refusal);
  *   - a reported test or suite carries a tag naming an ADR that does not
  *     exist or an id that ADR does not have (a tag that outlived its
  *     decision). A tag on a suite never counts as a passed test; it is read
  *     only to be reported, so an author learns why the decision reads as
  *     untested (barwise-ym8.7jz, item 7).
- * Refusals, exit 2: a report this run should have written is missing or is
+ * Refusals, exit 2: a tested decision whose tagged tests all skipped (none
+ * passed, none failed; a todo beside the skips does not change that), named
+ * with the skipped titles; and a report this run should have written is missing or is
  * not the shape this check reads -- a vitest upgrade that renamed a field
  * must stop the check, not pass it. The expected reports are derived: one
  * per package with a `test:coverage` script, one per file in
@@ -174,12 +182,21 @@ for (const t of ran) {
   }
 }
 
-// The evidence: a test, by its own title, that passed.
+// The evidence: a test, by its own title, that passed. Beside it, by
+// decision, the tagged tests that failed (an answer) and that skipped (none).
 const passed = new Set();
+const failed = new Set();
+const skipped = new Map();
 for (const t of ran) {
-  if (t.type !== "test" || t.status !== "passed") continue;
-  for (const { adr, id } of tagsIn(t.title)) passed.add(`${adr}#${id}`);
+  if (t.type !== "test") continue;
+  for (const { adr, id } of tagsIn(t.title)) {
+    const key = `${adr}#${id}`;
+    if (t.status === "passed") passed.add(key);
+    else if (t.status === "failed") failed.add(key);
+    else if (t.status === "skipped") skipped.set(key, [...(skipped.get(key) ?? []), t.title]);
+  }
 }
+let skipOnly = 0;
 const suiteOnly = new Set(
   ran.flatMap((t) => [...(t.type === "suite" ? [t.title] : []), ...t.ancestors])
     .flatMap((title) => tagsIn(title).map(({ adr, id }) => `${adr}#${id}`)),
@@ -193,9 +210,18 @@ for (const a of declaring) {
       : "";
     const unproven =
       `${a.f}: tests (${id}): no test carrying [adr:${key}] passed in this run${hint}`;
-    // With a report missing or unreadable, its passing test may be the one
-    // not read: the answer is "cannot tell", never the finding code.
-    if (unreadableReports > 0) {
+    const quoted = (titles) => titles.map((s) => `"${s}"`).join(", ");
+    if (failed.has(key)) {
+      findings.push(`${a.f}: tests (${id}): a test carrying [adr:${key}] failed in this run`);
+    } else if (skipped.has(key)) {
+      skipOnly++;
+      refusals.push(
+        `${a.f}: tests (${id}): every test carrying [adr:${key}] skipped, so this run cannot`
+          + ` tell: ${quoted(skipped.get(key))}`,
+      );
+    } else if (unreadableReports > 0) {
+      // With a report missing or unreadable, its passing test may be the one
+      // not read: the answer is "cannot tell", never the finding code.
       refusals.push(`${unproven}, and ${unreadableReports} report(s) were not read`);
     } else findings.push(unproven);
   }
@@ -208,7 +234,8 @@ if (findings.length > 0) {
 if (refusals.length > 0) {
   console.error(
     `check:adr-tests: cannot answer -- ${unreadableReports} report(s) not read,`
-      + ` ${refusals.length - unreadableReports} decision(s) left unproven by them:`,
+      + ` ${refusals.length - unreadableReports - skipOnly} decision(s) left unproven by them,`
+      + ` ${skipOnly} decision(s) whose tagged tests all skipped:`,
   );
   for (const r of refusals) console.error(`  ${r}`);
 }
