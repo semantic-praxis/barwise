@@ -249,9 +249,8 @@ default on). The rules, what is pinned and what is not checked are in
 
 The owner re-decided the rows that existed on 2026-10-13, under the
 2026-10-12 direction that MCP and VS Code mirror the CLI (barwise-0wa).
-A gap that stays reads `deliberate` with the reason the owner approved;
-a gap being closed reads `not yet` with the workstream of
-`docs/specs/surface-mirroring.spec.md` that closes it. `migrate` was
+The labels follow the ADR's decision 1, and each `not yet` names a
+workstream of `docs/specs/surface-mirroring.spec.md`. `migrate` was
 added since, and keeps its own spec's reason until the owner rules on it.
 
 The MCP and VS Code tool lists are pinned by `toEqual` tests
