@@ -2,6 +2,7 @@
  * Impact analysis: determine which artifacts depend on a changed model element.
  */
 
+import type { OrmModel } from "../model/OrmModel.js";
 import { checkScope, type ModelScope } from "./attribution.js";
 import type { LineageManifest } from "./types.js";
 
@@ -22,6 +23,12 @@ export interface AffectedArtifact {
 export interface ImpactReport {
   readonly changedElement: string;
   readonly affectedArtifacts: readonly AffectedArtifact[];
+  /**
+   * Exports written under 3.x ids that named no id this one is known by
+   * (iri-identity 6e): they may depend on the element under its old id, so
+   * they are listed rather than left out. Re-exporting answers it.
+   */
+  readonly exportsBefore40: readonly string[];
 }
 
 /**
@@ -45,13 +52,25 @@ export function analyzeImpact(
   manifest: LineageManifest | undefined,
   elementId: string,
   scope?: ModelScope,
+  model?: OrmModel,
 ): ImpactReport {
   if (!manifest) {
     return {
       changedElement: elementId,
       affectedArtifacts: [],
+      exportsBefore40: [],
     };
   }
+  // The ids the element is known by: as asked, and, for a model replayed
+  // from a 3.x file, its 4.0 id for a 3.x one the file states and its 3.x
+  // id for a 4.0 one (barwise-wcg.v5k). An export records the ids of the
+  // model that wrote it, so either can be the one it holds.
+  const known = new Set([elementId]);
+  const now = model?.idFromPrior(elementId);
+  if (now !== undefined) known.add(now);
+  const before = model?.priorIds?.get(elementId);
+  if (before !== undefined) known.add(before);
+  const exportsBefore40: string[] = [];
 
   if (scope) checkScope(scope);
   const affectedArtifacts: AffectedArtifact[] = [];
@@ -62,7 +81,8 @@ export function analyzeImpact(
       scope !== undefined && exp.sourceModel !== undefined
       && exp.sourceModel !== scope.sourceModel && scope.modelsBeside.includes(exp.sourceModel)
     ) continue;
-    const sourceRef = exp.sources.find(src => src.elementId === elementId);
+    const sourceRef = exp.sources.find((src) => known.has(src.elementId));
+    if (!sourceRef && exp.idsBefore40) exportsBefore40.push(exp.artifact);
 
     if (sourceRef) {
       affectedArtifacts.push({
@@ -77,6 +97,7 @@ export function analyzeImpact(
   return {
     changedElement: elementId,
     affectedArtifacts,
+    exportsBefore40,
   };
 }
 

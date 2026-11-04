@@ -2,11 +2,12 @@
  * impact_analysis tool: analyze impact of changing a model element.
  */
 
+import type { OrmModel } from "@barwise/core";
 import { analyzeImpact } from "@barwise/core/lineage";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { modelLocation, modelsBeside, readManifest } from "../workspace/lineageIo.js";
-import { type SourceInput, sourcePath } from "../workspace/resolve.js";
+import { resolveSource, type SourceInput, sourcePath } from "../workspace/resolve.js";
 import { sourceInputSchema } from "../workspace/sourceSchema.js";
 
 export function registerImpactAnalysisTool(server: McpServer): void {
@@ -44,10 +45,19 @@ export function executeImpactAnalysis(
   // With a path, only that model's exports are read. Without one there is
   // no model to read for, so every export holding the id is, and the
   // report names each export's model (iri-identity 6a).
+  // The model, when it loads, so an id a 3.x file states finds the exports
+  // that recorded its 4.0 id (barwise-wcg.v5k).
+  let model: OrmModel | undefined;
+  try {
+    model = resolveSource(source);
+  } catch {
+    model = undefined;
+  }
   const report = analyzeImpact(
     readManifest(dir),
     elementId,
     location ? { sourceModel: location.sourceModel, modelsBeside: modelsBeside(dir) } : undefined,
+    model,
   );
 
   return {

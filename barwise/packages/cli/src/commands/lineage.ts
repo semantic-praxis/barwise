@@ -4,6 +4,7 @@
  * Lineage tracking and staleness detection.
  */
 
+import type { OrmModel } from "@barwise/core";
 import { analyzeImpact, checkStaleness } from "@barwise/core/lineage";
 import type { Command } from "commander";
 import { loadModel } from "../workspace/io.js";
@@ -126,10 +127,14 @@ export function registerLineageCommand(program: Command): void {
       async (source: string, opts: { element: string; format: string; }) => {
         try {
           const { dir, sourceModel } = modelLocation(source);
-          const report = analyzeImpact(readManifest(dir), opts.element, {
-            sourceModel,
-            modelsBeside: modelsBeside(dir),
-          });
+          // The model, when it loads, so an id a 3.x file states finds the
+          // exports that recorded its 4.0 id (barwise-wcg.v5k).
+          const report = analyzeImpact(
+            readManifest(dir),
+            opts.element,
+            { sourceModel, modelsBeside: modelsBeside(dir) },
+            modelIfItLoads(source),
+          );
 
           if (opts.format === "json") {
             process.stdout.write(JSON.stringify(report, null, 2) + "\n");
@@ -140,8 +145,17 @@ export function registerLineageCommand(program: Command): void {
             `Impact analysis for element: ${report.changedElement}\n\n`,
           );
 
+          const before40 = () => {
+            if (report.exportsBefore40.length === 0) return;
+            process.stdout.write(
+              `\n${report.exportsBefore40.length} artifact(s) were exported under 3.x ids, so `
+                + "whether they depend on it is unknown; re-export them: "
+                + `${report.exportsBefore40.join(", ")}\n`,
+            );
+          };
           if (report.affectedArtifacts.length === 0) {
             process.stdout.write("No artifacts depend on this element.\n");
+            before40();
             return;
           }
 
@@ -158,6 +172,7 @@ export function registerLineageCommand(program: Command): void {
               process.stdout.write("    (names no model; re-export it to record one)\n");
             }
           }
+          before40();
         } catch (err) {
           process.stderr.write(`Error: ${(err as Error).message}\n`);
           process.exitCode = 1;
@@ -212,4 +227,13 @@ export function registerLineageCommand(program: Command): void {
         process.exitCode = 1;
       }
     });
+}
+
+/** The model at `source`, or undefined when it does not load: impact still reads the manifest. */
+function modelIfItLoads(source: string): OrmModel | undefined {
+  try {
+    return loadModel(source);
+  } catch {
+    return undefined;
+  }
 }

@@ -28,7 +28,7 @@ describe("readManifest", () => {
     expect(readManifest(tempDir)).toBeUndefined();
 
     const manifest: LineageManifest = {
-      version: 1,
+      version: 2,
       sourceModel: "model.orm.yaml",
       sourceModelHash: "abc123",
       exports: [],
@@ -44,7 +44,7 @@ describe("resolveArtifact", () => {
     const artifactPath = join(tempDir, "output", "schema.sql");
     writeFileSync(artifactPath, "CREATE TABLE test;", "utf-8");
     writeManifest(tempDir, {
-      version: 1,
+      version: 2,
       sourceModel: "model.orm.yaml",
       sourceModelHash: "abc123",
       exports: [
@@ -73,7 +73,7 @@ describe("resolveArtifact", () => {
 
   it("returns undefined when the artifact is not in the manifest", () => {
     writeManifest(tempDir, {
-      version: 1,
+      version: 2,
       sourceModel: "model.orm.yaml",
       sourceModelHash: "abc123",
       exports: [

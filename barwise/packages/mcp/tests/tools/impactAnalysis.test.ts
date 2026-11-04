@@ -43,7 +43,7 @@ describe("impact_analysis tool", () => {
     const modelHash = hashModel(model);
 
     const manifest: LineageManifest = {
-      version: 1,
+      version: 2,
       sourceModel: "test.orm.yaml",
       sourceModelHash: modelHash,
       exports: [
@@ -78,7 +78,7 @@ describe("impact_analysis tool", () => {
     const elementId = "550e8400-e29b-41d4-a716-446655440000";
 
     const manifest: LineageManifest = {
-      version: 1,
+      version: 2,
       sourceModel: "test.orm.yaml",
       sourceModelHash: modelHash,
       exports: [
@@ -152,7 +152,7 @@ describe("impact_analysis tool", () => {
     const elementId = "550e8400-e29b-41d4-a716-446655440000";
 
     const manifest: LineageManifest = {
-      version: 1,
+      version: 2,
       sourceModel: "test.orm.yaml",
       sourceModelHash: modelHash,
       exports: [
@@ -193,7 +193,7 @@ describe("impact_analysis tool", () => {
     const valueTypeId = "v2222222-e29b-41d4-a716-446655440000";
 
     const manifest: LineageManifest = {
-      version: 1,
+      version: 2,
       sourceModel: "test.orm.yaml",
       sourceModelHash: modelHash,
       exports: [
@@ -250,7 +250,7 @@ describe("impact_analysis tool", () => {
     const modelHash = hashModel(model);
 
     const manifest: LineageManifest = {
-      version: 1,
+      version: 2,
       sourceModel: "test.orm.yaml",
       sourceModelHash: modelHash,
       exports: [],
@@ -288,7 +288,7 @@ describe("impact_analysis tool", () => {
     // gone, the export would be read as a renamed model's.
     fs.copyFileSync(`${fixtures}/simple.orm.yaml`, path.join(tempDir, "b.orm.yaml"));
     const manifest = {
-      version: 1 as const,
+      version: 2 as const,
       sourceModel: "b.orm.yaml",
       sourceModelHash: "h",
       exports: [exportOf("a.sql", "a.orm.yaml"), exportOf("b.sql", "b.orm.yaml")],
@@ -306,5 +306,36 @@ describe("impact_analysis tool", () => {
       "a.orm.yaml",
       "b.orm.yaml",
     ]);
+  });
+
+  it("finds by an id a 3.x file states the export that recorded its 4.0 id (6e)", () => {
+    const modelPath = path.join(tempDir, "shop.orm.yaml");
+    fs.writeFileSync(
+      modelPath,
+      `orm_version: "3.0"
+model:
+  name: Shop
+  object_types:
+    - { id: ot-1, name: Customer, kind: entity, reference_mode: nr }
+`,
+    );
+    writeManifest(tempDir, {
+      version: 2,
+      sourceModel: "shop.orm.yaml",
+      sourceModelHash: "h",
+      exports: [{
+        artifact: "a.sql",
+        format: "ddl",
+        exportedAt: "2026-11-04T00:00:00Z",
+        modelHash: "h",
+        sources: [{ elementId: "Customer", elementType: "EntityType", elementName: "Customer" }],
+        sourceModel: "shop.orm.yaml",
+      }],
+    });
+    const report = JSON.parse(executeImpactAnalysis(modelPath, "ot-1").content[0]!.text);
+    expect(report.affectedArtifacts.map((a: { artifact: string; }) => a.artifact)).toEqual([
+      "a.sql",
+    ]);
+    expect(report.exportsBefore40).toEqual([]);
   });
 });

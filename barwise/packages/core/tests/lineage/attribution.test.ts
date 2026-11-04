@@ -87,7 +87,7 @@ const shared = (sourceModel: string) => ({
 });
 
 function manifest(exports: ManifestExport[]): LineageManifest {
-  return { version: 1, sourceModel: "billing.orm.yaml", sourceModelHash: "h", exports };
+  return { version: 2, sourceModel: "billing.orm.yaml", sourceModelHash: "h", exports };
 }
 
 describe("claiming an export that names no model", () => {

@@ -9,7 +9,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { readManifest, writeManifest } from "../../src/workspace/lineageIo.js";
 
 const manifest: LineageManifest = {
-  version: 1,
+  version: 2,
   sourceModel: "test.orm.yaml",
   sourceModelHash: "abc123",
   exports: [

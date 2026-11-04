@@ -344,7 +344,11 @@ In format 4.0 an element's id is its name, so a rename also gives the
 element the id its new name gives (`Order` becomes `Purchase`), and every
 id that embeds it follows: a renamed fact type's roles, populations and
 instances, and, through a project, each shadow's id in the other domains.
-Every reference to a changed id in the model files is rewritten, and each change is printed. Lineage manifests (`.barwise/lineage.yaml`) are not, so re-export what a renamed element was exported in. A
+Every reference to a changed id in the model files is rewritten, and each change is printed. So is
+the lineage manifest (`.barwise/lineage.yaml`) beside each changed file:
+the exports that model made name the new ids, in the same staged write.
+Their model hash is left as it was, so `barwise lineage status` reports
+them stale until they are re-exported. A
 rename whose new id another element already holds is refused. A minted id,
 such as a constraint's, is kept, and `barwise validate` reports one whose
 element now says something else (`structural/stale-minted-name`). Beyond
@@ -769,6 +773,15 @@ stderr. A copy of the model in the same directory would claim them too,
 and whichever exports first keeps them (barwise-wcg.t0i). An export that
 writes over another model's artifact path says so: that model's lineage no
 longer lists it.
+
+A manifest written before format 4.0 (`version: 1`) names elements by
+3.x ids. Each of its exports reads stale, with the reason "ids changed
+to 4.0", until it is re-exported, and the next export upgrades the
+manifest to `version: 2` and keeps the others marked. `lineage impact`
+lists such exports when they name no id the element is known by, rather
+than leaving them out, since they may depend on it under its old id.
+Given a 3.x model file, `impact` also finds an element by the id that file
+states.
 
 `status` exits 1, as it does for a stale artifact, on two kinds of export
 it cannot check:

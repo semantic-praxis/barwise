@@ -1,7 +1,7 @@
 /**
  * Tests for the lineage command group.
  */
-import { hashModel, type LineageManifest } from "@barwise/core/lineage";
+import { hashModel, type LineageManifest, serializeManifest } from "@barwise/core/lineage";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import { dirname, resolve } from "node:path";
@@ -94,7 +94,7 @@ describe("barwise lineage", () => {
       const modelHash = hashModel(model);
 
       const manifest: LineageManifest = {
-        version: 1,
+        version: 2,
         sourceModel: "test.orm.yaml",
         sourceModelHash: modelHash,
         exports: [
@@ -127,7 +127,7 @@ describe("barwise lineage", () => {
       // Create manifest with a different hash (simulating old model)
       const oldHash = "a1b2c3d4e5f6000000000000000000000000000000000000000000000000";
       const manifest: LineageManifest = {
-        version: 1,
+        version: 2,
         sourceModel: "test.orm.yaml",
         sourceModelHash: oldHash,
         exports: [
@@ -169,7 +169,7 @@ describe("barwise lineage", () => {
       const modelHash = hashModel(model);
 
       const manifest: LineageManifest = {
-        version: 1,
+        version: 2,
         sourceModel: "test.orm.yaml",
         sourceModelHash: modelHash,
         exports: [
@@ -211,7 +211,7 @@ describe("barwise lineage", () => {
       const oldHash = "a1b2c3d4e5f6000000000000000000000000000000000000000000000000";
 
       const manifest: LineageManifest = {
-        version: 1,
+        version: 2,
         sourceModel: "test.orm.yaml",
         sourceModelHash: modelHash,
         exports: [
@@ -251,7 +251,7 @@ describe("barwise lineage", () => {
       fs.copyFileSync(`${fixtures}/simple.orm.yaml`, path.join(tempDir, "other.orm.yaml"));
       const modelHash = hashModel(loadModel(modelPath));
       writeManifest(tempDir, {
-        version: 1,
+        version: 2,
         sourceModel: "test.orm.yaml",
         sourceModelHash: modelHash,
         exports: [
@@ -277,7 +277,7 @@ describe("barwise lineage", () => {
       fs.writeFileSync(modelPath, DETERMINISTIC_MODEL);
       const modelHash = hashModel(loadModel(modelPath));
       writeManifest(tempDir, {
-        version: 1,
+        version: 2,
         sourceModel: "test.orm.yaml",
         sourceModelHash: modelHash,
         exports: [{
@@ -305,7 +305,7 @@ describe("barwise lineage", () => {
       const modelHash = hashModel(model);
 
       const manifest: LineageManifest = {
-        version: 1,
+        version: 2,
         sourceModel: "test.orm.yaml",
         sourceModelHash: modelHash,
         exports: [
@@ -345,7 +345,7 @@ describe("barwise lineage", () => {
       const elementId = "550e8400-e29b-41d4-a716-446655440000";
 
       const manifest: LineageManifest = {
-        version: 1,
+        version: 2,
         sourceModel: "test.orm.yaml",
         sourceModelHash: modelHash,
         exports: [
@@ -404,7 +404,7 @@ describe("barwise lineage", () => {
       const modelHash = hashModel(model);
 
       const manifest: LineageManifest = {
-        version: 1,
+        version: 2,
         sourceModel: "test.orm.yaml",
         sourceModelHash: modelHash,
         exports: [],
@@ -429,6 +429,58 @@ describe("barwise lineage", () => {
     });
   });
 
+  describe("impact under format 4.0 (6e)", () => {
+    const SHOP_3X = `orm_version: "3.0"
+model:
+  name: Shop
+  object_types:
+    - { id: ot-1, name: Customer, kind: entity, reference_mode: nr }
+`;
+    const exportOf = (elementId: string) => ({
+      artifact: "schema.sql",
+      format: "ddl",
+      exportedAt: "2026-11-04T00:00:00Z",
+      modelHash: "h",
+      sources: [{ elementId, elementType: "EntityType", elementName: "Customer" }],
+      sourceModel: "shop.orm.yaml",
+    });
+
+    it("finds by an id the 3.x file states the export that recorded its 4.0 id", async () => {
+      const modelPath = path.join(tempDir, "shop.orm.yaml");
+      fs.writeFileSync(modelPath, SHOP_3X);
+      writeManifest(tempDir, {
+        version: 2,
+        sourceModel: "shop.orm.yaml",
+        sourceModelHash: "h",
+        exports: [exportOf("Customer")],
+      });
+      const result = await runCli(["lineage", "impact", modelPath, "--element", "ot-1"]);
+      expect(result.stdout).toContain("1 artifact(s) affected");
+      expect(result.exitCode).toBe(0);
+    });
+
+    it("names the exports made under 3.x ids rather than reporting nothing", async () => {
+      const modelPath = path.join(tempDir, "shop.orm.yaml");
+      fs.writeFileSync(modelPath, SHOP_3X);
+      fs.mkdirSync(path.join(tempDir, ".barwise"), { recursive: true });
+      fs.writeFileSync(
+        path.join(tempDir, ".barwise/lineage.yaml"),
+        serializeManifest({
+          version: 1,
+          sourceModel: "shop.orm.yaml",
+          sourceModelHash: "h",
+          exports: [exportOf("some-uuid")],
+        }),
+      );
+      const result = await runCli(["lineage", "impact", modelPath, "--element", "Customer"]);
+      expect(result.stdout).toContain("No artifacts depend on this element");
+      expect(result.stdout).toContain(
+        "1 artifact(s) were exported under 3.x ids, so whether they depend on it is unknown; "
+          + "re-export them: schema.sql",
+      );
+    });
+  });
+
   describe("show", () => {
     it("reports no manifest when none exists", async () => {
       const modelPath = path.join(tempDir, "test.orm.yaml");
@@ -448,7 +500,7 @@ describe("barwise lineage", () => {
       const modelHash = hashModel(model);
 
       const manifest: LineageManifest = {
-        version: 1,
+        version: 2,
         sourceModel: "test.orm.yaml",
         sourceModelHash: modelHash,
         exports: [
@@ -491,7 +543,7 @@ describe("barwise lineage", () => {
       const modelHash = hashModel(model);
 
       const manifest: LineageManifest = {
-        version: 1,
+        version: 2,
         sourceModel: "test.orm.yaml",
         sourceModelHash: modelHash,
         exports: [
@@ -517,7 +569,7 @@ describe("barwise lineage", () => {
       ]);
 
       const parsed = JSON.parse(result.stdout);
-      expect(parsed).toHaveProperty("version", 1);
+      expect(parsed).toHaveProperty("version", 2);
       expect(parsed).toHaveProperty("sourceModel");
       expect(parsed).toHaveProperty("sourceModelHash");
       expect(parsed).toHaveProperty("exports");

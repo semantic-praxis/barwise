@@ -74,8 +74,17 @@ export function checkStaleness(
   const freshArtifacts: string[] = [];
 
   for (const exp of own) {
-    // An artifact is stale if its model hash differs from the current model hash
-    if (exp.modelHash !== currentHash) {
+    // Written under 3.x ids: stale whatever its hash, and said so, since a
+    // hash taken through the old canonicalization never matches anyway
+    // (iri-identity 6e, decision 15 as amended).
+    if (exp.idsBefore40) {
+      staleArtifacts.push({
+        artifact: exp.artifact,
+        format: exp.format,
+        exportedAt: exp.exportedAt,
+        reason: "ids changed to 4.0: exported under 3.x ids; re-export it",
+      });
+    } else if (exp.modelHash !== currentHash) {
       staleArtifacts.push({
         artifact: exp.artifact,
         format: exp.format,

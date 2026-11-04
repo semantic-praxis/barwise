@@ -596,8 +596,10 @@ format: run `barwise migrate` on it first.
 
 **Like `merge_models`, this is an editing tool: a file source is written
 back.** Every changed file is staged before any is replaced, and files are
-written from the model, so YAML comments in them are lost. The CLI's
-`barwise rename` writes the same way.
+written from the model, so YAML comments in them are lost. The
+lineage manifest beside each changed file is rewritten in the same
+write, its exports naming the new ids and still stale until re-exported.
+The CLI's `barwise rename` writes the same way.
 
 ---
 
@@ -811,7 +813,9 @@ in the lineage manifest that depend on the element. As with
 `source` is a path, and only that model's exports are read (with any
 that name no model). Given inline YAML, every export holding the id is
 read, and each affected artifact carries the `sourceModel` its export
-names.
+names. `exportsBefore40` lists the exports written under 3.x ids (a
+`version: 1` manifest) that name no id the element is known by: they
+may depend on it under its old id, so re-export them.
 
 ---
 

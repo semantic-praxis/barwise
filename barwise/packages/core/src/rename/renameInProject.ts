@@ -37,8 +37,12 @@ import {
 export interface ProjectRenameResult {
   /** The renamed project; the input is unchanged. */
   readonly project: OrmProject;
-  /** Old id to new id, in every domain the rename reached. */
-  readonly ids: ReadonlyMap<string, string>;
+  /**
+   * Old id to new id, by the context of each domain whose ids changed: a
+   * shadow's id changes in each domain that holds it, so one map would
+   * merge two domains' ids (iri-identity 6e).
+   */
+  readonly ids: ReadonlyMap<string, ReadonlyMap<string, string>>;
   /** Every rewrite, in plain words, for a surface to print. */
   readonly changes: readonly string[];
   /** Each domain and mapping path whose content changed, to write. */
@@ -131,7 +135,7 @@ export function renameInProject(
   });
 
   const renamedModels = new Map<string, OrmModel>();
-  const ids = new Map<string, string>();
+  const ids = new Map<string, ReadonlyMap<string, string>>();
   for (const [ctx, doc] of docs) {
     const where = `In domain "${ctx}": `;
     let model: OrmModel;
@@ -152,7 +156,7 @@ export function renameInProject(
       if (err instanceof RenameError) throw new RenameError(where + err.message);
       throw err;
     }
-    for (const [from, now] of domainIds) ids.set(from, now);
+    if (domainIds.size > 0) ids.set(ctx, domainIds);
     renamedModels.set(ctx, withIds(model, domainIds, changes, ` in domain "${ctx}"`));
   }
 

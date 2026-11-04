@@ -26,7 +26,8 @@ rules, `imports` on the model, rename rewriting ids); 6b-3c implemented
 2026-11-03 (`generateId` and its installs retired); 6c implemented
 2026-11-03 (NORMA import names, export ids by decision 12(a)); 6d implemented
 2026-11-04 (merge keeps the base's ids, split writes alias shadows,
-`source_context` leaves 4.0); 6e, 6f and WS7 to come
+`source_context` leaves 4.0); 6e implemented 2026-11-04 (lineage manifest
+version 2, renames rewrite lineage); 6f and WS7 to come
 
 Created: 2026-10-28
 Last-updated: 2026-11-04
@@ -1545,6 +1546,28 @@ version-1 manifest would go silently empty for impact analysis.
   inherits MCP's). `ProjectRenameResult.ids` (`renameInProject.ts:36`)
   becomes a map per domain, because a shadow's id changes in each domain
   that holds it.
+  - _6e notes._
+    - The marker is applied when a manifest is read (`parseManifest`
+      through `upgradeManifest`), not only when a 4.0 build writes one,
+      so `lineage status` and `impact` see it on a manifest no 4.0
+      export has touched yet. The write keeps it: `updateManifest`
+      upgrades the manifest it is given, so each export it keeps stays
+      marked.
+    - A marked export is stale whatever its hash. Impact lists a marked
+      export in `exportsBefore40` when none of its sources holds an id
+      the element is known by.
+    - barwise-wcg.v5k: `analyzeImpact` takes the model when it loads,
+      and searches the id as asked, its 4.0 id for a 3.x one the file
+      states (`idFromPrior`), and its 3.x id for a 4.0 one (`priorIds`).
+      The CLI and MCP pass it.
+    - `ProjectRenameResult.ids` is a map per domain context. The lineage
+      step is one core helper, `lineageRenameWrites`, which both surfaces
+      call with their own manifest reader, so core reads no file. Under
+      `--check` the manifest is listed with the files that would be
+      written.
+    - An export that names no model (before 6a) is not rewritten by a
+      rename: whose it is is `attribution.ts`'s question, and it stays
+      stale by its hash either way.
 - **6f, the outputs.** DDL comments (`DdlExportFormat.ts:185`), Ossie's
   loss block (`lose`, `writeOssie.ts:156`; the `model_header` namespace and imports lines, added in 6b-3c) and SVG `data-id`
   (`diagram-ui/src/parts/*Node.tsx`) print local names with no code
