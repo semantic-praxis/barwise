@@ -22,7 +22,6 @@ barwise/packages/vscode/tests/unit/toolRegistration.test.ts,
 barwise/packages/cli/src/commands/merge.ts,
 barwise/packages/cli/src/commands/import/,
 barwise/packages/learn/src/exercise/catalog.ts,
-barwise/packages/promptlab/package.json,
 barwise/docs/CLI.md,
 barwise/docs/MCP.md,
 +barwise/scripts/audit-surfaces.mjs,
@@ -42,20 +41,21 @@ twice, first claiming parity and then claiming deliberate divergence
 options. This spec closes the gaps and lands a check that fails when
 a CLI option has no counterpart and no recorded reason.
 
-## What stays CLI-only? (resolved by the owner, 2026-10-13)
+## What stays CLI-only? (resolved by the owner, 2026-10-13 and 2026-11-04)
 
 A gap stays only if mirroring would produce a wrong or unattributable
 result, or break a documented safety rule. "Nobody has asked for it"
 does not qualify.
 
-| Stays CLI-only                                      | Reason                                                                                                                                                     |
-| --------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `prompt eval`, `prompt run`                         | The only `prompt` commands that call a model. A recorded score needs an attributable model, and MCP sampling reports none (`keyless-model-access.spec.md`) |
-| `--thinking-budget`                                 | Declared only on `prompt eval` and `prompt run`                                                                                                            |
-| `--artifacts`                                       | Unshipped prompt candidates must not reach production commands (`artifact-resolution-parity.spec.md`)                                                      |
-| `import batch`                                      | An evaluation sweep across models, the same family as `prompt eval`                                                                                        |
-| `llm-usage`                                         | Only the CLI writes the call log (`withCallLog` is used in `cli/src` alone), so a report from another surface would leave out that surface's own calls     |
-| MCP gym session log (`--emit-misses`, `--no-state`) | Owner decision. The log is the learner's history, which the `gym-coach` skill reads, and an agent's checks through MCP would be counted as the learner's   |
+| Stays CLI-only                                      | Reason                                                                                                                                                                              |
+| --------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `prompt eval`, `prompt run`                         | The only `prompt` commands that call a model. A recorded score needs an attributable model, and MCP sampling reports none (`keyless-model-access.spec.md`)                          |
+| `prompt score`, `rescore`, `history`, `compare`     | Owner decision (2026-11-04). promptlab is an application built on barwise, not a library other packages reuse, and these are its commands (see the `prompt` boundary section below) |
+| `--thinking-budget`                                 | Declared only on `prompt eval` and `prompt run`                                                                                                                                     |
+| `--artifacts`                                       | Unshipped prompt candidates must not reach production commands (`artifact-resolution-parity.spec.md`)                                                                               |
+| `import batch`                                      | An evaluation sweep across models, the same family as `prompt eval`                                                                                                                 |
+| `llm-usage`                                         | Only the CLI writes the call log (`withCallLog` is used in `cli/src` alone), so a report from another surface would leave out that surface's own calls                              |
+| MCP gym session log (`--emit-misses`, `--no-state`) | Owner decision. The log is the learner's history, which the `gym-coach` skill reads, and an agent's checks through MCP would be counted as the learner's                            |
 
 The owner also decided that `merge_models` keeps the base file as its
 write target; #637 made its tool description say so. How a write to an
@@ -101,13 +101,14 @@ missing is the same review on every surface and for every import.
 - **A target that cannot be read or merged is refused, never overwritten.** Today `barwise import transcript --output` falls back to the fresh extraction in both cases (`cli/src/commands/import/transcript.ts`), and MCP's `executeImport` uses `base` only as context for the model, not as a merge target.
 - **The change set is deterministic, so it lives in core:** delta ids in `diffModels`' order, valid only together with the fingerprint they were issued with.
 
-Two choices inside this are the owner's (open decision 2), and the
+Two choices inside this are the owner's (open decision 1), and the
 design may graduate to its own spec when workstream 2 is grounded.
 
-## Do the deterministic `prompt` commands cross a package boundary? (resolved: four of six do)
+## Do the deterministic `prompt` commands cross a package boundary? (resolved: four do, and stay CLI-only)
 
-The owner chose to mirror the six `prompt` commands that call no model.
-Two need only `@barwise/llm`, which MCP already depends on:
+On 2026-10-13 the owner chose to mirror the six `prompt` commands that
+call no model. Two need only `@barwise/llm`, which MCP already depends
+on, and are still mirrored:
 
 - `prompt schema` (`buildResponseSchema`, `buildReviewResponseSchema`).
 - `prompt artifact` (`resolveArtifact`, `builtinArtifacts`, `hashPrompt`; the hasher moved into `llm` under `artifact-resolution-parity.spec.md`, WS2).
@@ -120,9 +121,19 @@ dependency-cruiser and `check:architecture`, and two specs rely on it:
 - `keyless-model-access.spec.md`: "A sampling call is not deterministic and not attributable. It must never become reachable from promptlab."
 - `multi-sample-import.spec.md`: "The scorer lives in dev tooling on purpose."
 
-None of the four calls a model. The owner's decision to mirror them
-stands; what is open is how they cross the boundary, which is open
-decision 1.
+None of the four calls a model, but all four are promptlab's own
+commands. On 2026-11-04 the owner decided that promptlab is an
+application built on barwise, not a store of logic other packages
+reuse, so the four stay on its front end, the CLI. That reverses the
+2026-10-13 call for these four only. The code already has this shape:
+
+- `INTENDED` lists promptlab under `cli` alone, so the graph check enforces it.
+- The optimizer reaches promptlab only through the CLI, as a subprocess.
+- When another package needed promptlab code, the code moved down. `promptHash` moved into `llm` (`artifact-resolution-parity.spec.md`, WS2), and the scorer's rubric check is `evaluateCandidate` in `learn`.
+
+If the four are ever wanted on MCP, that is the route: the logic moves
+down into a library first, under its own spec. It is not recommended,
+because the scorer is the application.
 
 ## Scope
 
@@ -161,7 +172,7 @@ Out of scope:
 - New options on deprecated tools (`generate_schema`, `generate_diagram`). barwise-0wa.ymj decides their future, and their option gaps take baseline rows naming it.
 - The audit's section 5, capabilities MCP or VS Code has and the CLI lacks. The owner's direction is one-way.
 - VS Code palette parity. The VS Code column counts a language-model tool as reach (`docs/adr/surface-capability-parity.md`, decision 3), so the palette is a separate question, lineage for its Export... commands included (barwise-ace). The one palette change here is the per-delta review for the dbt and code imports.
-- Who may write `prompt eval`'s history. In an installed CLI, `prompt eval` appends beside the packaged suite (`appendRunHistory` at `historyPathFor(suitePath(...))`, which defaults to `defaultSuitePath()`). The mirrored tools only read history; this spec changes no write policy.
+- Who may write `prompt eval`'s history. In an installed CLI, `prompt eval` appends beside the packaged suite (`appendRunHistory` at `historyPathFor(suitePath(...))`, which defaults to `defaultSuitePath()`). No tool this spec adds reads or writes that history.
 
 ## Inventory
 
@@ -177,7 +188,7 @@ Out of scope:
 | `vscode/src/mcp/ToolRegistration.ts`                    | Separate transcript and review bodies; export forwards three options and drops the rest                            | Transcript and review call `executeImport` and `executeReview` with the editor's client; export forwards `options`                    |
 | `mcp/src/tools/validate.ts`                             | Per-domain validation only                                                                                         | Also `projectRules`                                                                                                                   |
 | `learn/src/exercise/catalog.ts`                         | Resolves the catalog from `import.meta.url`, empty in the CJS bundle                                               | Exercises generated into a module (owner, 2026-11-04)                                                                                 |
-| `mcp/src/tools/`                                        | 19 tools                                                                                                           | Adds `init_project`, `lineage_show`, `gym_show`, `model_history`, `prompt_schema`, `prompt_artifact`, and four promptlab-backed tools |
+| `mcp/src/tools/`                                        | 19 tools                                                                                                           | Adds `init_project`, `lineage_show`, `gym_show`, `model_history`, `prompt_schema`, `prompt_artifact`                                  |
 | `cli/src/commands/history.ts`                           | Git walk (about 60 lines of subprocess) plus rendering                                                             | Walk paralleled in MCP, with a drift test (owner, 2026-11-04)                                                                         |
 | `docs/adr/surface-capability-parity.md`                 | Decision 1 names only `deliberate`; its open list says every row awaits the owner                                  | Names `not yet` with its workstream; the open list records the owner's calls                                                          |
 | `CLAUDE.md` capability matrix                           | Hand-maintained                                                                                                    | Kept, and checked by `audit:surfaces` for command and parameter reach                                                                 |
@@ -283,10 +294,9 @@ repository (owner, 2026-11-04).
 
 ### 8. Deterministic `prompt` commands (provisional)
 
-`prompt_schema` and `prompt_artifact` first; they need only `llm`. Then
-`score`, `rescore`, `history` and `compare`, per open decision 1. Their
-suite defaults to the packaged one, as the CLI's does, carried in the
-bundle the way the gym exercises are.
+`prompt_schema` and `prompt_artifact`, which need only `llm`. `score`,
+`rescore`, `history` and `compare` stay CLI-only (owner, 2026-11-04),
+so no eval suite enters a bundle.
 
 ## API and migration impact
 
@@ -299,22 +309,20 @@ bundle the way the gym exercises are.
   - Without a terminal, they refuse unless the accepted deltas are named.
   - `import transcript` stops overwriting an existing file it cannot read or merge.
   - Each is a behaviour change for a script that relied on the overwrite.
-- **Dependency graph:** MCP gains an edge into promptlab under either option of open decision 1.
+- **Dependency graph:** unchanged. Only the CLI depends on promptlab (owner, 2026-11-04).
 - **CI:** one new step, `audit:surfaces -- --check`, plus its root forwarder (`check:root-scripts`).
 
 ## Open decisions (for review)
 
-1. **How `score`, `rescore`, `history` and `compare` reach MCP.** The owner asked whether these should be promptlab functions MCP calls, or a native part of MCP. They should exist once. A score is a measurement that is compared with history rows the CLI and the DSPy optimizer write (the optimizer calls `barwise prompt score` as a subprocess), so a second copy inside MCP is a scorer that must agree exactly with the first. Under the must-agree rule that needs a drift test, which is weaker than not copying. Moving them into MCP is not possible either: the CLI may not depend on MCP. The MCP tools are thin wrappers, as every other tool is; the question is only where the one copy lives.
-   - (A, recommended) Give promptlab a subpath export of its no-client functions (`loadSuite`, `scoreExtraction`, `readHistory`, `compareRows`, `rescoreDirectory`, `diffRescores`). Let MCP import only that subpath, and add a dependency-cruiser rule forbidding the root and `runSuite`. The guard stays structural: MCP still cannot reach the one function that takes a client. `@barwise/core`'s subpath exports are the precedent.
-   - (B) Split promptlab into a no-client package and a runner package. This is the cleanest boundary, but it adds a thirteenth package for four tools.
-2. **Two choices inside the reviewed change set.**
+1. **Two choices inside the reviewed change set.**
    - Does `merge_models` keep a single-call write for a caller that names the deltas it accepts up front (today's behaviour, made explicit), or must every write to an existing model start with a proposal? Recommended: keep the single call only with an explicit accept choice, never as the default. Scripts and automation need it, and the MCP client's own approval prompt still applies.
    - What does a CLI run without a terminal take as its accept choice? Recommended: a flag naming the delta kinds (`--accept additions,modifications`), and refusal without it.
 
 ### Resolved by the owner (2026-11-04)
 
 - **Where `history`'s git walk lives:** a copy in MCP with a drift test against the CLI's (workstream 6). No existing package fits both without coupling, and `core` keeps the diff and stays pure.
-- **Data files in the VS Code bundle:** gym exercises generated into a module, as `llm/src/prompt/artifacts/builtins.generated.ts` did for the same bundle failure; the eval suite defaults to the packaged one, with an explicit path for a barwise checkout's live suite. `loadSuite` has the same `import.meta.url` failure as the gym catalog.
+- **Where `score`, `rescore`, `history` and `compare` live:** on the CLI only. promptlab is an application built on barwise, not a library other packages reuse. This replaced the question of how they would reach MCP, and both options for it (a promptlab subpath export MCP could import, or a split package).
+- **Data files in the VS Code bundle:** gym exercises generated into a module, as `llm/src/prompt/artifacts/builtins.generated.ts` did for the same bundle failure. The owner also accepted that a bundled eval suite would default to the packaged one; since the promptlab commands stay CLI-only, no bundle loads the suite, and that half no longer applies.
 
 ## Risks and testing
 

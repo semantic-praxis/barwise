@@ -16,6 +16,14 @@ Depends on `@barwise/core` (validation, serialization), `@barwise/llm`
 dependencies on VS Code. `@barwise/cli` (`barwise prompt`) consumes
 this package; it must never depend on the CLI.
 
+promptlab is an application built on barwise, not a library other
+packages reuse (owner, 2026-11-04). The CLI is its front end and its
+only consumer, which `INTENDED` in `barwise/scripts/lib/intended.cjs`
+enforces; that is why its commands are CLI-only in the capability
+matrix. When another package needs code from here, the code moves down
+into a library, as `promptHash` moved into `@barwise/llm`; do not add an
+export for another package to import.
+
 ## Package Layout
 
 ```
