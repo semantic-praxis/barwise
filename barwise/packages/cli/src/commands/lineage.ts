@@ -138,17 +138,20 @@ export function registerLineageCommand(program: Command): void {
             model,
           );
 
+          // Without the model a 3.x id cannot be read, which changes the
+          // answer; say so, in either format, rather than let a load error
+          // pass silently.
+          const modelDidNotLoad = manifest !== undefined && model === undefined;
+
           if (opts.format === "json") {
-            process.stdout.write(JSON.stringify(report, null, 2) + "\n");
+            const out = modelDidNotLoad ? { ...report, modelDidNotLoad: true } : report;
+            process.stdout.write(JSON.stringify(out, null, 2) + "\n");
             return;
           }
 
           process.stdout.write(
             `Impact analysis for element: ${report.changedElement}\n\n`,
           );
-          // Without the model a 3.x id cannot be read, which changes the
-          // answer; say so rather than let a load error pass silently.
-          const modelDidNotLoad = manifest !== undefined && model === undefined;
           if (modelDidNotLoad) {
             process.stdout.write(
               `The model did not load (run barwise validate ${source}), so the element's `

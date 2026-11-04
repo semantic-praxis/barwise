@@ -4,7 +4,7 @@
 
 import type { OrmModel } from "../model/OrmModel.js";
 import { checkScope, type ModelScope } from "./attribution.js";
-import type { LineageManifest } from "./types.js";
+import type { LineageManifest, SourceReference } from "./types.js";
 
 /**
  * Information about an artifact affected by a change.
@@ -62,7 +62,7 @@ export function analyzeImpact(
       exportsBefore40: [],
     };
   }
-  const { now, before } = idsByGeneration(elementId, model);
+  const { now, before, beforeTypes } = idsByGeneration(elementId, model);
   const exportsBefore40: string[] = [];
 
   if (scope) checkScope(scope);
@@ -79,7 +79,10 @@ export function analyzeImpact(
     const id = exp.idsBefore40 ? before : now;
     const sourceRef = id === undefined
       ? undefined
-      : exp.sources.find((src) => src.elementId === id);
+      : exp.sources.find((src) =>
+        src.elementId === id
+        && (!exp.idsBefore40 || beforeTypes === undefined || beforeTypes.has(src.elementType))
+      );
     // With the element's 3.x id unknown, a marked export cannot be read.
     if (!sourceRef && exp.idsBefore40 && before === undefined) {
       exportsBefore40.push(exp.artifact);
@@ -113,18 +116,45 @@ export function analyzeImpact(
  * a file that does not load) the id is taken as a 4.0 id, as a 4.0 model's
  * is: trying it as a 3.x id too would pool the generations, and could name
  * another element's export.
+ *
+ * 3.x let an object type and a fact type state one id (Copilot, on 6e).
+ * Asked by that id, `idFromPrior` cannot tell which is meant, so it is not
+ * read as a 3.x id and its marked exports are listed as unknown. Asked by
+ * either element's 4.0 id, the shared 3.x id is matched only in sources of
+ * that element's kind (`beforeTypes`), since the id alone names both.
  */
 function idsByGeneration(
   elementId: string,
   model: OrmModel | undefined,
-): { now: string; before: string | undefined; } {
+): {
+  now: string;
+  before: string | undefined;
+  beforeTypes: ReadonlySet<SourceReference["elementType"]> | undefined;
+} {
   if (model?.priorIds === undefined) {
-    return { now: elementId, before: undefined };
+    return { now: elementId, before: undefined, beforeTypes: undefined };
   }
   const fromFile = model.idFromPrior(elementId);
-  if (fromFile !== undefined) return { now: fromFile, before: elementId };
+  if (fromFile !== undefined) return { now: fromFile, before: elementId, beforeTypes: undefined };
   const prior = model.priorIds.get(elementId);
-  return { now: elementId, before: prior };
+  const shared = prior !== undefined
+    && [...model.priorIds.values()].filter((p) => p === prior).length > 1;
+  return {
+    now: elementId,
+    before: prior,
+    beforeTypes: shared ? sourceTypesOf(model, elementId) : undefined,
+  };
+}
+
+/** The source types lineage records an element under, for the two kinds 3.x let share an id. */
+function sourceTypesOf(
+  model: OrmModel,
+  id: string,
+): ReadonlySet<SourceReference["elementType"]> | undefined {
+  const ot = model.getObjectType(id);
+  if (ot !== undefined) return new Set([ot.kind === "value" ? "ValueType" : "EntityType"]);
+  if (model.getFactType(id) !== undefined) return new Set(["FactType"]);
+  return undefined;
 }
 
 /**

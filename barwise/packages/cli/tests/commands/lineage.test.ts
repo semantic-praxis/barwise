@@ -476,6 +476,38 @@ model:
       expect(result.stdout).toContain("No artifact recorded under 4.0 ids depends on this element");
     });
 
+    it("says the model did not load in json too (Copilot, on 6e)", async () => {
+      const modelPath = path.join(tempDir, "shop.orm.yaml");
+      fs.writeFileSync(modelPath, "model: [not a model\n");
+      writeManifest(tempDir, {
+        version: 2,
+        sourceModel: "shop.orm.yaml",
+        sourceModelHash: "h",
+        exports: [exportOf("Customer")],
+      });
+      const result = await runCli([
+        "lineage",
+        "impact",
+        modelPath,
+        "--element",
+        "ot-1",
+        "--format",
+        "json",
+      ]);
+      expect(JSON.parse(result.stdout).modelDidNotLoad).toBe(true);
+      fs.writeFileSync(modelPath, SHOP_3X);
+      const loaded = await runCli([
+        "lineage",
+        "impact",
+        modelPath,
+        "--element",
+        "ot-1",
+        "--format",
+        "json",
+      ]);
+      expect(JSON.parse(loaded.stdout)).not.toHaveProperty("modelDidNotLoad");
+    });
+
     it("says nothing about loading when there is no manifest, since no model is read", async () => {
       const modelPath = path.join(tempDir, "shop.orm.yaml");
       fs.writeFileSync(modelPath, SHOP_3X);

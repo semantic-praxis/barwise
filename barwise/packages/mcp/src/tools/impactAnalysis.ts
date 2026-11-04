@@ -51,11 +51,14 @@ export function executeImpactAnalysis(
   // another's.
   const manifest = readManifest(dir);
   let model: OrmModel | undefined;
+  // Set when a path's model did not load: a 3.x id is then not read, which
+  // changes the answer, so the caller is told. Inline has no model by design.
+  let modelDidNotLoad = false;
   if (location && manifest) {
     try {
       model = resolveSource(source);
     } catch {
-      model = undefined;
+      modelDidNotLoad = true;
     }
   }
   const report = analyzeImpact(
@@ -66,6 +69,13 @@ export function executeImpactAnalysis(
   );
 
   return {
-    content: [{ type: "text" as const, text: JSON.stringify(report, null, 2) }],
+    content: [{
+      type: "text" as const,
+      text: JSON.stringify(
+        modelDidNotLoad ? { ...report, modelDidNotLoad: true } : report,
+        null,
+        2,
+      ),
+    }],
   };
 }

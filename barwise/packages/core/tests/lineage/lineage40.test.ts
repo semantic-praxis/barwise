@@ -26,6 +26,7 @@ import {
   projectLineageRenames,
 } from "../../src/rename/surfaceSupport.js";
 import { OrmYamlSerializer } from "../../src/serialization/OrmYamlSerializer.js";
+import { replayInto40 } from "../../src/serialization/replay.js";
 
 const shop = () => {
   const m = new OrmModel({ name: "Shop" });
@@ -203,6 +204,40 @@ model:
   it("reads an id that is both as the one the 3.x file states", () => {
     // Order is Customer's 3.x id and, under 4.0, the Order type's id.
     expect(affected("Order")).toEqual(["customers-3x.sql", "customers-40.sql"]);
+  });
+});
+
+describe("impact over a 3.x id two kinds shared (Copilot, on 6e)", () => {
+  // 3.x let the object type Person and the fact type Person smokes both state x1.
+  const model = () => {
+    const source = new OrmModel({ name: "Shared" });
+    source.addObjectType({ id: "x1", name: "Person", kind: "entity", referenceMode: "nr" });
+    source.addFactType({
+      id: "x1",
+      name: "Person smokes",
+      roles: [{ id: "r1", name: "smokes", playerId: "x1" }],
+      readings: ["{0} smokes"],
+    });
+    return replayInto40(source);
+  };
+  const asFactType: ManifestExport = {
+    ...exported("smokers.sql", "x1", "h"),
+    sources: [{ elementId: "x1", elementType: "FactType", elementName: "Person smokes" }],
+  };
+  const m = version1(exported("people.sql", "x1", "h"), asFactType);
+
+  it("matches by either element's 4.0 id only the sources of that element's kind", () => {
+    const m40 = model();
+    const affected = (id: string) =>
+      analyzeImpact(m, id, undefined, m40).affectedArtifacts.map((a) => a.artifact);
+    expect(affected("Person")).toEqual(["people.sql"]);
+    expect(affected("Person_smokes")).toEqual(["smokers.sql"]);
+  });
+
+  it("lists as unknown, never matches, when asked by the shared id itself", () => {
+    const report = analyzeImpact(m, "x1", undefined, model());
+    expect(report.affectedArtifacts).toEqual([]);
+    expect(report.exportsBefore40).toEqual(["people.sql", "smokers.sql"]);
   });
 });
 

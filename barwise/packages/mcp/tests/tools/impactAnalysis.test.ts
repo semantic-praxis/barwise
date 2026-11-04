@@ -348,5 +348,11 @@ model:
       "a.sql",
     ]);
     expect(report.exportsBefore40).toEqual([]);
+    expect(report).not.toHaveProperty("modelDidNotLoad");
+
+    // A model that does not load is said to have not loaded (Copilot, on 6e).
+    fs.writeFileSync(modelPath, "model: [not a model\n");
+    const unloaded = JSON.parse(executeImpactAnalysis(modelPath, "ot-1").content[0]!.text);
+    expect(unloaded.modelDidNotLoad).toBe(true);
   });
 });
