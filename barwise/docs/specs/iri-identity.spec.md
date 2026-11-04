@@ -1555,19 +1555,25 @@ version-1 manifest would go silently empty for impact analysis.
       marked.
     - A marked export is stale whatever its hash. Impact lists a marked
       export in `exportsBefore40` when none of its sources holds an id
-      the element is known by.
+      the element is known by, unless the model knows the element's 3.x id
+      (a replayed 3.x file), where a miss means the export does not
+      depend on it. Only `version: 1` is upgraded: an empty file stays no
+      manifest, and a version this build does not know is left as written.
     - barwise-wcg.v5k: `analyzeImpact` takes the model when it loads,
       and searches the id as asked, its 4.0 id for a 3.x one the file
       states (`idFromPrior`), and its 3.x id for a 4.0 one (`priorIds`).
-      The CLI and MCP pass it.
+      The CLI passes it, and MCP does given a path; inline, every model's
+      exports are read, and one model's ids say nothing of another's.
     - `ProjectRenameResult.ids` is a map per domain context. The lineage
       step is one core helper, `lineageRenameWrites`, which both surfaces
-      call with their own manifest reader, so core reads no file. Under
+      call with their own manifest reader and locator (`modelLocation`,
+      which resolves symlinks as an export does), so core reads no file and
+      two spellings of one directory are one write. Under
       `--check` the manifest is listed with the files that would be
       written.
     - An export that names no model (before 6a) is not rewritten by a
-      rename: whose it is is `attribution.ts`'s question, and it stays
-      stale by its hash either way.
+      rename. Only a version 1 manifest holds one, so it is marked, reads
+      stale, and impact lists it in `exportsBefore40`.
 - **6f, the outputs.** DDL comments (`DdlExportFormat.ts:185`), Ossie's
   loss block (`lose`, `writeOssie.ts:156`; the `model_header` namespace and imports lines, added in 6b-3c) and SVG `data-id`
   (`diagram-ui/src/parts/*Node.tsx`) print local names with no code

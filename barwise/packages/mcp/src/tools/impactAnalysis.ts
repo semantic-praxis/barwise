@@ -46,15 +46,20 @@ export function executeImpactAnalysis(
   // no model to read for, so every export holding the id is, and the
   // report names each export's model (iri-identity 6a).
   // The model, when it loads, so an id a 3.x file states finds the exports
-  // that recorded its 4.0 id (barwise-wcg.v5k).
+  // that recorded its 4.0 id (barwise-wcg.v5k). Only with a path: inline,
+  // every model's exports are read, and one model's ids say nothing of
+  // another's.
+  const manifest = readManifest(dir);
   let model: OrmModel | undefined;
-  try {
-    model = resolveSource(source);
-  } catch {
-    model = undefined;
+  if (location && manifest) {
+    try {
+      model = resolveSource(source);
+    } catch {
+      model = undefined;
+    }
   }
   const report = analyzeImpact(
-    readManifest(dir),
+    manifest,
     elementId,
     location ? { sourceModel: location.sourceModel, modelsBeside: modelsBeside(dir) } : undefined,
     model,

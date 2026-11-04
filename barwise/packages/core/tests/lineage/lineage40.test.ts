@@ -80,6 +80,16 @@ describe("a version 1 manifest", () => {
     ]);
   });
 
+  it("is no manifest when the file is empty, and a version this build does not know is left", () => {
+    expect(parseManifest("")).toBeNull();
+    const later = parseManifest(
+      "version: 3\nsourceModel: shop.orm.yaml\nsourceModelHash: h\nexports: []\n",
+    );
+    expect(later.version).toBe(3);
+    expect(parseManifest("version: 1\nsourceModel: s\nsourceModelHash: h\n").exports)
+      .toEqual([]);
+  });
+
   it("is never marked when it is already version 2", () => {
     const m = parseManifest(
       serializeManifest(updateManifest(exported("a.sql", "Customer", "h"), undefined)),
@@ -139,6 +149,18 @@ model:
     expect(report.affectedArtifacts.map((a) => a.artifact)).toEqual(["a.sql"]);
     expect(report.exportsBefore40).toEqual([]);
   });
+
+  it("does not list a marked export that misses a 3.x id the model knows", () => {
+    const model = new OrmYamlSerializer().deserialize(`orm_version: "3.0"
+model:
+  name: Shop
+  object_types:
+    - { id: ot-1, name: Customer, kind: entity, reference_mode: nr }
+`);
+    const m = version1(exported("a.sql", "ot-9", "h"));
+    expect(analyzeImpact(m, "Customer", undefined, model).exportsBefore40).toEqual([]);
+    expect(analyzeImpact(m, "Customer").exportsBefore40).toEqual(["a.sql"]);
+  });
 });
 
 describe("the model hash", () => {
@@ -195,9 +217,16 @@ describe("a rename's lineage", () => {
       { kind: "objectType", name: "Customer" },
       "Client",
     );
-    const renames = projectLineageRenames(result);
+    // Two spellings of one directory, as a project may name its domains:
+    // the locator resolves both to one place, so they are one write.
+    const locate = (p: string) => ({
+      dir: `/p/${p.replace(/^\.\//, "").replace(/\/[^/]*$/, "")}`,
+      sourceModel: p.replace(/^.*\//, ""),
+    });
+    const spelled = (p: string) => (p.startsWith("domains/billing") ? `./${p}` : p);
+    const renames = projectLineageRenames(result, (p) => locate(spelled(p)));
     expect(renames.map((r) => [r.dir, r.models.map((m) => m.sourceModel)])).toEqual([
-      ["domains", ["crm.orm.yaml", "billing.orm.yaml"]],
+      ["/p/domains", ["crm.orm.yaml", "billing.orm.yaml"]],
     ]);
     const held: LineageManifest = {
       version: 2,
@@ -208,7 +237,7 @@ describe("a rename's lineage", () => {
         { ...exported("billing.sql", "crm:Customer", "h"), sourceModel: "billing.orm.yaml" },
       ],
     };
-    const { writes, changes } = lineageRenameWrites(renames, (d) => `/p/${d}`, () => held);
+    const { writes, changes } = lineageRenameWrites(renames, () => held);
     expect(writes.map((w) => w.path)).toEqual(["/p/domains/.barwise/lineage.yaml"]);
     expect(parseManifest(writes[0]!.text).exports.map((e) => e.sources[0]!.elementId)).toEqual([
       "Client",
@@ -218,9 +247,12 @@ describe("a rename's lineage", () => {
   });
 
   it("writes nothing where no manifest is, or nothing in it changes", () => {
-    const renames = modelLineageRenames("shop.orm.yaml", new Map([["Customer", "Client"]]));
-    expect(lineageRenameWrites(renames, (d) => d, () => undefined).writes).toEqual([]);
-    expect(lineageRenameWrites(renames, (d) => d, () => ({ ...manifest(), exports: [] })).writes)
+    const renames = modelLineageRenames(
+      { dir: "/p", sourceModel: "shop.orm.yaml" },
+      new Map([["Customer", "Client"]]),
+    );
+    expect(lineageRenameWrites(renames, () => undefined).writes).toEqual([]);
+    expect(lineageRenameWrites(renames, () => ({ ...manifest(), exports: [] })).writes)
       .toEqual([]);
   });
 });

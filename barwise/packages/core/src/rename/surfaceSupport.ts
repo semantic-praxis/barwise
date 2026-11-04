@@ -8,7 +8,6 @@
  * and the writes.
  */
 
-import { basename, dirname } from "node:path";
 import { manifestPath, renameInManifest, serializeManifest } from "../lineage/manifest.js";
 import type { LineageManifest } from "../lineage/types.js";
 import type { OrmModel } from "../model/OrmModel.js";
@@ -59,9 +58,9 @@ export function projectRenameWrites(result: ProjectRenameResult): readonly Renam
 
 /**
  * A lineage manifest a rename rewrites (iri-identity 6e): the directory
- * whose `.barwise/lineage.yaml` it is, as the caller names paths, and the
- * ids each model file there changed. One entry per directory, because
- * domains share one and a staged write refuses two writes naming one file.
+ * whose `.barwise/lineage.yaml` it is, and the ids each model file there
+ * changed. One entry per directory, because domains share one and a staged
+ * write refuses two writes naming one file.
  */
 export interface LineageRename {
   readonly dir: string;
@@ -71,24 +70,42 @@ export interface LineageRename {
   }[];
 }
 
-/** The lineage a model file's rename rewrites: `path` as the caller names it. */
+/**
+ * Where lineage records a model file: its manifest's directory and its
+ * name there. The surfaces' `modelLocation`, which resolves symlinks as
+ * an export does, so a rename finds the manifest and the name an export
+ * recorded however the file was spelled.
+ */
+export interface ModelLocation {
+  readonly dir: string;
+  readonly sourceModel: string;
+}
+
+/** The lineage a model file's rename rewrites. */
 export function modelLineageRenames(
-  path: string,
+  location: ModelLocation,
   ids: ReadonlyMap<string, string>,
 ): readonly LineageRename[] {
   return ids.size === 0
     ? []
-    : [{ dir: dirname(path), models: [{ sourceModel: basename(path), ids }] }];
+    : [{ dir: location.dir, models: [{ sourceModel: location.sourceModel, ids }] }];
 }
 
-/** The lineage a project rename rewrites, folded by directory. */
-export function projectLineageRenames(result: ProjectRenameResult): readonly LineageRename[] {
+/**
+ * The lineage a project rename rewrites, folded by the directory each
+ * domain is located in, so two spellings of one directory are one write.
+ * `locate` is given each domain's path as the project names it.
+ */
+export function projectLineageRenames(
+  result: ProjectRenameResult,
+  locate: (domainPath: string) => ModelLocation,
+): readonly LineageRename[] {
   const byDir = new Map<string, { sourceModel: string; ids: ReadonlyMap<string, string>; }[]>();
   for (const domain of result.project.domains) {
     const ids = result.ids.get(domain.context);
     if (ids === undefined || ids.size === 0) continue;
-    const dir = dirname(domain.path);
-    byDir.set(dir, [...(byDir.get(dir) ?? []), { sourceModel: basename(domain.path), ids }]);
+    const { dir, sourceModel } = locate(domain.path);
+    byDir.set(dir, [...(byDir.get(dir) ?? []), { sourceModel, ids }]);
   }
   return [...byDir].map(([dir, models]) => ({ dir, models }));
 }
@@ -118,18 +135,16 @@ export function renameLineage(
 /**
  * The manifest writes a rename stages, and a line for each (iri-identity
  * 6e): every surface's lineage step, so the CLI and MCP do not each spell
- * it. `read` is the surface's own manifest read, given a directory as the
- * rename names it resolved by `resolveDir`; core reads no file.
+ * it. `read` is the surface's own manifest read; core reads no file.
  */
 export function lineageRenameWrites(
   renames: readonly LineageRename[],
-  resolveDir: (dir: string) => string,
   read: (dir: string) => LineageManifest | undefined,
 ): { readonly writes: readonly RenameWrite[]; readonly changes: readonly string[]; } {
   const writes: RenameWrite[] = [];
   const changes: string[] = [];
   for (const rename of renames) {
-    const dir = resolveDir(rename.dir);
+    const dir = rename.dir;
     const next = renameLineage(read(dir), rename);
     if (next === undefined) continue;
     const path = manifestPath(dir);

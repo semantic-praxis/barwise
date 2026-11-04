@@ -24,7 +24,7 @@ import {
 import type { Command } from "commander";
 import { dirname, resolve } from "node:path";
 import { readFile } from "../workspace/io.js";
-import { readManifest } from "../workspace/lineageIo.js";
+import { modelLocation, readManifest } from "../workspace/lineageIo.js";
 import { loadProject } from "../workspace/projectLoader.js";
 import {
   type FileWrite,
@@ -151,7 +151,10 @@ function renameFile(file: string, target: RenameTarget, opts: RenameOptions): Ou
   ];
   const { model: renamed, changes, ids } = renameInModel(model, target, opts.to!);
   // The lineage beside the file follows the new ids, staged with it (6e).
-  const lineage = lineageRenameWrites(modelLineageRenames(file, ids), (d) => d, readManifest);
+  const lineage = lineageRenameWrites(
+    modelLineageRenames(modelLocation(file), ids),
+    readManifest,
+  );
   return write(
     [{ path: file, text: new OrmYamlSerializer().serialize(renamed) }, ...lineage.writes],
     [...changes, ...lineage.changes],
@@ -185,8 +188,7 @@ function renameProject(
   }));
   // Each changed domain's lineage, one write per manifest (6e).
   const lineage = lineageRenameWrites(
-    projectLineageRenames(result),
-    (d) => resolve(base, d),
+    projectLineageRenames(result, (p) => modelLocation(resolve(base, p))),
     readManifest,
   );
   return write([...writes, ...lineage.writes], [...result.changes, ...lineage.changes], [], opts);

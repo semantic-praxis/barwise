@@ -129,11 +129,12 @@ export function registerLineageCommand(program: Command): void {
           const { dir, sourceModel } = modelLocation(source);
           // The model, when it loads, so an id a 3.x file states finds the
           // exports that recorded its 4.0 id (barwise-wcg.v5k).
+          const manifest = readManifest(dir);
           const report = analyzeImpact(
-            readManifest(dir),
+            manifest,
             opts.element,
             { sourceModel, modelsBeside: modelsBeside(dir) },
-            modelIfItLoads(source),
+            manifest === undefined ? undefined : modelIfItLoads(source),
           );
 
           if (opts.format === "json") {

@@ -460,8 +460,12 @@ model:
     });
 
     it("names the exports made under 3.x ids rather than reporting nothing", async () => {
+      // A 4.0 model: it knows no 3.x id, so whether the export used one is unknown.
       const modelPath = path.join(tempDir, "shop.orm.yaml");
-      fs.writeFileSync(modelPath, SHOP_3X);
+      fs.writeFileSync(
+        modelPath,
+        SHOP_3X.replace('"3.0"', '"4.0"').replace("id: ot-1", "id: Customer"),
+      );
       fs.mkdirSync(path.join(tempDir, ".barwise"), { recursive: true });
       fs.writeFileSync(
         path.join(tempDir, ".barwise/lineage.yaml"),

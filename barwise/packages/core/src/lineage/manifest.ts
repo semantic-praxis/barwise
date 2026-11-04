@@ -45,14 +45,20 @@ export function parseManifest(yamlContent: string): LineageManifest {
  * written by a build before format 4.0, so each of its exports names
  * elements by 3.x ids, and is marked `idsBefore40`. The marker is per
  * export because `updateManifest` keeps every export it does not replace,
- * so one manifest holds both. A version 2 manifest is returned as it is.
+ * so one manifest holds both. Any other manifest is returned as it is.
  */
 export function upgradeManifest(manifest: LineageManifest): LineageManifest {
-  if (manifest.version === LINEAGE_MANIFEST_VERSION) return manifest;
+  // An empty file parses to null, which every reader takes as no manifest;
+  // a version this build does not know is left as written, never relabelled.
+  if (manifest === null || typeof manifest !== "object" || manifest.version !== 1) {
+    return manifest;
+  }
   return {
     ...manifest,
     version: LINEAGE_MANIFEST_VERSION,
-    exports: manifest.exports.map((exp) => (exp.idsBefore40 ? exp : { ...exp, idsBefore40: true })),
+    exports: (manifest.exports ?? []).map((exp) =>
+      exp.idsBefore40 ? exp : { ...exp, idsBefore40: true }
+    ),
   };
 }
 

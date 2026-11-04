@@ -70,6 +70,9 @@ export function analyzeImpact(
   if (now !== undefined) known.add(now);
   const before = model?.priorIds?.get(elementId);
   if (before !== undefined) known.add(before);
+  // Where the element's 3.x id is known, a marked export that misses it
+  // does not depend on it, so only an unknown one is listed.
+  const priorKnown = model?.priorIds !== undefined && (now !== undefined || before !== undefined);
   const exportsBefore40: string[] = [];
 
   if (scope) checkScope(scope);
@@ -82,7 +85,7 @@ export function analyzeImpact(
       && exp.sourceModel !== scope.sourceModel && scope.modelsBeside.includes(exp.sourceModel)
     ) continue;
     const sourceRef = exp.sources.find((src) => known.has(src.elementId));
-    if (!sourceRef && exp.idsBefore40) exportsBefore40.push(exp.artifact);
+    if (!sourceRef && exp.idsBefore40 && !priorKnown) exportsBefore40.push(exp.artifact);
 
     if (sourceRef) {
       affectedArtifacts.push({

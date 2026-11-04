@@ -116,6 +116,18 @@ describe("barwise rename", () => {
     expect(result.stdout).toContain("stay stale until re-exported");
   });
 
+  it("finds the lineage where an export recorded it, through a symlink", async () => {
+    mkdirSync(join(dir, "real"));
+    const real = join(dir, "real", "model.orm.yaml");
+    writeFileSync(real, MODEL, "utf-8");
+    MANIFEST(join(dir, "real"), "ot-o", "model.orm.yaml");
+    const link = join(dir, "m.orm.yaml");
+    symlinkSync(real, link);
+    const result = await runCli(["rename", link, "--object-type", "Order", "--to", "Purchase"]);
+    expect(result.exitCode).toBe(0);
+    expect(lineageIds(join(dir, "real"))).toEqual(["Purchase"]);
+  });
+
   it("renames a role by its position", async () => {
     const path = file("shop.orm.yaml", MODEL);
     const result = await runCli([

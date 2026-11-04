@@ -25,7 +25,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { z } from "zod";
-import { readManifest } from "../workspace/lineageIo.js";
+import { modelLocation, readManifest } from "../workspace/lineageIo.js";
 import { loadProject } from "../workspace/projectLoader.js";
 import { isProjectSource, readSource, type SourceInput, sourcePath } from "../workspace/resolve.js";
 import { sourceInputSchema } from "../workspace/sourceSchema.js";
@@ -128,7 +128,10 @@ function renameModelSource(input: RenameElementInput, target: RenameTarget): Tex
   const yaml = new OrmYamlSerializer().serialize(renamed);
   if (path === undefined) return json({ yaml, changes, warnings });
   // The lineage beside the file follows the new ids, staged with it (6e).
-  const lineage = lineageRenameWrites(modelLineageRenames(path, ids), (d) => d, readManifest);
+  const lineage = lineageRenameWrites(
+    modelLineageRenames(modelLocation(path), ids),
+    readManifest,
+  );
   return writeBack(
     [{ path, text: yaml }, ...lineage.writes],
     [...changes, ...lineage.changes],
@@ -160,8 +163,7 @@ function renameProjectSource(input: RenameElementInput, target: RenameTarget): T
   }));
   // Each changed domain's lineage, one write per manifest (6e).
   const lineage = lineageRenameWrites(
-    projectLineageRenames(result),
-    (d) => resolve(base, d),
+    projectLineageRenames(result, (p) => modelLocation(resolve(base, p))),
     readManifest,
   );
   return writeBack(
