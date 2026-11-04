@@ -8,7 +8,7 @@ Tracking: barwise-ym8.z9g (follows docs/specs/adr-gate-reader-split.spec.md)
 Touches: barwise/scripts/lib/adr-judge.mjs, barwise/scripts/check-architecture.mjs,
 barwise/scripts/check-adr-tests.mjs, +barwise/scripts/lib/adr-population.mjs,
 +barwise/docs/adr/governance.orm.yaml, +barwise/scripts/check-adr-model.mjs,
-+barwise/scripts/tests/adr-model.test.mjs, barwise/scripts/lib/adr-enforcement.mjs,
++barwise/scripts/tests/adr-model.test.mjs, barwise/scripts/tests/adr-facts.test.mjs, barwise/scripts/lib/adr-enforcement.mjs,
 barwise/scripts/run-script-tests.mjs, barwise/scripts/tests/expected-counts.json,
 barwise/package.json, package.json, .github/workflows/ci.yml
 
@@ -46,32 +46,54 @@ gate's steps qualify, cannot be read, or fail (`unreadable`, `why` in
 `judgeDeclarations`), and whether a tested decision is proven, failed,
 skipped, unproven, or unknown because a report was not read (in
 `judgeTestedDecisions`). WS2 lifts both into exported functions,
-`stepVerdict` and `evidenceVerdict`, which the code judge calls unchanged.
-The population builder calls the same two. For a case either answers
-"unknown", the builder records the same refusal and leaves out the
-obligation fact that the rule constrains (below), so the model cannot
-report a finding there. The two judges cannot disagree about a refusal,
-because one function decides it.
+`stepVerdict` and `evidenceVerdict`, each returning its kind and the exact
+finding or refusal text the judge prints today, so no caller rebuilds a
+message. The code judge calls them unchanged; the population builder calls
+the same two. For a case either answers "unknown", the builder records the
+returned refusal and leaves out the obligation fact the rule constrains
+(below), so the model cannot report a finding there.
 
 Each relational rule is a pair of fact types: an obligation and its
-satisfaction, with a subset constraint from the first to the second. "Gate
-G must have a qualifying step" is populated only for a gate whose steps
-`stepVerdict` could read; "G has a qualifying step" only when it found one.
-"Decision D must be proven" is populated only when `evidenceVerdict`
-answered; "D is proven" only for a passing tag. Coverage ("every decision
-has an entry") uses the declarations themselves, which the reader always
-answers.
+satisfaction, with a subset constraint from the first to the second, and
+each rule has its own obligation fact type, so a diagnostic maps back to its
+rule by the fact type (or population) it names. Core's diagnostics name
+the constraint's own id only for mandatory constraints; uniqueness, ring
+and subset violations name the population, which is why the mapping goes
+by fact type. "Gate G must have a qualifying step" is populated only for a
+gate whose steps `stepVerdict` could read; "G has a qualifying step" only
+when it found one. "Decision D must be proven" is populated only when
+`evidenceVerdict` answered; "D is proven" only for a passing tag. Coverage
+("every decision has an entry") uses the declarations themselves, which
+the reader always answers.
 
-## How are two judges compared when one short-circuits? (resolved: first finding per entry)
+The builder asks every question its facts need, so it can ask what the
+code judge skips after a short-circuit (an entry whose script is not a gate
+name is never looked up in `package.json`). Those questions arise only for
+a subject the code judge has already given a finding or a refusal, so an
+extra refusal they produce always sits beside one, and the exit code cannot
+differ: a finding is exit 1 for both, and refusals alone are exit 2 for
+both. The comparison therefore requires the same exit code and the code
+judge's refusals to be a subset of the model's, in the same relative order,
+with any extra refusal only on such a subject.
 
-The code judge stops at the first failing rule of an entry (a script that
-is not a gate name is never looked up in `package.json`); the model checks
-every constraint. So the comparison is per subject -- an entry, a decision,
-an ADR -- on the first finding in the code judge's rule order, which WS2
-records as each rule's rank. `check:adr-model` reports the same way: of the
-model's violations for one subject, the lowest-ranked. Both judges then
-reach the same set of (subject, rule) pairs on every input, or the
-comparison names the first that differs.
+## How are two judges compared when one short-circuits? (resolved: every code finding, and the model's extras shadowed)
+
+The code judge stops at the first failing rule of a chain (a script that is
+not a gate name is never looked up in `package.json`), but not of every
+entry: an entry can carry both "lists an id no decision has" and "is not a
+gate name". The model checks every constraint. So the comparison runs per
+subject (an entry, a decision, an ADR, a report tag): every (subject, rule)
+the code judge reports is reported by the model too, and every (subject,
+rule) the model reports beyond those ranks after one the code judge
+reported on the same subject, in the code judge's rule order, which WS2
+records as each rule's rank. `check:adr-model` prints the code judge's view:
+of the model's violations for one subject, those not shadowed by a
+lower-ranked one in the same chain.
+
+The model judges in two scopes, the declarations (`check:architecture`'s
+relational rules) and the evidence (`check:adr-tests`'s), each compared
+with its own gate. Its one exit code is the two scopes' under the rule both
+gates already share: any finding is exit 1, refusals alone are 2.
 
 ## What keeps the schema and the code judge stating the same rules? (resolved: shared rule ids)
 
@@ -100,9 +122,12 @@ In scope:
   for each subject the lowest-ranked violated rule, by id and the instance
   that violates it; exit 1 on any finding, 2 on refusals alone or an
   unbuilt core.
-- When the WS3 comparison runs one input through both judges, they shall
-  reach the same exit code and the same set of (subject, rule id) first
-  findings, and the same refusals in the same order.
+- When the WS3 comparison runs one input through both judges, each scope
+  shall reach the same exit code as its gate; every (subject, rule id) its
+  gate reports shall be among the model's, and the model's others shall be
+  shadowed as above; and the gate's refusals shall be a subset of the
+  model's, in the same relative order, any extra on a subject the gate
+  already flagged.
 - When `RULES` and the schema's constraint ids differ, or a `RULES` id has
   no planted case, the WS3 tests shall fail naming the id.
 - When the schema alone is validated, it shall have no error; when barwise
@@ -118,14 +143,14 @@ Out of scope:
 
 ## Inventory
 
-| Code today (main, after #910)                                                                                                                                                                                                                  | Verdict                                                                                                                                                                             |
-| ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `adr-facts.mjs`: `createGovernanceReader` (`scripts()`, `steps(command)`, `issues()`, each `null` when unreadable), `readTestReports` (`unreadable` fixed at read time)                                                                        | used as is                                                                                                                                                                          |
-| `adr-judge.mjs` `judgeDeclarations`: well-formedness (header, parse, ids, empty Decision), relations (ids exist, coverage, gate name, meta gate, script exists, step qualifies, issue tracked, issue open), and the inline step classification | WS2: `wellFormed`, `stepVerdict`, `RULES` ids and ranks extracted, no behaviour change                                                                                              |
-| `adr-judge.mjs` `judgeTestedDecisions`: stale tags, and the inline evidence classification (passed, failed, skipped, unread)                                                                                                                   | WS2: `evidenceVerdict` extracted; stale tags become a relational rule with an id                                                                                                    |
-| core population validation                                                                                                                                                                                                                     | uniqueness, mandatory, disjunctive mandatory, subset, equality, exclusion, ring and value constraints; diagnostics carry `message`, `ruleId`, `elementId` and the constraint's name |
-| `run-script-tests.mjs`                                                                                                                                                                                                                         | runs before the build and has no single-file mode; WS3 adds `--only <file>`, held to the manifest count                                                                             |
-| `META_GATES`                                                                                                                                                                                                                                   | WS3 adds `check:adr-model` with no declaring ADR, like `check:adr-tests`                                                                                                            |
+| Code today (main, after #910)                                                                                                                                                                                                                  | Verdict                                                                                                                                                                                                                                                                                      |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `adr-facts.mjs`: `createGovernanceReader` (`scripts()`, `steps(command)`, `issues()`, each `null` when unreadable), `readTestReports` (`unreadable` fixed at read time)                                                                        | used as is                                                                                                                                                                                                                                                                                   |
+| `adr-judge.mjs` `judgeDeclarations`: well-formedness (header, parse, ids, empty Decision), relations (ids exist, coverage, gate name, meta gate, script exists, step qualifies, issue tracked, issue open), and the inline step classification | WS2: `wellFormed`, `stepVerdict`, `RULES` ids and ranks extracted, no behaviour change                                                                                                                                                                                                       |
+| `adr-judge.mjs` `judgeTestedDecisions`: stale tags, and the inline evidence classification (passed, failed, skipped, unread)                                                                                                                   | WS2: `evidenceVerdict` extracted; stale tags become a relational rule with an id                                                                                                                                                                                                             |
+| core population validation                                                                                                                                                                                                                     | uniqueness, mandatory, disjunctive mandatory, subset, equality, exclusion, ring and value constraints; diagnostics carry `message`, `ruleId` and `elementId`, which is the constraint's own id only for a mandatory constraint and the population for uniqueness, ring and subset violations |
+| `run-script-tests.mjs`                                                                                                                                                                                                                         | runs before the build and has no single-file mode; WS3 adds `--only <file>`, held to the manifest count                                                                                                                                                                                      |
+| `META_GATES`                                                                                                                                                                                                                                   | WS3 adds `check:adr-model` with no declaring ADR, like `check:adr-tests`                                                                                                                                                                                                                     |
 
 ## Target architecture
 
@@ -182,9 +207,12 @@ functions on the cases the gates' tests cover end to end.
 `check-adr-model.mjs`, the `check:adr-model` npm script and root forwarder,
 `META_GATES`, and `run-script-tests.mjs --only <file>`. `adr-model.test.mjs`
 drives both judges through a stub reader and stub reports, with no fixture
-repository: the clean input; one planted violation per `RULES` id,
-enumerated from `RULES`; each "unknown" case `stepVerdict` and
-`evidenceVerdict` produce; and the id-set equality. It skips without
+repository: the clean input; one planted violation per `RULES` id, enumerated from
+`RULES`; inputs with two co-occurring violations on one subject; and each
+"unknown" case `stepVerdict` and `evidenceVerdict` produce. The id-set
+equality needs no core, since it compares `RULES` with the constraint ids
+read from the schema file, so it lives in `adr-facts.test.mjs`, which
+`test:scripts` runs on every tree. It skips without
 `@barwise/core` built, so two ci.yml steps run it for real after the build:
 `npm run test:scripts -- --only adr-model.test.mjs`, and `npm run
 check:adr-model` after `check:adr-tests`, which judges the real tree. Rules
