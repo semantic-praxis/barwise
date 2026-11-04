@@ -1,9 +1,9 @@
 # Executable ADRs: each ADR declares what enforces it, and CI checks the declaration
 
-Status: WS1 implemented 2026-10-30 (the declaration pass in check:architecture, adr-enforcement.mjs, ciStepOccurrences(); an absent header still allowed). WS2 implemented 2026-10-30 (test reports from vitest and node --test, check:adr-tests and its ci.yml step, the turbo inputs fix for test and test:coverage, ADR changes not docs-only). WS4 implemented 2026-10-30 (the enforcement line in the generated ARCHITECTURE.md index, rendered once an ADR declares). WS3 implemented 2026-10-31, in five batches (#884, #885, #886, #887 and the last): every ADR declares Enforced-by:, each decision with an unguarded part has its own gap issue under barwise-ym8, and an absent header is a finding; WS5 is provisional and not started.
+Status: WS1 implemented 2026-10-30 (the declaration pass in check:architecture, adr-enforcement.mjs, ciStepOccurrences(); an absent header still allowed). WS2 implemented 2026-10-30 (test reports from vitest and node --test, check:adr-tests and its ci.yml step, the turbo inputs fix for test and test:coverage, ADR changes not docs-only). WS4 implemented 2026-10-30 (the enforcement line in the generated ARCHITECTURE.md index, rendered once an ADR declares). WS3 implemented 2026-10-31, in five batches (#884, #885, #886, #887 and the last): every ADR declares Enforced-by:, each decision with an unguarded part has its own gap issue under barwise-ym8, and an absent header is a finding; WS5 moved to enforceable-adr-practice.spec.md, not started.
 
 Created: 2026-10-28
-Last-updated: 2026-10-31
+Last-updated: 2026-11-04
 Plan-reviewed: e247c807 (code-review, pr-review; the review's ten items are barwise-ym8.7jz, which supersedes this text where they conflict)
 Tracking: barwise-ym8, barwise-ym8.7jz (required implementation items
 from the plan review)
@@ -515,15 +515,11 @@ id and a matching header, so the shape tests keep passing.
 Extend `renderSection` per the rendering rule, reading entries through
 `parseEnforcedBy()`, and regenerate `ARCHITECTURE.md`.
 
-### 5. Discrimination probes (provisional: not yet grounded)
+### 5. Discrimination probes (moved)
 
-For an ADR whose decision has a concrete violation, record one probe --
-a file, a planted edit and the gate expected to go red -- and run it with
-`scripts/mutate.mjs`, after adding an expected-exit option to it (today
-it counts any non-zero exit as caught, so a refusal would pass as
-discrimination). An on-demand script runs every probe, under a new npm
-script and its root forwarder. Ungrounded: where probes live, and whether
-process ADRs admit a plantable violation at all.
+Regrounded with WS3's evidence and owned by
+`docs/specs/enforceable-adr-practice.spec.md`, workstream 5. It is not
+started.
 
 ## API and migration impact
 
