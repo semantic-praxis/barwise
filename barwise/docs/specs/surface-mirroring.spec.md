@@ -97,18 +97,17 @@ missing is the same review on every surface and for every import.
 
 - **CLI on a terminal.** `barwise merge` and `barwise import ... --output <existing>` walk the deltas one at a time, as `git add -p` walks hunks: accept, reject, accept the rest, reject the rest, or quit without writing.
 - **CLI without a terminal.** A script or CI run still has a person in the loop (owner, 2026-11-04). There is a feedback loop instead of a flag that accepts changes by kind, in the shape of `terraform plan -out` and `terraform apply`:
-  - `--plan <file>` writes a plan instead of the model: the numbered deltas, each verbalized and marked `pending`, plus the fingerprint and the incoming model itself. The plan carries the incoming model because an import's incoming side is an extraction a second run would not reproduce.
+  - `--plan <file>` writes a plan instead of the model: the numbered deltas, each verbalized and marked `pending`, plus the fingerprint and the incoming model itself. Every delta starts `pending`, never pre-filled with its suggestion (owner, 2026-11-04), so a plan nobody opened cannot be applied. The plan carries the incoming model because an import's incoming side is an extraction a second run would not reproduce.
   - A person marks each delta `accept` or `reject`. A CI job can post the plan for review, as a Terraform plan is posted on a pull request.
   - `--apply <file>` writes exactly the accepted deltas. It refuses while any delta is still `pending`, and when the fingerprint no longer matches the target.
   - Today's merge default (additions and modifications, never removals) becomes a suggestion printed beside each delta, never a decision.
-- **MCP.** Two calls. The first returns the plan, in the format the CLI writes, and writes nothing. The second names the accepted deltas and repeats the fingerprint; the tool applies exactly those, and refuses if either side changed in between. The tool description tells the agent to show the user the deltas and ask. The client's own prompt to approve a tool call is the human gate.
+- **MCP.** Two calls. The first returns the plan, in the format the CLI writes, and writes nothing. The second names the accepted deltas and repeats the fingerprint; the tool applies exactly those, and refuses if either side changed in between. The tool description tells the agent to show the user the deltas and ask. The client's own prompt to approve a tool call is the human gate. There is no one-call write onto an existing model (owner, 2026-11-04); a merge whose base is inline YAML writes nothing, and a write to a new file has nothing to protect, so both stay one call.
 - **VS Code.** The same two calls. On the apply call, `prepareInvocation` returns `confirmationMessages`, so the editor shows the accepted deltas and the user confirms before anything is written. The palette's dbt and code imports, which overwrite today, get the per-delta review the transcript import already has.
 - **A target that cannot be read or merged is refused, never overwritten.** Today `barwise import transcript --output` falls back to the fresh extraction in both cases (`cli/src/commands/import/transcript.ts`), and MCP's `executeImport` uses `base` only as context for the model, not as a merge target.
 - **The change set is deterministic, so it lives in core:** delta ids in `diffModels`' order, valid only together with the fingerprint they were issued with. One plan format serves the CLI, MCP and VS Code.
 - **An LLM may advise and never decide.** The owner asked how LLMs could help. The proposed shape, after the human-only flow ships: an annotation on each delta in the plan, saying what it means, what it affects downstream (from the deterministic impact analysis and lineage), and a suggested decision with a reason. For example, a removal and an addition may be one rename. The annotation records the model that wrote it, as other LLM output does, and lives in `@barwise/llm`, outside core. The decision field is set only by a person. This gets its own spec.
 
-One choice inside this is the owner's (open decision 1), and the
-design may graduate to its own spec when workstream 2 is grounded.
+The design may graduate to its own spec when workstream 2 is grounded.
 
 ## Do the deterministic `prompt` commands cross a package boundary? (resolved: four do, and stay CLI-only)
 
@@ -323,12 +322,16 @@ so no eval suite enters a bundle.
 
 ## Open decisions (for review)
 
-1. **Does `merge_models` keep a one-call write onto an existing model?** Today one call accepts every addition and modification, rejects every removal, and writes the base file (`mcp/src/tools/merge.ts`). VS Code shows no confirmation first: its tool wrapper returns only a progress message (`ToolRegistration.ts`, `register`). The question is whether a caller may still do that, by naming up front which kinds of change it accepts, or whether every write to an existing model starts with a plan.
-   - Recommended: no one-call write onto an existing model. An agent offered a one-call path and a two-call path will take the one-call path, so it would become the default in practice whatever the description says. Requiring a plan's fingerprint on every write to an existing model means no change can be written unseen. This revises the earlier recommendation (keep it, never as the default), which was made before the owner asked for a person in the loop on every surface.
-   - Not affected: a merge whose base is inline YAML writes nothing, and a merge or import to a new file has nothing to protect. Both stay one call.
-   - Cost: an agent that relied on the immediate write now makes two calls, and an MCP client that auto-approves tool calls gets no extra gate from the second one. The plan is still shown to the person by the agent, and VS Code's confirmation step is the gate there.
+None. Every decision this spec needed is resolved below; what remains
+before workstream 1 is the plan review (`check:plan-review`).
 
 ### Resolved by the owner (2026-11-04)
+
+- **`merge_models` has no one-call write onto an existing model.** Today one call accepts every addition and modification, rejects every removal, and writes the base file (`mcp/src/tools/merge.ts`), and VS Code confirms nothing first: its tool wrapper returns only a progress message (`ToolRegistration.ts`, `register`).
+  - Why: an agent offered a one-call path and a two-call path takes the one-call path, so a shortcut would become the default in practice whatever the description says. Requiring a plan's fingerprint on every write to an existing model means no change is written unseen.
+  - Not affected: a merge whose base is inline YAML writes nothing, and a merge or import to a new file has nothing to protect. Both stay one call.
+  - Cost: an agent that relied on the immediate write now makes two calls, and an MCP client that auto-approves tool calls gets no extra gate from the second one. The agent still shows the plan to the person, and VS Code's confirmation step is the gate there.
+- **Deltas start `pending`.** A plan is never pre-filled with its suggestions, so `--apply` cannot run on a plan nobody opened.
 
 - **How a run without a terminal accepts changes:** through a feedback loop with a person in it, not a flag that accepts by kind. Start from the expectation of a human in the loop, and consider how LLMs can help. The plan and apply mechanism and the advisory LLM annotation above are the proposed design, provisional until workstream 2 is grounded.
 - **Where `history`'s git walk lives:** a copy in MCP with a drift test against the CLI's (workstream 6). No existing package fits both without coupling, and `core` keeps the diff and stays pure.
