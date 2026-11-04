@@ -45,13 +45,9 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import {
-  decisionIds,
-  GATE_EXCEPTIONS,
-  gateName,
-  META_GATES,
-  parseEnforcedBy,
-} from "./lib/adr-enforcement.mjs";
+import { parseEnforcedBy } from "./lib/adr-enforcement.mjs";
+import { createGovernanceReader } from "./lib/adr-facts.mjs";
+import { judgeDeclarations } from "./lib/adr-judge.mjs";
 import {
   ADR_DIR,
   currentSection,
@@ -63,9 +59,7 @@ import {
   trackedPaths,
 } from "./lib/architecture-section.mjs";
 import { opt } from "./lib/args.mjs";
-import { parseTracker } from "./lib/beads-merge.mjs";
 import { uncommittedPaths } from "./lib/changed-class.mjs";
-import { shouldRun } from "./lib/ci-gates.mjs";
 import { isInstructionFile } from "./lib/instruction-files.mjs";
 import { header, inSpecCorpus, touches } from "./lib/spec-reader.mjs";
 
@@ -388,167 +382,18 @@ for (const { f, text } of citing) {
 // `check:adr-tests` from the runners' reports, never from source text.
 // Inputs are read only when an entry needs them, and an unreadable one is a
 // refusal recorded here, so it never hides a finding from the passes above.
-const enforcementProblems = [];
+// The reads are scripts/lib/adr-facts.mjs and the rules
+// scripts/lib/adr-judge.mjs (docs/specs/adr-gate-reader-split.spec.md):
+// both push into this one refusal list, in the order the rules first ask.
 const refusals = [];
-const lazily = (label, load) => {
-  let done = false;
-  let value = null;
-  return () => {
-    if (!done) {
-      done = true;
-      try {
-        value = load();
-      } catch (err) {
-        refusals.push(`${label}: ${err.message}`);
-      }
-    }
-    return value;
-  };
-};
-const rootScripts = lazily("barwise/package.json", () => {
-  const json = JSON.parse(readFileSync(join(root, "barwise", "package.json"), "utf8"));
-  if (!isMap(json?.scripts)) throw new Error("no scripts object");
-  return json.scripts;
-});
 // ci-occurrences.mjs needs the `yaml` package, so it is imported only when
 // some ADR declares a gate: a tree with no such entry runs on builtins, as
 // this check always has.
 const needsWorkflow = adrs.some(({ text }) =>
   parseEnforcedBy(text).entries.some((e) => e.kind === "npm")
 );
-let ciStepOccurrences = null;
-if (needsWorkflow) {
-  try {
-    ({ ciStepOccurrences } = await import("./lib/ci-occurrences.mjs"));
-  } catch (err) {
-    refusals.push(`scripts/lib/ci-occurrences.mjs: ${err.message}`);
-  }
-}
-const steps = lazily(".github/workflows/ci.yml", () => {
-  if (ciStepOccurrences === null) throw new Error("its reader could not be loaded");
-  const found = ciStepOccurrences(join(root, ".github", "workflows", "ci.yml"));
-  if (found.length === 0) throw new Error("no steps found; has the workflow moved?");
-  return found;
-});
-const issues = lazily(".beads/issues.jsonl", () => {
-  const text = readFileSync(join(root, ".beads", "issues.jsonl"), "utf8");
-  const parsed = parseTracker(text, ".beads/issues.jsonl");
-  if (parsed.length === 0) throw new Error("the tracker holds no issues");
-  return new Map(parsed.map(({ obj }) => [obj.id, obj]));
-});
-// A step counts as the gate's when it runs in barwise/, cannot be told to
-// keep going on failure, and has a guard that runs it on every code change:
-// for both optimizer values, since a gate that runs only on optimizer
-// changes skips the rest.
-const guard = (condition) => {
-  const both = [true, false].map((optimizer) =>
-    shouldRun(condition, { docsOnly: false, optimizer })
-  );
-  return { understood: both.every((r) => r.understood), runs: both.every((r) => r.run) };
-};
-let declaring = 0;
-for (const { f, text } of adrs) {
-  const parsed = parseEnforcedBy(text);
-  const fail = (msg) => enforcementProblems.push(`${f}: ${msg}`);
-  if (!parsed.present) {
-    fail(
-      "no Enforced-by: header; every ADR names what holds each decision, and `none (<issue>: <ids>)` for one with no enforcer",
-    );
-    continue;
-  }
-  declaring++;
-  const name = f.slice(ADR_DIR.length, -".md".length);
-  for (const p of parsed.problems) fail(p);
-  const { decisions, problems: decisionProblems } = decisionIds(text);
-  for (const p of decisionProblems) fail(p);
-  if (decisions.length === 0) fail("its ## Decision section has no numbered decision");
-  const ids = new Map();
-  for (const d of decisions) {
-    // A malformed id was already reported by decisionIds().
-    if (d.id === null) {
-      if (!d.malformed) fail(`decision ${d.n} (line ${d.line}) has no {#id} after its bold title`);
-    } else if (ids.has(d.id)) fail(`decisions ${ids.get(d.id).n} and ${d.n} share the id ${d.id}`);
-    else ids.set(d.id, d);
-  }
-  const covered = new Set();
-  for (const entry of parsed.entries) {
-    for (const id of entry.ids) {
-      if (!ids.has(id)) fail(`"${entry.text}" lists ${id}, which no decision here has`);
-      covered.add(id);
-    }
-    if (entry.kind === "npm") {
-      const { script } = entry;
-      if (!gateName(script)) {
-        fail(
-          `"${entry.text}": ${script} is not a gate name (check:*, audit:*, or one of`
-            + ` ${Object.keys(GATE_EXCEPTIONS).join(", ")} in GATE_EXCEPTIONS)`,
-        );
-        continue;
-      }
-      if (Object.hasOwn(META_GATES, script) && !META_GATES[script].includes(name)) {
-        fail(`"${entry.text}": ${script} checks other gates and cannot vouch for this ADR`);
-        continue;
-      }
-      const scripts = rootScripts();
-      if (scripts !== null && !Object.hasOwn(scripts, script)) {
-        fail(`"${entry.text}": barwise/package.json has no script ${script}`);
-        continue;
-      }
-      const all = steps();
-      if (all === null) continue;
-      const want = entry.args === null ? `npm run ${script}` : `npm run ${script} -- ${entry.args}`;
-      const matching = all.filter((s) => s.run === want);
-      const inBarwise = matching.filter((s) => s.workingDirectory === "barwise");
-      const judged = inBarwise.map((s) => ({ s, g: guard(s.condition) }));
-      if (judged.some(({ s, g }) => s.continueOnError === false && g.understood && g.runs)) {
-        continue;
-      }
-      // Unreadable means it might still qualify. An expression
-      // continue-on-error on a step whose guard plainly never runs it on a
-      // code change cannot qualify either way, so that stays a finding.
-      const unreadable = judged
-        .filter(({ s, g }) =>
-          (s.continueOnError === null && (!g.understood || g.runs))
-          || (s.continueOnError === false && !g.understood)
-        )
-        .map(({ s }) => s);
-      if (unreadable.length > 0) {
-        refusals.push(
-          `${f}: "${entry.text}": cannot tell whether the step runs; its`
-            + ` ${
-              unreadable[0].continueOnError === null
-                ? "continue-on-error"
-                : `if: ${unreadable[0].condition}`
-            }`
-            + " is not a form this check reads",
-        );
-        continue;
-      }
-      const why = matching.length === 0
-        ? `no ci.yml step's run: is exactly "${want}"`
-        : inBarwise.length === 0
-        ? `the step "${want}" does not run in barwise/`
-        : inBarwise.some((s) => s.continueOnError === true)
-        ? `the step "${want}" is continue-on-error, so it cannot fail CI`
-        : `the step "${want}" has a guard that does not run it on every code change`;
-      fail(`"${entry.text}": ${why}`);
-    } else if (entry.kind === "none") {
-      const tracker = issues();
-      if (tracker === null) continue;
-      const issue = tracker.get(entry.issue);
-      if (issue === undefined) {
-        fail(`"${entry.text}": ${entry.issue} is not in .beads/issues.jsonl`);
-      } else if (issue.status === "closed") {
-        fail(
-          `"${entry.text}": ${entry.issue} is closed; declare the enforcer it built, or reopen it`,
-        );
-      }
-    }
-  }
-  for (const [id, d] of ids) {
-    if (!covered.has(id)) fail(`decision ${d.n} {#${id}} has no Enforced-by: entry`);
-  }
-}
+const reader = await createGovernanceReader(root, { needsWorkflow, refusals });
+const { problems: enforcementProblems, declaring } = judgeDeclarations(adrs, reader, refusals);
 
 // The generated section is rendered from these same inputs (the tracked
 // ADRs and INTENDED), so a stale section is one regen:architecture fixes.
