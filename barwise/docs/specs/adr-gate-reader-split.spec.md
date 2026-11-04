@@ -1,6 +1,6 @@
 # ADR gates: split reading from judging
 
-Status: Draft -- no workstream implemented
+Status: Implemented 2026-11-04 (WS1: the reader, the judge, the characterization tests; both gates' output on the real tree byte-identical but for the one named difference).
 
 Created: 2026-11-04
 Last-updated: 2026-11-04
@@ -141,6 +141,17 @@ list, so that gate's OK line counts one more report and that file's tests.
 The file carries no `[adr:]` tag and no `describe`, so nothing else in that
 line moves.
 Any other difference is a regression.
+
+## Implementation notes
+
+- The characterization test the spec listed for the `ci-occurrences.mjs`
+  import failing beside an unreadable `barwise/package.json` could not be
+  written against the gate: the import is of the gate's own module, which
+  a fixture tree cannot break without breaking the gate. It is pinned in
+  `adr-facts.test.mjs` instead, through an `importCiOccurrences` seam on
+  `createGovernanceReader` that only the reader's tests pass. The other
+  three characterization tests landed as planned, before the split, and
+  passed on the code they describe.
 
 ## API and migration impact
 
