@@ -131,6 +131,7 @@ export function mapOssieToOrm(doc: OssieDocument, modelName?: string): OssieMapR
     addMandatoryRoles(model, c, resolved.requires.get(c)!);
     addIdentifierMandatories(model, c);
   }
+  readNamespace(doc, model, warnings);
   return { model, warnings };
 }
 
@@ -328,14 +329,45 @@ function reportDropped(
       }`,
     );
   }
+}
+
+/**
+ * The model's namespace, from the IRIs the ontology states (iri-identity
+ * 6f): an element's identity IRI is the namespace followed by its id, so
+ * when every IRI that ends in its element's id leaves one namespace before
+ * it, the model takes that namespace. Each IRI that is not that namespace
+ * followed by its element's id is named in `warnings` and dropped: barwise
+ * keeps one namespace per model, and no IRI per element.
+ */
+function readNamespace(doc: OssieDocument, model: OrmModel, warnings: string[]): void {
+  const stated: { readonly name: string; readonly iri: string; readonly id: string; }[] = [];
   for (const c of doc.ontology) {
-    if (c.iri) warnings.push(`${c.concept}: iri ${c.iri} dropped; barwise has no field for IRIs.`);
+    if (c.iri) stated.push({ name: c.concept, iri: c.iri, id: conceptId(model, c.concept) });
     for (const r of c.relationships ?? []) {
-      if (r.iri) {
-        const name = ossieFactTypeName(c.concept, r.name);
-        warnings.push(`${name}: iri ${r.iri} dropped; barwise has no field for IRIs.`);
-      }
+      if (!r.iri) continue;
+      const ft = relationshipFact(model, c.concept, r.name);
+      stated.push({ name: ft.name, iri: r.iri, id: ft.id });
     }
+  }
+  const candidates = new Set(
+    stated
+      .filter((s) => s.iri.length > s.id.length && s.iri.endsWith(s.id))
+      .map((s) => s.iri.slice(0, -s.id.length)),
+  );
+  let namespace = candidates.size === 1 ? [...candidates][0] : undefined;
+  if (namespace !== undefined) {
+    try {
+      model.namespace = namespace;
+    } catch {
+      namespace = undefined; // not a namespace barwise can hold
+    }
+  }
+  for (const s of stated) {
+    if (namespace !== undefined && s.iri === `${namespace}${s.id}`) continue;
+    warnings.push(
+      `${s.name}: iri ${s.iri} dropped; barwise keeps an IRI only as the model's namespace `
+        + "followed by the element's id.",
+    );
   }
 }
 

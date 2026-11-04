@@ -20,6 +20,8 @@ import {
   type FactType,
   type IdentifyingComponent,
   type IdentifyingUniqueness,
+  iriOf,
+  localName,
   objectificationRef,
   type ObjectType,
   type OrmModel,
@@ -316,7 +318,10 @@ export function writeOssie(model: OrmModel): OssieWriteResult {
       }
       return false;
     });
-    relationships.set(declaring, [...(relationships.get(declaring) ?? []), rel]);
+    relationships.set(declaring, [
+      ...(relationships.get(declaring) ?? []),
+      withIri(rel, iriOf(model, w.ft.id)),
+    ]);
   }
 
   // External constraints not written as an identifier.
@@ -333,6 +338,10 @@ export function writeOssie(model: OrmModel): OssieWriteResult {
 
   const ontology: OssieConcept[] = [];
   const played = new Set(written.flatMap((w) => w.ft.roles.map((r) => r.playerId)));
+  // Whether the importer reads the namespace back: it does from a concept
+  // IRI that is the namespace and the id it gives that concept, which is
+  // the local name of the concept's written name.
+  let namespaceCarried = false;
   for (const ot of model.objectTypes) {
     if (isBuiltin(ot.id) && !played.has(ot.id)) {
       lose(ot.name, "a built-in no role uses is not written; Ossie declares none", {
@@ -341,15 +350,20 @@ export function writeOssie(model: OrmModel): OssieWriteResult {
       }, "all");
     }
     if (isBuiltin(ot.id)) continue;
-    ontology.push(writeConcept(ot, {
-      model,
-      name: nameOf(ot.id),
-      relationships: relationships.get(ot.id) ?? [],
-      identifyBy: identifyBy.get(ot.id),
-      mandatory: mandatory.get(ot.id) ?? [],
-      supertypes: supertypes.get(ot.id),
-      lose,
-    }));
+    const iri = iriOf(model, ot.id);
+    if (iri !== undefined && ot.id === localName(nameOf(ot.id))) namespaceCarried = true;
+    ontology.push(withIri(
+      writeConcept(ot, {
+        model,
+        name: nameOf(ot.id),
+        relationships: relationships.get(ot.id) ?? [],
+        identifyBy: identifyBy.get(ot.id),
+        mandatory: mandatory.get(ot.id) ?? [],
+        supertypes: supertypes.get(ot.id),
+        lose,
+      }),
+      iri,
+    ));
   }
 
   for (const p of model.populations) {
@@ -367,9 +381,12 @@ export function writeOssie(model: OrmModel): OssieWriteResult {
   if (model.domainContext) {
     lose("model", `domain context ${model.domainContext} not written`, { kind: "model" });
   }
-  if (model.namespace) {
-    // An element's identity IRI needs local-name ids, which arrive with
-    // format 4.0 (iri-identity WS6); until then the namespace is a loss.
+  // The namespace is carried by each element's identity IRI (iri-identity
+  // 6f), which the importer reads back from a concept whose id is its
+  // name's local name. It is still a loss where no concept is one: every
+  // concept a shadow (whose IRI names its owner's namespace, which only the
+  // project knows), or every id other than its name's (`id-not-from-name`).
+  if (model.namespace && !namespaceCarried) {
     lose("model", `namespace ${model.namespace} not written`, { kind: "model_header" }, [
       "namespace",
     ]);
@@ -793,6 +810,19 @@ function reading(
   });
   if (braced) lose(element, `reading "${template}" has brace text, written with parentheses`, key);
   return out.join("");
+}
+
+/**
+ * The element with its identity IRI as Ossie's `iri` (iri-identity 6f,
+ * decision 1). Decision 1's `equivalent_iri`, which would take its place,
+ * is a field no model holds yet. None for an element `iriOf` cannot place:
+ * a model with no namespace, or a shadow, whose namespace is its owner's.
+ */
+function withIri<T extends OssieConcept | OssieRelationship>(
+  element: T,
+  iri: string | undefined,
+): T {
+  return iri === undefined ? element : { ...element, iri };
 }
 
 // ---------------------------------------------------------------------------
