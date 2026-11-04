@@ -64,6 +64,8 @@ src/
                                  does not define, named as warnings
   ossie/mapOssieToOrm.ts         OssieDocument -> ORM model + warnings
   ossie/requiresShapes.ts        The requires expressions read as constraints
+  ossie/ossieNamespace.ts        namespaceOfIris: the namespace rule the importer
+                                 and the export's prediction share
   ossie/OssieImportFormat.ts     The importer adapter
   ossie/writeOssie.ts            ORM model -> Ossie document + loss report
   ossie/OssieExportFormat.ts     The exporter adapter (YAML, loss comment block)
