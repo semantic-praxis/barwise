@@ -7,7 +7,7 @@
         "3f1b98f6",
         "195ab27a"
       ],
-      "note": "Genuinely unimplemented, and the header is right. Both commits are enforceable-adr-practice WS1 (#905): they changed check-adr-tests.mjs and a test title in gates.test.mjs, two files this spec lists because its WS1 will refactor them, not because anything of this spec was built. Its plan has not passed review (the owner is choosing between options A, B and C on PR #907)."
+      "note": "Genuinely unimplemented, and the header is right. Both commits are enforceable-adr-practice WS1 (#905): they changed check-adr-tests.mjs and a test title in gates.test.mjs, two files this spec lists because its WS1 will split them, not because anything of this spec was built. The owner chose the staged path (option C, aiming at A) on 2026-11-04."
     },
     "conformance-property.spec.md": {
       "status": "Accepted (all decisions resolved 2026-08-25; both workstreams\nopen -- design only, no implementation in this PR)",
