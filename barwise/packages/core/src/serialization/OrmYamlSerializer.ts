@@ -424,6 +424,8 @@ function statedIds40(doc: DecodedDocument40): (readonly [string, IdKind])[] {
  */
 export function writeDocument(model: OrmModel): OrmYamlDocument {
   return documentOf(model, PREVIOUS_ORM_VERSION, {
+    // A 3.x shadow's owner, which only a model read as written still holds.
+    sourceContext: true,
     constraint: (c) => {
       if (c.id === undefined) {
         throw new Error(
@@ -482,6 +484,8 @@ export function writeDocument40(model: OrmModel): OrmYamlDocument40 {
 
 /** How one format writes the elements its ids differ on. */
 interface ElementWriters<C extends OrmYamlConstraint, S, O> {
+  /** Whether the format states a shadow's `source_context` (3.0 does, 4.0 does not). */
+  readonly sourceContext?: boolean;
   constraint(c: Constraint): C;
   subtypeFact(sf: SubtypeFact): S;
   objectification(o: ObjectifiedFactType): O;
@@ -514,7 +518,10 @@ function documentOf<V extends string, C extends OrmYamlConstraint, S, O>(
   const lists = {
     object_types: listed(
       model.objectTypes,
-      (ot) => serializeObjectType(ot, model.preferredIdentifierOf(ot.id)),
+      (ot) =>
+        serializeObjectType(ot, model.preferredIdentifierOf(ot.id), {
+          sourceContext: writers.sourceContext === true,
+        }),
     ),
     fact_types: listed(model.factTypes, (ft) => serializeFactType(ft, writers.constraint)),
     constraints: listed(model.constraints, writers.constraint),

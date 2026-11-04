@@ -24,11 +24,12 @@ the editor's "Store ids", the 3.x note); 6b-3b implemented 2026-11-03 (the
 rules, `imports` on the model, rename rewriting ids); 6b-3c implemented
 2026-11-03 (`iriOf`, the model header delta); 6b-4b implemented
 2026-11-03 (`generateId` and its installs retired); 6c implemented
-2026-11-03 (NORMA import names, export ids by decision 12(a)); 6d to 6f
-and WS7 to come
+2026-11-03 (NORMA import names, export ids by decision 12(a)); 6d implemented
+2026-11-04 (merge keeps the base's ids, split writes alias shadows,
+`source_context` leaves 4.0); 6e, 6f and WS7 to come
 
 Created: 2026-10-28
-Last-updated: 2026-11-03
+Last-updated: 2026-11-04
 Tracking: barwise-wcg, barwise-y1b
 Plan-reviewed: 15d6f18e (pr-review x5, code-review x3; re-pointed after WS6 was grounded and decisions 18 to 20 taken)
 Touches: barwise/packages/core/src/model/,
@@ -1446,6 +1447,72 @@ version-1 manifest would go silently empty for impact analysis.
   (`serialization/yaml/objectType.ts:15,54-55`), its 3.0 decoder
   (`decode/objectType.ts`) and the 2.0 reader (`reader20.ts`). 21 tracked YAML
   files set `source_context` (WS7).
+  - _6d notes (merge)._
+    - An accepted fact type modification takes the incoming fact type's
+      content under the base's id, its roles rebased from
+      `<incoming>.<role>` to `<base>.<role>` (`rebaseRoles`; a role of
+      another shape, built in code, keeps its id). The map is built before
+      any fact type is added, since an incoming join constraint may name a
+      rebased role; existing and incoming populations and constraints
+      across fact types follow through the role remaps, by position as
+      before.
+    - Its internal constraints pair with the base fact type's by id, then
+      by content, one for one (`pairFactTypeConstraints`, beside
+      `pairModelConstraints` in `elementDiff.ts` and sharing its pairing),
+      and a paired one keeps the base's id, so `carryMintedKeys` keeps the
+      base's `minted_from`. An unpaired one keeps its own.
+    - `mergedId` takes the suffix rule over every id the merged model
+      holds, of any kind; `MERGE_ID_TAG` is gone. A suffixed population is
+      what `id-not-from-name` reports. A subtype fact or objectification is
+      named from its sentence, so two that clash say the same thing, which
+      `duplicate-subtype-fact` or the objectification's refusal reports.
+    - `refuseNameClashes` also refuses an object type and a fact type the
+      merge would give one id: the diff pairs ids within one kind only.
+  - _6d notes (split and `aliasOf`)._
+    - Split gives each shadow `<alias>:<the owner's id>`, the alias the
+      owner's local name (as the 3.x reader builds it), imports it, and
+      rewrites each role player, subtype end, objectification and join
+      path root that names the shadowed type. `source_context` is not
+      written.
+    - `aliasOf(id)` and `ownerContextOf(model, id)` (`model/namespace.ts`)
+      replace the field for rename, lineage attribution, the diff's
+      `sourceContext` change kind (kept, now read from the two ids'
+      owners), `barwise migrate`'s owner map, MCP's split summary and
+      Ossie's writer. `ownerContextOf` falls back to the alias itself
+      where nothing imports it, as a standalone file's does.
+    - Format 4.0 has no `source_context`: the JSON schema drops it and the
+      4.0 object type decoder has no such field. The 3.0 decoder keeps it
+      (`objectTypeFileOf` takes it as an extra field), and so does
+      `ObjectType`, documented as the 3.x owner the replay builds the
+      alias from; the replay drops it from the model it builds.
+    - Ossie's "source context not written" line stays true and now
+      explains no change: the export check aligns the read-back to the
+      source's ids, alias included, so the lost owner never shows as one.
+    - The 6b-3b note is closed: a same-name repair through a project skips
+      a shadow already under `<alias>:<the owner's repaired id>` rather
+      than refusing in its domain.
+    - From /code-review: split and the 3.x replay name an owner's alias by
+      one rule, `aliasForContext` (`_2` for a second context with the same
+      local name), where split had copied it without the suffix. A source
+      already holding an `alias:local` shadow keeps it and its import.
+    - A shadow's owner is its id, and an accepted object type modification
+      keeps the base's id, so a merge cannot apply a change of owner. All
+      three reviewers of 6d's first push found that the change was offered,
+      accepted and dropped. `MERGE_DIFF_OPTIONS` now sets
+      `ownerChanges: false`, so a merge's diff does not offer it (a
+      transcript's owned `Customer` paired with the base's `crm:Customer` is
+      unchanged, and the shadow stays), and `mergeModels` refuses an accepted
+      one that a diff built otherwise offers. Two object types paired by id
+      are one element whatever the two models import, so no diff reports an
+      owner change for them; the header delta reports the import.
+    - From the pr-review: a population under its fact type's rule id follows
+      the fact type onto the base's id (`<base>.population`), and each
+      instance id `<population>.N` follows its population.
+    - From Copilot: the 3.0 writer still states a 3.x shadow's
+      `source_context` (the shared object type writer takes it as an
+      option), and `mapRoleIds` reads roles only where a constraint names
+      one (`mapConstraintReferences`), never in a literal.
+
 - **6e, lineage.** The manifest goes to `version: 2` (`types.ts:55`)
   and `canonicalizeIds` goes (`manifest.ts:124-`). The marker is per
   export, because `updateManifest` keeps every export it does not

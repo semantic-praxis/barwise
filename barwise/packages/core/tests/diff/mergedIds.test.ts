@@ -1,16 +1,15 @@
 /**
- * The id a merged element takes when its own is already held
- * (barwise-yg5). It used to come from the installed generator, so two
- * merges of the same inputs differed; it is derived now. One case per
- * kind, so the fix does not rest only on the merge law drawing colliding
- * ids by chance, and the case where a constraint names the second of two
- * repeated facts that both took derived ids.
+ * The id a merged element takes when its own is already held: the model's
+ * suffix rule on it (iri-identity 6d, decision 5), the same on every merge
+ * (barwise-yg5, when it came from the installed generator). One case per
+ * kind, so the rule does not rest only on the merge law drawing colliding
+ * ids by chance; a clash across kinds; and the case where a constraint
+ * names the second of two repeated facts that both took suffixed ids.
  */
 import { describe, expect, it } from "vitest";
 import { diffModels } from "../../src/diff/ModelDiff.js";
 import { MERGE_DIFF_OPTIONS, mergeAndValidate } from "../../src/diff/ModelMerge.js";
 import { OrmModel } from "../../src/model/OrmModel.js";
-import { derivedId, MERGE_ID_TAG } from "../../src/serialization/derivedId.js";
 
 function entities(m: OrmModel, ...ids: string[]): OrmModel {
   for (const id of ids) {
@@ -41,7 +40,7 @@ function mergeKeeping(existing: OrmModel, incoming: OrmModel): OrmModel {
   return result.model!;
 }
 
-describe("a held id is replaced by a derived one, the same on every merge", () => {
+describe("a held id takes the suffix rule, the same on every merge", () => {
   it("subtype facts", () => {
     const existing = entities(new OrmModel({ name: "M" }), "a", "b", "c");
     existing.addSubtypeFact({ id: "sf1", subtypeId: "b", supertypeId: "a" });
@@ -49,8 +48,7 @@ describe("a held id is replaced by a derived one, the same on every merge", () =
     incoming.addSubtypeFact({ id: "sf1", subtypeId: "c", supertypeId: "a" });
     const ids = () => mergeKeeping(existing, incoming).subtypeFacts.map((sf) => sf.id);
     const once = ids();
-    expect(once[0]).toBe("sf1");
-    expect(once[1]).not.toBe("sf1");
+    expect(once).toEqual(["sf1", "sf1_2"]);
     expect(ids()).toEqual(once);
   });
 
@@ -66,8 +64,7 @@ describe("a held id is replaced by a derived one, the same on every merge", () =
     const incoming = build("f2", "d");
     const ids = () => mergeKeeping(existing, incoming).objectifiedFactTypes.map((o) => o.id);
     const once = ids();
-    expect(once).toHaveLength(2);
-    expect(once[1]).not.toBe("of1");
+    expect(once).toEqual(["of1", "of1_2"]);
     expect(ids()).toEqual(once);
   });
 
@@ -83,13 +80,24 @@ describe("a held id is replaced by a derived one, the same on every merge", () =
     const incoming = build("f2");
     const ids = () => mergeKeeping(existing, incoming).populations.map((p) => p.id);
     const once = ids();
-    expect(once).toHaveLength(2);
-    expect(once[1]).not.toBe("pop1");
+    expect(once).toEqual(["pop1", "pop1_2"]);
     expect(ids()).toEqual(once);
   });
 });
 
-describe("a constraint follows a subtype fact to its derived id", () => {
+describe("an id held by another kind", () => {
+  it("is suffixed too, since a 4.0 model gives one id one element", () => {
+    const existing = entities(new OrmModel({ name: "M" }), "a");
+    factType(existing, "f1", "a");
+    const incoming = entities(new OrmModel({ name: "M" }), "a");
+    factType(incoming, "f1", "a");
+    // The incoming population states the id the base's object type holds.
+    incoming.addPopulation({ id: "a", factTypeId: "f1", instances: [] });
+    expect(mergeKeeping(existing, incoming).populations.map((p) => p.id)).toEqual(["a_2"]);
+  });
+});
+
+describe("a constraint follows a subtype fact to its suffixed id", () => {
   it("names both of two repeated incoming facts, not the first twice", () => {
     const existing = entities(new OrmModel({ name: "M" }), "a", "b", "c", "d");
     existing.addSubtypeFact({ id: "sf1", subtypeId: "b", supertypeId: "a" });
@@ -112,22 +120,18 @@ describe("a constraint follows a subtype fact to its derived id", () => {
 });
 
 describe("re-merging an earlier merge's output", () => {
-  // That output holds attempt 1's derived id, so a further collision on the
-  // same preferred id has to walk to attempt 2 (from the retroactive review
-  // of #734: no test reached it, and dropping the walk passed every test).
-  it("walks past a derived id the input already holds", () => {
+  // That output holds the first suffix, so a further collision on the same
+  // preferred id has to walk to the next (from the retroactive review of
+  // #734: no test reached it, and dropping the walk passed every test).
+  it("walks past a suffixed id the input already holds", () => {
     const existing = entities(new OrmModel({ name: "M" }), "a", "b", "c", "d");
     existing.addSubtypeFact({ id: "s", subtypeId: "b", supertypeId: "a" });
-    existing.addSubtypeFact({
-      id: derivedId(`${MERGE_ID_TAG}.subtype-fact`, ["s", "1"]),
-      subtypeId: "c",
-      supertypeId: "a",
-    });
+    existing.addSubtypeFact({ id: "s_2", subtypeId: "c", supertypeId: "a" });
     const incoming = entities(new OrmModel({ name: "M" }), "a", "b", "c", "d");
     incoming.addSubtypeFact({ id: "s", subtypeId: "d", supertypeId: "a" });
     const ids = () => mergeKeeping(existing, incoming).subtypeFacts.map((sf) => sf.id);
     const once = ids();
-    expect(new Set(once).size).toBe(3);
+    expect(once).toEqual(["s", "s_2", "s_3"]);
     expect(ids()).toEqual(once);
   });
 });

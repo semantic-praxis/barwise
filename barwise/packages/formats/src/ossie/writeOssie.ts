@@ -10,6 +10,7 @@
  * document.
  */
 import {
+  aliasOf,
   type ConceptualDataTypeName,
   type Constraint,
   type ConstraintInView,
@@ -22,6 +23,7 @@ import {
   objectificationRef,
   type ObjectType,
   type OrmModel,
+  ownerContextOf,
   type PreferredIdentifiers,
   preferredIdentifiers,
   resolvePreferredIdentifier,
@@ -468,7 +470,8 @@ function isPlainBuiltin(ot: ObjectType): boolean {
     && ot.dataType?.name === OSSIE_BUILTIN_VALUE_TYPES[ot.name]
     && ot.dataType.length === undefined && ot.dataType.scale === undefined
     && !ot.definition && !ot.valueConstraint && !ot.note && ot.defaultValue === undefined
-    && ot.aliases.length === 0 && !ot.independent && !ot.sourceContext && !ot.cardinality;
+    && ot.aliases.length === 0 && !ot.independent && aliasOf(ot.id) === undefined
+    && !ot.cardinality;
 }
 
 /** Letters, digits and `_` only, not starting with a digit: what `Entity.rel` parses. */
@@ -816,8 +819,13 @@ function writeConcept(ot: ObjectType, ctx: ConceptContext): OssieConcept {
   if (ot.cardinality) {
     lose(ot.name, "population cardinality not written", key, ["cardinality"]);
   }
-  if (ot.sourceContext) {
-    lose(ot.name, `source context ${ot.sourceContext} not written`, key, ["sourceContext"]);
+  // A shadow's owner, read from its id's alias (iri-identity 6d). Ossie
+  // has no place for it, so the line is true; it explains no change,
+  // because the check aligns the read-back to the source's ids, the alias
+  // included, so the owner it lost never shows as one.
+  const owner = ownerContextOf(ctx.model, ot.id);
+  if (owner !== undefined) {
+    lose(ot.name, `source context ${owner} not written`, key, []);
   }
   const { requires: noteRequires, derivedBy: noteDerivedBy, rest } = splitNoteLines(ot.note);
   for (const line of rest) {

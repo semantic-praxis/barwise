@@ -33,6 +33,10 @@ interface ObjectTypeOptions {
   kind?: ObjectTypeKind;
   referenceMode?: string;
   definition?: string;
+  /**
+   * Make it a shadow of this context's element: the id `<context>:<name>`
+   * and an import of the context, as a 4.0 file states one (iri-identity 6d).
+   */
   sourceContext?: string;
   valueConstraint?: ValueConstraintDef;
   dataType?: DataTypeDef;
@@ -255,19 +259,27 @@ export class ModelBuilder {
       flagged.add(id);
       return id;
     };
+    const contexts = [
+      ...new Set(this.objectTypeConfigs.flatMap(({ options }) => options.sourceContext ?? [])),
+    ];
     const model = new OrmModel({
       name: this.modelName,
       domainContext: this.domainContext,
+      ...(contexts.length > 0
+        ? { imports: Object.fromEntries(contexts.map((c) => [localName(c), c])) }
+        : {}),
     });
 
     // Add all object types first.
     for (const { name, options } of this.objectTypeConfigs) {
       model.addObjectType({
+        ...(options.sourceContext !== undefined
+          ? { id: `${localName(options.sourceContext)}:${localName(name)}` }
+          : {}),
         name,
         kind: options.kind ?? "entity",
         referenceMode: options.referenceMode,
         definition: options.definition,
-        sourceContext: options.sourceContext,
         valueConstraint: options.valueConstraint,
         dataType: options.dataType,
         aliases: options.aliases,

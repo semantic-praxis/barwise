@@ -9,15 +9,16 @@
  * written before exports named their model is attributed by its sources
  * instead: to a model that holds every source id and owns at least one.
  *
- * Holding is not enough, because `split` gives a shadow its owner's id, so
- * a domain holds the ids of every type it references; a shadow
- * (`sourceContext` set) does not own. Owning one is enough, with one model
+ * Holding is not enough, because a domain holds a shadow of every type it
+ * references, under the owner's id; a shadow (an `alias:local` id,
+ * iri-identity 6d) does not own. Owning one is enough, with one model
  * loaded, because `split` homes each fact type and subtype fact in exactly
  * one domain, so an owned id has one owner. A model copied whole into a
  * second file breaks that, and no rule over one loaded model can tell the
  * copies apart.
  */
 
+import { aliasOf } from "../model/namespace.js";
 import type { OrmModel } from "../model/OrmModel.js";
 import type { LineageManifest, ManifestExport } from "./types.js";
 
@@ -52,7 +53,7 @@ function holding(model: OrmModel, id: string): "owns" | "shadow" | "none" {
 
 function holdingAsIs(model: OrmModel, id: string): "owns" | "shadow" | "none" {
   const ot = model.getObjectType(id);
-  if (ot) return ot.sourceContext === undefined ? "owns" : "shadow";
+  if (ot) return aliasOf(ot.id) === undefined ? "owns" : "shadow";
   const held = model.getFactType(id) ?? model.findRole(id) ?? model.getConstraint(id)
     ?? model.getSubtypeFact(id);
   return held ? "owns" : "none";

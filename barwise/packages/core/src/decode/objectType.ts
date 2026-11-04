@@ -96,7 +96,6 @@ const baseFieldsOf = (ids: FormatIds<Schema.Struct.Fields>) => ({
   id: ids.objectType,
   name: Name,
   definition: Schema.optionalKey(Text),
-  source_context: Schema.optionalKey(Text),
   aliases: Schema.optionalKey(Schema.Array(nonEmpty(" (an alias)"))),
   independent: Schema.optionalKey(Flag),
   note: Schema.optionalKey(Text),
@@ -131,9 +130,13 @@ const forbiddenOnEntity = Object.fromEntries(
  * Discriminated by `kind`, so a malformed object type is checked against
  * its own variant only.
  */
-export function objectTypeFileOf(ids: FormatIds<Schema.Struct.Fields>) {
+export function objectTypeFileOf<Extra extends Schema.Struct.Fields = Record<never, never>>(
+  ids: FormatIds<Schema.Struct.Fields>,
+  extra: Extra = {} as Extra,
+) {
   const EntityTypeFile = Schema.Struct({
     ...baseFieldsOf(ids),
+    ...extra,
     kind: Schema.Literal("entity"),
     reference_mode: nonEmpty("").pipe(
       Schema.annotateKey({
@@ -146,6 +149,7 @@ export function objectTypeFileOf(ids: FormatIds<Schema.Struct.Fields>) {
 
   const ValueTypeFile = Schema.Struct({
     ...baseFieldsOf(ids),
+    ...extra,
     kind: Schema.Literal("value"),
     reference_mode: forbidden("is not allowed: a value type has no reference mode."),
     preferred_identifier: forbidden(
@@ -165,8 +169,14 @@ export function objectTypeFileOf(ids: FormatIds<Schema.Struct.Fields>) {
   );
 }
 
-/** An object type as a 3.0 file states it. */
-export const ObjectTypeFile = objectTypeFileOf(IDS_30);
+/**
+ * An object type as a 3.0 file states it, `source_context` included: the
+ * owner of a shadow, which 4.0 states in the shadow's `alias:local` id
+ * instead (iri-identity 6d), so the 4.0 decoder has no such field.
+ */
+export const ObjectTypeFile = objectTypeFileOf(IDS_30, {
+  source_context: Schema.optionalKey(Text),
+});
 
 /** A decoded file object type: exactly what the file states. */
 export type ObjectTypeFileValue = typeof ObjectTypeFile.Type;

@@ -34,6 +34,7 @@ import {
   REFERENCE_PATTERN,
   ROLE_ID_PATTERN,
 } from "../model/name.js";
+import { aliasForContext } from "../model/namespace.js";
 import { toObjectifiedFactTypeConfig } from "../model/ObjectifiedFactType.js";
 import type { ObjectTypeConfig } from "../model/ObjectType.js";
 import { OrmModel } from "../model/OrmModel.js";
@@ -195,16 +196,9 @@ export function replayIds(source: OrmModel, options: ReplayOptions = {}): Replay
    * alias and a shadow never names the wrong one.
    */
   const aliasFor = (context: string): string => {
-    const base = localName(context);
-    for (let n = 1;; n++) {
-      const alias = n === 1 ? base : `${base}_${n}`;
-      const bound = target.imports.get(alias);
-      if (bound === context) return alias;
-      if (bound === undefined) {
-        target.setImport(alias, context);
-        return alias;
-      }
-    }
+    const alias = aliasForContext(context, (a) => target.imports.get(a));
+    if (target.imports.get(alias) === undefined) target.setImport(alias, context);
+    return alias;
   };
   target.withReserved(reserved, () => {
     // Object types first: everything else refers to them. A shadow, which
@@ -212,7 +206,11 @@ export function replayIds(source: OrmModel, options: ReplayOptions = {}): Replay
     // context a local name too, as a 4.0 alias is; or the owner's own id,
     // when the caller knows it (`ReplayOptions.ownerId`).
     for (const ot of source.objectTypes) {
-      const { id: _old, ...config } = ot as ObjectTypeConfig & { readonly id: string; };
+      // The owner moves into the id's alias, and `source_context` goes
+      // (iri-identity 6d): a 4.0 model states ownership once.
+      const { id: _old, sourceContext: _owner, ...config } = ot as ObjectTypeConfig & {
+        readonly id: string;
+      };
       const id = ot.sourceContext !== undefined
         ? `${aliasFor(ot.sourceContext)}:${
           options.ownerId?.(ot.sourceContext, ot.name) ?? localName(ot.name)

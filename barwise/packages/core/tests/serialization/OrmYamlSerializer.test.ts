@@ -47,7 +47,6 @@ describe("OrmYamlSerializer", () => {
         kind: "entity",
         referenceMode: "customer_id",
         definition: "A person who buys things.",
-        sourceContext: "crm",
       });
 
       const yaml = serializer.serialize(model);
@@ -56,7 +55,8 @@ describe("OrmYamlSerializer", () => {
       expect(yaml).toContain("kind: entity");
       expect(yaml).toContain("reference_mode: customer_id");
       expect(yaml).toContain("definition: A person who buys things.");
-      expect(yaml).toContain("source_context: crm");
+      // A shadow's owner is its id's alias in 4.0 (iri-identity 6d).
+      expect(yaml).not.toContain("source_context");
     });
 
     it("serializes value types with value constraints", () => {
@@ -543,7 +543,9 @@ model:
       expect(ot.kind).toBe("entity");
       expect(ot.referenceMode).toBe("customer_id");
       expect(ot.definition).toBe("A person who buys things.");
-      expect(ot.sourceContext).toBe("crm");
+      // The owner moves into the alias, and the model imports it.
+      expect(ot.sourceContext).toBeUndefined();
+      expect(model.imports.get("crm")).toBe("crm");
     });
 
     it("deserializes value types with value constraints", () => {
@@ -940,7 +942,6 @@ model:
         expect(rest!.kind).toBe(orig.kind);
         expect(rest!.referenceMode).toBe(orig.referenceMode);
         expect(rest!.definition).toBe(orig.definition);
-        expect(rest!.sourceContext).toBe(orig.sourceContext);
         if (orig.valueConstraint) {
           expect(rest!.valueConstraint?.values).toEqual(
             orig.valueConstraint.values,
@@ -1036,7 +1037,6 @@ model:
         kind: "entity",
         referenceMode: "customer_id",
         definition: "A person or organization that has placed at least one order.",
-        sourceContext: "crm",
       });
 
       const yaml = serializer.serialize(model);

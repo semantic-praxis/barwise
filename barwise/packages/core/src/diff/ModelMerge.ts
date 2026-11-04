@@ -26,9 +26,17 @@ import {
 
 /** Marks a subtype fact the merge left out, for `withoutSubtypeFacts`. */
 const LEFT_OUT = "\u0000left-out";
+import {
+  type ConstraintFileValue,
+  constraintRecord,
+  modelConstraint,
+} from "../decode/constraint.js";
 import { withoutDiagramReferences } from "../model/DiagramLayout.js";
 import { type FactTypeConfig, toFactTypeConfig } from "../model/FactType.js";
 import { graphOf } from "../model/graph.js";
+import { populationIdBase, suffixed } from "../model/idRules.js";
+import { mapConstraintReferences } from "../model/mint.js";
+import { aliasOf } from "../model/namespace.js";
 import { toObjectifiedFactTypeConfig } from "../model/ObjectifiedFactType.js";
 import type { ObjectType } from "../model/ObjectType.js";
 import { OrmModel } from "../model/OrmModel.js";
@@ -39,14 +47,21 @@ import {
   subtypePairKey,
   toSubtypeFactConfig,
 } from "../model/SubtypeFact.js";
-import { derivedId, MERGE_ID_TAG } from "../serialization/derivedId.js";
 import { groupRepeats } from "../util/groupRepeats.js";
 import type { Diagnostic } from "../validation/Diagnostic.js";
 import { referenceDiagnostics } from "../validation/referenceDiagnostics.js";
 import { report, RULE_ID } from "../validation/ruleId.js";
 import { structuralRules, structuralWellFormedness } from "../validation/rules/structural.js";
 import { type DeltaKind, elementName, type ModelDiffResult, renamePairing } from "./deltas.js";
-import { isDanglingFactType, isDanglingPlayer } from "./elementDiff.js";
+import {
+  type ConstraintPairing,
+  constraintPairing,
+  isDanglingFactType,
+  isDanglingPlayer,
+  pairFactTypeConstraints,
+  type RoleHolders,
+  roleHolders,
+} from "./elementDiff.js";
 import { fromBasePrior } from "./identity.js";
 import type {
   ConstraintDelta,
@@ -75,7 +90,10 @@ export type MergeInput = Pick<ModelDiffResult, "deltas" | "matching" | "recogniz
  * `merge_models`) cannot come to diff differently, and so a reader sees
  * why: `mergeModels` refuses a recognized pair.
  */
-export const MERGE_DIFF_OPTIONS = { recognizeRenames: false } as const satisfies DiffOptions;
+export const MERGE_DIFF_OPTIONS = {
+  recognizeRenames: false,
+  ownerChanges: false,
+} as const satisfies DiffOptions;
 
 /**
  * Build a merged OrmModel from the existing model plus a set of accepted
@@ -97,6 +115,7 @@ export function mergeModels(
   refuseUnmergeablePairing(diff);
   const deltas = diff.deltas;
   refuseNameClashes(deltas, accepted);
+  refuseOwnerChanges(deltas, accepted);
   // A rebound alias is refused, accepted or not: the base's shadows behind
   // it would come to name another context, which no review of the header
   // line shows (iri-identity WS6).
@@ -195,6 +214,9 @@ export function mergeModels(
       if (isAccepted) {
         // Keep existing id, take incoming content.
         // For aliases, union existing + incoming (deduplicated).
+        // The id is also the owner (iri-identity 6d), so a shadow stays
+        // the base's owner's; `MERGE_DIFF_OPTIONS` reports no owner change,
+        // and `refuseOwnerChanges` refuses one a diff built otherwise offers.
         const existingOt = delta.existing!;
         const incomingOt = delta.incoming!;
         merged.addObjectType({
@@ -219,6 +241,15 @@ export function mergeModels(
     .map((d, i) => [d, i] as const)
     .filter(([d]) => d.elementType === "fact_type") as [FactTypeDelta, number][];
 
+  // The diff's constraint pairing, built once and only when a fact type
+  // modification is accepted (`keptConstraintIds`).
+  let constraintSides: ConstraintSides | undefined;
+  const sides = () =>
+    constraintSides ??= {
+      holders: { existing: roleHolders(existing), incoming: roleHolders(incoming) },
+      pairing: constraintPairing(existing, incoming, diff.matching),
+    };
+
   for (const [delta, idx] of ftDeltas) {
     const isAccepted = accepted.has(idx);
 
@@ -242,15 +273,26 @@ export function mergeModels(
       }
     } else if (delta.kind === "modified") {
       if (isAccepted) {
-        // Keep existing id, take incoming content.
+        // Keep the existing id and take the incoming content, its roles
+        // rebased onto that id and each of its constraints the diff pairs
+        // with one of the existing fact type's under that one's id, so the
+        // stored key stays with it (`carryMintedKeys`).
         addFactTypeToMerged(
           merged,
           delta.incoming!,
           delta.existing!.id,
           incomingIdToMergedId,
+          {
+            // A fact type's own constraints name only its roles (`PLACEMENT`);
+            // a constraint across fact types follows in phase 2b, through
+            // `incomingRoleIdToMergedId`, recorded below.
+            roleIds: rebaseRoles(delta.incoming!, delta.existing!.id),
+            constraintIds: keptConstraintIds(incoming, delta.existing!, delta.incoming!, sides()),
+          },
         );
-        recordRoleRemap(roleIdMap, delta.existing!, delta.incoming!);
-        // Merged took the INCOMING roles, so they need no translation.
+        const mergedFt = merged.getFactType(delta.existing!.id)!;
+        recordRoleRemap(roleIdMap, delta.existing!, mergedFt);
+        recordIncomingRoleRemap(incomingRoleIdToMergedId, delta.incoming!, mergedFt);
       } else {
         addFactTypeToMerged(merged, delta.existing!, null, incomingIdToMergedId);
         recordIncomingRoleRemap(incomingRoleIdToMergedId, delta.incoming!, delta.existing!);
@@ -442,10 +484,10 @@ export function mergeModels(
     const supertypeId = resolveObjectTypeId(merged, chosen.supertypeId, incomingIdToMergedId);
     // An accepted modification keeps the existing id so anything holding
     // it still resolves, as the object-type and fact-type phases do.
-    // Otherwise the element's own id, or a derived one where the merged
-    // model holds it (`mergedId`).
+    // Otherwise the element's own id, suffixed where the merged model
+    // holds it (`mergedId`).
     const preferredId = delta.kind === "modified" && isAccepted ? delta.existing!.id : chosen.id;
-    const id = mergedId("subtype-fact", preferredId, (x) => merged.getSubtypeFact(x) !== undefined);
+    const id = mergedId(preferredId, merged);
     const config = { ...toSubtypeFactConfig(chosen), id, subtypeId, supertypeId };
     // Asked before adding because a throw loses the WHOLE merge rather than
     // one element (`mergeAndValidate` returns a null model). An accepted
@@ -523,8 +565,7 @@ export function mergeModels(
       number,
     ][];
 
-  const objectificationId = (id: string | undefined) =>
-    mergedId("objectification", id, (x) => merged.getObjectifiedFactType(x) !== undefined);
+  const objectificationId = (id: string | undefined) => mergedId(id, merged);
   for (const [delta, idx] of oftDeltas) {
     const isAccepted = accepted.has(idx);
     const chosen = delta.kind === "unchanged"
@@ -564,7 +605,6 @@ export function mergeModels(
     });
   }
 
-  const holdsPopulation = (x: string) => merged.getPopulation(x) !== undefined;
   // Phase 6: populations. After fact types, because a population
   // references one and keys its instances by that fact type's role ids.
   const popDeltas = deltas
@@ -613,7 +653,7 @@ export function mergeModels(
             toPopulationConfig(chosen),
             fromIncoming ? incomingRoleIdToMergedId : roleIdMap,
           ),
-          id: mergedId("population", chosen.id, holdsPopulation),
+          id: mergedId(chosen.id, merged),
           factTypeId,
         },
         { skipPlayerValidation: true },
@@ -621,16 +661,27 @@ export function mergeModels(
       continue;
     }
 
-    const preferredId = delta.kind === "modified" && isAccepted ? delta.existing!.id : chosen.id;
-    const id = mergedId("population", preferredId, holdsPopulation);
-    merged.addPopulation({
-      ...remapPopulationRoles(
-        toPopulationConfig(chosen),
-        fromIncoming ? incomingRoleIdToMergedId : roleIdMap,
-      ),
+    // A population under its fact type's rule id follows that fact type
+    // onto the base's id, as its roles do (iri-identity 6d, decision 7).
+    const followsFactType = fromIncoming && factTypeId !== chosen.factTypeId
+      && chosen.id === populationIdBase(chosen.factTypeId);
+    const preferredId = delta.kind === "modified" && isAccepted
+      ? delta.existing!.id
+      : followsFactType
+      ? populationIdBase(factTypeId)
+      : chosen.id;
+    const id = mergedId(preferredId, merged);
+    merged.addPopulation(withPopulationId(
+      {
+        ...remapPopulationRoles(
+          toPopulationConfig(chosen),
+          fromIncoming ? incomingRoleIdToMergedId : roleIdMap,
+        ),
+        factTypeId,
+      },
+      chosen.id,
       id,
-      factTypeId,
-    });
+    ));
   }
 
   // Phase 6b: preferred identifiers, now that every constraint is placed.
@@ -675,9 +726,8 @@ export function mergeModels(
   // merged model would name an alias it does not import. An alias the
   // merged model still uses cannot be removed out from under it.
   for (const ot of merged.objectTypes) {
-    const colon = ot.id.indexOf(":");
-    if (colon < 0) continue;
-    const alias = ot.id.slice(0, colon);
+    const alias = aliasOf(ot.id);
+    if (alias === undefined) continue;
     const target = incoming.imports.get(alias) ?? existing.imports.get(alias);
     if (!merged.imports.has(alias) && target !== undefined) merged.setImport(alias, target);
   }
@@ -855,6 +905,23 @@ function recordIncomingRoleRemap(
 }
 
 /**
+ * A population under `id`, each instance id that was `<from>.N` moved to
+ * `<id>.N` with it, so an instance does not name the population it came
+ * from (an instance's id is its population's and a number, decision 7).
+ */
+function withPopulationId(config: PopulationConfig, from: string, id: string): PopulationConfig {
+  if (id === from || !config.instances) return { ...config, id };
+  const prefix = `${from}.`;
+  return {
+    ...config,
+    id,
+    instances: config.instances.map((inst) =>
+      inst.id?.startsWith(prefix) ? { ...inst, id: `${id}.${inst.id.slice(prefix.length)}` } : inst
+    ),
+  };
+}
+
+/**
  * Rewrite a carried population's instance keys through the role remap.
  * An unmapped key belongs to a fact type the merge did not rewrite and
  * passes through; a key mapped to null lost its role and is dropped.
@@ -890,30 +957,23 @@ function remapPopulationRoles(
 
 /**
  * The id a merged subtype fact, objectification or population takes: the
- * one it prefers, or, where the merged store already holds that, one
- * derived from the kind, the preferred id and an attempt number.
+ * one it prefers, or, where the merged model already holds that for any
+ * kind, the model's suffix rule on it (`_2`, `_3`; decision 5), as a
+ * load or an add gives a second element one id (iri-identity 6d). A
+ * suffixed population id is what `id-not-from-name` reports; a subtype
+ * fact or objectification takes its id from its sentence, so two that
+ * clash say the same thing and `duplicate-subtype-fact` or the
+ * objectification's own refusal reports them.
  *
  * The id is the caller's because the store refuses a held one
- * (`DuplicateIdError`), which would lose the whole merge. It used to be
- * left to the installed generator, so merging the same two models twice
- * gave those elements different ids, against the rule that core is
- * deterministic (barwise-yg5). Derived from what the merge already has,
- * it is the same every time. The attempt number walks past every id the
- * merged store already holds: a third element preferring the same id, and
- * an element that kept a derived id from an earlier merge whose output is
- * being merged again.
+ * (`DuplicateIdError`), which would lose the whole merge. Before 6d the
+ * fallback was a UUIDv8 under `MERGE_ID_TAG`, deterministic but not a
+ * local name; the suffix keeps it deterministic and makes it one.
  */
-function mergedId<P extends string | undefined>(
-  kind: "subtype-fact" | "objectification" | "population",
-  preferred: P,
-  holds: (id: string) => boolean,
-): P | string {
+function mergedId<P extends string | undefined>(preferred: P, merged: OrmModel): P | string {
   // One its model left unnamed (decision 19) stays unnamed in the merge.
-  if (preferred === undefined || !holds(preferred)) return preferred;
-  for (let attempt = 1;; attempt++) {
-    const id = derivedId(`${MERGE_ID_TAG}.${kind}`, [preferred, String(attempt)]);
-    if (!holds(id)) return id;
-  }
+  if (preferred === undefined) return preferred;
+  return suffixed(preferred, (id) => merged.idKindsHolding(id).length === 0);
 }
 
 /**
@@ -1002,7 +1062,7 @@ function refuseImportClashes(existing: OrmModel, incoming: OrmModel): void {
 
 /**
  * Refuse a merge that would give two object types, or two fact types, one
- * name, before anything is built.
+ * name, or an object type and a fact type one id, before anything is built.
  *
  * The diff pairs a shared id as one element (model invariants, decision
  * 1), so an accepted addition cannot collide with an id the merge keeps;
@@ -1033,18 +1093,55 @@ function refuseNameClashes(deltas: readonly ModelDelta[], accepted: ReadonlySet<
       : d.kind === "modified"
       ? `kept, the rename to ${JSON.stringify(d.incoming!.name)} not accepted`
       : "unchanged";
-    return [{ kind: d.elementType, name: side.name, label: `${id} (${why})` }];
+    return [{ kind: d.elementType, id, name: side.name, label: `${id} (${why})` }];
   });
   const clashes = [...groupRepeats(kept, (k) => `${k.kind} ${k.name}`).values()];
-  if (clashes.length === 0) return;
-  const lines = clashes.map((group) =>
-    `${group[0]!.kind.replace("_", " ")} ${JSON.stringify(group[0]!.name)}: `
-    + group.map((k) => k.label).join(", ")
+  if (clashes.length > 0) {
+    const lines = clashes.map((group) =>
+      `${group[0]!.kind.replace("_", " ")} ${JSON.stringify(group[0]!.name)}: `
+      + group.map((k) => k.label).join(", ")
+    );
+    throw new Error(
+      `two elements would take one name: ${lines.join("; ")}. `
+        + "Accept or reject the changes that share a name together, "
+        + "or rename one of them in the base model first.",
+    );
+  }
+  // And one id for an object type and a fact type, which a 4.0 file cannot
+  // hold (iri-identity 6d): the diff pairs an id within one kind only, so
+  // an added fact type can arrive under a kept object type's id.
+  const acrossKinds = [...groupRepeats(kept, (k) => k.id).values()];
+  if (acrossKinds.length === 0) return;
+  const lines = acrossKinds.map((group) =>
+    `${JSON.stringify(group[0]!.id)}: `
+    + group.map((k) => `${k.kind.replace("_", " ")} ${JSON.stringify(k.name)}`).join(", ")
   );
   throw new Error(
-    `two elements would take one name: ${lines.join("; ")}. `
-      + "Accept or reject the changes that share a name together, "
-      + "or rename one of them in the base model first.",
+    `two elements would take one id: ${lines.join("; ")}. `
+      + "Rename one of them in either model first, so their names give different ids.",
+  );
+}
+
+/**
+ * Refuse an accepted change of an object type's owner, which only a diff
+ * built without `MERGE_DIFF_OPTIONS` reports. The owner is the id's alias
+ * (iri-identity 6d) and an accepted modification keeps the base's id, so
+ * the merge could only drop the change it was told to make; taking the
+ * incoming id would strand every base reference to the old one.
+ */
+function refuseOwnerChanges(deltas: readonly ModelDelta[], accepted: ReadonlySet<number>): void {
+  const moved = deltas.flatMap((d, i) => {
+    if (d.elementType !== "object_type" || d.kind !== "modified" || !accepted.has(i)) return [];
+    const change = d.changes.find((c) => c.change === "sourceContext");
+    return change?.change === "sourceContext"
+      ? [`"${d.name}" (${change.from ?? "owned"} -> ${change.to ?? "owned"})`]
+      : [];
+  });
+  if (moved.length === 0) return;
+  throw new Error(
+    `cannot change which domain owns ${moved.join(", ")}: the owner is part of the id, `
+      + "and a merge keeps the base's ids. Diff with MERGE_DIFF_OPTIONS, which does not "
+      + "offer it, or change the owner in the domains themselves.",
   );
 }
 
@@ -1075,21 +1172,87 @@ function addFactTypeToMerged(
   source: import("../model/FactType.js").FactType,
   overrideId: string | null,
   incomingIdToMergedId: Map<string, string>,
+  incomingSide?: {
+    /** The source's role ids an accepted modification rebased. */
+    readonly roleIds: ReadonlyMap<string, string>;
+    /** The id each of the source's constraints keeps, where it changes. */
+    readonly constraintIds?: ReadonlyMap<import("../model/Constraint.js").Constraint, string>;
+  },
 ): void {
   // The projection is the only place a role's fields are listed; this
   // overrides the one it means to change (barwise-927 review).
   const projected = toFactTypeConfig(source);
+  const roleId = (id: string | undefined) =>
+    id === undefined ? id : incomingSide?.roleIds.get(id) ?? id;
   const config: FactTypeConfig = {
     ...projected,
     id: overrideId ?? source.id,
     roles: projected.roles.map((r) => ({
       ...r,
+      id: roleId(r.id),
       playerId: resolvePlayerId(merged, r.playerId, incomingIdToMergedId, source),
     })),
-    constraints: remapConstraintIds(source.internalConstraints, merged, incomingIdToMergedId),
+    constraints: remapConstraintIds(source.internalConstraints, merged, incomingIdToMergedId)
+      .map((c, i) => {
+        if (!incomingSide) return c;
+        const kept = incomingSide.constraintIds?.get(source.internalConstraints[i]!);
+        const mapped = mapRoleIds(c, incomingSide.roleIds);
+        return kept === undefined ? mapped : { ...mapped, id: kept };
+      }),
   };
 
   merged.addFactType(config);
+}
+
+/**
+ * Each role of `incoming` whose id is its fact type's id and a local name,
+ * to the same local name under `baseId`: what an accepted modification
+ * gives the incoming roles when it keeps the base's fact type id
+ * (iri-identity 6d). Every role a 4.0 file holds has that shape; one that
+ * does not (a model built in code) keeps its id. Empty when the two fact
+ * types already share an id.
+ */
+function rebaseRoles(
+  incoming: import("../model/FactType.js").FactType,
+  baseId: string,
+): Map<string, string> {
+  const out = new Map<string, string>();
+  if (incoming.id === baseId) return out;
+  const prefix = `${incoming.id}.`;
+  for (const r of incoming.roles) {
+    if (r.id.startsWith(prefix)) out.set(r.id, `${baseId}.${r.id.slice(prefix.length)}`);
+  }
+  return out;
+}
+
+/** What `keptConstraintIds` pairs constraints with, built once per merge. */
+interface ConstraintSides {
+  readonly holders: { readonly existing: RoleHolders; readonly incoming: RoleHolders; };
+  readonly pairing: ConstraintPairing;
+}
+
+/**
+ * The existing id each incoming constraint keeps where the diff pairs it
+ * with one of the existing fact type's: by id, then by content
+ * (`pairFactTypeConstraints`). An unpaired one keeps its own, and so does
+ * one whose existing id the incoming model gives another element (a
+ * constraint moved out of the fact type, say), which taking it would
+ * hand to two.
+ */
+function keptConstraintIds(
+  incoming: OrmModel,
+  existingFt: import("../model/FactType.js").FactType,
+  incomingFt: import("../model/FactType.js").FactType,
+  { holders, pairing }: ConstraintSides,
+): Map<import("../model/Constraint.js").Constraint, string> {
+  const out = new Map<import("../model/Constraint.js").Constraint, string>();
+  for (const pair of pairFactTypeConstraints(existingFt, incomingFt, holders, pairing)) {
+    const id = pair.existing?.id;
+    if (id === undefined || !pair.incoming || pair.incoming.id === id) continue;
+    if (incoming.idKindsHolding(id).length > 0) continue;
+    out.set(pair.incoming, id);
+  }
+  return out;
 }
 
 /**
@@ -1186,30 +1349,30 @@ function remapConstraintIds<C extends import("../model/Constraint.js").Constrain
 
 /**
  * Rewrite every role id a constraint names through a role remap, in
- * whatever field its kind keeps them (join paths included): the walk is
- * over the constraint's values rather than a list of its fields, so a
- * kind added later is covered. A role mapped to null keeps its id, and
- * the caller's role check decides what that means. Only role ids are
- * keys of the map, so no other string can match.
+ * whatever field its kind keeps them (join paths included), through the
+ * one traversal of a constraint's references (`mapConstraintReferences`),
+ * which refuses a field it does not classify, so a kind added later cannot
+ * slip through. A literal is never read as a role: a value constraint's
+ * allowed value spelled like a rebased role id stays the value it was
+ * (Copilot, on 6d; the walk over every string this replaced rewrote it).
+ * A role mapped to null keeps its id, and the caller's role check decides
+ * what that means.
  */
 function mapRoleIds<C extends import("../model/Constraint.js").Constraint>(
   constraint: C,
   roleIdMap: ReadonlyMap<string, string | null>,
 ): C {
   if (roleIdMap.size === 0) return constraint;
-  const walk = (value: unknown, key: string | undefined): unknown => {
-    if (typeof value === "string") {
-      if (key === "id" || key === "type" || key === "modality") return value;
-      const mapped = roleIdMap.get(value);
-      return mapped === undefined || mapped === null ? value : mapped;
-    }
-    if (Array.isArray(value)) return value.map((v) => walk(v, key));
-    if (value !== null && typeof value === "object") {
-      return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, walk(v, k)]));
-    }
-    return value;
-  };
-  return walk(constraint, undefined) as C;
+  const form = mapConstraintReferences(
+    constraint,
+    (ref) => (ref.kind === "role" ? roleIdMap.get(ref.id) ?? ref.id : ref.id),
+  );
+  const record = modelConstraint(
+    constraintRecord({ ...form, id: constraint.id ?? "" } as ConstraintFileValue),
+  );
+  if (constraint.id !== undefined) return record as unknown as C;
+  const { id: _none, ...unnamed } = record;
+  return unnamed as unknown as C;
 }
 
 /**

@@ -17,13 +17,15 @@ import { OrmModel } from "../../src/model/OrmModel.js";
 describe("the same conceptual change gets the same breaking level", () => {
   /** A model carrying both an object type definition and a standalone one. */
   function model(objectTypeDefinition: string, termDefinition: string, context: string) {
-    const m = new OrmModel({ name: "M" });
+    // A shadow of the context's Customer: its id's alias names the context
+    // (iri-identity 6d).
+    const m = new OrmModel({ name: "M", imports: { [context]: context } });
     m.addObjectType({
+      id: `${context}:Customer`,
       name: "Customer",
       kind: "entity",
       referenceMode: "customer_id",
       definition: objectTypeDefinition,
-      sourceContext: context,
     });
     m.addDefinition({ term: "Churn", definition: termDefinition, context });
     return m;

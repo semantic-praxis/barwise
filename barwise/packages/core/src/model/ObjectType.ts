@@ -124,7 +124,11 @@ export interface ObjectTypeConfig {
   readonly referenceMode?: string;
   /** Natural-language definition for the ubiquitous language. */
   readonly definition?: string;
-  /** The bounded context this object type originates from. */
+  /**
+   * A 2.0 or 3.0 shadow's owner, as the file stated it, for the replay to
+   * build the shadow's `alias:local` id from. A 4.0 model has none: the
+   * id's alias says whose element it is (`ownerContextOf`, iri-identity 6d).
+   */
   readonly sourceContext?: string;
   /** Value constraint for value types. */
   readonly valueConstraint?: ValueConstraintDef;

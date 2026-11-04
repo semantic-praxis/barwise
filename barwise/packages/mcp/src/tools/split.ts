@@ -11,8 +11,10 @@
  */
 
 import {
+  aliasOf,
   type OrmModel,
   OrmYamlSerializer,
+  ownerContextOf,
   splitFiles,
   splitModel,
   type SplitResult,
@@ -165,15 +167,17 @@ function summarize(context: string, file: string, yaml: string): DomainSummary {
   } catch {
     return { context, file };
   }
-  const owned = model.objectTypes.filter((o) => o.sourceContext === undefined);
+  // A shadow is known by its id's alias, its owner by the import behind it
+  // (iri-identity 6d).
+  const owned = model.objectTypes.filter((o) => aliasOf(o.id) === undefined);
   return {
     context,
     file,
     entityTypes: owned.filter((o) => o.kind === "entity").map((o) => o.name),
     valueTypeCount: owned.filter((o) => o.kind === "value").length,
     sharedObjectTypes: model.objectTypes
-      .filter((o) => o.sourceContext !== undefined)
-      .map((o) => ({ name: o.name, owner: o.sourceContext! })),
+      .filter((o) => aliasOf(o.id) !== undefined)
+      .map((o) => ({ name: o.name, owner: ownerContextOf(model, o.id)! })),
     factTypeCount: model.factTypes.length,
   };
 }

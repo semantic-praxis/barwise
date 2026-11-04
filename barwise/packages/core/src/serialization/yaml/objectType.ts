@@ -12,6 +12,7 @@ export interface OrmYamlObjectType {
   /** An entity's preferred identifier: a uniqueness constraint's id (3.0). */
   preferred_identifier?: string;
   definition?: string;
+  /** A 2.0 or 3.0 shadow's owner; 4.0 states it in the id's alias (iri-identity 6d). */
   source_context?: string;
   value_constraint?: OrmYamlValueConstraintBody;
   data_type?: { name: string; length?: number; scale?: number; };
@@ -30,6 +31,13 @@ export interface OrmYamlObjectType {
 export function serializeObjectType(
   ot: ObjectType,
   preferredIdentifierId?: string,
+  options: {
+    /**
+     * Write a 3.x shadow's `source_context`: format 3.0 states the owner
+     * there, 4.0 in the id's alias and has no such field (iri-identity 6d).
+     */
+    readonly sourceContext?: boolean;
+  } = {},
 ): OrmYamlObjectType {
   const result: OrmYamlObjectType = {
     id: ot.id,
@@ -51,7 +59,7 @@ export function serializeObjectType(
   if (ot.definition) {
     result.definition = ot.definition;
   }
-  if (ot.sourceContext) {
+  if (options.sourceContext && ot.sourceContext) {
     result.source_context = ot.sourceContext;
   }
   if (value?.valueConstraint) {

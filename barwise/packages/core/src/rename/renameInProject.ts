@@ -3,15 +3,18 @@
  * rename `renameInModel` does, in the named domain and every domain it
  * reaches. Pure: the input project and its models are never changed.
  *
- * What links domains in 3.x is names, not ids: a shadow is an object type
- * whose `source_context` names its owner's domain and whose name is the
- * owner's (split also copies the owner's id, but a hand-written shadow
- * need not), and a mapping file names object types by plain name. So the
- * cascade follows names, and `files` says which files it changed.
+ * A shadow is an object type whose id's alias the domain imports from
+ * its owner's domain, and whose name is the owner's (split gives it
+ * `<alias>:<the owner's id>`, iri-identity 6d, but a hand-written shadow
+ * need not hold the owner's id), and a mapping file names object types by
+ * plain name. So the cascade follows the owner and the name, the shadow
+ * takes `<alias>:<the owner's new id>`, and `files` says which files it
+ * changed.
  */
 
 import { toSnake } from "../mapping/columnNames.js";
 import type { ContextMappingConfig } from "../model/ContextMapping.js";
+import { aliasOf, ownerContextOf } from "../model/namespace.js";
 import type { OrmModel } from "../model/OrmModel.js";
 import { OrmProject } from "../model/OrmProject.js";
 import { writeDocument40 } from "../serialization/OrmYamlSerializer.js";
@@ -78,12 +81,19 @@ export function renameInProject(
   // the shadow's domain checked by the same refusals as the owner's.
   const renamed: { context: string; plan: RenamePlan; }[] = [{ context, plan }];
   if (plan.kind === "objectType") {
+    // A rename to the same name repairs the owner's id (decision 13); a
+    // shadow already under `<alias>:<that id>` has nothing to repair, and is
+    // left rather than refused (the 6b-3b note for 6d).
+    const repairedId = plan.from === plan.to
+      ? idsForRename(owner, plan).get(plan.elementId) ?? plan.elementId
+      : undefined;
     for (const [ctx, model] of models) {
       if (ctx === context) continue;
       const shadow = model.objectTypes.find((ot) =>
-        ot.sourceContext === context && ot.name === plan.from
+        ownerContextOf(model, ot.id) === context && ot.name === plan.from
       );
       if (!shadow) continue;
+      if (repairedId !== undefined && shadow.id === `${aliasOf(shadow.id)}:${repairedId}`) continue;
       const shadowPlan = planInDomain(model, ctx, { kind: "objectType", name: plan.from }, plan.to);
       renamed.push({ context: ctx, plan: shadowPlan });
     }
@@ -241,11 +251,11 @@ function followReferenceModes(
     for (const id of ids) {
       const entity = models.get(ctx)!.getObjectType(id);
       if (!entity) continue;
-      const ownerCtx = entity.sourceContext ?? ctx;
+      const ownerCtx = ownerContextOf(models.get(ctx)!, entity.id) ?? ctx;
       for (const [other, model] of models) {
         const copy = model.objectTypes.find((ot) =>
           ot.name === entity.name
-          && (other === ownerCtx ? ot.sourceContext === undefined : ot.sourceContext === ownerCtx)
+          && ownerContextOf(model, ot.id) === (other === ownerCtx ? undefined : ownerCtx)
         );
         if (copy?.kind !== "entity" || copy.referenceMode !== fromMode) continue;
         const copyDoc = docOf(other).model.object_types?.find((ot) => ot.id === copy.id);

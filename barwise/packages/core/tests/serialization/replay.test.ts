@@ -88,6 +88,19 @@ const asText = (model: OrmModel) => {
     model: Record<string, unknown>;
   };
   const { imports: _added, ...header } = doc.model;
+  // A 3.0 shadow states its owner in `source_context`; 4.0 in its id's
+  // alias, which the replay binds to that owner (iri-identity 6d). Read
+  // off the id and the imports by hand, not through `ownerContextOf`, so
+  // the expectation does not move with the code it checks (the pr-review
+  // on 6d).
+  const objectTypes = header["object_types"] as Record<string, unknown>[] | undefined;
+  if (objectTypes) {
+    header["object_types"] = objectTypes.map((ot) => {
+      const id = ot["id"] as string;
+      const owner = id.includes(":") ? model.imports.get(id.slice(0, id.indexOf(":"))) : undefined;
+      return owner === undefined ? ot : { ...ot, source_context: owner };
+    });
+  }
   return { ...doc, model: header, orm_version: "3.0" };
 };
 
@@ -124,6 +137,18 @@ describe("replaying a 3.x model into format 4.0", () => {
 
   it("reads the corpus", () => {
     expect(corpus.length).toBeGreaterThan(40);
+  });
+
+  it("holds shadows, so the shadow cases below have something to read", () => {
+    // The corpus is written by the 3.0 writer; when a change stopped it
+    // writing `source_context`, every file lost its shadows and each case
+    // below still passed, on less (Copilot, on 6d). Counted, not assumed.
+    const shadows = corpus.flatMap((c) =>
+      (c.doc.model.object_types ?? []).filter((ot: Record<string, unknown>) =>
+        ot["source_context"] !== undefined
+      )
+    );
+    expect(shadows.length).toBeGreaterThan(20);
   });
 
   it.each(corpus.map((c) => [c.file, c] as const))(

@@ -65,6 +65,16 @@ export interface DiffOptions {
    * changed it at once (`pairedBy: "declared"`). Merge refuses these too.
    */
   readonly renames?: readonly DeclaredRename[];
+  /**
+   * Report an object type owned in one model and a shadow in the other, or
+   * a shadow of two owners, as a `sourceContext` change. Default on. Every
+   * merge path turns it off: the owner is the id's alias (iri-identity
+   * 6d) and a merge keeps the base's ids, so it cannot apply the change,
+   * and offering it would let a reviewer accept what the merge then drops.
+   * A transcript's owned `Customer` paired with the base's `crm:Customer`
+   * is then unchanged, and the shadow stays the base's.
+   */
+  readonly ownerChanges?: boolean;
 }
 
 export {
@@ -228,7 +238,14 @@ export function diffModels(
         breakingLevel: classifyBreakingLevel("removed", [], "object_type"),
       });
     } else {
-      const changes = diffObjectType(ot, match, existing, incoming, identity);
+      const changes = diffObjectType(
+        ot,
+        match,
+        existing,
+        incoming,
+        identity,
+        options.ownerChanges ?? true,
+      );
       const kind: DeltaKind = changes.length > 0 ? "modified" : "unchanged";
       deltas.push({
         kind,

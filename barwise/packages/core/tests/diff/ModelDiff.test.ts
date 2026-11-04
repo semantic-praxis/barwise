@@ -223,19 +223,19 @@ describe("diffModels", () => {
     expect(addedDef!.term).toBe("Order");
   });
 
-  it("detects modified object type source context", () => {
-    const existing = new ModelBuilder("Test")
-      .withEntityType("Customer", {
+  it("detects modified object type source context, read from the shadow's alias", () => {
+    const shadow = (context: string) => {
+      const m = new OrmModel({ name: "Test", imports: { [context]: context } });
+      m.addObjectType({
+        id: `${context}:Customer`,
+        name: "Customer",
+        kind: "entity",
         referenceMode: "customer_id",
-        sourceContext: "CRM",
-      })
-      .build();
-    const incoming = new ModelBuilder("Test")
-      .withEntityType("Customer", {
-        referenceMode: "customer_id",
-        sourceContext: "Sales",
-      })
-      .build();
+      });
+      return m;
+    };
+    const existing = shadow("CRM");
+    const incoming = shadow("Sales");
 
     const result = diffModels(existing, incoming);
     const delta = result.deltas.find((d) => d.name === "Customer");

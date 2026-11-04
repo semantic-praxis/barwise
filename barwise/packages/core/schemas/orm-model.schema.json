@@ -146,10 +146,6 @@
           "type": "string",
           "description": "Natural-language definition for the ubiquitous language."
         },
-        "source_context": {
-          "type": "string",
-          "description": "The bounded context this object type originates from."
-        },
         "value_constraint": {
           "$ref": "#/definitions/value_constraint_def",
           "description": "Value constraint for value types."

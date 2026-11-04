@@ -207,16 +207,24 @@ directories, ready for you to add models by hand.
 ## Context mappings
 
 When two contexts share an object type, the owning context keeps the
-real definition and the other context gets a **shadow** -- a copy
-marked with `source_context` so a reader knows it is owned elsewhere:
+real definition and the other context gets a **shadow** -- a copy whose
+id is the owner's id behind an alias, so a reader knows it is owned
+elsewhere. The domain imports the alias, naming the owning context:
 
 ```yaml
-- id: 39a503b7-4caa-4c25-9eea-d9817bf69a30
-  name: Auction
-  kind: entity
-  reference_mode: id
-  source_context: auctions
+imports:
+  auctions: auctions
+object_types:
+  - id: auctions:Auction
+    name: Auction
+    kind: entity
+    reference_mode: id
 ```
+
+Every reference to the shadow in that domain (a role's player, a subtype
+fact's end) names `auctions:Auction`. A file from before format 4.0 marks
+a shadow with `source_context: auctions` instead; `barwise migrate`
+rewrites it this way.
 
 A `.map.yaml` file documents the correspondence. The split generates
 one with the `shared_kernel` pattern:

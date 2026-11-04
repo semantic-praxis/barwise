@@ -43,23 +43,20 @@ function sales(): OrmModel {
   return m;
 }
 
-/** Billing shadows Sales' Customer, as split leaves it, and owns Invoice. */
+/**
+ * Billing shadows Sales' Customer, as split leaves it (iri-identity 6d:
+ * the owner's id behind Sales' alias), and owns Invoice.
+ */
 function billing(): OrmModel {
-  const m = new OrmModel({ name: "Billing" });
-  m.addObjectType({
-    id: "cust",
-    name: "Customer",
-    kind: "entity",
-    referenceMode: "nr",
-    sourceContext: "Sales",
-  });
+  const m = new OrmModel({ name: "Billing", imports: { Sales: "Sales" } });
+  m.addObjectType({ id: "Sales:cust", name: "Customer", kind: "entity", referenceMode: "nr" });
   m.addObjectType({ id: "inv", name: "Invoice", kind: "entity", referenceMode: "nr" });
   m.addFactType({
     id: "billed",
     name: "Invoice bills Customer",
     roles: [
       { id: "billed-0", name: "bills", playerId: "inv" },
-      { id: "billed-1", name: "is billed by", playerId: "cust" },
+      { id: "billed-1", name: "is billed by", playerId: "Sales:cust" },
     ],
     readings: ["{0} bills {1}"],
   });
@@ -111,12 +108,14 @@ describe("claiming an export that names no model", () => {
   });
 
   it("is not a domain's that only shadows the type", () => {
-    // Billing holds `cust`, through its shadow, and owns none of these.
-    expect(claimsExport(billing(), exp("customers.sql", ["cust"]))).toBe(false);
+    // Billing holds `Sales:cust`, its shadow, and owns none of these.
+    expect(claimsExport(billing(), exp("customers.sql", ["Sales:cust"]))).toBe(false);
   });
 
   it("is a domain's whose own export references a shadow", () => {
-    expect(claimsExport(billing(), exp("invoices.sql", ["inv", "cust", "billed"]))).toBe(true);
+    expect(claimsExport(billing(), exp("invoices.sql", ["inv", "Sales:cust", "billed"]))).toBe(
+      true,
+    );
   });
 
   it("is nobody's when the model lacks a source id, or there are no sources", () => {
