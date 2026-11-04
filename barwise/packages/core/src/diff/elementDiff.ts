@@ -83,9 +83,11 @@ export function diffObjectType(
   }
   // Whose element it is, read from the id's alias (iri-identity 6d): an
   // owned type and a shadow of one pair by name, under different ids.
+  // Paired by id, it is one element whoever imports what: a change to the
+  // import is the header's delta, not this one's.
   const ownerA = ownerContextOf(existingModel, a.id);
   const ownerB = ownerContextOf(incomingModel, b.id);
-  if ((ownerA ?? "") !== (ownerB ?? "")) {
+  if (a.id !== b.id && (ownerA ?? "") !== (ownerB ?? "")) {
     changes.push({ change: "sourceContext", from: ownerA, to: ownerB });
   }
 

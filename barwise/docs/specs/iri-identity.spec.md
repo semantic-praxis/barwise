@@ -1491,6 +1491,18 @@ version-1 manifest would go silently empty for impact analysis.
     - The 6b-3b note is closed: a same-name repair through a project skips
       a shadow already under `<alias>:<the owner's repaired id>` rather
       than refusing in its domain.
+    - From /code-review: split and the 3.x replay name an owner's alias by
+      one rule, `aliasForContext` (`_2` for a second context with the same
+      local name), where split had copied it without the suffix. A source
+      already holding an `alias:local` shadow keeps it and its import.
+    - A shadow's owner is its id, and an accepted object type modification
+      keeps the base's id, so a change of owner is never applied: a
+      transcript's owned `Customer` paired with the base's `crm:Customer`
+      leaves the shadow as it was, which is the right outcome there.
+      barwise-wcg.5fv tracks the surfaces still counting that delta as
+      accepted. Two object types paired by id are one element whatever the
+      two models import, so the diff reports no owner change for them; the
+      header delta reports the import.
 
 - **6e, lineage.** The manifest goes to `version: 2` (`types.ts:55`)
   and `canonicalizeIds` goes (`manifest.ts:124-`). The marker is per

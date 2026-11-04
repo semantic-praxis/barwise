@@ -30,6 +30,7 @@ import { withoutDiagramReferences } from "../model/DiagramLayout.js";
 import { type FactTypeConfig, toFactTypeConfig } from "../model/FactType.js";
 import { graphOf } from "../model/graph.js";
 import { suffixed } from "../model/idRules.js";
+import { aliasOf } from "../model/namespace.js";
 import { toObjectifiedFactTypeConfig } from "../model/ObjectifiedFactType.js";
 import type { ObjectType } from "../model/ObjectType.js";
 import { OrmModel } from "../model/OrmModel.js";
@@ -47,10 +48,12 @@ import { report, RULE_ID } from "../validation/ruleId.js";
 import { structuralRules, structuralWellFormedness } from "../validation/rules/structural.js";
 import { type DeltaKind, elementName, type ModelDiffResult, renamePairing } from "./deltas.js";
 import {
+  type ConstraintPairing,
   constraintPairing,
   isDanglingFactType,
   isDanglingPlayer,
   pairFactTypeConstraints,
+  type RoleHolders,
   roleHolders,
 } from "./elementDiff.js";
 import { fromBasePrior } from "./identity.js";
@@ -201,6 +204,12 @@ export function mergeModels(
       if (isAccepted) {
         // Keep existing id, take incoming content.
         // For aliases, union existing + incoming (deduplicated).
+        // The id is also the owner (iri-identity 6d): a shadow stays the
+        // base's owner's, and an owned type stays owned, whatever the
+        // incoming side says. A transcript's fragment pairs its owned
+        // `Customer` with the base's `crm:Customer` by name, and knows
+        // nothing of domains; taking its id would strand every base
+        // reference. barwise-wcg.5fv tracks saying so in the merge's output.
         const existingOt = delta.existing!;
         const incomingOt = delta.incoming!;
         merged.addObjectType({
@@ -225,17 +234,14 @@ export function mergeModels(
     .map((d, i) => [d, i] as const)
     .filter(([d]) => d.elementType === "fact_type") as [FactTypeDelta, number][];
 
-  // An accepted modification keeps the base's fact type id, so its
-  // incoming roles take `<base>.<role>` in place of their own fact type's
-  // prefix (iri-identity 6d). Computed before any fact type is added: an
-  // incoming fact type's join constraint may name one of those roles.
-  const rebasedRoles = new Map<string, string>();
-  for (const [delta, idx] of ftDeltas) {
-    if (delta.kind !== "modified" || !accepted.has(idx)) continue;
-    for (const [from, to] of rebaseRoles(delta.incoming!, delta.existing!.id)) {
-      rebasedRoles.set(from, to);
-    }
-  }
+  // The diff's constraint pairing, built once and only when a fact type
+  // modification is accepted (`keptConstraintIds`).
+  let constraintSides: ConstraintSides | undefined;
+  const sides = () =>
+    constraintSides ??= {
+      holders: { existing: roleHolders(existing), incoming: roleHolders(incoming) },
+      pairing: constraintPairing(existing, incoming, diff.matching),
+    };
 
   for (const [delta, idx] of ftDeltas) {
     const isAccepted = accepted.has(idx);
@@ -250,9 +256,7 @@ export function mergeModels(
       }
     } else if (delta.kind === "added") {
       if (isAccepted) {
-        addFactTypeToMerged(merged, delta.incoming!, null, incomingIdToMergedId, {
-          roleIds: rebasedRoles,
-        });
+        addFactTypeToMerged(merged, delta.incoming!, null, incomingIdToMergedId);
         incomingFtIdToMergedId.set(delta.incoming!.id, delta.incoming!.id);
         // Merged took the incoming roles verbatim; no translation needed.
       }
@@ -272,8 +276,11 @@ export function mergeModels(
           delta.existing!.id,
           incomingIdToMergedId,
           {
-            roleIds: rebasedRoles,
-            constraintIds: keptConstraintIds(existing, incoming, delta.existing!, delta.incoming!),
+            // A fact type's own constraints name only its roles (`PLACEMENT`);
+            // a constraint across fact types follows in phase 2b, through
+            // `incomingRoleIdToMergedId`, recorded below.
+            roleIds: rebaseRoles(delta.incoming!, delta.existing!.id),
+            constraintIds: keptConstraintIds(incoming, delta.existing!, delta.incoming!, sides()),
           },
         );
         const mergedFt = merged.getFactType(delta.existing!.id)!;
@@ -701,9 +708,8 @@ export function mergeModels(
   // merged model would name an alias it does not import. An alias the
   // merged model still uses cannot be removed out from under it.
   for (const ot of merged.objectTypes) {
-    const colon = ot.id.indexOf(":");
-    if (colon < 0) continue;
-    const alias = ot.id.slice(0, colon);
+    const alias = aliasOf(ot.id);
+    if (alias === undefined) continue;
     const target = incoming.imports.get(alias) ?? existing.imports.get(alias);
     if (!merged.imports.has(alias) && target !== undefined) merged.setImport(alias, target);
   }
@@ -1109,7 +1115,7 @@ function addFactTypeToMerged(
   overrideId: string | null,
   incomingIdToMergedId: Map<string, string>,
   incomingSide?: {
-    /** Incoming role ids an accepted modification rebased. */
+    /** The source's role ids an accepted modification rebased. */
     readonly roleIds: ReadonlyMap<string, string>;
     /** The id each of the source's constraints keeps, where it changes. */
     readonly constraintIds?: ReadonlyMap<import("../model/Constraint.js").Constraint, string>;
@@ -1161,22 +1167,32 @@ function rebaseRoles(
   return out;
 }
 
+/** What `keptConstraintIds` pairs constraints with, built once per merge. */
+interface ConstraintSides {
+  readonly holders: { readonly existing: RoleHolders; readonly incoming: RoleHolders; };
+  readonly pairing: ConstraintPairing;
+}
+
 /**
  * The existing id each incoming constraint keeps where the diff pairs it
  * with one of the existing fact type's: by id, then by content
- * (`pairFactTypeConstraints`). An unpaired one keeps its own.
+ * (`pairFactTypeConstraints`). An unpaired one keeps its own, and so does
+ * one whose existing id the incoming model gives another element (a
+ * constraint moved out of the fact type, say), which taking it would
+ * hand to two.
  */
 function keptConstraintIds(
-  existing: OrmModel,
   incoming: OrmModel,
   existingFt: import("../model/FactType.js").FactType,
   incomingFt: import("../model/FactType.js").FactType,
+  { holders, pairing }: ConstraintSides,
 ): Map<import("../model/Constraint.js").Constraint, string> {
-  const holders = { existing: roleHolders(existing), incoming: roleHolders(incoming) };
-  const pairing = constraintPairing(existing, incoming, "id-first");
   const out = new Map<import("../model/Constraint.js").Constraint, string>();
   for (const pair of pairFactTypeConstraints(existingFt, incomingFt, holders, pairing)) {
-    if (pair.existing?.id !== undefined && pair.incoming) out.set(pair.incoming, pair.existing.id);
+    const id = pair.existing?.id;
+    if (id === undefined || !pair.incoming || pair.incoming.id === id) continue;
+    if (incoming.idKindsHolding(id).length > 0) continue;
+    out.set(pair.incoming, id);
   }
   return out;
 }

@@ -111,3 +111,23 @@ export function ownerContextOf(model: OrmModel, id: string): string | undefined 
   const alias = aliasOf(id);
   return alias === undefined ? undefined : model.imports.get(alias) ?? alias;
 }
+
+/**
+ * The alias a model imports `context` under (iri-identity 6b-3b, 6d): the
+ * context's local name, or that with `_N` when another context already
+ * holds it ("Sales Ops" and "Sales_Ops"), so no two contexts share one
+ * alias and a shadow never names the wrong owner. `bound` says what an
+ * alias is bound to so far; the caller binds the one returned if it is new.
+ * The one rule the 3.x replay and split both name shadows by.
+ */
+export function aliasForContext(
+  context: string,
+  bound: (alias: string) => string | undefined,
+): string {
+  const base = localName(context);
+  for (let n = 1;; n++) {
+    const alias = n === 1 ? base : `${base}_${n}`;
+    const target = bound(alias);
+    if (target === undefined || target === context) return alias;
+  }
+}

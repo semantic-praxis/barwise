@@ -77,3 +77,69 @@ describe("an accepted fact type modification", () => {
     ]);
   });
 });
+
+describe("a kept constraint id", () => {
+  it("is not taken where the incoming model gives it to another element", () => {
+    // The base's uniqueness id is, in the incoming model, a constraint
+    // across fact types; the internal one the diff pairs by content keeps
+    // its own id, so the merge does not hold one id twice.
+    const base = owns("Person_owns_Car", "{0} owns {1}", "u1");
+    const incoming = owns("Ownership", "{0} has {1}", "u2");
+    incoming.addFactType({
+      id: "Car_is_red",
+      name: "Car is red",
+      roles: [{ name: "is red", playerId: "Car" }],
+      readings: ["{0} is red"],
+    });
+    incoming.addConstraint({
+      type: "external_uniqueness",
+      id: "u1",
+      roleIds: ["Ownership.is_owned_by", "Car_is_red.is_red"],
+    });
+    const merged = takeAll(base, incoming);
+    const ids = merged.everyConstraint().map(([c]) => c.id);
+    expect(ids.filter((id) => id === "u1")).toHaveLength(1);
+    expect(merged.getFactType("Person_owns_Car")!.internalConstraints[0]!.id).toBe("u2");
+  });
+});
+
+describe("an object type's owner", () => {
+  /** Customer, owned in one model and crm's shadow in the other. */
+  const withCustomer = (id: string) => {
+    const m = new OrmModel({ name: "M", ...(id.includes(":") ? { imports: { crm: "crm" } } : {}) });
+    m.addObjectType({ id, name: "Customer", kind: "entity", referenceMode: "nr" });
+    return m;
+  };
+
+  it("is the base's after an accepted modification: a fragment does not take a shadow over", () => {
+    const base = withCustomer("crm:Customer");
+    const fragment = withCustomer("Customer");
+    const diff = diffModels(base, fragment, MERGE_DIFF_OPTIONS);
+    const i = diff.deltas.findIndex((d) => d.elementType === "object_type");
+    expect(diff.deltas[i]!.changeDescriptions).toEqual(['source context: "crm" -> "(none)"']);
+    const merged = mergeModels(base, fragment, diff, new Set([i]));
+    expect(merged.objectTypes.map((o) => o.id)).toEqual(["crm:Customer"]);
+  });
+
+  it("is no change for one id under imports that differ: the header says that", () => {
+    // Bound to CRM here, unbound (so the alias itself) there.
+    const base = new OrmModel({ name: "M", imports: { crm: "CRM" } });
+    base.addObjectType({
+      id: "crm:Customer",
+      name: "Customer",
+      kind: "entity",
+      referenceMode: "nr",
+    });
+    const bare = new OrmModel({ name: "M" });
+    bare.addObjectType({
+      id: "crm:Customer",
+      name: "Customer",
+      kind: "entity",
+      referenceMode: "nr",
+    });
+    const objectTypes = diffModels(base, bare).deltas.filter((d) =>
+      d.elementType === "object_type"
+    );
+    expect(objectTypes.map((d) => d.kind)).toEqual(["unchanged"]);
+  });
+});

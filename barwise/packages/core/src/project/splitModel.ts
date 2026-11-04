@@ -15,7 +15,7 @@ import { type ConstraintFileValue, constraintRecord } from "../decode/constraint
 import { roleIdsOf, subtypeFactIdsOf } from "../model/Constraint.js";
 import { ContextMapping } from "../model/ContextMapping.js";
 import { IRI_BASE_PATTERN } from "../model/iri.js";
-import { localName } from "../model/name.js";
+import { aliasForContext, aliasOf } from "../model/namespace.js";
 import type { OrmModel } from "../model/OrmModel.js";
 import { OrmProject } from "../model/OrmProject.js";
 import { MappingSerializer } from "../serialization/MappingSerializer.js";
@@ -340,24 +340,35 @@ export function splitModel(modelYaml: string, config: SplitConfig): SplitResult 
 
     // Foreign references become shadows; record the seam. A shadow is
     // identified in its owner's domain, so it names no identifier here.
-    // Its id is `<owner>:<the owner's id>`, the alias bound to the owner
+    // Its id is `<alias>:<the owner's id>`, the alias bound to the owner
     // by an import, so the id says whose element it is and `source_context`
-    // goes (iri-identity 6d). The alias is the owner's local name, as the
-    // 3.x reader builds it; the owner's id, not its name's local name, since
+    // goes (iri-identity 6d). The alias is the 3.x reader's for the owner
+    // (`aliasForContext`); the owner's id, not its name's local name, since
     // the two differ for a suffixed id or a name edited without a rename.
+    // An id the source already holds behind an alias is another domain's
+    // shadow: it keeps its id, and the domain keeps the source's import.
     const shadows: RawObjectType[] = [];
     const shadowIdOf = new Map<string, string>();
     const imports: Record<string, string> = {};
+    for (const id of [...homedOts.map((o) => o.id), ...referenced]) {
+      const alias = aliasOf(id);
+      const bound = alias === undefined ? undefined : source.imports.get(alias);
+      if (alias !== undefined && bound !== undefined) imports[alias] = bound;
+    }
     for (const id of referenced) {
       const owner = home.get(id);
       if (!owner || owner === ctx) continue;
       const ot = otById.get(id);
       if (!ot) continue;
       const { preferred_identifier: _owned, ...shadow } = ot;
-      const alias = localName(owner);
-      imports[alias] = owner;
-      shadowIdOf.set(id, `${alias}:${id}`);
-      shadows.push({ ...shadow, id: `${alias}:${id}` });
+      if (aliasOf(id) !== undefined) {
+        shadows.push(shadow as RawObjectType);
+      } else {
+        const alias = aliasForContext(owner, (a) => imports[a]);
+        imports[alias] = owner;
+        shadowIdOf.set(id, `${alias}:${id}`);
+        shadows.push({ ...shadow, id: `${alias}:${id}` });
+      }
       let byShadow = seams.get(owner);
       if (!byShadow) {
         byShadow = new Map();

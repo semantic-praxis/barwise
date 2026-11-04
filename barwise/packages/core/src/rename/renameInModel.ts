@@ -18,7 +18,7 @@ import { toSnake } from "../mapping/columnNames.js";
 import { referenceModeCandidates } from "../mapping/RelationalMapper.js";
 import type { FactType } from "../model/FactType.js";
 import { localName } from "../model/name.js";
-import { ownerContextOf } from "../model/namespace.js";
+import { aliasOf, ownerContextOf } from "../model/namespace.js";
 import type { OrmModel } from "../model/OrmModel.js";
 import { OrmYamlSerializer, writeDocument40 } from "../serialization/OrmYamlSerializer.js";
 import { danglingReferences } from "../serialization/replay.js";
@@ -92,9 +92,9 @@ export function idsForRename(model: OrmModel, plan: RenamePlan): Map<string, str
   if (plan.kind === "role") {
     ids.set(plan.elementId, `${plan.factTypeId}.${local}`);
   } else if (plan.kind === "objectType") {
-    const colon = plan.elementId.indexOf(":");
+    const alias = aliasOf(plan.elementId);
     // A shadow keeps its alias; its local name is its owner's new id.
-    ids.set(plan.elementId, colon < 0 ? local : `${plan.elementId.slice(0, colon)}:${local}`);
+    ids.set(plan.elementId, alias === undefined ? local : `${alias}:${local}`);
   } else {
     ids.set(plan.elementId, local);
     const prefix = `${plan.elementId}.`;
