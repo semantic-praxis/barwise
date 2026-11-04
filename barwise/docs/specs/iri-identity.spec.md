@@ -1496,13 +1496,22 @@ version-1 manifest would go silently empty for impact analysis.
       local name), where split had copied it without the suffix. A source
       already holding an `alias:local` shadow keeps it and its import.
     - A shadow's owner is its id, and an accepted object type modification
-      keeps the base's id, so a change of owner is never applied: a
-      transcript's owned `Customer` paired with the base's `crm:Customer`
-      leaves the shadow as it was, which is the right outcome there.
-      barwise-wcg.5fv tracks the surfaces still counting that delta as
-      accepted. Two object types paired by id are one element whatever the
-      two models import, so the diff reports no owner change for them; the
-      header delta reports the import.
+      keeps the base's id, so a merge cannot apply a change of owner. All
+      three reviewers of 6d's first push found that the change was offered,
+      accepted and dropped. `MERGE_DIFF_OPTIONS` now sets
+      `ownerChanges: false`, so a merge's diff does not offer it (a
+      transcript's owned `Customer` paired with the base's `crm:Customer` is
+      unchanged, and the shadow stays), and `mergeModels` refuses an accepted
+      one that a diff built otherwise offers. Two object types paired by id
+      are one element whatever the two models import, so no diff reports an
+      owner change for them; the header delta reports the import.
+    - From the pr-review: a population under its fact type's rule id follows
+      the fact type onto the base's id (`<base>.population`), and each
+      instance id `<population>.N` follows its population.
+    - From Copilot: the 3.0 writer still states a 3.x shadow's
+      `source_context` (the shared object type writer takes it as an
+      option), and `mapRoleIds` reads roles only where a constraint names
+      one (`mapConstraintReferences`), never in a literal.
 
 - **6e, lineage.** The manifest goes to `version: 2` (`types.ts:55`)
   and `canonicalizeIds` goes (`manifest.ts:124-`). The marker is per

@@ -34,7 +34,7 @@ import {
 import { withoutDiagramReferences } from "../model/DiagramLayout.js";
 import { type FactTypeConfig, toFactTypeConfig } from "../model/FactType.js";
 import { graphOf } from "../model/graph.js";
-import { suffixed } from "../model/idRules.js";
+import { populationIdBase, suffixed } from "../model/idRules.js";
 import { mapConstraintReferences } from "../model/mint.js";
 import { aliasOf } from "../model/namespace.js";
 import { toObjectifiedFactTypeConfig } from "../model/ObjectifiedFactType.js";
@@ -90,7 +90,10 @@ export type MergeInput = Pick<ModelDiffResult, "deltas" | "matching" | "recogniz
  * `merge_models`) cannot come to diff differently, and so a reader sees
  * why: `mergeModels` refuses a recognized pair.
  */
-export const MERGE_DIFF_OPTIONS = { recognizeRenames: false } as const satisfies DiffOptions;
+export const MERGE_DIFF_OPTIONS = {
+  recognizeRenames: false,
+  ownerChanges: false,
+} as const satisfies DiffOptions;
 
 /**
  * Build a merged OrmModel from the existing model plus a set of accepted
@@ -112,6 +115,7 @@ export function mergeModels(
   refuseUnmergeablePairing(diff);
   const deltas = diff.deltas;
   refuseNameClashes(deltas, accepted);
+  refuseOwnerChanges(deltas, accepted);
   // A rebound alias is refused, accepted or not: the base's shadows behind
   // it would come to name another context, which no review of the header
   // line shows (iri-identity WS6).
@@ -210,12 +214,9 @@ export function mergeModels(
       if (isAccepted) {
         // Keep existing id, take incoming content.
         // For aliases, union existing + incoming (deduplicated).
-        // The id is also the owner (iri-identity 6d): a shadow stays the
-        // base's owner's, and an owned type stays owned, whatever the
-        // incoming side says. A transcript's fragment pairs its owned
-        // `Customer` with the base's `crm:Customer` by name, and knows
-        // nothing of domains; taking its id would strand every base
-        // reference. barwise-wcg.5fv tracks saying so in the merge's output.
+        // The id is also the owner (iri-identity 6d), so a shadow stays
+        // the base's owner's; `MERGE_DIFF_OPTIONS` reports no owner change,
+        // and `refuseOwnerChanges` refuses one a diff built otherwise offers.
         const existingOt = delta.existing!;
         const incomingOt = delta.incoming!;
         merged.addObjectType({
@@ -660,16 +661,27 @@ export function mergeModels(
       continue;
     }
 
-    const preferredId = delta.kind === "modified" && isAccepted ? delta.existing!.id : chosen.id;
+    // A population under its fact type's rule id follows that fact type
+    // onto the base's id, as its roles do (iri-identity 6d, decision 7).
+    const followsFactType = fromIncoming && factTypeId !== chosen.factTypeId
+      && chosen.id === populationIdBase(chosen.factTypeId);
+    const preferredId = delta.kind === "modified" && isAccepted
+      ? delta.existing!.id
+      : followsFactType
+      ? populationIdBase(factTypeId)
+      : chosen.id;
     const id = mergedId(preferredId, merged);
-    merged.addPopulation({
-      ...remapPopulationRoles(
-        toPopulationConfig(chosen),
-        fromIncoming ? incomingRoleIdToMergedId : roleIdMap,
-      ),
+    merged.addPopulation(withPopulationId(
+      {
+        ...remapPopulationRoles(
+          toPopulationConfig(chosen),
+          fromIncoming ? incomingRoleIdToMergedId : roleIdMap,
+        ),
+        factTypeId,
+      },
+      chosen.id,
       id,
-      factTypeId,
-    });
+    ));
   }
 
   // Phase 6b: preferred identifiers, now that every constraint is placed.
@@ -893,6 +905,23 @@ function recordIncomingRoleRemap(
 }
 
 /**
+ * A population under `id`, each instance id that was `<from>.N` moved to
+ * `<id>.N` with it, so an instance does not name the population it came
+ * from (an instance's id is its population's and a number, decision 7).
+ */
+function withPopulationId(config: PopulationConfig, from: string, id: string): PopulationConfig {
+  if (id === from || !config.instances) return { ...config, id };
+  const prefix = `${from}.`;
+  return {
+    ...config,
+    id,
+    instances: config.instances.map((inst) =>
+      inst.id?.startsWith(prefix) ? { ...inst, id: `${id}.${inst.id.slice(prefix.length)}` } : inst
+    ),
+  };
+}
+
+/**
  * Rewrite a carried population's instance keys through the role remap.
  * An unmapped key belongs to a fact type the merge did not rewrite and
  * passes through; a key mapped to null lost its role and is dropped.
@@ -1090,6 +1119,29 @@ function refuseNameClashes(deltas: readonly ModelDelta[], accepted: ReadonlySet<
   throw new Error(
     `two elements would take one id: ${lines.join("; ")}. `
       + "Rename one of them in either model first, so their names give different ids.",
+  );
+}
+
+/**
+ * Refuse an accepted change of an object type's owner, which only a diff
+ * built without `MERGE_DIFF_OPTIONS` reports. The owner is the id's alias
+ * (iri-identity 6d) and an accepted modification keeps the base's id, so
+ * the merge could only drop the change it was told to make; taking the
+ * incoming id would strand every base reference to the old one.
+ */
+function refuseOwnerChanges(deltas: readonly ModelDelta[], accepted: ReadonlySet<number>): void {
+  const moved = deltas.flatMap((d, i) => {
+    if (d.elementType !== "object_type" || d.kind !== "modified" || !accepted.has(i)) return [];
+    const change = d.changes.find((c) => c.change === "sourceContext");
+    return change?.change === "sourceContext"
+      ? [`"${d.name}" (${change.from ?? "owned"} -> ${change.to ?? "owned"})`]
+      : [];
+  });
+  if (moved.length === 0) return;
+  throw new Error(
+    `cannot change which domain owns ${moved.join(", ")}: the owner is part of the id, `
+      + "and a merge keeps the base's ids. Diff with MERGE_DIFF_OPTIONS, which does not "
+      + "offer it, or change the owner in the domains themselves.",
   );
 }
 

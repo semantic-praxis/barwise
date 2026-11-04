@@ -122,7 +122,6 @@ interface RawObjectType {
   id: string;
   name: string;
   kind: string;
-  source_context?: string;
   preferred_identifier?: string;
   [key: string]: unknown;
 }
@@ -731,19 +730,6 @@ function pickWinner(votes: ReadonlyMap<string, number>): string | undefined {
  * compile here until it is classified rather than falling through as
  * "no roles."
  */
-/**
- * A constraint with each join path's `root` read through `local`, at any
- * depth: the root is the one object type reference a constraint holds.
- */
-function rootsThrough(value: unknown, local: (id: string) => string): unknown {
-  if (Array.isArray(value)) return value.map((v) => rootsThrough(v, local));
-  if (value === null || typeof value !== "object") return value;
-  return Object.fromEntries(
-    Object.entries(value).map((
-      [k, v],
-    ) => [k, k === "root" && typeof v === "string" ? local(v) : rootsThrough(v, local)]),
-  );
-}
 
 function constraintRoleIds(constraint: RawConstraint): string[] {
   return roleIdsOf(constraintRecord(constraint as unknown as ConstraintFileValue));
@@ -764,4 +750,18 @@ function constraintIsLocal(
     if (!ftId || ftHome.get(ftId) !== ctx) return false;
   }
   return true;
+}
+
+/**
+ * A constraint with each join path's `root` read through `local`, at any
+ * depth: the root is the one object type reference a constraint holds.
+ */
+function rootsThrough(value: unknown, local: (id: string) => string): unknown {
+  if (Array.isArray(value)) return value.map((v) => rootsThrough(v, local));
+  if (value === null || typeof value !== "object") return value;
+  return Object.fromEntries(
+    Object.entries(value).map((
+      [k, v],
+    ) => [k, k === "root" && typeof v === "string" ? local(v) : rootsThrough(v, local)]),
+  );
 }

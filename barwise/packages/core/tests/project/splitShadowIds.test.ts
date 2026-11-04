@@ -6,6 +6,7 @@
  * its `minted_from`.
  */
 import { describe, expect, it } from "vitest";
+import { OrmModel } from "../../src/model/OrmModel.js";
 import { splitModel } from "../../src/project/splitModel.js";
 import { OrmYamlSerializer } from "../../src/serialization/OrmYamlSerializer.js";
 
@@ -141,5 +142,44 @@ model:
       expect(model.getObjectType("ext:Party"), d.context).toBeDefined();
       expect(model.imports.get("ext"), d.context).toBe("https://example.org/ext/");
     }
+  });
+});
+
+describe("a split domain's join paths", () => {
+  it("root at the shadow when they start from a shadowed type (the pr-review on 6d)", () => {
+    // Both fact types are homed with Person; the join paths start at Country.
+    const source = new OrmModel({ name: "shop" });
+    for (const name of ["Person", "Country"]) {
+      source.addObjectType({ name, kind: "entity", referenceMode: "id" });
+    }
+    const fact = (name: string, reading: string) =>
+      source.addFactType({
+        name,
+        roles: [{ name: "person", playerId: "Person" }, { name: "country", playerId: "Country" }],
+        readings: [reading],
+      });
+    const born = fact("Person born in Country", "{0} born in {1}");
+    const citizen = fact("Person citizen of Country", "{0} citizen of {1}");
+    const operand = (ft: typeof born) => ({
+      path: { root: "Country", steps: [{ entry: ft.roles[1]!.id, exit: ft.roles[0]!.id }] },
+      projection: [0, 1],
+    });
+    source.addConstraint({
+      type: "join_subset",
+      subset: operand(born),
+      superset: operand(citizen),
+    });
+    const result = splitModel(new OrmYamlSerializer().serialize(source), {
+      projectName: "P",
+      domains: { geo: ["Country"], people: ["Person"] },
+    });
+    const people = new OrmYamlSerializer().deserialize(
+      result.domains.find((d) => d.context === "people")!.yaml,
+    );
+    const join = people.constraints.find((c) => c.type === "join_subset");
+    expect(join).toMatchObject({
+      subset: { path: { root: "geo:Country" } },
+      superset: { path: { root: "geo:Country" } },
+    });
   });
 });

@@ -61,10 +61,12 @@ describe("an accepted fact type modification", () => {
     const baseId = base.getFactType("Person_owns_Car")!.internalConstraints[0]!.id!;
     expect(base.mintedFromOf(baseId)).toBeDefined();
     expect(merged.mintedFromOf(baseId)).toBe(base.mintedFromOf(baseId));
-    expect(new OrmYamlSerializer().serialize(merged)).toContain("minted_from:");
+    // And written: the reloaded file states the same key beside the id.
+    const back = new OrmYamlSerializer().deserialize(new OrmYamlSerializer().serialize(merged));
+    expect(back.mintedFromOf(baseId)).toBe(base.mintedFromOf(baseId));
   });
 
-  it("gives an incoming population the rebased role ids", () => {
+  it("gives an incoming population the rebased role ids, and the base's fact type's id", () => {
     const withData = owns("Ownership", "{0} has {1}");
     withData.addPopulation({
       factTypeId: "Ownership",
@@ -74,6 +76,12 @@ describe("an accepted fact type modification", () => {
     expect(Object.keys(pop!.instances[0]!.roleValues).sort()).toEqual([
       "Person_owns_Car.is_owned_by",
       "Person_owns_Car.owns",
+    ]);
+    // And its id and its instances' follow the fact type (the pr-review on 6d).
+    expect(withData.populations[0]!.id).toBe("Ownership.population");
+    expect([pop!.id, ...pop!.instances.map((i) => i.id)]).toEqual([
+      "Person_owns_Car.population",
+      "Person_owns_Car.population.1",
     ]);
   });
 });
@@ -111,14 +119,28 @@ describe("an object type's owner", () => {
     return m;
   };
 
-  it("is the base's after an accepted modification: a fragment does not take a shadow over", () => {
+  it("is the base's: the merge's diff offers no owner change, so a fragment takes no shadow over", () => {
     const base = withCustomer("crm:Customer");
     const fragment = withCustomer("Customer");
     const diff = diffModels(base, fragment, MERGE_DIFF_OPTIONS);
+    const ot = diff.deltas.filter((d) => d.elementType === "object_type");
+    expect(ot.map((d) => d.kind)).toEqual(["unchanged"]);
+    const all = new Set(diff.deltas.map((_, i) => i));
+    expect(mergeModels(base, fragment, diff, all).objectTypes.map((o) => o.id)).toEqual([
+      "crm:Customer",
+    ]);
+  });
+
+  it("is a change a plain diff reports, and a merge refuses rather than drops", () => {
+    const base = withCustomer("crm:Customer");
+    const fragment = withCustomer("Customer");
+    // Rename recognition off, as every merge diff has it; owner changes on.
+    const diff = diffModels(base, fragment, { recognizeRenames: false });
     const i = diff.deltas.findIndex((d) => d.elementType === "object_type");
     expect(diff.deltas[i]!.changeDescriptions).toEqual(['source context: "crm" -> "(none)"']);
-    const merged = mergeModels(base, fragment, diff, new Set([i]));
-    expect(merged.objectTypes.map((o) => o.id)).toEqual(["crm:Customer"]);
+    expect(() => mergeModels(base, fragment, diff, new Set([i]))).toThrow(
+      /cannot change which domain owns "Customer" \(crm -> owned\)/,
+    );
   });
 
   it("is no change for one id under imports that differ: the header says that", () => {

@@ -35,6 +35,7 @@ export function diffObjectType(
   existingModel: OrmModel,
   incomingModel: OrmModel,
   identity: DiffIdentity,
+  ownerChanges = true,
 ): ChangeDescription[] {
   const changes: ChangeDescription[] = [];
 
@@ -87,7 +88,7 @@ export function diffObjectType(
   // import is the header's delta, not this one's.
   const ownerA = ownerContextOf(existingModel, a.id);
   const ownerB = ownerContextOf(incomingModel, b.id);
-  if (a.id !== b.id && (ownerA ?? "") !== (ownerB ?? "")) {
+  if (ownerChanges && a.id !== b.id && (ownerA ?? "") !== (ownerB ?? "")) {
     changes.push({ change: "sourceContext", from: ownerA, to: ownerB });
   }
 
