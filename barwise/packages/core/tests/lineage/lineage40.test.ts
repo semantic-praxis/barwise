@@ -15,7 +15,7 @@ import {
   updateManifest,
 } from "../../src/lineage/manifest.js";
 import { checkStaleness } from "../../src/lineage/staleness.js";
-import type { LineageManifest, ManifestExport, SourceReference } from "../../src/lineage/types.js";
+import type { LineageManifest, ManifestExport } from "../../src/lineage/types.js";
 import { OrmModel } from "../../src/model/OrmModel.js";
 import { OrmProject } from "../../src/model/OrmProject.js";
 import { renameInModel } from "../../src/rename/renameInModel.js";
@@ -161,6 +161,23 @@ model:
     expect(report.exportsBefore40).toEqual([]);
   });
 
+  it("does not list a marked export that misses the 3.x id it was asked by", () => {
+    const model = new OrmYamlSerializer().deserialize(`orm_version: "3.0"
+model:
+  name: Shop
+  object_types:
+    - { id: ot-1, name: Customer, kind: entity, reference_mode: nr }
+`);
+    const report = analyzeImpact(
+      version1(exported("a.sql", "ot-9", "h")),
+      "ot-1",
+      undefined,
+      model,
+    );
+    expect(report.affectedArtifacts).toEqual([]);
+    expect(report.exportsBefore40).toEqual([]);
+  });
+
   it("does not list a marked export that misses a 3.x id the model knows", () => {
     const model = new OrmYamlSerializer().deserialize(`orm_version: "3.0"
 model:
@@ -207,7 +224,7 @@ model:
   });
 });
 
-describe("impact over a 3.x id two kinds shared (Copilot, on 6e)", () => {
+describe("impact over a 3.x id more than one element stated (Copilot, the pr-review, the owner, on 6e)", () => {
   // 3.x let the object type Person and the fact type Person smokes both state x1.
   const model = () => {
     const source = new OrmModel({ name: "Shared" });
@@ -224,18 +241,23 @@ describe("impact over a 3.x id two kinds shared (Copilot, on 6e)", () => {
     ...exported("smokers.sql", "x1", "h"),
     sources: [{ elementId: "x1", elementType: "FactType", elementName: "Person smokes" }],
   };
-  const m = version1(exported("people.sql", "x1", "h"), asFactType);
+  const m = version1(
+    exported("people.sql", "x1", "h"),
+    asFactType,
+    exported("other.sql", "zz", "h"),
+  );
 
-  it("matches by either element's 4.0 id only the sources of that element's kind", () => {
-    const m40 = model();
-    const affected = (id: string) =>
-      analyzeImpact(m, id, undefined, m40).affectedArtifacts.map((a) => a.artifact);
-    expect(affected("Person")).toEqual(["people.sql"]);
-    expect(affected("Person_smokes")).toEqual(["smokers.sql"]);
+  it("never matches the shared id, by either element: it lists the exports holding it", () => {
+    for (const id of ["Person", "Person_smokes"]) {
+      const report = analyzeImpact(m, id, undefined, model());
+      expect(report.affectedArtifacts, id).toEqual([]);
+      expect(report.exportsBefore40, id).toEqual(["people.sql", "smokers.sql"]);
+      expect(report, id).not.toHaveProperty("ambiguous");
+    }
   });
 
-  it("names the candidates, and matches nothing, when asked by the shared id itself", () => {
-    // A 4.0 export of either element is not matched either (the pr-review on 6e).
+  it("names the candidates when asked by the shared id itself, matching nothing", () => {
+    // A 4.0 export of either element is not matched either: x1 is no 4.0 id.
     const both: LineageManifest = {
       ...m,
       exports: [...m.exports, exported("people-40.sql", "Person", "h")],
@@ -246,33 +268,7 @@ describe("impact over a 3.x id two kinds shared (Copilot, on 6e)", () => {
     expect(report.exportsBefore40).toEqual(["people.sql", "smokers.sql"]);
   });
 
-  it("states no ambiguity for an id that names one element", () => {
-    expect(analyzeImpact(m, "Person", undefined, model())).not.toHaveProperty("ambiguous");
-  });
-
-  it("filters a value type's shared id to object type sources", () => {
-    const source = new OrmModel({ name: "Shared" });
-    source.addObjectType({ id: "x1", name: "Colour", kind: "value", dataType: { name: "text" } });
-    source.addFactType({
-      id: "x1",
-      name: "Colour is bright",
-      roles: [{ id: "r1", name: "is bright", playerId: "x1" }],
-      readings: ["{0} is bright"],
-    });
-    const asValue: ManifestExport = {
-      ...exported("colours.sql", "x1", "h"),
-      sources: [{ elementId: "x1", elementType: "ValueType", elementName: "Colour" }],
-    };
-    const report = analyzeImpact(
-      version1(asValue, asFactType),
-      "Colour",
-      undefined,
-      replayInto40(source),
-    );
-    expect(report.affectedArtifacts.map((a) => a.artifact)).toEqual(["colours.sql"]);
-  });
-
-  it("does not read a shared id for a kind lineage never records, such as a population", () => {
+  it("lists, whatever kind the other element is, such as a population", () => {
     const source = new OrmModel({ name: "Shared" });
     source.addObjectType({ id: "x1", name: "Person", kind: "entity", referenceMode: "nr" });
     source.addFactType({
@@ -282,18 +278,15 @@ describe("impact over a 3.x id two kinds shared (Copilot, on 6e)", () => {
       readings: ["{0} smokes"],
     });
     source.addPopulation({ id: "x1", factTypeId: "f1", instances: [{ roleValues: { r1: "p1" } }] });
-    const report = analyzeImpact(
-      version1(exported("people.sql", "x1", "h")),
-      "Person_smokes.population",
-      undefined,
-      replayInto40(source),
-    );
-    // No source can hold a population, so none is listed as unknown either.
-    expect(report.affectedArtifacts).toEqual([]);
-    expect(report.exportsBefore40).toEqual([]);
+    const shared = version1(exported("people.sql", "x1", "h"), exported("other.sql", "zz", "h"));
+    for (const id of ["Person", "Person_smokes.population"]) {
+      const report = analyzeImpact(shared, id, undefined, replayInto40(source));
+      expect(report.affectedArtifacts, id).toEqual([]);
+      expect(report.exportsBefore40, id).toEqual(["people.sql"]);
+    }
   });
 
-  it("still matches 4.0 exports when the shared id is also a 4.0 id (the pr-review on 6e)", () => {
+  it("still matches 4.0 exports, and a third element's own 3.x id, when the shared id is also a 4.0 id", () => {
     // Room states Room, and so does the fact type; Room's 4.0 id is Room.
     const room = new OrmModel({ name: "Shared" });
     room.addObjectType({ id: "Room", name: "Room", kind: "entity", referenceMode: "nr" });
@@ -303,7 +296,7 @@ describe("impact over a 3.x id two kinds shared (Copilot, on 6e)", () => {
       roles: [{ id: "r1", name: "is booked", playerId: "Room" }],
       readings: ["{0} is booked"],
     });
-    const m40: LineageManifest = {
+    const rooms: LineageManifest = {
       version: 2,
       sourceModel: "shop.orm.yaml",
       sourceModelHash: "h",
@@ -313,10 +306,9 @@ describe("impact over a 3.x id two kinds shared (Copilot, on 6e)", () => {
         { ...exported("other-3x.sql", "zz", "h"), idsBefore40: true },
       ],
     };
-    const report = analyzeImpact(m40, "Room", undefined, replayInto40(room));
+    const report = analyzeImpact(rooms, "Room", undefined, replayInto40(room));
     expect(report.ambiguous).toEqual(["Room", "Room_is_booked"]);
     expect(report.affectedArtifacts.map((a) => a.artifact)).toEqual(["rooms-40.sql"]);
-    // Only the marked export holding the shared id is listed.
     expect(report.exportsBefore40).toEqual(["rooms-3x.sql"]);
 
     // Client and its fact type state Customer; the type named Customer states c9.
@@ -330,72 +322,27 @@ describe("impact over a 3.x id two kinds shared (Copilot, on 6e)", () => {
       readings: ["{0} buys"],
     });
     const customers: LineageManifest = {
-      ...m40,
-      exports: [exported("customers-40.sql", "Customer", "h")],
+      ...rooms,
+      exports: [
+        exported("customers-40.sql", "Customer", "h"),
+        { ...exported("customers-c9.sql", "c9", "h"), idsBefore40: true },
+        { ...exported("clients-3x.sql", "Customer", "h"), idsBefore40: true },
+      ],
     };
     const thirdReport = analyzeImpact(customers, "Customer", undefined, replayInto40(third));
     expect(thirdReport.ambiguous).toEqual(["Client", "Client_buys"]);
-    expect(thirdReport.affectedArtifacts.map((a) => a.artifact)).toEqual(["customers-40.sql"]);
+    // The pr-review on e15c18d1: the Customer type's own 3.x export matches by c9.
+    expect(thirdReport.affectedArtifacts.map((a) => a.artifact)).toEqual([
+      "customers-40.sql",
+      "customers-c9.sql",
+    ]);
+    expect(thirdReport.exportsBefore40).toEqual(["clients-3x.sql"]);
   });
 
-  it("filters a role's and a subtype fact's shared id to their own kinds", () => {
-    const source = new OrmModel({ name: "Shared" });
-    source.addObjectType({ id: "x1", name: "Person", kind: "entity", referenceMode: "nr" });
-    source.addObjectType({ id: "x2", name: "Employee", kind: "entity", referenceMode: "nr" });
-    source.addFactType({
-      id: "f1",
-      name: "Person smokes",
-      roles: [{ id: "x2", name: "smokes", playerId: "x1" }],
-      readings: ["{0} smokes"],
-    });
-    source.addSubtypeFact({ id: "x1", subtypeId: "x2", supertypeId: "x1" });
-    const model = replayInto40(source);
-    const roleId = model.getFactType("Person_smokes")!.roles[0]!.id;
-    const sfId = model.subtypeFacts[0]!.id!;
-    const kinds = (id: string, elementType: SourceReference["elementType"]): ManifestExport => ({
-      ...exported(`${elementType}-${id}.sql`, id, "h"),
-      sources: [{ elementId: id, elementType, elementName: "x" }],
-    });
-    const m = version1(
-      kinds("x1", "EntityType"),
-      kinds("x1", "SubtypeFact"),
-      kinds("x2", "EntityType"),
-      kinds("x2", "Role"),
-    );
-    const affected = (id: string) =>
-      analyzeImpact(m, id, undefined, model).affectedArtifacts.map((a) => a.artifact);
-    expect(affected(roleId)).toEqual(["Role-x2.sql"]);
-    expect(affected(sfId)).toEqual(["SubtypeFact-x1.sql"]);
-  });
-
-  it("filters a constraint's shared id to constraint sources", () => {
-    const source = new OrmModel({ name: "Shared" });
-    source.addObjectType({ id: "x1", name: "Person", kind: "entity", referenceMode: "nr" });
-    source.addObjectType({ id: "o2", name: "Car", kind: "entity", referenceMode: "vin" });
-    source.addFactType({
-      id: "f1",
-      name: "Person drives Car",
-      roles: [{ id: "r1", name: "drives", playerId: "x1" }, {
-        id: "r2",
-        name: "is driven by",
-        playerId: "o2",
-      }],
-      readings: ["{0} drives {1}"],
-      constraints: [{ type: "internal_uniqueness", id: "x1", roleIds: ["r1"] }],
-    });
-    const model = replayInto40(source);
-    const ucId = model.getFactType("Person_drives_Car")!.internalConstraints[0]!.id!;
-    const asConstraint: ManifestExport = {
-      ...exported("rules.sql", "x1", "h"),
-      sources: [{ elementId: "x1", elementType: "Constraint", elementName: "uc" }],
-    };
-    const report = analyzeImpact(
-      version1(exported("people.sql", "x1", "h"), asConstraint),
-      ucId,
-      undefined,
-      model,
-    );
-    expect(report.affectedArtifacts.map((a) => a.artifact)).toEqual(["rules.sql"]);
+  it("states no ambiguity, and lists nothing, for an element whose 3.x id is its own", () => {
+    const report = analyzeImpact(m, "Person_smokes.smokes", undefined, model());
+    expect(report).not.toHaveProperty("ambiguous");
+    expect(report.exportsBefore40).toEqual([]);
   });
 });
 

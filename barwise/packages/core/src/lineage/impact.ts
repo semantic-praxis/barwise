@@ -4,7 +4,7 @@
 
 import type { OrmModel } from "../model/OrmModel.js";
 import { checkScope, type ModelScope } from "./attribution.js";
-import type { LineageManifest, SourceReference } from "./types.js";
+import type { LineageManifest } from "./types.js";
 
 /**
  * Information about an artifact affected by a change.
@@ -24,10 +24,11 @@ export interface ImpactReport {
   readonly changedElement: string;
   readonly affectedArtifacts: readonly AffectedArtifact[];
   /**
-   * Exports written under 3.x ids that impact could not match, because the
-   * element's 3.x id is unknown (a 4.0 model, or none) (iri-identity 6e):
-   * they may depend on it under its old id, so they are listed rather than
-   * left out. Re-exporting answers it.
+   * Exports written under 3.x ids that impact could not read (iri-identity
+   * 6e): every one it missed when the element's 3.x id is unknown (a 4.0
+   * model, or none), else those holding a 3.x id more than one element
+   * stated. They may depend on the element under its old id, so they are
+   * listed rather than left out. Re-exporting answers it.
    */
   readonly exportsBefore40: readonly string[];
   /**
@@ -71,7 +72,7 @@ export function analyzeImpact(
       exportsBefore40: [],
     };
   }
-  const { now, before, beforeTypes, ambiguous } = idsByGeneration(elementId, model);
+  const { now, before, unknownIds, ambiguous } = idsByGeneration(elementId, model);
   const exportsBefore40: string[] = [];
 
   if (scope) checkScope(scope);
@@ -88,17 +89,12 @@ export function analyzeImpact(
     const id = exp.idsBefore40 ? before : now;
     const sourceRef = id === undefined
       ? undefined
-      : exp.sources.find((src) =>
-        src.elementId === id
-        && (!exp.idsBefore40 || beforeTypes === undefined || beforeTypes.has(src.elementType))
-      );
-    // With the element's 3.x id unknown, a marked export cannot be read.
-    // An ambiguous id lists only the marked exports that hold it.
-    const holdsAsked = ambiguous === undefined
-      || exp.sources.some((s) => s.elementId === elementId);
-    if (!sourceRef && exp.idsBefore40 && before === undefined && holdsAsked) {
-      exportsBefore40.push(exp.artifact);
-    }
+      : exp.sources.find((src) => src.elementId === id);
+    // A marked export that cannot be read is listed as unknown: every one
+    // when no 3.x id is known, else those holding an id that cannot be read.
+    const unreadable = unknownIds === undefined
+      || exp.sources.some((src) => unknownIds.has(src.elementId));
+    if (!sourceRef && exp.idsBefore40 && unreadable) exportsBefore40.push(exp.artifact);
 
     if (sourceRef) {
       affectedArtifacts.push({
@@ -118,29 +114,28 @@ export function analyzeImpact(
   };
 }
 
-type SourceType = SourceReference["elementType"];
-
 /**
  * The element's id in each generation an export can record (iri-identity
- * 6e, barwise-wcg.v5k). For a model replayed from a 3.x file both are
- * known: an id the file states is read as that (its 4.0 id from
- * `idFromPrior`), else as a 4.0 id (its 3.x id from `priorIds`); the
- * file's reading wins where an id is both, since the file is what the
- * caller is looking at. A 4.0 model knows no 3.x id, so a marked export
- * cannot be matched and is listed as unknown. With no model (inline MCP, or
- * a file that does not load) the id is taken as a 4.0 id, as a 4.0 model's
- * is: trying it as a 3.x id too would pool the generations, and could name
- * another element's export.
+ * 6e, barwise-wcg.v5k), and the 3.x ids that cannot be read.
  *
- * 3.x let elements of different kinds state one id (Copilot and the
- * pr-review, on 6e). Asked by that id, which is meant cannot be told, so
- * nothing is matched and the candidates are returned as `ambiguous`; its
- * marked exports are listed as unknown. Asked by one element's 4.0 id, the
- * shared 3.x id is matched only in sources of that element's kind
- * (`beforeTypes`), since the id alone names each; an element of a kind
- * lineage never records matches no source. Asked by a shared id that an
- * element also holds as its 4.0 id, exports written under 4.0 ids still
- * match that element; only the marked exports holding the id are listed.
+ * For a model replayed from a 3.x file: an id the file states for one
+ * element is read as that element's 3.x id (its 4.0 id from
+ * `idFromPrior`); else the id is read as a 4.0 id, and the element's 3.x
+ * id comes from `priorIds`. The file's reading wins where an id is both,
+ * since the file is what the caller is looking at.
+ *
+ * 3.x let elements of different kinds state one id. Such an id says nothing
+ * about which element an export meant, so it is never matched, and the
+ * marked exports holding it are listed as unknown (`unknownIds`); this is
+ * the owner's call on 6e, after attempts to tell the elements apart by kind
+ * kept missing cases. Asked by the shared id itself, the elements it names
+ * are returned as `ambiguous`, and exports a 4.0 build wrote still match
+ * whichever element holds that id now.
+ *
+ * A 4.0 model, or none (inline MCP, or a file that does not load), knows
+ * no 3.x id: the id is a 4.0 id, and every marked export it misses is
+ * listed (`unknownIds` undefined). Trying the id as a 3.x id too would pool
+ * the generations, and could name another element's export.
  */
 function idsByGeneration(
   elementId: string,
@@ -148,53 +143,28 @@ function idsByGeneration(
 ): {
   now: string | undefined;
   before: string | undefined;
-  beforeTypes: ReadonlySet<SourceType> | undefined;
+  unknownIds: ReadonlySet<string> | undefined;
   ambiguous: readonly string[] | undefined;
 } {
-  const plain = { beforeTypes: undefined, ambiguous: undefined };
-  if (model?.priorIds === undefined) return { now: elementId, before: undefined, ...plain };
+  if (model?.priorIds === undefined) {
+    return { now: elementId, before: undefined, unknownIds: undefined, ambiguous: undefined };
+  }
+  const priorIds = model.priorIds;
   const fromFile = model.idFromPrior(elementId);
-  if (fromFile !== undefined) return { now: fromFile, before: elementId, ...plain };
-  const sharing = [...model.priorIds].filter(([, p]) => p === elementId).map(([id]) => id);
-  if (sharing.length > 1) {
-    // Exports a 4.0 build wrote still match the element that holds this id
-    // now, which may be one of the candidates or another element (the
-    // pr-review on 6e); only the 3.x reading is ambiguous.
-    const holds = model.priorIds.has(elementId);
-    return {
-      now: holds ? elementId : undefined,
-      before: undefined,
-      beforeTypes: undefined,
-      ambiguous: sharing,
-    };
+  if (fromFile !== undefined) {
+    return { now: fromFile, before: elementId, unknownIds: new Set(), ambiguous: undefined };
   }
-  const prior = model.priorIds.get(elementId);
+  const unknownIds = new Set<string>();
+  const sharing = [...priorIds].filter(([, p]) => p === elementId).map(([id]) => id);
+  const ambiguous = sharing.length > 1 ? sharing : undefined;
+  if (ambiguous !== undefined) unknownIds.add(elementId);
+  // The element asked for as a 4.0 id, if the model holds one by it.
+  const now = ambiguous === undefined || priorIds.has(elementId) ? elementId : undefined;
+  const prior = now === undefined ? undefined : priorIds.get(now);
   // `idFromPrior` is undefined for a prior id exactly when it is shared.
-  if (prior === undefined || model.idFromPrior(prior) !== undefined) {
-    return { now: elementId, before: prior, ...plain };
-  }
-  // A kind lineage never records (a population) matches no source, and
-  // since none can hold it, none is listed as unknown either.
-  return {
-    now: elementId,
-    before: prior,
-    beforeTypes: sourceTypesOf(model, elementId) ?? new Set(),
-    ambiguous: undefined,
-  };
-}
-
-/**
- * The source types lineage records an element under. Either object type
- * kind for an object type: one 3.x id cannot name two object types, and an
- * export taken before its kind was edited still recorded the old one.
- */
-function sourceTypesOf(model: OrmModel, id: string): ReadonlySet<SourceType> | undefined {
-  if (model.getObjectType(id) !== undefined) return new Set(["EntityType", "ValueType"]);
-  if (model.getFactType(id) !== undefined) return new Set(["FactType"]);
-  if (model.getConstraint(id) !== undefined) return new Set(["Constraint"]);
-  if (model.getSubtypeFact(id) !== undefined) return new Set(["SubtypeFact"]);
-  if (model.factTypes.some((ft) => ft.roles.some((r) => r.id === id))) return new Set(["Role"]);
-  return undefined;
+  const unique = prior !== undefined && model.idFromPrior(prior) !== undefined;
+  if (prior !== undefined && !unique) unknownIds.add(prior);
+  return { now, before: unique ? prior : undefined, unknownIds, ambiguous };
 }
 
 /**

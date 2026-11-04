@@ -1571,9 +1571,11 @@ version-1 manifest would go silently empty for impact analysis.
       read as a 3.x id: asked by it, `ambiguous` names the elements' 4.0
       ids, the marked exports holding it are listed as unknown, and exports
       written under 4.0 ids still match the element that holds it now.
-      Asked by either element's 4.0 id, it is matched only in sources of
-      that element's kind; a kind lineage never records, such as a
-      population, matches no source (Copilot and the pr-review, on 6e). The CLI's json and
+      Asked by either element's 4.0 id, it is never matched, and the
+      marked exports holding it are listed as unknown. Telling the elements
+      apart by the kind a source records was tried and kept missing cases;
+      the owner chose listing over guessing (2026-11-04). Re-exporting
+      answers it. The CLI's json and
       MCP add `modelDidNotLoad` when a path's model did not load.
       The CLI passes it, and MCP does given a path; inline, every model's
       exports are read, and one model's ids say nothing of another's.
