@@ -3,11 +3,13 @@
 Status: Draft -- no workstream implemented
 
 Created: 2026-10-13
-Last-updated: 2026-10-13
+Last-updated: 2026-11-04
 Tracking: barwise-0wa. Sources: `docs/cli-surface-audit-2026-10-12.md`
 (option by option) and `docs/surface-parity-audit-2026-10-12.md`
 (runtime behaviour, a separate same-day audit whose issues are mapped
-below).
+below). The rules for the capability matrix are
+`docs/adr/surface-capability-parity.md`; this spec is how its open rows
+close.
 
 ## Principle
 
@@ -38,9 +40,15 @@ does not qualify.
 | `llm-usage`                                         | Only the CLI writes the call log (`withCallLog` is used in `cli/src` alone), so a report from another surface would leave out that surface's own calls     |
 | MCP gym session log (`--emit-misses`, `--no-state`) | Owner decision. The log is the learner's history, which the `gym-coach` skill reads, and an agent's checks through MCP would be counted as the learner's   |
 
-The owner also decided that `merge_models` keeps writing back to `base`
-by default; #637 made its tool description say so. Workstream 2 adds an
-explicit output path beside it.
+The owner also decided that `merge_models` keeps the base file as its
+write target; #637 made its tool description say so. How a write to an
+existing model is approved is the next section.
+
+### Rows added to the matrix since the audit
+
+- `rename` and `--matching content` read "none": every surface has them.
+- `--surrogate-keys` reaches MCP through `export_model`'s `options` and not VS Code, whose export tool drops `options`. Workstream 3 closes it.
+- `migrate` keeps the reason its own spec gave ("rewrites files in place"). It post-dates the owner's 2026-10-13 calls, so this spec does not reopen it; the owner rules on it like any other row.
 
 ### Corrections to the audit
 
@@ -49,11 +57,35 @@ The audit is a dated record and is not edited in place. These supersede it:
 - It recommended keeping all eight `prompt` subcommands CLI-only. Six call no model, so they fail the test above; the owner chose to mirror them.
 - It gave `llm-usage`'s reason as "written by whichever process made the calls." The mechanism is narrower: only the CLI writes the log at all.
 - It said a gym session log is "per-person state a shared server should not write." A stdio MCP server runs as the user's own process, so that reason does not hold. The reason in the table above replaces it.
-- It found three bugs. The same-day surface-parity audit found more, among them barwise-fbi: the gym fails in every shipped bundle, the server VS Code embeds included. That was reproduced again while grounding this spec.
+- It found three bugs. The same-day surface-parity audit found more, among them barwise-fbi: the gym fails in every shipped bundle, the server VS Code embeds included. That reproduced again on 2026-11-04.
 
 Presentation flags (`--format text|json`, `--json`) are not mirrored.
 MCP and VS Code return JSON because an agent reads the result; the flag
 changes the rendering, not what a caller can do.
+
+## How does an import or merge change an existing model? (direction resolved by the owner, 2026-11-04; design provisional)
+
+The owner's direction: a flow that lets a person mindfully allow each
+change to their model, in the spirit of `git add -p`. That replaces the
+earlier "refuse to overwrite unless forced" proposal (barwise-pks):
+refusal is what happens without a review, and the review is the normal
+path.
+
+The pieces exist in core. `diffModels(base, incoming)` yields a list of
+deltas, and `mergeAndValidate(base, incoming, deltas, accepted)`
+applies only the accepted ones. VS Code's palette transcript import
+already lets the user pick the deltas to keep, from a multi-select list
+(`ImportTranscriptCommand.ts`). What is
+missing is the same review on every surface and for every import.
+
+- **CLI.** `barwise merge` and `barwise import ... --output <existing>` walk the deltas one at a time, as `git add -p` walks hunks: accept, reject, accept the rest, reject the rest, or quit without writing. Without a terminal, in a script or CI, they refuse an existing target unless told which deltas to take. Today's merge default (additions and modifications, never removals) becomes one such named choice.
+- **MCP.** Two calls. The first returns the numbered deltas and a fingerprint of the target and the incoming model, and writes nothing. The second names the accepted deltas and repeats the fingerprint; the tool applies exactly those, and refuses if either side changed in between. The tool description tells the agent to show the user the deltas and ask. The client's own prompt to approve a tool call is the human gate.
+- **VS Code.** The same two calls. On the apply call, `prepareInvocation` returns `confirmationMessages`, so the editor shows the accepted deltas and the user confirms before anything is written. The palette's dbt and code imports, which overwrite today, get the per-delta review the transcript import already has.
+- **A target that cannot be read or merged is refused, never overwritten.** Today `barwise import transcript --output` falls back to the fresh extraction in both cases (`cli/src/commands/import/transcript.ts`), and MCP's `executeImport` uses `base` only as context for the model, not as a merge target.
+- **The change set is deterministic, so it lives in core:** delta ids in `diffModels`' order, valid only together with the fingerprint they were issued with.
+
+Two choices inside this are the owner's (open decision 2), and the
+design may graduate to its own spec when workstream 2 is grounded.
 
 ## Do the deterministic `prompt` commands cross a package boundary? (resolved: four of six do)
 
@@ -64,9 +96,9 @@ Two need only `@barwise/llm`, which MCP already depends on:
 - `prompt artifact` (`resolveArtifact`, `builtinArtifacts`, `hashPrompt`; the hasher moved into `llm` under `artifact-resolution-parity.spec.md`, WS2).
 
 Four need `@barwise/promptlab` and its eval suite: `score`, `rescore`,
-`history`, `compare`. MCP may not depend on promptlab. That rule is
-enforced by dependency-cruiser (`.dependency-cruiser.cjs`, `INTENDED.mcp`),
-stated in `mcp/CLAUDE.md`, and relied on by two specs:
+`history`, `compare`. MCP may not depend on promptlab. The rule is
+`INTENDED.mcp` in `scripts/lib/intended.cjs`, enforced by
+dependency-cruiser and `check:architecture`, and two specs rely on it:
 
 - `keyless-model-access.spec.md`: "A sampling call is not deterministic and not attributable. It must never become reachable from promptlab."
 - `multi-sample-import.spec.md`: "The scorer lives in dev tooling on purpose."
@@ -80,14 +112,17 @@ decision 1.
 In scope, as requirements:
 
 - When `npm run audit:surfaces -- --check` runs, the system shall fail on a CLI command or option that has no MCP or VS Code counterpart and no row in the baseline, and on a baseline row no longer detected. When a built surface it reads is missing, it shall exit 2.
+- When a workstream closes a behavioural gap (a difference in what a tool does, not in what it accepts), it shall land a regression test that fails on the old behaviour. The baseline records command and parameter gaps only, since a schema cannot show behaviour.
 - When a VS Code language-model tool wraps an MCP tool, it shall declare every parameter that MCP tool declares, except parameters the baseline excludes with a reason.
-- When `import_model` or `merge_models` receives an output path, the system shall write the result there under the posture open decision 2 settles (barwise-pks).
+- When `import_model`, `import_transcript` or `merge_models` receives an output path that does not exist, the system shall write the result there.
+- When an import or a merge would change an existing model file, on any surface, the system shall present the change as numbered deltas and write only the ones the user accepts (barwise-pks).
+- When the existing target cannot be read or merged, the system shall refuse and write nothing.
 - When `export_model` writes an artifact to disk, the system shall record it in the lineage manifest as `barwise export` does (barwise-ace).
 - When `export_model` receives a project manifest with no `domain` and an output path, the system shall export every domain into that directory, as `barwise export` does. Today it refuses (`executeExportModel`).
 - When an export format produces several files (dbt, Avro) and `export_model` has an output path, the system shall write each file under it, as `barwise export` does. Today it returns only the combined `result.text`.
 - When `barwise_import_transcript` runs in VS Code, it shall accept `base`, `alternatives`, `samples` and an output path, and read `transcript` from disk when given a file path (barwise-0wa.pte).
 - When `barwise_review_model` runs in VS Code, it shall accept a project manifest and a `domain`.
-- When `barwise_export_model` runs in VS Code, it shall forward format options, `dialect` included.
+- When `barwise_export_model` runs in VS Code, it shall forward format options, `dialect` and `surrogateKeys` included.
 - When `validate_model` receives a project manifest, it shall report the cross-domain project rules the CLI reports (barwise-0wa.qh3).
 - When an MCP client calls `gym_list` or `gym_check` on the server bundled with VS Code, it shall get the same answer as from `packages/mcp` (barwise-fbi).
 - When a CLI command in the audit's section 1 has no counterpart, the system shall gain one on both surfaces:
@@ -108,23 +143,27 @@ Out of scope:
   - barwise-ntw is documentation; each workstream updates `docs/CLI.md` and `docs/MCP.md` for what it changes, which narrows that issue without closing it.
 - New options on deprecated tools (`generate_schema`, `generate_diagram`). barwise-0wa.ymj decides their future, and their option gaps take baseline rows naming it.
 - The audit's section 5, capabilities MCP or VS Code has and the CLI lacks. The owner's direction is one-way.
-- VS Code palette commands. The VS Code column counts a language-model tool as reach (`CLAUDE.md`, barwise-988), so palette parity is a separate question. That includes lineage for the palette's Export... commands, which stays with barwise-ace.
+- VS Code palette parity. The VS Code column counts a language-model tool as reach (`docs/adr/surface-capability-parity.md`, decision 3), so the palette is a separate question, lineage for its Export... commands included (barwise-ace). The one palette change here is the per-delta review for the dbt and code imports.
+- Who may write `prompt eval`'s history. In an installed CLI, `prompt eval` appends beside the packaged suite (`appendRunHistory` at `historyPathFor(suitePath(...))`, which defaults to `defaultSuitePath()`). The mirrored tools only read history; this spec changes no write policy.
 
 ## Inventory
 
-| Area                                         | Current state                                                               | Verdict                                                                                                                              |
-| -------------------------------------------- | --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| `barwise/scripts/audit-surfaces.mjs`         | Does not exist                                                              | New: reads the built CLI program, MCP server and VS Code manifest; ratchets gaps against a baseline                                  |
-| `barwise/surface-parity-baseline.json`       | Does not exist                                                              | New: one row per gap, `gap` (names its workstream or tracking issue) or `kept` (owner-approved reason)                               |
-| `vscode/tests/unit/toolRegistration.test.ts` | Pins tool names                                                             | Also pins each wrapped tool's parameters against the MCP tool's schema                                                               |
-| `mcp/src/tools/importModel.ts`, `merge.ts`   | No output path                                                              | Output path                                                                                                                          |
-| `mcp/src/tools/exportModel.ts`               | One domain per call; returns the combined `result.text`; records no lineage | Project-wide export, multi-file write, and lineage on write                                                                          |
-| `vscode/src/mcp/ToolRegistration.ts`         | Bespoke transcript and review bodies; export drops `options`                | Transcript and review call `executeImport`/`executeReview` with the editor's client; export forwards options                         |
-| `mcp/src/tools/validate.ts`                  | Per-domain validation only                                                  | Also `projectRules`                                                                                                                  |
-| `learn/src/exercise/catalog.ts`              | Resolves the catalog from `import.meta.url`, empty in the CJS bundle        | A catalog the bundle can reach (open decision 4)                                                                                     |
-| `mcp/src/tools/`                             | 18 tools                                                                    | Adds `init_project`, `lineage_show`, `gym_show`, `model_history`, `prompt_schema`, `prompt_artifact`, and up to four promptlab tools |
-| `cli/src/commands/history.ts`                | Git walk (about 60 lines of subprocess) plus rendering                      | Walk shared or paralleled (open decision 3)                                                                                          |
-| `CLAUDE.md` capability matrix                | Hand-maintained                                                             | Kept, and checked by `audit:surfaces`                                                                                                |
+| Area                                                    | Current state                                                                                                      | Verdict                                                                                                                               |
+| ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `barwise/scripts/audit-surfaces.mjs`                    | Does not exist                                                                                                     | New: reads the built CLI program, MCP server and VS Code manifest; ratchets command and parameter gaps against a baseline             |
+| `barwise/surface-parity-baseline.json`                  | Does not exist                                                                                                     | New: one row per gap, `gap` (names its workstream or tracking issue) or `kept` (owner-approved reason)                                |
+| `vscode/tests/unit/toolRegistration.test.ts`            | Pins tool names                                                                                                    | Also pins each wrapped tool's parameters against the MCP tool's schema                                                                |
+| `@barwise/core/diff`                                    | `diffModels` and `mergeAndValidate` with an accepted set                                                           | Plus a change set: delta ids and a fingerprint (provisional)                                                                          |
+| `mcp/src/tools/importModel.ts`, `import.ts`, `merge.ts` | No output path; `executeImport`'s `base` is extraction context only; `merge_models` writes the base at once        | Output path; an existing target changes through the reviewed change set                                                               |
+| `cli/src/commands/merge.ts`, `import/*.ts`              | `--output` overwrites (`writeOutput`); `import transcript` falls back to the extraction when a merge or read fails | Interactive review on a terminal; refusal without one unless the accepted deltas are named; never overwrite on a failed read or merge |
+| `mcp/src/tools/exportModel.ts`                          | One domain per call; returns the combined `result.text`; records no lineage                                        | Project-wide export, multi-file write through `mcp/src/workspace/stagedWrite.ts`, and lineage on write                                |
+| `vscode/src/mcp/ToolRegistration.ts`                    | Separate transcript and review bodies; export forwards three options and drops the rest                            | Transcript and review call `executeImport` and `executeReview` with the editor's client; export forwards `options`                    |
+| `mcp/src/tools/validate.ts`                             | Per-domain validation only                                                                                         | Also `projectRules`                                                                                                                   |
+| `learn/src/exercise/catalog.ts`                         | Resolves the catalog from `import.meta.url`, empty in the CJS bundle                                               | Exercises generated into a module (owner, 2026-11-04)                                                                                 |
+| `mcp/src/tools/`                                        | 19 tools                                                                                                           | Adds `init_project`, `lineage_show`, `gym_show`, `model_history`, `prompt_schema`, `prompt_artifact`, and four promptlab-backed tools |
+| `cli/src/commands/history.ts`                           | Git walk (about 60 lines of subprocess) plus rendering                                                             | Walk paralleled in MCP, with a drift test (owner, 2026-11-04)                                                                         |
+| `docs/adr/surface-capability-parity.md`                 | Decision 1 names only `deliberate`; its open list says every row awaits the owner                                  | Names `not yet` with its workstream; the open list records the owner's calls                                                          |
+| `CLAUDE.md` capability matrix                           | Hand-maintained                                                                                                    | Kept, and checked by `audit:surfaces` for command and parameter reach                                                                 |
 
 ## Target architecture
 
@@ -135,11 +174,17 @@ audit:surfaces (root script, reads built output only)
   VS Code  package.json contributes.languageModelTools -> tools, schemas
   correspondence.json  CLI command -> MCP tool -> VS Code tool;
                        CLI option -> parameter, where camelCase is not enough
-  surface-parity-baseline.json  every remaining gap: gap (WS n or issue) | kept (reason)
+  surface-parity-baseline.json  every command or parameter gap: gap (WS n or issue) | kept (reason)
   --check: unclassified gap -> fail; stale row -> fail; missing dist -> exit 2
 
-Each workstream below deletes the baseline rows it closes, so "done" is
-the baseline, not a claim in a PR body.
+reviewed change set (core, deterministic)
+  propose(base, incoming) -> { fingerprint, deltas[] }   writes nothing
+  apply(base, incoming, accepted ids, fingerprint)       refuses on a stale fingerprint
+  CLI: interactive walk | MCP: two calls | VS Code: two calls + confirmation
+
+The baseline sees what a surface accepts, not what it does. A workstream
+deletes the command and parameter rows it closes, and closes each
+behavioural issue with a regression test.
 ```
 
 ## Alternatives considered
@@ -147,40 +192,46 @@ the baseline, not a claim in a PR body.
 - **Keep the hand-maintained matrix and close gaps once.** This is the status quo that went stale twice. The next new CLI option would reopen a gap that nothing reports.
 - **Generate the MCP and VS Code tools from the CLI's commander definitions.** It would give one source, but CLI options are shaped for a terminal (stdout, `--format`, exit codes) and tools return JSON. One schema for both would couple the surfaces, against orthogonality. The `execute*` functions are already the shared layer; this spec checks the surfaces instead of fusing them.
 - **Put the parity check in a package's test suite.** No package can see both the CLI and MCP: `cli` may not depend on `mcp`, and the reverse is also forbidden. A root script reading built output is the only vantage point that sees all three, which is why the root audits (`audit:duplication`, `audit:rubric`) live there.
+- **Refuse to overwrite unless forced.** This was the earlier proposal for barwise-pks. It protects a file, but the only choices it offers a person are all or nothing. The owner asked for a review of each change.
 
 ## Workstreams (each independently shippable)
 
 ### 1. The parity check, with every current gap in its baseline (provisional: not yet grounded)
 
-Land `audit:surfaces` and a baseline holding every gap the audit found,
-each marked `gap` with its workstream or tracking issue, or `kept` with
-its reason. CI runs
-`--check`, and writes go through `scripts/lib/baseline-merge.mjs`. It
-lands first so every later workstream has a mechanical definition of
-done: its rows disappear. The VS Code parameter pin in
-`toolRegistration.test.ts` lands with it.
+Land `audit:surfaces` and a baseline holding every command and
+parameter gap the audit found, each marked `gap` with its workstream or
+tracking issue, or `kept` with its reason. CI runs `--check`, and writes
+go through `scripts/lib/baseline-merge.mjs`. It lands first so every
+later workstream has a mechanical definition of done for what a surface
+accepts: its rows disappear. Behavioural gaps (validate's project rules,
+the bundled gym, export lineage, overwrite on import) are invisible to a
+schema; each closes with a regression test in its own workstream. The
+VS Code parameter pin in `toolRegistration.test.ts` lands with it.
 
-### 2. Write paths (provisional)
+### 2. Write paths and reviewed changes (provisional)
 
-`import_model` and `merge_models` gain an output path on MCP and VS
-Code. `merge_models` already discloses its write-back in its
-description (#637, barwise-xjf). `export_model` writes the way `barwise
-export` does: every domain of a project when no `domain` is given,
-each file of a multi-file format, and a lineage entry for each write
-(barwise-ace), so the lineage tools see what the other surfaces export. A relative path in VS Code resolves through `resolveWriteDir`
-(from `split-model-tool.spec.md`). This is the failure the user hit:
-`@barwise` receives only barwise-tagged tools, so a tool that cannot
-write its result leaves the agent unable to save it.
+- `import_model`, `import_transcript` and `merge_models` gain an output path on MCP and VS Code. `executeImport` writes nothing today, so the transcript path is new in the shared function and its MCP registration, not only forwarded.
+- A new file is written directly. An existing file changes only through the reviewed change set (above), on every surface, and a target that cannot be read or merged is refused.
+- `merge_models` keeps the base as its target and already discloses that (#637, barwise-xjf).
+- `export_model` writes the way `barwise export` does:
+  - every domain of a project when no `domain` is given;
+  - each file of a multi-file format, through MCP's staged writer, which is paired with the CLI's in `parity.manifest.json`;
+  - a lineage entry for each write (barwise-ace), so the lineage tools see what the other surfaces export.
+- A relative path in VS Code resolves through `resolveWriteDir` (from `split-model-tool.spec.md`).
+
+This is the failure the user hit: `@barwise` receives only barwise-tagged
+tools, so a tool that cannot write its result leaves the agent unable to
+save it.
 
 ### 3. VS Code onto the shared execute functions (provisional)
 
 `barwise_import_transcript` calls `executeImport` with the editor's
-client. That function already takes a client as its last argument, so
-this gains `base`, `alternatives`, `samples` (the `--samples` row) and
-an output path, and fixes barwise-0wa.pte (with barwise-6n8).
-`barwise_review_model` calls `executeReview` and gains project input and
-`domain` (barwise-rb4). `barwise_export_model`
-forwards `options`.
+client. That function already takes a client as its last argument. The
+tool gains `base`, `alternatives`, `samples` (the `--samples` row) and
+the output path from workstream 2, and this fixes barwise-0wa.pte (with
+barwise-6n8). `barwise_review_model` calls `executeReview` and gains
+project input and `domain` (barwise-rb4). `barwise_export_model`
+forwards `options`, which closes the `--surrogate-keys` row.
 
 ### 4. MCP correctness (provisional)
 
@@ -196,7 +247,9 @@ workstream 4) and `analyze_repository`.
 
 ### 6. `history` (provisional)
 
-`model_history` on both surfaces, after open decision 3.
+`model_history` on both surfaces. MCP carries its own copy of the git
+walk, with a drift test that runs it and the CLI's against one fixture
+repository (owner, 2026-11-04).
 
 ### 7. Remaining option mirrors (provisional)
 
@@ -214,31 +267,37 @@ workstream 4) and `analyze_repository`.
 ### 8. Deterministic `prompt` commands (provisional)
 
 `prompt_schema` and `prompt_artifact` first; they need only `llm`. Then
-`score`, `rescore`, `history` and `compare`, per open decisions 1 and 4.
+`score`, `rescore`, `history` and `compare`, per open decision 1. Their
+suite defaults to the packaged one, as the CLI's does, carried in the
+bundle the way the gym exercises are.
 
 ## API and migration impact
 
-- **`@barwise/mcp`:** new tools and parameters, all additive. `merge_models` keeps its write-back default.
-- **`barwise-vscode`:** new tools, and new parameters on the transcript, review and export tools. The pinned tool lists and the capability matrix change in the same commit as each surface change.
-- **`@barwise/learn`:** a catalog the bundle can reach.
-- **`@barwise/cli`:** unchanged, unless open decision 2 takes its recommended option. Then `barwise import model --output` and `barwise merge --output` refuse an existing file without `--force`, a behaviour change for anyone who relied on the overwrite.
-- **Dependency graph:** MCP gains an edge into promptlab under either option of open decision 1: a subpath of it (A) or a new no-client package (B).
+- **`@barwise/core`:** a change-set API beside `diffModels` and `mergeAndValidate`; additive.
+- **`@barwise/mcp`:** new tools and parameters. Two changes are not additive. `merge_models` stops writing in a single call and proposes first. An import onto an existing file goes through the same review. Both are behaviour changes for an agent that relied on the immediate write.
+- **`barwise-vscode`:** new tools; new parameters on the transcript, review and export tools; a confirmation step before a reviewed write. The pinned tool lists and the capability matrix change in the same commit as each surface change.
+- **`@barwise/learn`:** exercises generated into a module the bundle can reach.
+- **`@barwise/cli`:**
+  - `barwise merge --output <existing>` and `barwise import ... --output <existing>` review interactively on a terminal.
+  - Without a terminal, they refuse unless the accepted deltas are named.
+  - `import transcript` stops overwriting an existing file it cannot read or merge.
+  - Each is a behaviour change for a script that relied on the overwrite.
+- **Dependency graph:** MCP gains an edge into promptlab under either option of open decision 1.
 - **CI:** one new step, `audit:surfaces -- --check`, plus its root forwarder (`check:root-scripts`).
 
 ## Open decisions (for review)
 
-1. **The promptlab boundary, for `score`, `rescore`, `history`, `compare`.**
+1. **How `score`, `rescore`, `history` and `compare` reach MCP.** The owner asked whether these should be promptlab functions MCP calls, or a native part of MCP. They should exist once. A score is a measurement that is compared with history rows the CLI and the DSPy optimizer write (the optimizer calls `barwise prompt score` as a subprocess), so a second copy inside MCP is a scorer that must agree exactly with the first. Under the must-agree rule that needs a drift test, which is weaker than not copying. Moving them into MCP is not possible either: the CLI may not depend on MCP. The MCP tools are thin wrappers, as every other tool is; the question is only where the one copy lives.
    - (A, recommended) Give promptlab a subpath export of its no-client functions (`loadSuite`, `scoreExtraction`, `readHistory`, `compareRows`, `rescoreDirectory`, `diffRescores`). Let MCP import only that subpath, and add a dependency-cruiser rule forbidding the root and `runSuite`. The guard stays structural: MCP still cannot reach the one function that takes a client. `@barwise/core`'s subpath exports are the precedent.
    - (B) Split promptlab into a no-client package and a runner package. This is the cleanest boundary, but it adds a thirteenth package for four tools.
-2. **Overwrite posture for imports and merges onto an existing file.** barwise-pks asks for one rule on every surface, the CLI included: merge into the existing model, or refuse.
-   - (Recommended) Adopt pks's rule everywhere. Transcript import keeps merging into an existing model, which never removes anything. `import_model` and `merge_models` with an output path refuse an existing file unless `force` is set, as `split_model` and `barwise project split` already do. This changes the CLI: `barwise import model --output` and `barwise merge --output` (both through `writeOutput`, `cli/src/workspace/io.ts`) stop overwriting silently and take `--force`.
-   - (Alternative) Refuse only on MCP and VS Code, and leave the CLI overwriting. An overwrite is ordinary for a path a person typed, and riskier for one an agent chose. This leaves pks open.
-3. **Where `history`'s git walk lives.**
-   - (Recommended) Parallel the roughly 60-line walk in MCP, with a drift test that runs both against one fixture repository. `core` keeps the diff and stays pure.
-   - (Alternative) Move the walk into a package both can import. No existing package fits without coupling: `code-analysis` does git I/O for a different concern, and a new package for one function is shallow.
-4. **Data files in the VS Code bundle.**
-   - Gym exercises: generate them into a module, as `llm/src/prompt/artifacts/builtins.generated.ts` did for the same bundle failure (recommended), or ship the directory and pass its path through `McpServerProvider`.
-   - The eval suite: default to the suite packaged with the release, as the CLI's `--suite` does (`defaultSuitePath`), and accept an explicit suite path for a barwise checkout's live suite (recommended). The packaged history is the release's snapshot; `prompt eval` appends only to a live suite, and only from the CLI. The packaged suite reaches the bundle the same way the gym exercises do, and `loadSuite` has the same `import.meta.url` failure.
+2. **Two choices inside the reviewed change set.**
+   - Does `merge_models` keep a single-call write for a caller that names the deltas it accepts up front (today's behaviour, made explicit), or must every write to an existing model start with a proposal? Recommended: keep the single call only with an explicit accept choice, never as the default. Scripts and automation need it, and the MCP client's own approval prompt still applies.
+   - What does a CLI run without a terminal take as its accept choice? Recommended: a flag naming the delta kinds (`--accept additions,modifications`), and refusal without it.
+
+### Resolved by the owner (2026-11-04)
+
+- **Where `history`'s git walk lives:** a copy in MCP with a drift test against the CLI's (workstream 6). No existing package fits both without coupling, and `core` keeps the diff and stays pure.
+- **Data files in the VS Code bundle:** gym exercises generated into a module, as `llm/src/prompt/artifacts/builtins.generated.ts` did for the same bundle failure; the eval suite defaults to the packaged one, with an explicit path for a barwise checkout's live suite. `loadSuite` has the same `import.meta.url` failure as the gym catalog.
 
 ## Risks and testing
 
@@ -246,6 +305,9 @@ workstream 4) and `analyze_repository`.
 - **Unit tests run on source; users run bundles.** barwise-fbi shipped because no test spawned a bundle. Workstream 4's spawn test is the guard, and workstream 1 should read the bundled server too, not only `packages/mcp/dist`.
 - **Every new guard is seen failing on its defect** through `scripts/mutate.mjs` before its workstream merges.
 - **Premortem: the check passes while a gap exists.** This happens if the option-to-parameter mapping maps a CLI option onto an unrelated parameter. Mapping rows name both sides explicitly, and a test plants an unmapped option and expects a failure.
+- **Premortem: a review that nobody reviewed.**
+  - An agent may accept every delta without showing them. VS Code's confirmation step and the MCP client's approval prompt are the gates a person sees. The tool description is guidance only.
+  - A delta id from a stale proposal could apply the wrong change. The fingerprint check refuses it, and a test applies a proposal after the target changed and expects a refusal.
 
 ## Non-goals
 

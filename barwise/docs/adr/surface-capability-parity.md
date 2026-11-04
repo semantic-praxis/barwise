@@ -1,8 +1,8 @@
 # Surface capability parity
 
 Scope: architecture
-Date: 2026-09-10
-Tracking: barwise-ubc, barwise-0wa, barwise-1fr, barwise-1005, barwise-xpt,
+Date: 2026-11-04
+Tracking: barwise-ubc, barwise-0wa, docs/specs/surface-mirroring.spec.md, barwise-1fr, barwise-1005, barwise-xpt,
 docs/specs/cli-surface-parity.spec.md,
 docs/specs/getting-started-guides.spec.md
 Enforced-by: tests (pinned-tool-lists), none (barwise-ym8.0pq: pinned-tool-lists),
@@ -29,7 +29,8 @@ toolset; which gaps survive that direction is being decided row by row
 
 1. **The capability matrix in the root `CLAUDE.md` records which
    surface reaches which capability, and an unmarked gap is a bug.** {#matrix-records-reach} A
-   gap that stays is marked `deliberate` with its reason.
+   gap that stays is marked `deliberate` with its reason; a gap being
+   closed is marked `not yet` with the workstream that closes it.
 2. **A change to a surface's reach updates the matrix in the same
    commit.** {#matrix-same-commit} The surface change is incomplete until the table agrees
    with it.
@@ -64,20 +65,17 @@ toolset; which gaps survive that direction is being decided row by row
   documents imply the matrix is checked (barwise-xpt). Decisions 1 and 2
   are on the `pr-review` checklist ("When a surface changed"); decision 3
   is on no checklist.
-- Open under barwise-0wa and its audit: since the owner's 2026-10-12
-  direction, every `deliberate` row except `merge` (decided by the
-  owner, barwise-xjf) awaits the owner's call row by row. The matrix also
-  disagrees with itself and the code:
-  - `project init` reads `under review`, a label decision 1 does not
-    name;
-  - the `gym` row says MCP has it, but `gym show` has no MCP tool, and
-    its `deliberate` VS Code gap is "a later workstream" in
-    `modeling-gym.spec.md`;
-  - `import batch` has no row, `lineage show` sits under a `none` row
-    although MCP and VS Code lack it, and MCP has no `--output`
-    equivalent on import and no project-wide export; also
-    transcript-import options (barwise-6n8) and project awareness
-    (barwise-rb4).
+- The owner re-decided the rows that existed on 2026-10-13, under the
+  2026-10-12 direction that MCP and VS Code mirror the CLI (barwise-0wa,
+  `docs/specs/surface-mirroring.spec.md`): each now reads `deliberate`
+  with the reason the owner approved, or `not yet` with its workstream.
+  `migrate`, added since, keeps its own spec's reason until the owner
+  rules on it. What the matrix still cannot show: `lineage show` sits
+  under a `none` row although MCP and VS Code lack it, and option-level
+  gaps (MCP has no `--output` equivalent on import and no project-wide
+  export; transcript-import options, barwise-6n8; project awareness,
+  barwise-rb4) sit under rows that read `none`. That spec's workstream 1
+  turns them into a checked baseline.
 - Decision 3 counts any registration as reach, so a "yes" can hide a
   partial one: VS Code's Import and Export pickers offer only some
   registered formats (barwise-i22).
