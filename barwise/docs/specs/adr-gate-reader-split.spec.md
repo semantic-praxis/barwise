@@ -114,7 +114,7 @@ Out of scope:
 | the step lookup (`all.filter((s) => s.run === want)`)                                                    | `reader.steps(command)`  | the steps as `ci.yml` states them, or `null` when it cannot be read; `guard`, the `barwise/` and `continue-on-error` filters, the verdict and its message stay in the judge |
 | the per-ADR loop, `guard`, `declaring`, `enforcementProblems`                                            | `judgeDeclarations`      | unchanged; it returns the problems and the count the gate prints                                                                                                            |
 | `readVitest`, `readNodeTest`, the expected-report list and its reading (check-adr-tests.mjs)             | `readTestReports`        | an unreadable list stays an exit 2 in the gate                                                                                                                              |
-| the declaring-ADR parse (`declaring`, `testedIds`), stale tags, the per-decision verdicts and `skipOnly` | `judgeTestedDecisions`   | unchanged; `unreadableReports` is `reports.refusals.length`                                                                                                                 |
+| the declaring-ADR parse (`declaring`, `testedIds`), stale tags, the per-decision verdicts and `skipOnly` | `judgeTestedDecisions`   | unchanged; `unreadableReports` is `reports.unreadable`, fixed at read time                                                                                                  |
 
 ## Alternatives considered
 
