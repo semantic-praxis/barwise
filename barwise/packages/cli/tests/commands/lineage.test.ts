@@ -502,7 +502,8 @@ model:
       const result = await runCli(["lineage", "impact", modelPath, "--element", "x1"]);
       expect(result.stdout).not.toContain("No artifacts depend");
       expect(result.stdout).toContain(
-        '"x1" is a 3.x id the file states for more than one element (Person, Person_smokes)',
+        '"x1" is a 3.x id the file states for more than one element (Person, Person_smokes), '
+          + "so exports written under 3.x ids that hold it are not matched by it.",
       );
     });
 

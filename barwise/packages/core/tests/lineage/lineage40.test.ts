@@ -340,9 +340,19 @@ describe("impact over a 3.x id more than one element stated (Copilot, the pr-rev
   });
 
   it("states no ambiguity, and lists nothing, for an element whose 3.x id is its own", () => {
-    const report = analyzeImpact(m, "Person_smokes.smokes", undefined, model());
+    const withRole = version1(...m.exports, exported("smokes.sql", "r1", "h"));
+    const report = analyzeImpact(withRole, "Person_smokes.smokes", undefined, model());
     expect(report).not.toHaveProperty("ambiguous");
+    expect(report.affectedArtifacts.map((a) => a.artifact)).toEqual(["smokes.sql"]);
     expect(report.exportsBefore40).toEqual([]);
+  });
+
+  it("lists every marked export it misses for an id the model holds under neither reading", () => {
+    // A deleted element, say: no 3.x id is known for it (the pr-review on a5d9fcb0).
+    const gone = version1(exported("gone.sql", "g9", "h"), exported("other.sql", "zz", "h"));
+    const report = analyzeImpact(gone, "g9", undefined, model());
+    expect(report.affectedArtifacts).toEqual([]);
+    expect(report.exportsBefore40).toEqual(["gone.sql", "other.sql"]);
   });
 });
 

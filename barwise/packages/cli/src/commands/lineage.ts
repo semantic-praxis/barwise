@@ -162,7 +162,7 @@ export function registerLineageCommand(program: Command): void {
             process.stdout.write(
               `"${report.changedElement}" is a 3.x id the file states for more than one `
                 + `element (${report.ambiguous.join(", ")}), so exports written under 3.x ids `
-                + "are not matched by it.\n\n",
+                + "that hold it are not matched by it.\n\n",
             );
           }
 

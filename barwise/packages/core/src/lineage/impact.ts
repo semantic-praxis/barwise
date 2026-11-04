@@ -35,8 +35,8 @@ export interface ImpactReport {
    * The 4.0 ids of the elements the asked id names, present when it is a
    * 3.x id the file stated for more than one element, which 3.x allowed and
    * no lookup by the id alone can tell apart (iri-identity 6e). Exports
-   * written under 3.x ids are then not matched by it, and those holding it
-   * are listed in `exportsBefore40`; exports written under 4.0 ids still
+   * written under 3.x ids that hold it are then not matched by it, and are
+   * listed in `exportsBefore40`; exports written under 4.0 ids still
    * match the element whose 4.0 id it is, if any.
    */
   readonly ambiguous?: readonly string[];
@@ -161,6 +161,12 @@ function idsByGeneration(
   // The element asked for as a 4.0 id, if the model holds one by it.
   const now = ambiguous === undefined || priorIds.has(elementId) ? elementId : undefined;
   const prior = now === undefined ? undefined : priorIds.get(now);
+  // An id the model holds under neither reading (a deleted element): no
+  // 3.x id is known for it, so, as for a 4.0 model, every marked export
+  // it misses is listed (the pr-review on a5d9fcb0).
+  if (prior === undefined && ambiguous === undefined) {
+    return { now, before: undefined, unknownIds: undefined, ambiguous: undefined };
+  }
   // `idFromPrior` is undefined for a prior id exactly when it is shared.
   const unique = prior !== undefined && model.idFromPrior(prior) !== undefined;
   if (prior !== undefined && !unique) unknownIds.add(prior);
