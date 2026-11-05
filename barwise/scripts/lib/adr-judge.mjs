@@ -30,9 +30,46 @@ const guard = (condition) => {
 };
 
 /**
+ * The fact rules: decided from facts alone, and the ones the conformance
+ * model states as constraints (docs/specs/adr-conformance-model.spec.md).
+ * A chain is the rules one `continue` cuts short, ranked in the order the
+ * judge checks them; a rule that cuts nothing short is a chain of one. The
+ * key is the one value a finding is about: the decision `<adr>#<id>`, the
+ * script, or the issue.
+ */
+export const RULES = [
+  { id: "ids-exist", chain: "ids-exist", rank: 1, key: "decision" },
+  { id: "coverage", chain: "coverage", rank: 1, key: "decision" },
+  { id: "script-exists", chain: "script-exists", rank: 1, key: "script" },
+  { id: "issue-tracked", chain: "issue", rank: 1, key: "issue" },
+  { id: "issue-open", chain: "issue", rank: 2, key: "issue" },
+];
+
+/**
+ * Whether the judge looks an `npm` entry's script up at all: the gate-name
+ * and meta-gate verdicts, as the finding's text, or `null` when the script
+ * passes both. Shared, so the conformance model's fact builder writes a
+ * "names script" fact exactly when the judge would look the script up.
+ */
+export function scriptVerdict(entry, adr) {
+  const { script } = entry;
+  if (!gateName(script)) {
+    return `"${entry.text}": ${script} is not a gate name (check:*, audit:*, or one of`
+      + ` ${Object.keys(GATE_EXCEPTIONS).join(", ")} in GATE_EXCEPTIONS)`;
+  }
+  if (Object.hasOwn(META_GATES, script) && !META_GATES[script].includes(adr)) {
+    return `"${entry.text}": ${script} checks other gates and cannot vouch for this ADR`;
+  }
+  return null;
+}
+
+/**
  * Each ADR's `Enforced-by:` declarations, judged (check:architecture).
  * `reader` is createGovernanceReader()'s; `refusals` is the gate's list.
- * Returns the findings and `held`: how
+ * Returns the findings; `facts`, one per finding of a rule in `RULES`, as
+ * `{ rule, adr, position, key }` with the entry's index in
+ * `parseEnforcedBy(text).entries` (`null` for coverage, which has no entry);
+ * and `held`: how
  * the decisions are held, over every decision with an id
  * (docs/specs/enforceable-adr-practice.spec.md, WS2). A decision with an
  * `npm` entry has a gate; with `tests` and no `npm`, tests and no gate;
@@ -41,6 +78,7 @@ const guard = (condition) => {
  */
 export function judgeDeclarations(adrs, reader, refusals) {
   const problems = [];
+  const facts = [];
   const held = { decisions: 0, gate: 0, testsOnly: 0, noneOnly: 0, gap: 0 };
   // Each gap issue is one decision's own: the first entry to name an issue,
   // across every ADR, by file and entry text.
@@ -55,6 +93,10 @@ export function judgeDeclarations(adrs, reader, refusals) {
       continue;
     }
     const name = f.slice(ADR_DIR.length, -".md".length);
+    const finding = (rule, position, key, msg) => {
+      facts.push({ rule, adr: name, position, key });
+      fail(msg);
+    };
     for (const p of parsed.problems) fail(p);
     const { decisions, problems: decisionProblems } = decisionIds(text);
     for (const p of decisionProblems) fail(p);
@@ -72,28 +114,34 @@ export function judgeDeclarations(adrs, reader, refusals) {
     }
     // Each id an entry lists, with the kinds of entry that list it.
     const covered = new Map();
-    for (const entry of parsed.entries) {
+    for (const [position, entry] of parsed.entries.entries()) {
       for (const id of entry.ids) {
-        if (!ids.has(id)) fail(`"${entry.text}" lists ${id}, which no decision here has`);
+        if (!ids.has(id)) {
+          finding(
+            "ids-exist",
+            position,
+            `${name}#${id}`,
+            `"${entry.text}" lists ${id}, which no decision here has`,
+          );
+        }
         if (!covered.has(id)) covered.set(id, new Set());
         covered.get(id).add(entry.kind);
       }
       if (entry.kind === "npm") {
         const { script } = entry;
-        if (!gateName(script)) {
-          fail(
-            `"${entry.text}": ${script} is not a gate name (check:*, audit:*, or one of`
-              + ` ${Object.keys(GATE_EXCEPTIONS).join(", ")} in GATE_EXCEPTIONS)`,
-          );
-          continue;
-        }
-        if (Object.hasOwn(META_GATES, script) && !META_GATES[script].includes(name)) {
-          fail(`"${entry.text}": ${script} checks other gates and cannot vouch for this ADR`);
+        const verdict = scriptVerdict(entry, name);
+        if (verdict !== null) {
+          fail(verdict);
           continue;
         }
         const scripts = reader.scripts();
         if (scripts !== null && !Object.hasOwn(scripts, script)) {
-          fail(`"${entry.text}": barwise/package.json has no script ${script}`);
+          finding(
+            "script-exists",
+            position,
+            script,
+            `"${entry.text}": barwise/package.json has no script ${script}`,
+          );
           continue;
         }
         const want = entry.args === null
@@ -157,11 +205,19 @@ export function judgeDeclarations(adrs, reader, refusals) {
         // In order: the issue exists, it is open, then what makes it this
         // decision's own, so a closed issue reports only that it is closed.
         if (issue === undefined) {
-          fail(`"${entry.text}": ${entry.issue} is not in .beads/issues.jsonl`);
+          finding(
+            "issue-tracked",
+            position,
+            entry.issue,
+            `"${entry.text}": ${entry.issue} is not in .beads/issues.jsonl`,
+          );
           continue;
         }
         if (issue.status === "closed") {
-          fail(
+          finding(
+            "issue-open",
+            position,
+            entry.issue,
             `"${entry.text}": ${entry.issue} is closed; declare the enforcer it built, or reopen it`,
           );
           continue;
@@ -186,7 +242,14 @@ export function judgeDeclarations(adrs, reader, refusals) {
       }
     }
     for (const [id, d] of ids) {
-      if (!covered.has(id)) fail(`decision ${d.n} {#${id}} has no Enforced-by: entry`);
+      if (!covered.has(id)) {
+        finding(
+          "coverage",
+          null,
+          `${name}#${id}`,
+          `decision ${d.n} {#${id}} has no Enforced-by: entry`,
+        );
+      }
     }
     // Over the decisions with an entry, so the three buckets sum to it; one
     // with none is a finding above, and the OK line never prints beside one.
@@ -200,7 +263,7 @@ export function judgeDeclarations(adrs, reader, refusals) {
       if (kinds.has("none")) held.gap++;
     }
   }
-  return { problems, held };
+  return { problems, facts, held };
 }
 
 /**

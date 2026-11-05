@@ -13,6 +13,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { test } from "node:test";
 import { createGovernanceReader, readTestReports } from "../lib/adr-facts.mjs";
+import { judgeDeclarations, RULES, scriptVerdict } from "../lib/adr-judge.mjs";
 
 function tree(files) {
   const dir = mkdtempSync(join(tmpdir(), "barwise-adr-facts-"));
@@ -175,4 +176,73 @@ test("adr-facts: a report list that cannot be built throws, for the gate to repo
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+// The judge's fact records (docs/specs/adr-conformance-model.spec.md, WS2):
+// each finding of a rule in RULES, with the entry's position in
+// parseEnforcedBy(text).entries, which the conformance model compares by.
+const factAdr = (name, header, ids) => ({
+  f: `barwise/docs/adr/${name}.md`,
+  text: `# ${name}\n\nEnforced-by: ${header}\n\n## Decision\n\n`
+    + ids.map((d, i) => `${i + 1}. **D${i}** {#${d}}. Text.\n`).join(""),
+});
+const factReader = () => ({
+  scripts: () => ({ "check:x": "x" }),
+  steps: () => [],
+  issues: () =>
+    new Map([
+      ["barwise-c", { status: "closed", title: "c" }],
+    ]),
+});
+const factsOf = (adrs) =>
+  judgeDeclarations(adrs, factReader(), []).facts.map((x) =>
+    `${x.rule}|${x.adr}|${x.position}|${x.key}`
+  );
+
+test("adr-judge: every RULES finding is a fact, keyed and placed by its entry's position", () => {
+  assert.deepEqual(
+    factsOf([
+      factAdr("a", "bogus, npm run check:gone (one, ghost, ghost), npm run check:gone (one)", [
+        "one",
+        "two",
+      ]),
+      factAdr("b", "none (barwise-zz: one), none (barwise-c: two)", ["one", "two"]),
+    ]),
+    [
+      // The malformed "bogus" is not an entry, so the first entry is at 0.
+      "ids-exist|a|0|a#ghost",
+      "ids-exist|a|0|a#ghost",
+      "script-exists|a|0|check:gone",
+      "script-exists|a|1|check:gone",
+      "coverage|a|null|a#two",
+      "issue-tracked|b|0|barwise-zz",
+      "issue-open|b|1|barwise-c",
+    ],
+  );
+  // Every rule in RULES has a case above, and nothing else is a fact.
+  const seen = new Set(
+    factsOf([
+      factAdr("a", "bogus, npm run check:gone (one, ghost, ghost)", ["one", "two"]),
+      factAdr("b", "none (barwise-zz: one), none (barwise-c: two)", ["one", "two"]),
+    ]).map((x) => x.split("|")[0]),
+  );
+  assert.deepEqual([...seen].sort(), RULES.map((r) => r.id).sort());
+});
+
+test("adr-judge: scriptVerdict is the gate-name and meta-gate check, and a rejected script is no fact", () => {
+  const entry = (script) => ({ script, text: `npm run ${script} (one)` });
+  assert.equal(scriptVerdict(entry("check:x"), "a"), null);
+  assert.match(scriptVerdict(entry("build"), "a"), /build is not a gate name/);
+  assert.match(
+    scriptVerdict(entry("check:architecture"), "a"),
+    /check:architecture checks other gates and cannot vouch for this ADR/,
+  );
+  assert.equal(scriptVerdict(entry("check:architecture"), "package-graph-authority"), null);
+  // Neither undefined script is looked up, so neither is a script-exists fact.
+  assert.deepEqual(
+    factsOf([
+      factAdr("a", "npm run build (one), npm run check:architecture (two)", ["one", "two"]),
+    ]),
+    [],
+  );
 });
