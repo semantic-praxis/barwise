@@ -40,14 +40,17 @@ function refuse(message) {
   process.exit(2);
 }
 
-const argv = process.argv.slice(2);
-const flag = (name) => {
-  const i = argv.indexOf(name);
-  return i >= 0 ? argv[i + 1] : undefined;
-};
+// The gates' one flag parser: a flag given without a value refuses rather
+// than falling back to the live repository or the default build.
 const here = dirname(fileURLToPath(import.meta.url));
-const root = resolve(flag("--root") ?? join(here, "..", ".."));
-const corePath = flag("--core") ?? join(root, "barwise", "packages", "core", "dist", "index.js");
+let root, corePath;
+try {
+  const { opt } = await import("./lib/args.mjs");
+  root = resolve(opt("--root") ?? join(here, "..", ".."));
+  corePath = opt("--core") ?? join(root, "barwise", "packages", "core", "dist", "index.js");
+} catch (err) {
+  refuse(err instanceof Error ? err.message : String(err));
+}
 
 // Every import is loaded here, in one place that can refuse. The CI step
 // runs under !cancelled(), so after a failed `npm ci` too, when `yaml`

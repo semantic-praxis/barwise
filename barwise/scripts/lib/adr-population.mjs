@@ -180,7 +180,15 @@ export function modelJudge(adrs, reader, { core, YAML, schemaText, rules }) {
       continue;
     }
     const [ft, entryRole, valueRole] = carrier;
-    for (const row of (pops[ft] ?? []).filter((r) => r[valueRole] === key)) {
+    const carriers = (pops[ft] ?? []).filter((r) => r[valueRole] === key);
+    // A violation no entry carries is not one of this rule's: the schema
+    // states the constraint some other way (its roles reversed, say), and
+    // dropping it would read as agreement.
+    if (carriers.length === 0) {
+      self.push(`${rule}: a violation of ${key} that no entry carries`);
+      continue;
+    }
+    for (const row of carriers) {
       const { adr, position, ids } = entries.get(row[entryRole]);
       // ids-exist counts once per time the entry lists the id, as the code
       // judge reports it; the facts hold each id once.

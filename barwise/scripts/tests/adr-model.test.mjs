@@ -82,7 +82,12 @@ function both(adrs, mk = stub(), schemaText = SCHEMA_TEXT) {
   });
   return { code: factStrings(code.facts), model, codeRefusals, modelRefusals, disagreements };
 }
-const agrees = (name, r) => assert.deepEqual(r.disagreements, [], name);
+// Agreement means the model answered: a refusal skips the comparison and
+// would otherwise pass as an empty list of disagreements.
+const agrees = (name, r) => {
+  assert.deepEqual(r.model.self, [], `${name}: the model refused`);
+  assert.deepEqual(r.disagreements, [], name);
+};
 
 test(
   "adr-model: one planted violation per RULES rule, each found by both judges alike",
@@ -256,6 +261,17 @@ test(
       YAML.stringify(extra),
     );
     assert.match(e.model.self.join("\n"), /an error it cannot classify/);
+    // A rule stated the other way round: script-exists with its roles
+    // reversed reports a defined script no entry names, which no entry
+    // carries, so it is a refusal rather than a silent agreement.
+    const reversed = doc();
+    const se = reversed.model.constraints.find((c) => c.id === "script-exists");
+    [se.subset_roles, se.superset_roles] = [se.superset_roles, se.subset_roles];
+    const rv = both([adr("a", "npm run check:x (one)", ["one"])], stub(), YAML.stringify(reversed));
+    assert.match(
+      rv.model.self.join("\n"),
+      /script-exists: a violation of check:a\]b that no entry carries/,
+    );
   },
 );
 

@@ -37,9 +37,10 @@ const run = spawnSync(
   ["--test", "--test-reporter=tap", join(here, "tests", "adr-model.test.mjs")],
   { encoding: "utf8" },
 );
-process.stdout.write(run.stdout);
-process.stderr.write(run.stderr);
+// A child that never started has no output to print: refuse first.
 if (run.error || run.signal) refuse(`the run did not finish (${run.error?.message ?? run.signal})`);
+process.stdout.write(run.stdout ?? "");
+process.stderr.write(run.stderr ?? "");
 const count = (name) => {
   const m = new RegExp(`^# ${name} (\\d+)$`, "m").exec(run.stdout);
   return m === null ? null : Number(m[1]);
