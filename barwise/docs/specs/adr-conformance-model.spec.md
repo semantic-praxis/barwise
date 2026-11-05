@@ -1,6 +1,6 @@
 # ADR conformance as an ORM model
 
-Status: WS1 implemented 2026-11-04 by docs/specs/adr-gate-reader-split.spec.md (#910); WS2-WS4 not started.
+Status: WS1 implemented 2026-11-04 by docs/specs/adr-gate-reader-split.spec.md (#910); WS2 implemented 2026-11-05 (RULES, scriptVerdict, and a { rule, adr, position, key } fact per fact-rule finding, with no output change); WS3-WS4 not started.
 
 Created: 2026-11-04
 Last-updated: 2026-11-05
@@ -226,7 +226,7 @@ Out of scope:
 
 ```
 adr-facts.mjs        reader (#910)
-adr-judge.mjs        RULES: { id, chain, rank }; scriptVerdict(entry, adr),
+adr-judge.mjs        RULES: { id, chain, rank, key }; scriptVerdict(entry, adr),
                      shared; judgeDeclarations tags each fact-rule finding
                      with (rule, key, entry position)
 adr-population.mjs   build(adrs, reader) -> populations; a table of the 4.0
