@@ -1168,9 +1168,10 @@ function refuseOwnerChanges(deltas: readonly ModelDelta[], accepted: ReadonlySet
  * element (model-invariants decision 1), so a rotation of names under
  * kept ids is a set of renames (`renamedPair.law.test.ts`).
  *
- * Both signs are heuristics, and each misreads one case (barwise-wcg.3qv).
+ * Both signs are heuristics, and each misreads some cases (barwise-wcg.3qv).
  * A chain rename in one revision (Draft to Order, Order to Purchase
- * Order) moves a name exactly as a partial swap does, so it is refused.
+ * Order) moves a name exactly as a partial swap does, so it is refused,
+ * and so is a revision that renames every element.
  * Two unrelated files that happen to share one name under one number
  * (each opens with Customer as `ot0`) look related, so their other
  * coinciding numbers still merge as renames.
