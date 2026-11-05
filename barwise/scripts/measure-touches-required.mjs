@@ -29,6 +29,7 @@
  * Prints one JSON object. Exit 0 printed, 2 git or an argument failed.
  */
 import { execFileSync } from "node:child_process";
+import { isAdr } from "./lib/architecture-section.mjs";
 import { opt } from "./lib/args.mjs";
 import {
   CLAIMS_NOTHING_BUILT,
@@ -175,7 +176,7 @@ for (const [sha, subject] of commits) {
     if (r.path.startsWith(`${SPECS}archive/`)) {
       archive.added += 1;
       if (renamed.some((x) => x.path === r.path)) archive.moves += 1;
-    } else if (r.path.startsWith("barwise/docs/adr/")) {
+    } else if (isAdr(r.path)) {
       adrAdded += 1;
     }
   }

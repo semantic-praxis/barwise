@@ -97,15 +97,22 @@ export function ciSteps(workflow = WORKFLOW) {
  * Only the forms ci.yml uses are understood: a comparison of
  * `steps.changes.outputs.docs_only` or `.optimizer` with `'true'` or
  * `'false'`, `github.event_name == 'pull_request'`, and `&&` joins of
- * those. The event test is true locally: ci-local runs before a push, and
- * every push from a branch is headed for a pull request, so a PR-only step
- * is one the push will meet (check-tracker-closes, barwise-i61). Anything
- * else answers `run: true` with `understood: false`, because skipping a
+ * those, and `${{ !cancelled() }}` alone. The event test is true locally:
+ * ci-local runs before a push, and every push from a branch is headed for
+ * a pull request, so a PR-only step is one the push will meet
+ * (check-tracker-closes, barwise-i61). Anything else answers `run: true` with `understood: false`, because skipping a
  * gate CI will run turns a green local pass into a red push -- the failure
  * the local runner exists to prevent. The caller prints the unknown condition rather than hiding it.
  */
 export function shouldRun(condition, cls) {
   if (condition === "") return { run: true, understood: true };
+  // A step that runs even after an earlier step failed: locally always, since
+  // ci-local is never cancelled. Only this exact form: the bare
+  // `!cancelled()` is a YAML tag, which the YAML reader sees as an empty
+  // `if:` and the line reader as a condition, and no general `${{ }}`
+  // stripping, which would make every wrapped guard read as understood
+  // (docs/specs/adr-conformance-model.spec.md, WS3).
+  if (condition === "${{ !cancelled() }}") return { run: true, understood: true };
   const outputs = { docs_only: cls.docsOnly, optimizer: cls.optimizer };
   let run = true;
   for (const atom of condition.split("&&").map((s) => s.trim())) {

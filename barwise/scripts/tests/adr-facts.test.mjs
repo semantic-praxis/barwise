@@ -8,10 +8,12 @@
  * will judge.
  */
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { test } from "node:test";
+import { fileURLToPath } from "node:url";
 import { createGovernanceReader, readTestReports } from "../lib/adr-facts.mjs";
 import { judgeDeclarations, RULES, scriptVerdict } from "../lib/adr-judge.mjs";
 
@@ -249,4 +251,52 @@ test("adr-judge: scriptVerdict is the gate-name and meta-gate check, and a rejec
     ]),
     [],
   );
+});
+
+// The schema and the code judge state the same rules, and the builder
+// writes only fact types and roles the schema has. Neither needs core, so
+// both run on every tree test:scripts runs on, before the build
+// (docs/specs/adr-conformance-model.spec.md, WS3).
+test("adr-model schema: its rule constraints are RULES, and every role the builder writes is in it", async () => {
+  const YAML = (await import("yaml")).default;
+  const { ROLES } = await import("../lib/adr-population.mjs");
+  const here = dirname(fileURLToPath(import.meta.url));
+  const doc = YAML.parse(
+    readFileSync(join(here, "..", "..", "docs", "adr", "governance.orm.yaml"), "utf8"),
+  );
+  assert.equal(doc.orm_version, "4.0", "a 3.x file would rename every constraint on load");
+  // The model's own constraints are exactly the rules; every other one is
+  // a fact type's uniqueness, the structure a valid schema needs.
+  assert.deepEqual(doc.model.constraints.map((c) => c.id).sort(), RULES.map((r) => r.id).sort());
+  for (const c of doc.model.constraints) assert.equal(c.type, "subset", `${c.id} is a subset`);
+  for (const ft of doc.model.fact_types) {
+    for (const c of ft.constraints ?? []) {
+      assert.equal(c.type, "internal_uniqueness", `${ft.id}: ${c.id}`);
+    }
+  }
+  const roles = new Map(
+    doc.model.fact_types.map((ft) => [ft.id, new Set(ft.roles.map((r) => r.id))]),
+  );
+  for (const [kind, [ft, a, b]] of Object.entries(ROLES)) {
+    assert.ok(roles.has(ft), `${kind}: fact type ${ft} is not in the schema`);
+    assert.ok(
+      roles.get(ft).has(a) && roles.get(ft).has(b),
+      `${kind}: ${a} or ${b} is not a role of ${ft}`,
+    );
+  }
+});
+
+test("check:adr-model: a core that will not load is a refusal, exit 2, never the finding code", () => {
+  const here = dirname(fileURLToPath(import.meta.url));
+  const r = spawnSync(
+    process.execPath,
+    [
+      join(here, "..", "check-adr-model.mjs"),
+      "--core",
+      join(tmpdir(), "barwise-no-core", "index.js"),
+    ],
+    { encoding: "utf8" },
+  );
+  assert.equal(r.status, 2, r.stdout + r.stderr);
+  assert.match(r.stderr, /check:adr-model: cannot answer: a dependency would not load/);
 });
