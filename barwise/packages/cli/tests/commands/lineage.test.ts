@@ -358,7 +358,7 @@ describe("barwise lineage", () => {
               {
                 elementId,
                 elementType: "EntityType",
-                elementName: "Game",
+                elementName: "Customer",
               },
             ],
           },
@@ -371,7 +371,7 @@ describe("barwise lineage", () => {
               {
                 elementId,
                 elementType: "EntityType",
-                elementName: "Game",
+                elementName: "Customer",
               },
             ],
           },
@@ -392,7 +392,7 @@ describe("barwise lineage", () => {
       expect(result.stdout).toContain("2 artifact(s) affected");
       expect(result.stdout).toContain("schema.sql");
       expect(result.stdout).toContain("models/game.sql");
-      expect(result.stdout).toContain("derived from entity type Game");
+      expect(result.stdout).toContain("derived from entity type Customer");
       expect(result.exitCode).toBe(0);
     });
 
@@ -607,7 +607,7 @@ model:
               {
                 elementId: "Customer",
                 elementType: "EntityType",
-                elementName: "Game",
+                elementName: "Customer",
               },
             ],
           },

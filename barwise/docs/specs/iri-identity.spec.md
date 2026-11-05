@@ -31,7 +31,8 @@ version 2, renames rewrite lineage); 6f implemented 2026-11-04 (Ossie's
 `iri`, the namespace read back), so WS6 is complete; WS7 implemented
 2026-11-05: 7a (the examples, docs, learn and test-plan models), 7b (the
 trial lane's models stay as written, its ratchet brought current) and 7c
-(the UUID-literal tests)
+(the UUID-literal tests). Not shipped: decision 1's `equivalent_iri`,
+deferred by the owner and filed as barwise-wcg.vn2
 
 Created: 2026-10-28
 Last-updated: 2026-11-05
@@ -1972,10 +1973,15 @@ rewrites ids. WS7 also migrates the tests holding UUID literals (`cli/tests/comm
   - _7c, decided by the owner (2026-11-05): only the UUID-literal tests._
     Every other test fixture stays at its version, since old-format inputs
     keep the replay tested. 7c gave the cli and mcp lineage tests' hand-built
-    version 2 manifests 4.0 ids (`Customer`, `Supplier`, a constraint id),
-    and stated the three code-analysis tests' inline guiding models at 4.0
-    with ids from names. `NormaJoinPaths.test.ts`, which the list above
-    names, held no UUID literal by then. The UUIDs left in core's tests
+    version 2 manifests 4.0 ids (`Customer`; `Supplier`, `Status` and a
+    constraint-shaped id kept absent from the fixture on purpose, since an
+    id the model does not hold takes its own branch, now pinned in core's
+    `lineage40.test.ts`). Two code-analysis tests' inline guiding models
+    are 4.0 with ids from names; the TypeScript one stays at 1.0, so a
+    guiding model from before 4.0 is still loaded somewhere, because the
+    loader turns any failure into an empty set. `exportLineage.test.ts`
+    held no UUID by then, and `NormaJoinPaths.test.ts` holds only NORMA's
+    own GUIDs, which stay. The UUIDs left in core's tests
     are deliberate: five test reading old formats and the id rules
     themselves (`format30`, `derivedConstraintIds`, `localNamePattern`,
     `id`, the 4.0 schema drift test), `format40` checks that a UUID is
