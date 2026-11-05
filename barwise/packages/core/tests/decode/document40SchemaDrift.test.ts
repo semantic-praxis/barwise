@@ -173,6 +173,54 @@ const CASES: [string, (d: Record<string, any>) => void, boolean][] = [
   ["orm_version 3.0", (d) => (d.orm_version = "3.0"), false],
 ];
 
+/**
+ * Where the decoder refuses what the schema accepts, on purpose: a pattern
+ * cannot test Unicode NFC (barwise-wcg.6tv), so a stated id that is not in
+ * NFC passes the schema and is refused when the file is read.
+ */
+// The fourth field: whether the decoder names NFC. A map key it refuses
+// is reported in the decoder's words for any refused key.
+const DIVERGENCES: [string, (d: Record<string, any>) => void, boolean][] = [
+  ["an object type id with a combining accent", (d) => {
+    d.model.object_types[0].id = "Cafe\u0301";
+  }, true],
+  ["an Angstrom sign in a fact type id", (d) => (d.model.fact_types[0].id = "\u212Bngstrom"), true],
+  ["a role id not in NFC", (d) => {
+    d.model.fact_types[0].roles[0].id = "Person_smokes.sme\u0301kes";
+  }, true],
+  ["a reference not in NFC", (d) => (d.model.subtype_facts[0].supertype = "Pe\u0301rson"), true],
+  ["a role value key not in NFC", (d) => {
+    d.model.populations[0].instances[0].role_values = { "Person_smokes.sme\u0301kes": "p1" };
+  }, false],
+  ["an alias not in NFC", (d) => (d.model.imports = { "cr\u0301m": "Crm" }), false],
+];
+
+describe("the deliberate divergence: the decoder refuses an id not in NFC", () => {
+  const ajv = new Ajv({ allErrors: true, strict: false });
+  const validate = ajv.compile(schema);
+
+  it.each(DIVERGENCES)("%s", (_, change, namesNfc) => {
+    const doc = base();
+    change(doc);
+    let message = "";
+    try {
+      runDocument40Decode(doc);
+    } catch (err) {
+      if (!(err instanceof DecodeError)) throw err;
+      message = err.message;
+    }
+    expect(validate(doc)).toBe(true);
+    expect(message).not.toBe("");
+    if (namesNfc) expect(message).toMatch(/Unicode NFC/);
+  });
+
+  it("accepts the same ids written in NFC", () => {
+    const doc = base();
+    doc.model.object_types[0].id = "Caf\u00E9";
+    expect(() => runDocument40Decode(doc)).not.toThrow();
+  });
+});
+
 describe("the 4.0 JSON Schema and decoders accept and refuse alike", () => {
   const ajv = new Ajv({ allErrors: true, strict: false });
   const validate = ajv.compile(schema);

@@ -38,7 +38,7 @@ import {
   smallElementConfigs,
 } from "./document.js";
 import { type DecodedFactType, factTypeFileOf } from "./factType.js";
-import { IDS_40 } from "./ids.js";
+import { IDS_40, inNfc } from "./ids.js";
 import { Flag, Integer, Name, nonEmpty, notBlank, Text } from "./leaves.js";
 import { objectTypeFileOf } from "./objectType.js";
 import { type ElementLabel, elementOf } from "./problems.js";
@@ -132,7 +132,7 @@ const Alias = Schema.String.check(
   Schema.makeFilter((alias: string) => LOCAL_NAME_PATTERN.test(alias), {
     message: "must be a local name (an alias).",
   }),
-);
+).check(inNfc(" (an alias)"));
 
 const ModelFile = Schema.Struct({
   name: Name,

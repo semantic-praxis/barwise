@@ -79,11 +79,27 @@ export const IDS_30 = {
   mintedRule: undefined,
 } satisfies FormatIds<Schema.Struct.Fields>;
 
+/**
+ * A 4.0 id is in Unicode NFC, as every id `localName` gives is
+ * (iri-identity decision 3; the owner's call on barwise-wcg.6tv). Two ids
+ * that print alike, one stated with a combining accent and one minted, would
+ * otherwise be two ids. A pattern cannot test NFC, so the JSON Schema
+ * accepts what this refuses: a deliberate divergence, pinned by the 4.0
+ * drift test.
+ */
+export const inNfc = (what = "") =>
+  Schema.makeFilter((id: string) => id === id.normalize("NFC"), {
+    message: `must be in Unicode NFC form${what}: write each accented letter as one `
+      + "code point, as the id a name gives always is.",
+  });
+
 /** A string of one of 4.0's id shapes, refused in the shape's own words. */
 const shaped = (pattern: RegExp, shape: string, what = "") =>
-  nonEmpty(what).check(
-    Schema.makeFilter((id: string) => pattern.test(id), { message: `must be ${shape}${what}.` }),
-  );
+  nonEmpty(what)
+    .check(
+      Schema.makeFilter((id: string) => pattern.test(id), { message: `must be ${shape}${what}.` }),
+    )
+    .check(inNfc(what));
 
 const LOCAL = "a local name: letters, digits, _ and the characters an IRI keeps, with no space, "
   + "'.' or ':'";
@@ -115,7 +131,7 @@ export const IDS_40 = {
     Schema.makeFilter((key: string) => ROLE_ID_PATTERN.test(key), {
       message: `must be a role id: ${ROLE}.`,
     }),
-  ),
+  ).check(inNfc()),
   minted: MINTED_40,
   constraintMinted: MINTED_40,
   mintedRule: crossField(
