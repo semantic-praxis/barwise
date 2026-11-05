@@ -383,14 +383,15 @@ now holds, guards, or learns that they did not have to.
 - `Date:` moved if the decision changed. A script cannot tell a changed
   decision from a reflow, so this is the reviewer's call. Authority:
   the same spec, "The format".
-- Each `npm` or `tests` entry the PR adds or changes in an
-  `Enforced-by:` header has a plant line in the body, in the form
-  `spec-writer/adr-writing.md` gives under "The record": the enforcer
-  was seen red on a violation of that decision. A gate picked because its name sounds related reads
+- Each `npm` entry the PR adds or changes in an `Enforced-by:` header
+  has a row in `barwise/docs/adr/probes.json` that `npm run adr-probes -- --only <adr>#<id>` reads as CAUGHT (or an `unprobed` row whose
+  reason holds), and each `tests` entry a plant line in the body, both
+  in the form `spec-writer/adr-writing.md` gives under "The record": the
+  enforcer was seen red on a violation of that decision. A gate picked because its name sounds related reads
   green on the violation it was declared for; four batches of
   executable-adrs WS3 shipped such proxies. Entries the PR leaves alone
   need none. Authority: `docs/specs/enforceable-adr-practice.spec.md`,
-  WS4; the method is `spec-writer/adr-writing.md`.
+  WS4 and WS5; the method is `spec-writer/adr-writing.md`.
 
 ## When Python was touched
 

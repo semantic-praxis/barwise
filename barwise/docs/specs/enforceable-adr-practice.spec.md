@@ -1,6 +1,6 @@
 # Enforceable ADR practice
 
-Status: WS1 implemented 2026-11-04 (check:adr-tests refuses a decision whose tagged tests all skipped; credential-handling#gitleaks-detects declared through its probe tests); WS3 implemented 2026-11-05 (the 87 gap issues labelled adr-gap; check:architecture requires the label, the title prefix, one decision per none entry, and one entry per gap issue). WS4 implemented 2026-11-05 (spec-writer/adr-writing.md, the SKILL.md and template pointers, the pr-review checklist item). WS5 in part: mutate.mjs --expect-exit; the probe runner designed 2026-11-05 at the owner's direction, on the plants recorded so far. WS2 implemented 2026-11-05 (#920: the held-by breakdown on check:architecture's OK line; the real tree reads 89 decisions, 14 with a gate, 31 tests and no gate, 44 none only, 87 carrying a gap issue).
+Status: WS1 implemented 2026-11-04 (check:adr-tests refuses a decision whose tagged tests all skipped; credential-handling#gitleaks-detects declared through its probe tests); WS3 implemented 2026-11-05 (the 87 gap issues labelled adr-gap; check:architecture requires the label, the title prefix, one decision per none entry, and one entry per gap issue). WS4 implemented 2026-11-05 (spec-writer/adr-writing.md, the SKILL.md and template pointers, the pr-review checklist item). WS5 implemented 2026-11-05 at the owner's direction (npm run adr-probes over barwise/docs/adr/probes.json; 13 of the 14 gated decisions probed and CAUGHT, check:plan-review's one unprobed because it reads committed state; no proxy found). WS2 implemented 2026-11-05 (#920: the held-by breakdown on check:architecture's OK line; the real tree reads 89 decisions, 14 with a gate, 31 tests and no gate, 44 none only, 87 carrying a gap issue).
 
 Created: 2026-11-04
 Last-updated: 2026-11-05
@@ -283,7 +283,8 @@ it.
    that would sit badly in an ADR's prose. One file is also one input
    for the runner to read and check. Neither reason is strong; a file
    per ADR would work as well, and the manifest is the cheaper start.
-   Each row is `{ decision: "<adr>#<id>", file, old, new }`, `file`
+   Each row is `{ decision: "<adr>#<id>", file, old, new }`, or
+   `{ decision, unprobed: "<why>" }` for a gate a probe cannot reach (below), `file`
    from the repository root. A row names no command: the runner takes
    the script and its `-- <args>` from the decision's `npm` entry, so a
    probe runs exactly what the header declares and CI runs.
@@ -345,6 +346,21 @@ declaration: it gets a gap issue (the header change is the ADR
 refactor's, barwise-ym8.gc9), and no probe, so the runner's unprobed
 list names it. A MISSED reading counts as a proxy only after the gate's
 input is confirmed to be the working tree, per the paragraph above.
+
+**What the first seeding found (2026-11-05).** All 13 probes CAUGHT,
+so none of the 14 gated decisions is a proxy. Three first plants read
+MISSED, and each was the plant's fault, which is the reason a MISSED
+reading is confirmed before it is filed:
+
+- `check:python-uv` passed a bare `python3` and a `--with` planted in
+  a `package.json` script. Its header says it does not read
+  `package.json`, and barwise-ym8.fq7 names that boundary; the probes
+  plant in `ci.yml`, which it reads.
+- `depcruise` exited 13 on a core-to-diagram import: the import closes
+  a cycle, and dependency-cruiser's exit code is its violation count,
+  which the refusal contract misreads (barwise-vt2). The probe plants a
+  diagram-to-llm import, one violation, so it exits 1; until vt2 is
+  fixed, a depcruise probe must stay a one-violation edit.
 
 **The skill.** `spec-writer/adr-writing.md` step 4 changes from
 recording each plant in the PR body to adding it to `probes.json`, and

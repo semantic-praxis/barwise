@@ -1,0 +1,84 @@
+[
+  {
+    "decision": "determinism-in-core#pure-ops",
+    "file": "barwise/packages/core/src/diff/ModelDiff.ts",
+    "old": "export function diffModels(",
+    "new": "import { readFileSync } from \"node:fs\";\nexport function diffModels("
+  },
+  {
+    "decision": "determinism-in-core#ambient-as-argument",
+    "file": "barwise/packages/core/src/diff/ModelMerge.ts",
+    "old": "export function mergeModels(",
+    "new": "const mergedAt = Date.now();\nexport function mergeModels("
+  },
+  {
+    "decision": "connector-packages#connector-owns-io",
+    "file": "barwise/packages/core/src/format/registry.ts",
+    "old": "export function registerFormat(",
+    "new": "import { execFileSync } from \"node:child_process\";\nexport function registerFormat("
+  },
+  {
+    "decision": "package-graph-authority#intended-is-graph",
+    "file": "barwise/packages/diagram/src/index.ts",
+    "old": "// Graph types and conversion.",
+    "new": "import \"@barwise/llm\";\n// Graph types and conversion."
+  },
+  {
+    "decision": "package-graph-authority#claude-md-rendering",
+    "file": "CLAUDE.md",
+    "old": "  |--- @barwise/diagram         (core)",
+    "new": "  |--- @barwise/diagram         (core, llm)"
+  },
+  {
+    "decision": "package-graph-authority#runtime-deps-within",
+    "file": "barwise/packages/diagram/package.json",
+    "old": "\"dependencies\": {\n    \"@barwise/core\"",
+    "new": "\"dependencies\": {\n    \"@barwise/cli\": \"*\",\n    \"@barwise/core\""
+  },
+  {
+    "decision": "must-agree-copies#registered-sets-identical",
+    "file": "barwise/packages/dbt/src/sql/SqlglotBridge.ts",
+    "old": "const DIALECT_MAP: Record<SqlDialect, string> = {",
+    "new": "const DIALECT_MAP: Record<SqlDialect, string> = {\n  // drifted\n"
+  },
+  {
+    "decision": "must-agree-copies#every-candidate-verdict",
+    "file": "barwise/audit-baseline.json",
+    "old": "\"generated:45f4fbb82790\": {",
+    "new": "\"generated:000000000000\": {"
+  },
+  {
+    "decision": "plan-before-code#plan-reviewed",
+    "unprobed": "check:plan-review reads committed state only (its header: \"Committed state only, read through git\"), so a working-tree edit cannot reach it"
+  },
+  {
+    "decision": "plan-before-code#touches-named",
+    "file": "barwise/docs/specs/plan-scope-check.spec.md",
+    "old": "Touches: -plan.md, .gitattributes, barwise/review-tiers.json,",
+    "new": "Touches: -plan.md, .gitattributes, barwise/review-tierz.json,"
+  },
+  {
+    "decision": "findings-close-by-mechanism#person-classifies",
+    "file": "barwise/spec-status-baseline.json",
+    "old": "\"note\": \"Genuinely unimplemented, and the header is right. Both workstreams",
+    "new": "\"note\": \"TODO: classify Genuinely unimplemented, and the header is right. Both workstreams"
+  },
+  {
+    "decision": "python-from-the-lockfile#lockfile-only",
+    "file": ".github/workflows/ci.yml",
+    "old": "uv sync --locked --only-group sqlglot",
+    "new": "uv sync --only-group sqlglot"
+  },
+  {
+    "decision": "python-from-the-lockfile#no-outside-forms",
+    "file": ".github/workflows/ci.yml",
+    "old": "uv sync --locked --only-group sqlglot",
+    "new": "uv pip install sqlglot"
+  },
+  {
+    "decision": "python-from-the-lockfile#uv-bootstrap",
+    "file": ".github/workflows/ci.yml",
+    "old": "python3 -m pip install --quiet uv==",
+    "new": "python3 -m pip install --quiet uv>="
+  }
+]
