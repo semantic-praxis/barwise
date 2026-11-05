@@ -1159,14 +1159,21 @@ function refuseOwnerChanges(deltas: readonly ModelDelta[], accepted: ReadonlySet
  *   nothing shows they are revisions of one model (Customer and Order
  *   against Employee and Department);
  * - a rename's names moved, the incoming file holding the old name on
- *   another element or the merged model keeping the new one on another
- *   element (Dog and Cat under ids swapped between two files).
+ *   another element, or the base holding the new one on another element
+ *   it does not remove (Dog and Cat under ids swapped between two files).
  *
  * A changed structure is not one: an edited revision renames Customer to
  * Client and `customer_id` to `client_id` together (`simple-modified`).
  * And models with no prior ids pair by their own, where a shared id is one
  * element (model-invariants decision 1), so a rotation of names under
  * kept ids is a set of renames (`renamedPair.law.test.ts`).
+ *
+ * Both signs are heuristics, and each misreads one case (barwise-wcg.3qv).
+ * A chain rename in one revision (Draft to Order, Order to Purchase
+ * Order) moves a name exactly as a partial swap does, so it is refused.
+ * Two unrelated files that happen to share one name under one number
+ * (each opens with Customer as `ot0`) look related, so their other
+ * coinciding numbers still merge as renames.
  */
 function refuseCoincidentIds(
   existing: OrmModel,
@@ -1226,8 +1233,8 @@ function refuseCoincidentIds(
   throw new Error(
     `the two 3.x files share the id ${pairs.join(", ")}, and ${why}, so the ids likely `
       + "coincide between unrelated files, and merging would turn one element into the other. "
-      + "Diff with --matching content to see how they pair by content, or give one model's "
-      + "elements ids of their own (barwise migrate).",
+      + "Diff them matching by content to see how they pair, or migrate one file to format "
+      + "4.0, whose ids come from names.",
   );
 }
 

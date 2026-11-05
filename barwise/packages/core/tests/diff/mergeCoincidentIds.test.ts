@@ -75,9 +75,10 @@ describe("a merge of two 3.x files that keep a name (revisions of one model)", (
     expect(merged.objectTypes.map((o) => o.name)).toEqual(["Order_Line", "Cat"]);
   });
 
-  it("refuses a rename onto a name the merged model keeps elsewhere", () => {
-    // ot0 becomes Cat; the base keeps Cat under ot1, which the incoming
-    // file renames to Bird. Fish is kept, so the files are related.
+  it("refuses a rename onto a name the base holds on another element it keeps", () => {
+    // ot0 becomes Cat; the base holds Cat under ot1, which the incoming
+    // file renames to Bird (so a chain or a partial swap). Fish is kept,
+    // so the files are related.
     expect(() => takeAll(replayed("Dog", "Cat", "Fish"), replayed("Cat", "Bird", "Fish")))
       .toThrow(/share the id "ot0" \("Dog" and "Cat"\).*held on other elements/);
   });

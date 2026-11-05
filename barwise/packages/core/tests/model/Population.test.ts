@@ -207,6 +207,13 @@ describe("a fact instance id (barwise-wcg.4kp)", () => {
     expect(() => pop.addInstance(stated)).toThrow(DuplicateIdError);
   });
 
+  it("is free again once the instance holding it is removed", () => {
+    const stated = { id: "F.population.1", roleValues: {} };
+    const pop = new Population({ factTypeId: "F", instances: [stated] });
+    pop.removeInstance("F.population.1");
+    expect(pop.addInstance(stated).id).toBe("F.population.1");
+  });
+
   it("is never minted onto a number stated later in the same list", () => {
     const pop = new Population({
       factTypeId: "F",

@@ -2023,7 +2023,8 @@ accepted. The options stay, so a later reader sees what was weighed.
    "never reused" holds while a model is loaded, and a stated id another
    instance holds is refused; a file keeps no record of a removed instance,
    so after a save and reload a removed number can come back. The sites
-   that key on the id need it unique at any moment, which it is.) (b) fact instances drop their id and every one of
+   that key on the id need it unique at any moment. It is within its
+   population; across populations it is not yet, barwise-wcg.ezo.) (b) fact instances drop their id and every one of
    those sites moves to positions. **Decided: (a).**
 8. **How diff recognizes a rename.** (a) after the id and name passes, pair
    the rest by content (same kind, roles, players and constraints) and
