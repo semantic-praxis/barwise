@@ -134,3 +134,8 @@ const code = codeJudge(adrs, reader(), []);
 const model = modelJudge(adrs, reader(), [], { breakFactType: true });
 const c = compare(code, model);
 console.log("model fails to load, code has a finding: exit", exitOf(code, model, c));
+const unbuilt = modelJudge(adrs, reader(), [], { coreMissing: true });
+console.log(
+  "core not built, code has a finding: exit",
+  exitOf(code, unbuilt, compare(code, unbuilt)),
+);

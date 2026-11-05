@@ -72,7 +72,7 @@ export function build(
     }
     parsed.entries.forEach((e, n) => {
       const entry = `${adr}:${n}`;
-      entries.set(entry, { adr, text: e.text });
+      entries.set(entry, { adr, n, text: e.text, ids: e.ids });
       for (const id of new Set(e.ids)) fact("lists", entry, `${adr}#${id}`);
       if (e.kind === "npm" && scriptIsLookedUp(e, adr)) {
         askedScripts = true;

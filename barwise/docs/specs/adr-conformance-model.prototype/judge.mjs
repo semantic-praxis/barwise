@@ -2,10 +2,19 @@
 // refusals compared for the inputs the model reads.
 import { readFileSync } from "node:fs";
 import YAML from "../../../node_modules/yaml/dist/index.js";
-import { OrmYamlSerializer, ValidationEngine } from "../../../packages/core/dist/index.js";
+// Core is loaded dynamically: an unbuilt core is the model's own refusal,
+// exit 2, never an import crash, which exits 1.
+let core = null;
+let coreError = null;
+try {
+  core = await import("../../../packages/core/dist/index.js");
+} catch (e) {
+  coreError = e.message;
+}
 import { build, ROLES } from "./build.mjs";
 const { judgeDeclarations } = await import("../../../scripts/lib/adr-judge.mjs");
 const { ADR_DIR } = await import("../../../scripts/lib/architecture-section.mjs");
+const { parseEnforcedBy } = await import("../../../scripts/lib/adr-enforcement.mjs");
 export const RULES = [
   "ids-exist",
   "coverage",
@@ -47,21 +56,48 @@ const PATTERNS = [
   ],
   ["issue-open", /^(?<f>\S+): "(?<e>.*)": (?<i>\S+) is closed; /, (m) => m.i],
 ];
+// The code judge's findings name an entry by its text. WS2 attaches the
+// position instead; here the position is recovered from the text: the k-th
+// finding of one rule on one text is the k-th entry with that text.
 export function codeJudge(adrs, reader, refusals) {
   const { problems } = judgeDeclarations(adrs, reader, refusals);
+  const positions = new Map(adrs.map(({ f, text }) => [
+    f.slice(ADR_DIR.length, -".md".length),
+    parseEnforcedBy(text).entries.map((e) => e.text),
+  ]));
+  const seen = new Map();
+  const position = (rule, adr, text, key) => {
+    const k = `${rule}|${adr}|${text}|${key}`;
+    const nth = seen.get(k) ?? 0;
+    seen.set(k, nth + 1);
+    const at = (positions.get(adr) ?? []).map((t, i) => (t === text ? i : -1)).filter((i) =>
+      i >= 0
+    );
+    return at.length === 0 ? "?" : at[Math.min(nth, at.length - 1)];
+  };
   const findings = [];
   for (const p of problems) {
     for (const [rule, re, key] of PATTERNS) {
       const m = p.match(re);
       if (!m) continue;
       const adr = m.groups.f.slice(ADR_DIR.length, -".md".length);
-      findings.push(`${rule}|${adr}|${m.groups.e ?? ""}|${key({ ...m.groups, adr })}`);
+      const k = key({ ...m.groups, adr });
+      const at = m.groups.e === undefined ? "" : position(rule, adr, m.groups.e, k);
+      findings.push(`${rule}|${adr}|${at}|${k}`);
     }
   }
   return { findings, refusals };
 }
 
 export function modelJudge(adrs, reader, refusals, opts = {}) {
+  if (core === null || opts.coreMissing) {
+    return {
+      findings: [],
+      refusals,
+      self: [`@barwise/core is not built: ${coreError ?? "(test)"}`],
+    };
+  }
+  const { OrmYamlSerializer, ValidationEngine } = core;
   const entries = new Map();
   const pops = build(adrs, reader, { ...opts, entries });
   const doc = YAML.parse(readFileSync(SCHEMA, "utf8"));
@@ -105,12 +141,14 @@ export function modelJudge(adrs, reader, refusals, opts = {}) {
       findings.push(`${rule}|${key.split("#")[0]}||${key}`);
       continue;
     }
-    // One finding per entry that carries the key, so two identical entries
-    // are two findings, as they are for the code judge.
+    // One finding per entry that carries the key, by the entry's position,
+    // and for ids-exist once per time the entry lists the id, as the code
+    // judge reports it (the facts hold each id once: the schema's uniqueness).
     const [, er, vr] = ROLES[KEY_ROLE[rule]];
     for (const row of rows(KEY_ROLE[rule]).filter((r) => r[vr] === key)) {
-      const { adr, text } = entries.get(row[er]);
-      findings.push(`${rule}|${adr}|${text}|${key}`);
+      const { adr, n, ids } = entries.get(row[er]);
+      const times = rule === "ids-exist" ? ids.filter((id) => `${adr}#${id}` === key).length : 1;
+      for (let i = 0; i < times; i++) findings.push(`${rule}|${adr}|${n}|${key}`);
     }
   }
   return { findings, refusals, self };

@@ -10,7 +10,8 @@ Touches: barwise/scripts/lib/adr-judge.mjs, barwise/scripts/check-architecture.m
 +barwise/scripts/check-adr-model.mjs, +barwise/scripts/tests/adr-model.test.mjs,
 barwise/scripts/tests/adr-facts.test.mjs, barwise/scripts/lib/adr-enforcement.mjs,
 barwise/scripts/tests/expected-counts.json, barwise/package.json, package.json,
-.github/workflows/ci.yml
+.github/workflows/ci.yml, barwise/scripts/lib/ci-gates.mjs,
+barwise/scripts/tests/ci-conditions.test.mjs
 
 ## Principle
 
@@ -35,7 +36,7 @@ differ from the code judge's; the owner chose to prototype (2026-11-05).
 The prototype is committed beside this spec, in
 `docs/specs/adr-conformance-model.prototype/`: five rules in a format-4.0
 schema (`governance.orm.yaml`), a fact builder over the real reader
-(`build.mjs`), both judges and their comparison (`judge.mjs`), twenty-two stub cases (`run.mjs`), the real tree clean and with four violations
+(`build.mjs`), both judges and their comparison (`judge.mjs`), twenty-four stub cases (`run.mjs`), the real tree clean and with four violations
 planted into a real ADR, each plant checked to change the ADR's text
 (`real.mjs`), and the classifier's edge cases, core's one-violation-per-value count, the mandatory-coverage leak and the exit when the model cannot load (`typo.mjs`). Each runs
 with `node <file>` from that directory after `npm run build`. Every claim
@@ -78,16 +79,19 @@ missing script are one core violation _(prototype)_. The key is the single
 value in the table above. `check-adr-model.mjs` expands each violation to
 the entries that carry its key, from its own facts (coverage has no
 entry, only its ADR), and the two judges are compared as **multisets of
-(rule, ADR, entry, key)**, where the entry is its position in the header,
+(rule, ADR, entry, key)**, where the entry is its position, its index in `parseEnforcedBy(text).entries` on both sides (a malformed part is dropped from that list, so a count over the raw header would differ),
 so a disagreement on a second entry with the same key is not hidden
 behind the first, and two identical entries are two findings on both
 sides. The code judge's side comes from the (rule, key, entry position)
-WS2 attaches to each finding. The prototype identifies an entry by its
-text, which with multiset counting gives the same answer on its cases,
-including two identical entries _(prototype)_; the position removes the
-reliance on counting.
+WS2 attaches to each finding. The prototype recovers the code side's position from the entry's text
+(the k-th finding of a rule on a text is the k-th entry with that text),
+and its cases include two identical entries and a malformed entry before
+a finding _(prototype)_. `ids-exist` counts once per time an entry lists
+the id, as the code judge reports it: the facts hold each id once (the
+schema's uniqueness on "Entry lists Decision"), so the expansion counts
+the entry's own list _(prototype: `(one, ghost, ghost)`)_.
 
-On that grain the two judges agreed on all twenty-two stub cases and all five
+On that grain the two judges agreed on all twenty-four stub cases and all five
 real-tree runs _(prototype)_. One case needs a rule beyond set equality:
 an issue not in the tracker is also not open, and the code judge reports
 only `issue-tracked` while the model reports both. `issue-tracked` and
@@ -121,14 +125,15 @@ guard, the last with two entries asking so that the refusal is pushed
 once _(prototype)_. A difference between the two refusal sets is a
 disagreement: the builder asked the reader differently.
 
-The model's **own** refusals are another matter: a population that does
-not load, a deontic `RULES` constraint, an error diagnostic that is not a
+The model's **own** refusals are another matter: an unbuilt core (core is
+loaded with a dynamic import, so a missing build is a refusal, not an
+import crash, which would exit 1), a population that does not load, a deontic `RULES` constraint, an error diagnostic that is not a
 `RULES` violation, or a violation message that does not have the pinned
 shape. With any of them the model has no answer, so the comparison does
 not run and the check exits 2. Comparing anyway would turn every code
 finding into "missed by the model" and report a refusal with the finding
 code, which the gate-refusal contract forbids _(prototype: exit 2 with a
-code finding beside a load failure)_.
+code finding beside a load failure, and beside an unbuilt core)_.
 
 ## How do diagnostics map back to rules? (resolved: stated ids, format 4.0)
 
@@ -280,18 +285,21 @@ diff is cleaner against a judge that is not also moving.
 vouches for no ADR). `adr-model.test.mjs` drives both judges through stub
 readers, from the prototype's cases: the clean input, one planted
 violation per rule enumerated from `RULES`, two entries naming one
-missing value, two identical entries, one value on two entries the
-verdict splits, the
+missing value, two identical entries, an id listed twice in one entry,
+a malformed entry before a finding, one value on two entries the verdict
+splits, the
 untracked-issue chain, an unreadable `package.json` and tracker (asked
 and not), an unreadable `ci.yml` (asked by two entries) and step guard (code-only
 refusals), a
 headerless ADR, a value containing `]`, a deontic rule, a population
-that does not load beside a code finding (exit 2), an unclassified
-diagnostic, and the pinned message shape. It carries no `[adr:...]` tag. The role-id and id-set tests need
+that does not load and an unbuilt core, each beside a code finding (exit
+2), an unclassified diagnostic, and the pinned message shape. It carries no `[adr:...]` tag. The role-id and id-set tests need
 no core and live in `adr-facts.test.mjs`. `adr-model.test.mjs` skips
-without `@barwise/core` built, as it is when `test:scripts` runs, so a
-`test:adr-model` npm script runs it after building core, in the CI steps
-below; an npm script, so `ci:local` runs it too.
+without `@barwise/core` built, as it is when `test:scripts` runs (before
+the build), so a `test:adr-model` npm script runs it in the CI steps
+below, after core is built; an npm script, so `ci:local` runs it too.
+`test:adr-model` first checks that core's build is there and exits 2 if
+it is not, so it never passes with every case skipped.
 Every disagreement CI reports is resolved in a commit that adds its input
 as a case here; that test file's history and the job's run count are the
 record WS4 starts from.
@@ -311,33 +319,35 @@ the owner reviews WS3's record: how many runs, and every disagreement.
 - No package API changes.
 - WS2 changes no output. WS3 adds three CI steps and three npm scripts
   (`build:core`, `check:adr-model`, `test:adr-model`), each with its root
-  forwarder. The knip ignore for spec
+  forwarder, and teaches `shouldRun` the `!cancelled()` condition. The knip ignore for spec
   prototypes lands with the prototype, in the plan PR. WS4 moves
   the fact rules' findings from `check:architecture` to `check:adr-model`;
   the owner approves it first.
 
 ## Open decisions (for review)
 
-- **Where `check:adr-model` runs in CI.** It needs core built, it must
-  run when `check:architecture` fails (a disagreement hides exactly then)
-  and on tracker-only changes, which are docs-only and skip the build, and
-  it must be required, or WS3's judge is advisory, which the owner
-  rejected. Recommended: three unguarded steps in the required `ci` job
-  directly after `npm ci`, before any gate: `npm run build:core`
-  (`turbo run build --filter=@barwise/core`, so the later full build
-  reuses it from turbo's cache), `npm run check:adr-model`, and `npm run
-  test:adr-model`. Running first, they run whenever `check:architecture`
-  could, and need no new `if:` form: an `if: ${{ !cancelled() }}` after
-  the gates, the owner's choice of the two first offered (2026-11-05), is
-  a form `shouldRun` does not read, so `ci-conditions.test.mjs` would
-  fail and `ci:local` would report it as not understood. This keeps that
-  choice's intent (required, runs when a gate fails, runs on docs-only
-  changes) without the new form, and the owner confirms it in this plan's
-  review. The cost is core's build on a docs-only run. Rejected: a
-  separate job, which branch protection does not require without an
-  admin change; and steps after `check:adr-tests` guarded like their
-  neighbours, which never run after a failed gate or on a docs-only
-  change.
+- **Where `check:adr-model` runs in CI** (decided by the owner,
+  2026-11-05: option A). It needs core built, it must run when
+  `check:architecture` fails (a disagreement hides exactly then) and on
+  tracker-only changes, which are docs-only and skip the build, and it
+  must be required, or WS3's judge is advisory, which the owner rejected.
+  Three steps at the end of the required `ci` job, each guarded
+  `if: ${{ !cancelled() }}` and not by `docs_only` (`npm ci` already
+  runs unguarded): `npm run build:core` (`turbo run build
+  --filter=@barwise/core`, a cache hit after the job's full build), `npm
+  run check:adr-model`, and `npm run test:adr-model`. At the end, a
+  failure in them skips no other gate; under `!cancelled()`, they run
+  after a failed gate and on a docs-only change. `shouldRun`
+  (`scripts/lib/ci-gates.mjs`) learns the atom `!cancelled()`, with or
+  without its `${{ }}`, as always true locally, since `ci:local` is
+  never cancelled; `ci-conditions.test.mjs` gains its case, so the
+  real-`ci.yml` test keeps passing and `ci:local` runs the steps.
+  Rejected: the same steps first, after `npm ci`, where any failure in
+  them (a core compile error, an unreadable tracker) skips every later
+  gate; a separate job, which branch protection does not require without
+  an admin change; `continue-on-error`, which makes the judge advisory;
+  and steps guarded like their neighbours, which never run after a failed
+  gate or on a docs-only change.
 - **How long WS3 runs before WS4.** Recommended: one release cycle, and a
   look at every disagreement it records.
 - **Names.** `check:adr-model` and `barwise/docs/adr/governance.orm.yaml`;
