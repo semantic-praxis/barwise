@@ -25,8 +25,10 @@
  * Exit codes (docs/adr/gate-refusal-contract.md):
  *   0  every probe CAUGHT
  *   1  a finding: a row naming a decision no ADR has or no `npm` entry
- *      lists (reported before anything runs), or a probe MISSED -- the
- *      gate did not exit 1 on the violation
+ *      lists, or one both probed and unprobed (reported before anything
+ *      runs); a probe MISSED -- the gate did not fail on the violation; or
+ *      OFF-CODE -- it failed with a code other than 1, which the refusal
+ *      contract misreads (barwise-vt2), a finding about the gate, not a proxy
  *   2  could not answer, with no finding: the manifest would not read, a
  *      probed file has uncommitted changes, mutate.mjs refused (anchor
  *      absent or ambiguous, gate red unmutated, gate refused), or there
@@ -80,7 +82,7 @@ export function readRows(text) {
 
 /**
  * Each decision's declared gates, from the ADRs' headers:
- * `{ ids: Map<"<adr>#<id>", true>, gates: Map<"<adr>#<id>", entry[]> }`,
+ * `{ ids: Set<"<adr>#<id>">, gates: Map<"<adr>#<id>", entry[]> }`,
  * an entry being `{ script, args, text }`.
  */
 export function declaredGates(adrs, { parseEnforcedBy, decisionIds, ADR_DIR }) {
@@ -101,16 +103,49 @@ export function declaredGates(adrs, { parseEnforcedBy, decisionIds, ADR_DIR }) {
   return { ids, gates };
 }
 
-/** The rows' findings: a decision with no declared gate to probe. */
+/**
+ * The rows' findings: a decision with no declared gate to probe, or one
+ * both probed and declared unprobed, which would read as both.
+ */
 export function rowFindings(rows, { ids, gates }) {
   const out = [];
+  const unprobed = new Set(rows.filter((r) => r.unprobed !== undefined).map((r) => r.decision));
   for (const r of rows) {
     if (!ids.has(r.decision)) out.push(`${r.decision}: no ADR has this decision`);
     else if (!gates.has(r.decision)) {
       out.push(`${r.decision}: no npm entry of its ADR lists it, so there is no gate to probe`);
+    } else if (r.file !== undefined && unprobed.has(r.decision)) {
+      out.push(`${r.decision}: has a probe and an unprobed row; keep one`);
     }
   }
   return out;
+}
+
+/**
+ * The header's `-- <args>` as argv, or null when they hold a quote or a
+ * backslash: CI's shell would unquote them, and splitting on spaces here
+ * would probe a different command than the one declared.
+ */
+export function argv(args) {
+  if (args === null) return [];
+  if (/["'\\`$]/.test(args)) return null;
+  return ["--", ...args.split(/\s+/)];
+}
+
+/**
+ * mutate.mjs's verdict, from its exit status and its last `mutate:` line.
+ * An exit 1 that names another code is a gate that went red off the
+ * refusal contract (depcruise's violation count, barwise-vt2): not a
+ * proxy, and not reported as one.
+ */
+export function verdict(status, last) {
+  if (status === 0) return "CAUGHT";
+  if (status === 1) {
+    return /failed with exit \d+, not the expected/.test(last)
+      ? "OFF-CODE"
+      : "MISSED";
+  }
+  return "REFUSED";
 }
 
 async function main() {
@@ -153,6 +188,7 @@ async function main() {
 
   const lines = [];
   const missed = [];
+  const offCode = [];
   const refused = [];
   for (const p of probes) {
     // mutate.mjs restores the bytes it found, committed or not, so a dirty
@@ -171,8 +207,15 @@ async function main() {
         refused.push(`${label}: ${p.file} has uncommitted changes`);
         continue;
       }
-      const command = ["npm", "run", "--silent", gate.script];
-      if (gate.args !== null) command.push("--", ...gate.args.split(/\s+/));
+      const rest = argv(gate.args);
+      if (rest === null) {
+        lines.push(`  REFUSED  ${label}`);
+        refused.push(
+          `${label}: its args hold a quote, which a probe cannot pass as CI's shell would`,
+        );
+        continue;
+      }
+      const command = ["npm", "run", "--silent", gate.script, ...rest];
       const run = spawnSync(
         process.execPath,
         [
@@ -188,18 +231,24 @@ async function main() {
           "--",
           ...command,
         ],
-        { cwd: join(root, "barwise"), encoding: "utf8" },
+        // mutate runs the gate with inherited stdio, so the gate's output,
+        // twice over, lands here: the buffer is sized for the chattiest gate.
+        { cwd: join(root, "barwise"), encoding: "utf8", maxBuffer: 256 * 1024 * 1024 },
       );
-      const last = `${run.stdout ?? ""}${run.stderr ?? ""}`.trim().split("\n")
-        .filter((l) => l.startsWith("mutate:")).at(-1) ?? "mutate printed no verdict";
-      if (run.status === 0) lines.push(`  CAUGHT   ${label}`);
-      else if (run.status === 1) {
-        lines.push(`  MISSED   ${label}`);
-        missed.push(`${label}: ${last}`);
-      } else {
-        lines.push(`  REFUSED  ${label}`);
-        refused.push(`${label}: ${last}`);
-      }
+      const output = `${run.stdout ?? ""}${run.stderr ?? ""}`.trim().split("\n");
+      const last = output.filter((l) => l.startsWith("mutate:")).at(-1)
+        ?? `mutate printed no verdict (${
+          run.error?.message ?? run.signal ?? `exit ${run.status}`
+        })`;
+      // The gate's own last lines, so a reading that is not CAUGHT says
+      // what the gate printed without a rerun by hand.
+      const tail = output.filter((l) => !l.startsWith("mutate:")).slice(-8)
+        .map((l) => `      | ${l}`).join("\n");
+      const v = verdict(run.status, last);
+      lines.push(`  ${v.padEnd(8)} ${label}`);
+      if (v === "MISSED") missed.push(`${label}: ${last}\n${tail}`);
+      else if (v === "OFF-CODE") offCode.push(`${label}: ${last}\n${tail}`);
+      else if (v === "REFUSED") refused.push(`${label}: ${last}\n${tail}`);
     }
   }
 
@@ -213,9 +262,20 @@ async function main() {
     console.log(`Declared gates with no probe (${unprobed.length}), not judged:`);
     for (const k of unprobed) console.log(`  ${k}${reasons.has(k) ? `: ${reasons.get(k)}` : ""}`);
   }
-  if (missed.length > 0) {
-    say(`FAIL -- ${missed.length} declared gate(s) did not go red on their decision's violation:`);
-    for (const m of missed) console.error(`  ${m}`);
+  if (missed.length > 0 || offCode.length > 0) {
+    if (missed.length > 0) {
+      say(
+        `FAIL -- ${missed.length} declared gate(s) did not go red on their decision's violation:`,
+      );
+      for (const m of missed) console.error(`  ${m}`);
+    }
+    if (offCode.length > 0) {
+      say(
+        `FAIL -- ${offCode.length} declared gate(s) went red with a code other than 1,`
+          + " so the refusal contract misreads them (not a proxy):",
+      );
+      for (const m of offCode) console.error(`  ${m}`);
+    }
     for (const r of refused) console.error(`  cannot answer: ${r}`);
     process.exit(1);
   }

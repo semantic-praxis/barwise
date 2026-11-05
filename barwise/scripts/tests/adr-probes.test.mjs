@@ -11,7 +11,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
-import { readRows } from "../adr-probes.mjs";
+import { argv, readRows, verdict } from "../adr-probes.mjs";
 
 const SCRIPT = join(dirname(fileURLToPath(import.meta.url)), "..", "adr-probes.mjs");
 
@@ -172,4 +172,59 @@ test("adr-probes: readRows accepts the two row shapes and nothing between them",
   assert.ok(readRows(JSON.stringify([{ ...ONE, unprobed: "both" }])).problem);
   assert.ok(readRows(JSON.stringify([{ ...ONE, old: "" }])).problem);
   assert.ok(readRows(JSON.stringify([null])).problem);
+});
+
+test("adr-probes: --only runs that decision's probe alone, and refuses one with none", () => {
+  // Decision two is declared and unprobed, so a run without --only would
+  // list it; --only reports on the one decision asked about.
+  withFixture([ONE], {}, (dir) => {
+    const r = run(dir, "--only", "a-concern#one");
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    assert.match(r.stdout, /1 probe\(s\)/);
+    assert.match(r.stdout, /CAUGHT {3}a-concern#one/);
+    assert.doesNotMatch(r.stdout, /a-concern#two|no probe/);
+    assert.match(run(dir).stdout, /no probe \(1\)/);
+    const none = run(dir, "--only", "a-concern#three");
+    assert.equal(none.status, 2, none.stdout + none.stderr);
+    assert.match(none.stderr, /no probe to run for a-concern#three/);
+  });
+});
+
+test("adr-probes: a gate red with a code other than 1 is OFF-CODE, a finding, not MISSED", () => {
+  const thirteen = "import { readFileSync } from 'node:fs';\n"
+    + "process.exit(readFileSync('src.txt', 'utf8').includes('BAD') ? 13 : 0);\n";
+  withFixture([ONE], { gate: thirteen }, (dir) => {
+    const r = run(dir);
+    assert.equal(r.status, 1, r.stdout + r.stderr);
+    assert.match(r.stdout, /OFF-CODE a-concern#one/);
+    assert.match(r.stderr, /code other than 1[^]*exit 13/);
+    assert.doesNotMatch(r.stderr, /did not go red/);
+  });
+});
+
+test("adr-probes: a decision both probed and declared unprobed is a finding", () => {
+  withFixture([ONE, { decision: "a-concern#one", unprobed: "why" }], {}, (dir) => {
+    const r = run(dir);
+    assert.equal(r.status, 1, r.stdout + r.stderr);
+    assert.match(r.stderr, /a-concern#one: has a probe and an unprobed row/);
+  });
+});
+
+test("adr-probes: argv passes plain args and refuses quoted ones; verdict reads mutate", () => {
+  assert.deepEqual(argv(null), []);
+  assert.deepEqual(argv("--check --strict"), ["--", "--check", "--strict"]);
+  for (const quoted of ['--pattern "a b"', "--x 'y'", "--x $HOME", "--x a\\ b"]) {
+    assert.equal(argv(quoted), null, quoted);
+  }
+  assert.equal(verdict(0, ""), "CAUGHT");
+  assert.equal(
+    verdict(1, "mutate: UNCAUGHT -- the command PASSED with the mutation applied."),
+    "MISSED",
+  );
+  assert.equal(
+    verdict(1, "mutate: UNCAUGHT -- the command failed with exit 13, not the expected 1."),
+    "OFF-CODE",
+  );
+  assert.equal(verdict(2, ""), "REFUSED");
+  assert.equal(verdict(null, ""), "REFUSED");
 });

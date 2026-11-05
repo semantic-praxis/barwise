@@ -317,8 +317,8 @@ manifest and the ADRs' `Enforced-by:` headers, and for each probe:
   are committed, so a dirty file would be judged as a tree nobody
   committed;
 - otherwise it spawns `mutate.mjs --file <file> --old <old> --new <new>
-  --expect-exit 1 -- npm run <script> [-- <args>]` from the repository
-  root, with no shell, and reads mutate's own status: 0 CAUGHT, 1
+  --expect-exit 1 -- npm run <script> [-- <args>]` in `barwise/`,
+  with no shell, and reads mutate's own status: 0 CAUGHT, 1
   MISSED (the gate passed, or failed some other way, on the violation:
   a proxy declaration, the finding this workstream exists for), 2
   REFUSED (stale anchor, gate red unmutated, gate refused).
