@@ -105,7 +105,8 @@ dependency.
 
 A throwaway encoder (about 300 lines of Python over `z3-solver` 4.15.4,
 in the session scratch directory, run through a temporary uv dependency
-group that was reverted) read a JSON projection of each model -- object
+group that was reverted by hand, which the lockfile rule gives a spike no
+better way to do: barwise-0vn) read a JSON projection of each model -- object
 types with their enumeration size and cardinality, fact types with roles
 and internal constraints, external constraints, subtype facts,
 objectifications -- written by a throwaway vitest file through core's
