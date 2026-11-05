@@ -35,11 +35,6 @@ export const GATE_EXCEPTIONS = {
 };
 
 /**
- * Gates that check other gates. Each would vouch for any decision, so it
- * may be declared only by the ADRs it implements: `check:adr-tests` by
- * none, `check:architecture` by `package-graph-authority`.
- */
-/**
  * The label a gap issue carries: the tracker issue a `none` entry names is
  * this decision's own record of what holds nothing yet, and the label tells
  * it from an umbrella issue that happens to have a fitting title
@@ -47,6 +42,11 @@ export const GATE_EXCEPTIONS = {
  */
 export const GAP_LABEL = "adr-gap";
 
+/**
+ * Gates that check other gates. Each would vouch for any decision, so it
+ * may be declared only by the ADRs it implements: `check:adr-tests` by
+ * none, `check:architecture` by `package-graph-authority`.
+ */
 export const META_GATES = {
   "check:adr-tests": [],
   "check:architecture": ["package-graph-authority"],

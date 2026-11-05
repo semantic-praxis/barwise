@@ -21,8 +21,9 @@ for a CI gate that fails when the decision is violated, `tests` for
 decisions whose tests carry [adr:<this-file>#<id>] in their titles, and
 `none (<issue>: <id>)` on the decision's own gap issue for whatever no
 gate or test holds: one decision per entry, an issue labelled `adr-gap`
-and titled `Gap: <this-file> decision <id> ...`, named by no other entry. Declare a gate only if a violation of that decision
-makes it fail (docs/specs/executable-adrs.spec.md).
+and titled `Gap: <this-file> decision <id> ...`, named by no other
+entry. Declare a gate only if a violation of that decision makes it fail
+(docs/specs/executable-adrs.spec.md).
 Delete this comment.
 -->
 

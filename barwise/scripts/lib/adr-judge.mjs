@@ -130,7 +130,14 @@ export function judgeDeclarations(adrs, reader, refusals) {
           : `the step "${want}" has a guard that does not run it on every code change`;
         fail(`"${entry.text}": ${why}`);
       } else if (entry.kind === "none") {
-        // Needs no tracker, so it is judged even when the tracker is not read.
+        // These two need no tracker, so they are judged even when it is not
+        // read: one decision per entry, and one entry per gap issue.
+        if (entry.ids.length !== 1) {
+          fail(
+            `"${entry.text}": lists ${entry.ids.length} decisions; a none entry names one,`
+              + " on that decision's own gap issue",
+          );
+        }
         const first = gapNamedBy.get(entry.issue);
         if (first === undefined) gapNamedBy.set(entry.issue, `${f}: "${entry.text}"`);
         else {
@@ -153,18 +160,21 @@ export function judgeDeclarations(adrs, reader, refusals) {
           );
           continue;
         }
-        if (!(issue.labels ?? []).includes(GAP_LABEL)) {
+        // A labels field that is not a list is not the label, whatever it
+        // holds: a string would otherwise match on a substring.
+        if (!(Array.isArray(issue.labels) && issue.labels.includes(GAP_LABEL))) {
           fail(`"${entry.text}": ${entry.issue} does not carry the ${GAP_LABEL} label`);
         }
-        if (entry.ids.length !== 1) {
-          fail(
-            `"${entry.text}": lists ${entry.ids.length} decisions; a none entry names one,`
-              + " on that decision's own gap issue",
-          );
-        } else {
+        // With more than one id there is no one decision for the title to
+        // name; the finding above covers that entry. The space after the id
+        // keeps "decision four" from matching "decision fourteen".
+        if (entry.ids.length === 1) {
           const prefix = `Gap: ${name} decision ${entry.ids[0]} `;
           if (!String(issue.title ?? "").startsWith(prefix)) {
-            fail(`"${entry.text}": ${entry.issue}'s title does not begin "${prefix}"`);
+            fail(
+              `"${entry.text}": ${entry.issue}'s title does not begin "${prefix}"`
+                + " (that prefix, a space, then what the gap is)",
+            );
           }
         }
       }

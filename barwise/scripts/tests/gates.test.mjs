@@ -7659,6 +7659,25 @@ test("check:architecture requires Enforced-by:, and reads no ci.yml, scripts or 
     );
     assert.equal(bare.status, 1, bare.stdout + bare.stderr);
     assert.match(bare.stderr, /a-concern\.md: no Enforced-by: header/);
+    // One decision per none entry and one entry per gap issue need no
+    // tracker, so they are findings here, beside the tracker's refusal.
+    const shared = archPlanted(
+      dir,
+      "barwise/docs/adr/a-concern.md",
+      (s) =>
+        s.replace(
+          "Enforced-by: tests (the-rule)",
+          "Enforced-by: none (barwise-g: the-rule, x), none (barwise-g: the-rule)",
+        ),
+    );
+    assert.equal(shared.status, 1, shared.stdout + shared.stderr);
+    assert.match(shared.stderr, /"none \(barwise-g: the-rule, x\)": lists 2 decisions/);
+    assert.match(shared.stderr, /"none \(barwise-g: the-rule\)": barwise-g is also named by/);
+    assert.match(
+      shared.stderr,
+      /\.beads\/issues\.jsonl: /,
+      "the tracker it could not read is a refusal",
+    );
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
