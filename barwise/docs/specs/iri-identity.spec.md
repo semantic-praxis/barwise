@@ -1950,22 +1950,31 @@ rewrites ids. WS7 also migrates the tests holding UUID literals (`cli/tests/comm
 
 - _WS7 notes._
   - The corpus is 162 tracked models now, against 119 when counted: 48 at
-    1.0, 29 at 1.1, 29 at 2.0, 46 at 3.0 and 10 already at 4.0. More than
-    half are core test fixtures that exist to test reading an old format,
-    and those stay as written. So WS7 splits by what verifies each part:
+    1.0, 29 at 1.1, 29 at 2.0, 46 at 3.0 and 10 already at 4.0. About
+    two-thirds (106) are test fixtures, and most of core's (the 67 in
+    `tests/fixtures/malformed/`) exist to test reading an old format, so
+    those stay as written. So WS7 splits by what verifies each part:
     - 7a, the 29 models in `examples/`, `docs/`, `packages/learn/` and
       `test-plan/`, verified by the package suites, `validate:examples`
       and the regenerated goldens;
-    - 7b, the 18 in `trial/` (customer kernels and findings), which the
+    - 7b, the 17 in `trial/` (customer kernels and findings), which the
       trial lane's own run and ratchet verify;
     - 7c, the test fixtures that are not about an old format, and the tests
       holding UUID literals listed above.
   - `barwise migrate` drops YAML comments (`docs/CLI.md`). 7a put back the
     86 hand-written comment lines in eight of its files, each where it
     stood.
+  - `migrate` also dropped one `is_preferred` flag in
+    `examples/output/order-management.orm.yaml`, on a uniqueness constraint
+    over "Customer has Name" that identifies no entity type. It was inert:
+    the 3.x load already ignored it (the diagnostics and the DDL are
+    unchanged).
   - A test that needs an old-format file no longer borrows an example for
-    it: `derivedConstraintIds.test.ts` reads a 2.0 copy of the shop in
-    `core/tests/fixtures/`.
+    it: `derivedConstraintIds.test.ts` and `NormaConstraintIds.test.ts`'s
+    determinism test read a 2.0 copy of the shop in `core/tests/fixtures/`.
+  - The tutorial renderer no longer reads a step's constraint id through
+    `idFromPrior`: every snapshot is 4.0, so an id from before 4.0 is not
+    found and the render says so.
   - `docs/ORM_PROJECT_GUIDE.md` already shows 4.0 shadows, and the migrated
     auction project matches it, so it needs no change.
 
