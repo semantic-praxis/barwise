@@ -1,6 +1,6 @@
 # Enforceable ADR practice
 
-Status: WS1 implemented 2026-11-04 (check:adr-tests refuses a decision whose tagged tests all skipped; credential-handling#gitleaks-detects declared through its probe tests); WS3 implemented 2026-11-05 (the 87 gap issues labelled adr-gap; check:architecture requires the label, the title prefix, one decision per none entry, and one entry per gap issue). WS4 implemented 2026-11-05 (spec-writer/adr-writing.md, the SKILL.md and template pointers, the pr-review checklist item). WS5 in part: mutate.mjs --expect-exit; the probe runner waits on the plants WS4's PR bodies record. WS2 implemented 2026-11-05 (#920: the held-by breakdown on check:architecture's OK line; the real tree reads 89 decisions, 14 with a gate, 31 tests and no gate, 44 none only, 87 carrying a gap issue).
+Status: WS1 implemented 2026-11-04 (check:adr-tests refuses a decision whose tagged tests all skipped; credential-handling#gitleaks-detects declared through its probe tests); WS3 implemented 2026-11-05 (the 87 gap issues labelled adr-gap; check:architecture requires the label, the title prefix, one decision per none entry, and one entry per gap issue). WS4 implemented 2026-11-05 (spec-writer/adr-writing.md, the SKILL.md and template pointers, the pr-review checklist item). WS5 in part: mutate.mjs --expect-exit; the probe runner designed 2026-11-05 at the owner's direction, on the plants recorded so far. WS2 implemented 2026-11-05 (#920: the held-by breakdown on check:architecture's OK line; the real tree reads 89 decisions, 14 with a gate, 31 tests and no gate, 44 none only, 87 carrying a gap issue).
 
 Created: 2026-11-04
 Last-updated: 2026-11-05
@@ -11,6 +11,8 @@ barwise/scripts/mutate.mjs, barwise/scripts/tests/check-adr-tests.test.mjs,
 barwise/scripts/tests/gates.test.mjs, barwise/scripts/tests/expected-counts.json,
 barwise/docs/adr/credential-handling.md, barwise/docs/ARCHITECTURE.md,
 barwise/docs/specs/executable-adrs.spec.md, .beads/issues.jsonl,
++barwise/scripts/adr-probes.mjs, +barwise/scripts/tests/adr-probes.test.mjs,
++barwise/docs/adr/probes.json, barwise/package.json, package.json,
 .claude/skills/spec-writer/SKILL.md, +.claude/skills/spec-writer/adr-writing.md,
 .claude/skills/spec-writer/template.adr.md, .claude/skills/pr-review/checklist.md
 Plan-reviewed: 1004b993 (code-review, pr-review)
@@ -245,20 +247,103 @@ plant record, and backfilling one is the refactor session's work
 (barwise-ym8.gc9).
 `check:review-tiers` keys on headings, and none is added.
 
-### 5. Discrimination probes (provisional: grounded in part)
+### 5. Discrimination probes (design 2026-11-05)
 
-This replaces WS5 of `executable-adrs.spec.md`, whose section becomes a pointer here after this spec's `Plan-reviewed:` line. WS3 grounded two of its open questions. Process ADRs do
-admit plants: an unpinned bootstrap line made `check:python-uv` exit 1,
-and a `TODO: classify` note made `audit:specs -- --check` exit 1, both
-recorded in #885 and #886. And `mutate.mjs` counted any non-zero exit
-as caught, so it needed an expected-exit option before a probe could
-tell a refusal from a catch; `--expect-exit` landed with WS4
-(2026-11-05), and an exit 2 the caller did not ask for is a refusal. Still ungrounded: where probes live (a file
-per ADR beside it, or one manifest), how a probe stays valid when the
-code it edits moves (`mutate.mjs` already refuses an absent anchor, exit
-2, which would flag a stale probe), and whether probes run in CI or on
-demand. Ground these from the plants WS4's PR bodies record, before
-writing the runner.
+This replaces WS5 of `executable-adrs.spec.md`, whose section becomes a
+pointer here after this spec's `Plan-reviewed:` line.
+
+**What it adds.** A declared gate is held today to existing and running
+in CI (`check:architecture`, `check:adr-model`), not to failing when its
+decision is broken; a WS3 batch found a proxy declaration that way
+only by review (#886's `check:review-tiers`). A probe states one
+violation of one decision and the declared gate that must go red on it,
+and `npm run adr-probes` replays every probe through `mutate.mjs
+--expect-exit 1`. That delivers the provisional requirement under Scope.
+
+**The grounding, and how thin it is.** The owner chose on 2026-11-05 to
+design WS5 now rather than wait for ADR-writing PRs to record plants
+(WS4's skill step); no PR has recorded one since. Seven plants exist:
+
+| Plant                            | Where it edits             | Enforcer                 | Kind                            |
+| -------------------------------- | -------------------------- | ------------------------ | ------------------------------- |
+| unpinned uv bootstrap (#885)     | `.github/workflows/ci.yml` | `check:python-uv`        | a declared gate on its decision |
+| `TODO: classify` note (#886)     | a spec                     | `audit:specs -- --check` | a declared gate on its decision |
+| five header plants (#926 review) | the ADR's own file         | `check:adr-model`        | a test of a gate's own rules    |
+
+Only the first two are probes in this section's sense; the five test
+`check:adr-model` itself and already live in `adr-model.test.mjs`. So
+the design rests on two probe-shaped plants and the 14 decisions that
+declare a gate today, across 10 `npm` entries. The three questions WS3
+left open are answered from that, and each answer says what would move
+it.
+
+1. **Where probes live: one manifest, `barwise/docs/adr/probes.json`.**
+   A probe cannot live in its ADR: a probe of a header rule (five of the
+   seven plants) edits the ADR's own text, and its `old` string written
+   into the same file would occur twice, which `mutate.mjs` refuses as
+   an ambiguous anchor. A manifest beside the ADRs also keeps the ADR
+   prose free of literal code. Each row is
+   `{ decision: "<adr>#<id>", file, old, new, script, args? }`, `file`
+   from the repository root.
+2. **A probe whose code moved: refused, never passed.** `mutate.mjs`
+   already refuses (exit 2) an absent or ambiguous anchor, a no-op edit,
+   a command that fails unmutated, and a restore that does not verify.
+   The runner reports each such probe as stale or unreadable and exits
+   2, so a moved anchor is never read as a gate that still catches. The
+   cost is maintenance: a refactor of a probed file may need its probe
+   updated. Two probes cannot show how often that happens; the first
+   probes that go stale will.
+3. **On demand, not in CI.** `executable-adrs.spec.md` already put
+   discrimination on demand, in the shape of `npm run fault-matrix`, and
+   ruled out proving it on every PR. Running it costs a full gate run
+   per probe, unmutated and mutated, in sequence (each edits the working
+   tree); `purity` and `depcruise` need a build first. A CI step is an
+   open decision below, not part of this workstream.
+
+**The runner, `barwise/scripts/adr-probes.mjs`.** It reads the
+manifest and the ADRs' `Enforced-by:` headers, and for each probe:
+
+- a manifest error is a finding (exit 1), checked before anything runs:
+  a decision no ADR has, or a `script` its decision's header does not
+  declare in an `npm` entry (a probe of an undeclared gate says nothing
+  about the header);
+- otherwise it spawns `mutate.mjs --file <file> --old <old> --new <new>
+  --expect-exit 1 -- npm run <script> [-- <args>]` from the repository
+  root, with no shell, and reads mutate's own status: 0 CAUGHT, 1
+  MISSED (the gate passed, or failed some other way, on the violation:
+  a proxy declaration, the finding this workstream exists for), 2
+  REFUSED (stale anchor, gate red unmutated, gate refused).
+
+It prints one line per probe and then the declared pairs (`npm` entry,
+decision id) with no probe, as information. Exit 1 if any manifest error
+or MISSED; else 2 if any REFUSED or if the manifest has no probe; else
+0. It runs only on a clean tree for the files its probes touch, which
+`mutate.mjs` already guarantees by restoring bytes it hashed; it adds
+no lock, because it runs one probe at a time.
+
+**Seeding.** The same PR writes a probe for each of the 14 decisions that
+declare a gate, planted by hand first. A gate that will not go red on any
+honest violation of its decision is a proxy declaration: it gets a gap
+issue (the header change is the ADR refactor's, barwise-ym8.gc9), and no
+probe, so the runner's unprobed list names it.
+
+**The skill.** `spec-writer/adr-writing.md` step 4 changes from
+recording each plant in the PR body to adding it to `probes.json`, and
+the `pr-review` checklist item asks for the row instead of the record.
+
+**Tests**, in `scripts/tests/adr-probes.test.mjs` on a git fixture with a
+one-gate repository: a caught probe exits 0; a gate that ignores the
+edit exits 1, MISSED; a moved anchor exits 2; a probe naming an
+undeclared script or an unknown decision exits 1 before any run; an
+empty manifest exits 2. Each is watched red by removing the branch it
+pins.
+
+**What it still cannot see.** A probe proves the gate catches one
+violation, not every violation of its decision: the decision's gap
+issue says what else is unguarded. And a tagged test (`tests` entries)
+is not probed here; `check:adr-tests` holds it to passing, and a probe
+of a test is the same `mutate.mjs` run with a test command, left for
+when an author records one.
 
 The spec lands in a commit of its own, with nothing it lists in
 `Touches:`; the tracker issues it files and the pointer in
@@ -295,3 +380,14 @@ a `Touches:` path.
   "none only" would pressure authors toward declaring weak enforcers,
   which is the proxy problem this spec exists to stop. Revisit once WS5
   can tell a real enforcer from a proxy.
+- **WS5: should `adr-probes` run in CI?** Recommended not yet: on
+  demand, as `executable-adrs.spec.md` decided and `fault-matrix` does.
+  A CI step would catch a gate that stops discriminating on the PR that
+  breaks it, at the price of a gate run per probe on every
+  non-docs PR and a red CI whenever a refactor moves a probe's anchor.
+  Revisit once the seeded probes show how often anchors move.
+- **WS5: should a declared gate with no probe be a finding?**
+  Recommended no in WS5: the runner lists them. Once the 14 are seeded,
+  a later step can require a probe for every new `npm` entry, which
+  pushes toward proof rather than toward weaker declarations, unlike a
+  ratchet on the breakdown.
