@@ -30,7 +30,8 @@ rules, `imports` on the model, rename rewriting ids); 6b-3c implemented
 version 2, renames rewrite lineage); 6f implemented 2026-11-04 (Ossie's
 `iri`, the namespace read back), so WS6 is complete; WS7 in progress:
 7a implemented 2026-11-05 (the examples, docs, learn and test-plan
-models), 7b (the trial lane) and 7c (test fixtures) to come
+models); 7b decided 2026-11-05 (the trial lane's models stay as written,
+its ratchet brought current); 7c (the UUID-literal tests) to come
 
 Created: 2026-10-28
 Last-updated: 2026-11-05
@@ -1957,17 +1958,28 @@ rewrites ids. WS7 also migrates the tests holding UUID literals (`cli/tests/comm
     - 7a, the 29 models in `examples/`, `docs/`, `packages/learn/` and
       `test-plan/`, verified by the package suites, `validate:examples`
       and the regenerated goldens;
-    - 7b, the 17 in `trial/` (customer kernels and findings), which the
-      trial lane's own run and ratchet verify;
-    - 7c, the test fixtures that are not about an old format, and the tests
-      holding UUID literals listed above.
+    - 7b, the 17 in `trial/` (customer kernels and findings);
+    - 7c, the tests holding UUID literals listed above, and the fixtures
+      with hand-written ids they read.
+  - _7b, decided by the owner (2026-11-05): the trial lane's 17 models stay
+    at 1.0 and 1.1._ They are deliberate old-format input, so the lane runs
+    the old-file load path end to end at scale, as real customers' files
+    will. Migrating them would also have meant rewriting the lane's
+    generators, whose history and scale steps mint pre-4.0 ids
+    (`ft-hist-3`, `...-r0`, `...-m2`) that a 4.0 kernel's revisions
+    cannot hold: the 4.0 reader refuses them, about 190 findings in one run.
+    7b instead brings the lane's ratchet current, which WS6 left red on main
+    because the lane is not in CI (7 new, 16 stale).
+  - _7c, decided by the owner (2026-11-05): only the UUID-literal tests._
+    Every other test fixture stays at its version, since old-format inputs
+    keep the replay tested.
   - `barwise migrate` drops YAML comments (`docs/CLI.md`). 7a put back the
     86 hand-written comment lines in eight of its files, each where it
     stood.
   - `migrate` also dropped one `is_preferred` flag in
     `examples/output/order-management.orm.yaml`, on a uniqueness constraint
     over "Customer has Name" that identifies no entity type. It was inert:
-    the 3.x load already ignored it (the diagnostics and the DDL are
+    the 1.1 load already ignored it (the diagnostics and the DDL are
     unchanged).
   - A test that needs an old-format file no longer borrows an example for
     it: `derivedConstraintIds.test.ts` and `NormaConstraintIds.test.ts`'s

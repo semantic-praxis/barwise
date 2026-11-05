@@ -42,13 +42,6 @@
       "note": "The default OpenAPI export writes a /* comment */ header when the model has diagnostics (which it always has after barwise-lh9), so the .json is not JSON and the importer returns an empty model with exit 0 (barwise-sxh).",
       "detail": "145 delta(s) outside the declared loss set: removed object_type Patient; removed object_type Provider; removed object_type Payer; removed object_type Facility; removed object_type Department; removed object_type Encounter; removed object_type InpatientEncounter; removed object_type OutpatientEncount"
     },
-    "C01/small/4.5/late:impact-name": {
-      "severity": "S1",
-      "class": "lineage-impact-by-name",
-      "issue": "barwise-5m9",
-      "note": "docs/CLI.md shows lineage impact --element with a name; the option takes an id and a name silently matches nothing, exit 0 (barwise-5m9). Cannot close before barwise-ofb, since with no sources recorded the id gives the same empty answer.",
-      "detail": "lineage impact reports no affected artifacts for DischargeDisposition, which the DDL exported before the change renders"
-    },
     "C01/small/4/read-back-diff-ddl:ansi": {
       "severity": "S1",
       "class": "sql-read-back-own-export",
@@ -97,20 +90,6 @@
       "issue": "barwise-a0h",
       "note": "OpenAPI export then import drops data-type lengths, definitions and value constraints on every value type and loses subtypes beyond the declared loss set (barwise-a0h).",
       "detail": "151 delta(s) outside the declared loss set: modified object_type PartyId; modified object_type LegalName; modified object_type TaxIdentifier; modified object_type KycStatus; modified object_type KycScreeningDate; modified object_type DateOfBirth; modified object_type GivenName; modified object_type "
-    },
-    "C02/small/1/roundtrip-diff:regmart-ddl": {
-      "severity": "S1",
-      "class": "sql-import-roundtrip",
-      "issue": "barwise-dnm",
-      "note": "Consequence of barwise-dnm: import sql reads DDL through the DDL importer (barwise-jjd), so the model it produces loses value types and fact types on the export-and-reimport round trip as the DDL importer's does. Closes with the parent.",
-      "detail": "18 delta(s) outside the declared loss set: removed object_type Party; removed object_type Product; removed object_type Branch; removed object_type Currency; removed object_type LoanAccount; removed object_type GeneralLedgerAccount; removed object_type DepositAccount; removed object_type LegalEntity"
-    },
-    "C02/small/4.5/late:impact-name": {
-      "severity": "S1",
-      "class": "lineage-impact-by-name",
-      "issue": "barwise-5m9",
-      "note": "docs/CLI.md shows lineage impact --element with a name; the option takes an id and a name silently matches nothing, exit 0 (barwise-5m9). Cannot close before barwise-ofb, since with no sources recorded the id gives the same empty answer.",
-      "detail": "lineage impact reports no affected artifacts for TransactionType, which the DDL exported before the change renders"
     },
     "C02/small/4/read-back-diff-ddl:ansi": {
       "severity": "S1",
@@ -174,20 +153,6 @@
       "issue": "barwise-vsp",
       "note": "dbt export then import loses value types, definitions, subtypes and objectification beyond the declared loss set (barwise-vsp).",
       "detail": "52 delta(s) outside the declared loss set: modified object_type Account; modified object_type Producer; modified object_type Adjuster; modified object_type Policy; modified object_type Term; modified object_type PolicyPeriod; modified object_type Coverage; modified object_type Risk"
-    },
-    "C03/small/1/roundtrip-diff:pc-ddl": {
-      "severity": "S1",
-      "class": "sql-import-roundtrip",
-      "issue": "barwise-dnm",
-      "note": "Consequence of barwise-dnm: import sql reads DDL through the DDL importer (barwise-jjd), so the model it produces loses value types and fact types on the export-and-reimport round trip as the DDL importer's does. Closes with the parent.",
-      "detail": "13 delta(s) outside the declared loss set: removed object_type PcContact; removed object_type PcAccount; removed object_type PcProducer; removed object_type PcPolicyPeriod; removed object_type PcRisk; removed object_type PcVehicleRisk; removed object_type PcAdjuster; removed object_type PcClaim"
-    },
-    "C03/small/4.5/late:impact-name": {
-      "severity": "S1",
-      "class": "lineage-impact-by-name",
-      "issue": "barwise-5m9",
-      "note": "docs/CLI.md shows lineage impact --element with a name; the option takes an id and a name silently matches nothing, exit 0 (barwise-5m9). Cannot close before barwise-ofb, since with no sources recorded the id gives the same empty answer.",
-      "detail": "lineage impact reports no affected artifacts for Claim, which the DDL exported before the change renders"
     },
     "C03/small/4/read-back-diff-ddl:ansi": {
       "severity": "S1",
@@ -280,13 +245,6 @@
       "note": "dbt export then import loses value types, definitions, subtypes and objectification beyond the declared loss set (barwise-vsp).",
       "detail": "68 delta(s) outside the declared loss set: modified object_type Category; modified object_type Product; modified object_type PhysicalProduct; modified object_type HazmatProduct; modified object_type ProductVariant; modified object_type Listing; modified object_type Order; modified object_type OrderL"
     },
-    "C04/small/4.5/late:impact-name": {
-      "severity": "S1",
-      "class": "lineage-impact-by-name",
-      "issue": "barwise-5m9",
-      "note": "docs/CLI.md shows lineage impact --element with a name; the option takes an id and a name silently matches nothing, exit 0 (barwise-5m9). Cannot close before barwise-ofb, since with no sources recorded the id gives the same empty answer.",
-      "detail": "lineage impact reports no affected artifacts for CurrencyCode, which the DDL exported before the change renders"
-    },
     "C04/small/4/read-back-diff-ddl:ansi": {
       "severity": "S1",
       "class": "sql-read-back-own-export",
@@ -363,13 +321,6 @@
       "issue": "barwise-dnm",
       "note": "Consequence of barwise-dnm: import sql reads DDL through the DDL importer (barwise-jjd), so the model it produces loses value types and fact types on the export-and-reimport round trip as the DDL importer's does. Closes with the parent.",
       "detail": "15 delta(s) outside the declared loss set: removed object_type UnitOfMeasure; removed object_type Mat; removed object_type WorkCenter; removed object_type FinishedGood; removed object_type Werk; removed object_type Plko; removed object_type Charg; removed object_type Lifnr"
-    },
-    "C05/small/4.5/late:impact-name": {
-      "severity": "S1",
-      "class": "lineage-impact-by-name",
-      "issue": "barwise-5m9",
-      "note": "docs/CLI.md shows lineage impact --element with a name; the option takes an id and a name silently matches nothing, exit 0 (barwise-5m9). Cannot close before barwise-ofb, since with no sources recorded the id gives the same empty answer.",
-      "detail": "lineage impact reports no affected artifacts for UomCode, which the DDL exported before the change renders"
     },
     "C05/small/4/read-back-diff-ddl:ansi": {
       "severity": "S1",
@@ -455,13 +406,6 @@
       "note": "Consequence of barwise-dnm: import sql reads DDL through the DDL importer (barwise-jjd), so the model it produces loses value types and fact types on the export-and-reimport round trip as the DDL importer's does. Closes with the parent.",
       "detail": "20 delta(s) outside the declared loss set: removed object_type Consignee; removed object_type Port; removed object_type Carrier; removed object_type Vehicle; removed object_type Container; removed object_type Voyage; removed object_type Leg; removed object_type Shipment"
     },
-    "C06/small/4.5/late:impact-name": {
-      "severity": "S1",
-      "class": "lineage-impact-by-name",
-      "issue": "barwise-5m9",
-      "note": "docs/CLI.md shows lineage impact --element with a name; the option takes an id and a name silently matches nothing, exit 0 (barwise-5m9). Cannot close before barwise-ofb, since with no sources recorded the id gives the same empty answer.",
-      "detail": "lineage impact reports no affected artifacts for ImdgClass, which the DDL exported before the change renders"
-    },
     "C06/small/4/read-back-diff-ddl:ansi": {
       "severity": "S1",
       "class": "sql-read-back-own-export",
@@ -532,13 +476,6 @@
       "note": "The default OpenAPI export writes a /* comment */ header when the model has diagnostics (which it always has after barwise-lh9), so the .json is not JSON and the importer returns an empty model with exit 0 (barwise-sxh).",
       "detail": "140 delta(s) outside the declared loss set: removed object_type Party; removed object_type Individual; removed object_type Organization; removed object_type Customer; removed object_type Subscriber; removed object_type Country; removed object_type Operator; removed object_type ProductSpecification"
     },
-    "C07/small/4.5/late:impact-name": {
-      "severity": "S1",
-      "class": "lineage-impact-by-name",
-      "issue": "barwise-5m9",
-      "note": "docs/CLI.md shows lineage impact --element with a name; the option takes an id and a name silently matches nothing, exit 0 (barwise-5m9). Cannot close before barwise-ofb, since with no sources recorded the id gives the same empty answer.",
-      "detail": "lineage impact reports no affected artifacts for RatePlanCode, which the DDL exported before the change renders"
-    },
     "C07/small/4/read-back-diff-ddl:ansi": {
       "severity": "S1",
       "class": "sql-read-back-own-export",
@@ -602,13 +539,6 @@
       "note": "Consequence of barwise-dnm: import sql reads DDL through the DDL importer (barwise-jjd), so the model it produces loses value types and fact types on the export-and-reimport round trip as the DDL importer's does. Closes with the parent.",
       "detail": "14 delta(s) outside the declared loss set: removed object_type Premise; removed object_type Transformer; removed object_type Manufacturer; removed object_type ServicePoint; removed object_type Meter; removed object_type SmartMeter; removed object_type Customer; removed object_type Tariff"
     },
-    "C08/small/4.5/late:impact-name": {
-      "severity": "S1",
-      "class": "lineage-impact-by-name",
-      "issue": "barwise-5m9",
-      "note": "docs/CLI.md shows lineage impact --element with a name; the option takes an id and a name silently matches nothing, exit 0 (barwise-5m9). Cannot close before barwise-ofb, since with no sources recorded the id gives the same empty answer.",
-      "detail": "lineage impact reports no affected artifacts for RateCode, which the DDL exported before the change renders"
-    },
     "C08/small/4/read-back-diff-ddl:ansi": {
       "severity": "S1",
       "class": "sql-read-back-own-export",
@@ -671,13 +601,6 @@
       "issue": "barwise-dnm",
       "note": "Consequence of barwise-dnm: the DDL export of the imported model does not read back to the same model -- value types and fact types are lost beyond the declared loss set. Closes with the parent.",
       "detail": "503 delta(s) outside the declared loss set: removed object_type StudyTitle; removed object_type StudyPhase; removed object_type ProtocolTitle; removed object_type AmendmentApprovalDate; removed object_type CountryCode; removed object_type InvestigatorName; removed object_type SubjectNumber; removed "
-    },
-    "C09/small/4.5/late:impact-name": {
-      "severity": "S1",
-      "class": "lineage-impact-by-name",
-      "issue": "barwise-5m9",
-      "note": "docs/CLI.md shows lineage impact --element with a name; the option takes an id and a name silently matches nothing, exit 0 (barwise-5m9). Cannot close before barwise-ofb, since with no sources recorded the id gives the same empty answer.",
-      "detail": "lineage impact reports no affected artifacts for MeddraPreferredTermCode, which the DDL exported before the change renders"
     },
     "C09/small/4/read-back-diff-ddl:ansi": {
       "severity": "S1",
@@ -748,20 +671,6 @@
       "issue": "barwise-a0h",
       "note": "OpenAPI export then import drops data-type lengths, definitions and value constraints on every value type and loses subtypes beyond the declared loss set (barwise-a0h).",
       "detail": "167 delta(s) outside the declared loss set: modified object_type Pidm; modified object_type StudentNumber; modified object_type CampusCode; modified object_type CollegeCode; modified object_type DepartmentCode; modified object_type CourseId; modified object_type Crn; modified object_type TermCode"
-    },
-    "C10/small/1/roundtrip-diff:sis-ddl": {
-      "severity": "S1",
-      "class": "sql-import-roundtrip",
-      "issue": "barwise-dnm",
-      "note": "Consequence of barwise-dnm: import sql reads DDL through the DDL importer (barwise-jjd), so the model it produces loses value types and fact types on the export-and-reimport round trip as the DDL importer's does. Closes with the parent.",
-      "detail": "16 delta(s) outside the declared loss set: removed object_type Spriden; removed object_type Stvcamp; removed object_type Sgbstdn; removed object_type Sibinst; removed object_type Pebempl; removed object_type Stvcoll; removed object_type Stvdept; removed object_type Scbcrse"
-    },
-    "C10/small/4.5/late:impact-name": {
-      "severity": "S1",
-      "class": "lineage-impact-by-name",
-      "issue": "barwise-5m9",
-      "note": "docs/CLI.md shows lineage impact --element with a name; the option takes an id and a name silently matches nothing, exit 0 (barwise-5m9). Cannot close before barwise-ofb, since with no sources recorded the id gives the same empty answer.",
-      "detail": "lineage impact reports no affected artifacts for GradeCode, which the DDL exported before the change renders"
     },
     "C10/small/4/read-back-diff-ddl:ansi": {
       "severity": "S1",
@@ -840,13 +749,6 @@
       "note": "dbt export then import loses value types, definitions, subtypes and objectification beyond the declared loss set (barwise-vsp).",
       "detail": "75 delta(s) outside the declared loss set: modified object_type Workspace; modified object_type Project; modified object_type ApiKey; modified object_type ServiceAccount; modified object_type Plan; modified object_type Subscription; modified object_type EventDefinition; modified object_type Event"
     },
-    "C11/small/4.5/late:impact-name": {
-      "severity": "S1",
-      "class": "lineage-impact-by-name",
-      "issue": "barwise-5m9",
-      "note": "docs/CLI.md shows lineage impact --element with a name; the option takes an id and a name silently matches nothing, exit 0 (barwise-5m9). Cannot close before barwise-ofb, since with no sources recorded the id gives the same empty answer.",
-      "detail": "lineage impact reports no affected artifacts for ReservedEventName, which the DDL exported before the change renders"
-    },
     "C11/small/4/read-back-diff-ddl:ansi": {
       "severity": "S1",
       "class": "sql-read-back-own-export",
@@ -916,20 +818,6 @@
       "issue": "barwise-a0h",
       "note": "OpenAPI export then import drops data-type lengths, definitions and value constraints on every value type and loses subtypes beyond the declared loss set (barwise-a0h).",
       "detail": "183 delta(s) outside the declared loss set: modified object_type ClientNumber; modified object_type HouseholdNumber; modified object_type IncomeSourceId; modified object_type CaseId; modified object_type CaseNumber; modified object_type ProgramCode; modified object_type PeriodNumber; modified object"
-    },
-    "C12/small/1/roundtrip-diff:modern-ddl": {
-      "severity": "S1",
-      "class": "sql-import-roundtrip",
-      "issue": "barwise-dnm",
-      "note": "Consequence of barwise-dnm: import sql reads DDL through the DDL importer (barwise-jjd), so the model it produces loses value types and fact types on the export-and-reimport round trip as the DDL importer's does. Closes with the parent.",
-      "detail": "29 delta(s) outside the declared loss set: removed object_type Hhld; removed object_type Clnt; removed object_type Aplct; removed object_type Ofc; removed object_type EligWrk; removed object_type Supv; removed object_type Detr; removed object_type Prgm"
-    },
-    "C12/small/4.5/late:impact-name": {
-      "severity": "S1",
-      "class": "lineage-impact-by-name",
-      "issue": "barwise-5m9",
-      "note": "docs/CLI.md shows lineage impact --element with a name; the option takes an id and a name silently matches nothing, exit 0 (barwise-5m9). Cannot close before barwise-ofb, since with no sources recorded the id gives the same empty answer.",
-      "detail": "lineage impact reports no affected artifacts for ClosureReasonCode, which the DDL exported before the change renders"
     },
     "C12/small/4/read-back-diff-ddl:ansi": {
       "severity": "S1",

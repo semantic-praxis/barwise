@@ -38,6 +38,15 @@ import {
 import { exemptPositions } from "./personas.mjs";
 import { gradedCandidate } from "./skinNames.mjs";
 
+/**
+ * How a spilled MCP result opens: the server writes its notice first
+ * (mcp/src/workspace/response.ts), and `spill.test.mjs` reads that file
+ * so the two cannot drift apart. A length cap stood in for this before: a
+ * spill's preview of a long DDL ran past it, and the preview was graded
+ * against the CLI's whole output as a parity failure.
+ */
+export const MCP_SPILL_NOTICE = /^\[barwise\] Output is .* too large to return inline\./;
+
 export function loadCustomer(dir) {
   const customer = parse(readFileSync(join(dir, "customer.yaml"), "utf8"));
   customer.dir = dir;
@@ -1194,8 +1203,7 @@ export async function sprint6Surfaces(customer, tier, record) {
       for (const [name, args, tool, toolArgs, compare] of pairs) {
         const cli = runCli(args, { timeoutMs: budget });
         const m = await mcp.call(tool, toolArgs);
-        const spilled = /mcp-cache|written to|truncated|spilled/i.test(m.text)
-          && m.text.length < 4000;
+        const spilled = MCP_SPILL_NOTICE.test(m.text);
         if (spilled) {
           record({
             sprint: 6,
