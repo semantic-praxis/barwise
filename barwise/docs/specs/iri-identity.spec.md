@@ -28,10 +28,12 @@ rules, `imports` on the model, rename rewriting ids); 6b-3c implemented
 2026-11-04 (merge keeps the base's ids, split writes alias shadows,
 `source_context` leaves 4.0); 6e implemented 2026-11-04 (lineage manifest
 version 2, renames rewrite lineage); 6f implemented 2026-11-04 (Ossie's
-`iri`, the namespace read back), so WS6 is complete; WS7 to come
+`iri`, the namespace read back), so WS6 is complete; WS7 in progress:
+7a implemented 2026-11-05 (the examples, docs, learn and test-plan
+models), 7b (the trial lane) and 7c (test fixtures) to come
 
 Created: 2026-10-28
-Last-updated: 2026-11-04
+Last-updated: 2026-11-05
 Tracking: barwise-wcg, barwise-y1b
 Plan-reviewed: 15d6f18e (pr-review x5, code-review x3; re-pointed after WS6 was grounded and decisions 18 to 20 taken)
 Touches: barwise/packages/core/src/model/,
@@ -1945,6 +1947,27 @@ rewrites ids. WS7 also migrates the tests holding UUID literals (`cli/tests/comm
 `mcp/tests/tools/impactAnalysis.test.ts`,
 `formats/tests/NormaJoinPaths.test.ts`, three in code-analysis) and
 `docs/ORM_PROJECT_GUIDE.md`. The test builder moves in 6a.
+
+- _WS7 notes._
+  - The corpus is 162 tracked models now, against 119 when counted: 48 at
+    1.0, 29 at 1.1, 29 at 2.0, 46 at 3.0 and 10 already at 4.0. More than
+    half are core test fixtures that exist to test reading an old format,
+    and those stay as written. So WS7 splits by what verifies each part:
+    - 7a, the 29 models in `examples/`, `docs/`, `packages/learn/` and
+      `test-plan/`, verified by the package suites, `validate:examples`
+      and the regenerated goldens;
+    - 7b, the 18 in `trial/` (customer kernels and findings), which the
+      trial lane's own run and ratchet verify;
+    - 7c, the test fixtures that are not about an old format, and the tests
+      holding UUID literals listed above.
+  - `barwise migrate` drops YAML comments (`docs/CLI.md`). 7a put back the
+    86 hand-written comment lines in eight of its files, each where it
+    stood.
+  - A test that needs an old-format file no longer borrows an example for
+    it: `derivedConstraintIds.test.ts` reads a 2.0 copy of the shop in
+    `core/tests/fixtures/`.
+  - `docs/ORM_PROJECT_GUIDE.md` already shows 4.0 shadows, and the migrated
+    auction project matches it, so it needs no change.
 
 ## API and migration impact
 
