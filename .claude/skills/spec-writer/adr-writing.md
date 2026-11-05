@@ -35,7 +35,9 @@ that asks that question before review does.
    `none (<issue>: <id>)` on the decision's own gap issue: one decision
    per entry, an issue labelled `adr-gap` and titled
    `Gap: <adr> decision <id> ...`, named by no other entry.
-   `check:architecture` enforces that shape.
+   `check:architecture` holds the label, the title, and one decision per
+   entry; `check:adr-model` holds that the issue is in the tracker and
+   open.
 
 Exit 2 is not red. A gate that refuses (could not answer) did not catch
 the violation; it did not see it. Declare it only once it exits 1 on the

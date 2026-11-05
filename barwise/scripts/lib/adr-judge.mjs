@@ -188,9 +188,11 @@ export function judgeDeclarations(adrs, reader, refusals) {
           fail(`"${entry.text}": ${entry.issue} does not carry the ${GAP_LABEL} label`);
         }
         // With more than one id there is no one decision for the title to
-        // name; the finding above covers that entry. The space after the id
-        // keeps "decision four" from matching "decision fourteen".
-        if (entry.ids.length === 1) {
+        // name; the finding above covers that entry. An id the ADR does not
+        // have is check:adr-model's finding (ids-exist), reported only as
+        // that. The space after the id keeps "decision four" from matching
+        // "decision fourteen".
+        if (entry.ids.length === 1 && ids.has(entry.ids[0])) {
           const prefix = `Gap: ${name} decision ${entry.ids[0]} `;
           if (!String(issue.title ?? "").startsWith(prefix)) {
             fail(

@@ -275,13 +275,20 @@ export function modelJudge(adrs, reader, { core, YAML, schemaText }) {
       }
     }
   }
-  // In ADR and entry order, coverage after an ADR's entries.
-  const sorted = withinChains(findings).sort((x, y) =>
-    x.adr < y.adr
-      ? -1
-      : x.adr > y.adr
-      ? 1
-      : (x.position ?? Infinity) - (y.position ?? Infinity)
-  );
+  // In the order the ADRs were read, then entry order, then coverage after
+  // an ADR's entries in decision order. Array.sort is stable, so repeats of
+  // one entry keep the order they were found in.
+  const adrOrder = new Map(adrs.map(({ f }, i) => [f.slice(ADR_DIR.length, -".md".length), i]));
+  const rank = (x) =>
+    x.position === null
+      ? [1, decisions.get(x.key).n]
+      : [0, x.position];
+  const sorted = withinChains(findings).sort((x, y) => {
+    const byAdr = adrOrder.get(x.adr) - adrOrder.get(y.adr);
+    if (byAdr !== 0) return byAdr;
+    const [xa, xb] = rank(x);
+    const [ya, yb] = rank(y);
+    return xa - ya || xb - yb;
+  });
   return { findings: sorted, self };
 }

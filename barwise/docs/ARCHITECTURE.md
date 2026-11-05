@@ -28,9 +28,10 @@ February 2026 design record.
 ### Decisions
 
 After an ADR's date: `declared:` names the gates and tagged tests its
-`Enforced-by:` header lists, which `check:architecture` and
-`check:adr-tests` hold to existing and running in CI, not to catching a
-violation; `gap:` names the open issue for what a decision's gates and
+`Enforced-by:` header lists, which `check:adr-model`,
+`check:architecture` and `check:adr-tests` hold to existing and running
+in CI, not to catching a violation; `gap:` names the open issue, held
+to tracked and open by `check:adr-model`, for what a decision's gates and
 tests leave unguarded, beside them or alone. A declared gate blocks a
 merge only if `main` requires the `ci` check (barwise-raw), and most
 gates skip a docs-only change.

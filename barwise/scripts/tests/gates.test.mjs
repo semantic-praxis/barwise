@@ -7596,6 +7596,8 @@ test("check:architecture leaves the five fact rules to check:adr-model, and its 
         // issue-tracked and issue-open: and no label or title finding.
         [(s) => s.replace("barwise-gap:", "barwise-nil:"), /barwise-nil/],
         [(s) => s.replace("barwise-gap:", "barwise-shut:"), /barwise-shut/],
+        // ids-exist on a none entry: not also a title finding for the id.
+        [(s) => s.replace("(barwise-gap: four)", "(barwise-gap: fourr)"), /fourr/],
       ]
     ) {
       // Staged with the generated section regenerated, so the header

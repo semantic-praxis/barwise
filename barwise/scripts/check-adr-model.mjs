@@ -86,7 +86,10 @@ async function main() {
     { core, YAML, schemaText },
   );
 
+  // Still exit 2, since a rule may have gone unjudged, but what it did find
+  // is printed, so an author can fix that while the model is repaired.
   if (model.self.length > 0) {
+    for (const f of model.findings) console.error(`  ${f.message}`);
     console.error("check:adr-model: the model could not answer, so a rule may have gone unjudged:");
     for (const s of model.self) console.error(`  ${s}`);
     process.exit(2);
