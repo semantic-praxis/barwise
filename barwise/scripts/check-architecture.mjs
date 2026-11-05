@@ -393,7 +393,7 @@ const needsWorkflow = adrs.some(({ text }) =>
   parseEnforcedBy(text).entries.some((e) => e.kind === "npm")
 );
 const reader = await createGovernanceReader(root, { needsWorkflow, refusals });
-const { problems: enforcementProblems, declaring } = judgeDeclarations(adrs, reader, refusals);
+const { problems: enforcementProblems, held } = judgeDeclarations(adrs, reader, refusals);
 
 // The generated section is rendered from these same inputs (the tracked
 // ADRs and INTENDED), so a stale section is one regen:architecture fixes.
@@ -446,5 +446,7 @@ if (refusals.length > 0) process.exit(2);
 console.log(
   `check:architecture: ${drawnEdges.size} edges in CLAUDE.md and ${manifests.length} package`
     + ` manifests agree with INTENDED; ${adrs.length} ADRs are well-formed and every reference`
-    + ` in ${citing.length} files resolves; ${declaring} declare Enforced-by:. OK`,
+    + ` in ${citing.length} files resolves; ${held.decisions} decisions: ${held.gate} with a gate,`
+    + ` ${held.testsOnly} tests and no gate, ${held.noneOnly} none only; ${held.gap} carry a gap`
+    + ` issue. OK`,
 );
