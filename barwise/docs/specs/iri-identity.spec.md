@@ -1976,9 +1976,11 @@ rewrites ids. WS7 also migrates the tests holding UUID literals (`cli/tests/comm
     and stated the three code-analysis tests' inline guiding models at 4.0
     with ids from names. `NormaJoinPaths.test.ts`, which the list above
     names, held no UUID literal by then. The UUIDs left in core's tests
-    are deliberate: they test reading old formats and the id rules
+    are deliberate: five test reading old formats and the id rules
     themselves (`format30`, `derivedConstraintIds`, `localNamePattern`,
-    `id`, the 4.0 schema drift test).
+    `id`, the 4.0 schema drift test), `format40` checks that a UUID is
+    refused as a 4.0 role id, and `spanningRoleNames` quotes a past bug's
+    output in a comment.
   - `barwise migrate` drops YAML comments (`docs/CLI.md`). 7a put back the
     86 hand-written comment lines in eight of its files, each where it
     stood.
