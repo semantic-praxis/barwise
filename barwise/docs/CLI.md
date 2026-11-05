@@ -285,8 +285,8 @@ name the element's rule gives), and is written as 4.0 on its next save.
 `migrate` does that rewrite for every named file at once, and says what
 reading each one changed beyond the format. A 2.0 `is_preferred` flag that identifies
 no entity type is dropped, and of two flags that name one entity type,
-one is kept. Each is printed under its file. Run `barwise validate` with
-your 2.x build first if you want to see those cases before they are
+one is kept. Each is printed under its file; `barwise migrate --check`
+prints them without writing anything, so you can see them before they are
 resolved. Until a file is migrated, `barwise validate` and the editor name
 its elements by their 4.0 ids, which the file does not state, and say so
 once, at the top of the file.

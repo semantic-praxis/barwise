@@ -31,12 +31,12 @@ say so once, as an info diagnostic ("This file is in a format before
    kept.
 3. Run `barwise migrate` on your models, or on a project's
    `.orm-project.yaml` so every domain moves together and each shared
-   object type keeps one id across domains. `barwise migrate --check`
-   lists what would change without writing anything. `migrate` also drops
-   an `is_preferred` flag that identifies no entity type, and keeps one of
-   two flags that name the same entity type, printing each under its file;
-   run `barwise validate` with your 1.7.0 build first to see those cases
-   before they are resolved. See `docs/CLI.md`, "migrate".
+   object type keeps one id across domains. Do it before anyone edits a
+   model with the new build, since an editor save writes 4.0 too.
+   `migrate` also drops an `is_preferred` flag that identifies no entity
+   type, and keeps one of two flags that name the same entity type.
+   `barwise migrate --check` prints each of those, and everything else that
+   would change, without writing anything. See `docs/CLI.md`, "migrate".
 4. Re-export anything you track with `barwise lineage`. Exports made
    before 4.0 name the old ids, so `barwise lineage status` reports each
    one stale with the reason "ids changed to 4.0", and the next export
@@ -64,11 +64,12 @@ type in other domains. The lineage manifest beside each changed file is
 rewritten in the same write.
 
 Two things do not follow. A fact type named after a renamed object type
-keeps its own name and id, and a constraint keeps its id; `barwise validate`
-warns where one now describes its element wrongly
-(`structural/stale-minted-name`), so you can rename it too. And `rename`
-works on 4.0 files only: it refuses an older file and asks you to migrate it
-first. See `docs/CLI.md`, "rename".
+keeps its own name and id; rename it with `barwise rename --fact-type` if
+its name should follow. And a constraint keeps its id: `barwise validate`
+warns where a constraint's id no longer says what it does
+(`structural/stale-minted-name`), and you can state a new id or remove its
+`minted_from`. `rename` also works on 4.0 files only: it refuses an older
+file and asks you to migrate it first. See `docs/CLI.md`, "rename".
 
 ### Shared object types name their owner
 
