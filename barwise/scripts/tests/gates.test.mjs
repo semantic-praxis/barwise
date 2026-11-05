@@ -7480,16 +7480,6 @@ test("check:architecture names each broken Enforced-by: declaration, exit 1", ()
           (s) => s.replace("{#four}", "{#one}"),
           /decisions 1 and 4 share the id one/,
         ],
-        [
-          ENFORCED_PATH,
-          (s) => s.replace("tests (three)", "tests (thre)"),
-          /lists thre, which no decision/,
-        ],
-        [
-          ENFORCED_PATH,
-          (s) => s.replace("\ntests (three), ", "\n"),
-          /decision 3 \{#three\} has no Enforced-by: entry/,
-        ],
         // The header's own form.
         [ENFORCED_PATH, (s) => s.replace("(one),", "(one)"), /is not an entry/],
         [
@@ -7513,11 +7503,6 @@ test("check:architecture names each broken Enforced-by: declaration, exit 1", ()
           ENFORCED_PATH,
           (s) => s.replace("check:x (one)", "check:adr-tests (one)"),
           /check:adr-tests checks other gates and cannot vouch/,
-        ],
-        [
-          ENFORCED_PATH,
-          (s) => s.replace("check:x (one)", "check:nope (one)"),
-          /has no script check:nope/,
         ],
         [
           CI_PATH,
@@ -7560,17 +7545,6 @@ test("check:architecture names each broken Enforced-by: declaration, exit 1", ()
             ),
           /"npm run check:x" does not run in barwise\//,
         ],
-        // Gap issues.
-        [
-          ENFORCED_PATH,
-          (s) => s.replace("barwise-gap:", "barwise-shut:"),
-          /barwise-shut is closed/,
-        ],
-        [
-          ENFORCED_PATH,
-          (s) => s.replace("barwise-gap:", "barwise-nil:"),
-          /barwise-nil is not in \.beads/,
-        ],
         // A gap issue is the decision's own (enforceable-adr-practice, WS3).
         [
           TRACKER_PATH,
@@ -7597,6 +7571,42 @@ test("check:architecture names each broken Enforced-by: declaration, exit 1", ()
       const r = archPlanted(dir, rel, edit);
       assert.equal(r.status, 1, `${why}\n${r.stdout}${r.stderr}`);
       assert.match(r.stderr, why);
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// The five fact rules are check:adr-model's (adr-conformance-model.spec.md,
+// WS4): check:architecture reports none of them, and where one cut a
+// verdict rule short it still stops there, silently, so one defect fails
+// one gate. Each plant below is a finding of check:adr-model's
+// (adr-model.test.mjs) and none of check:architecture's.
+test("check:architecture leaves the five fact rules to check:adr-model, and its guards silent", () => {
+  const { dir } = enforcementRepo();
+  try {
+    for (
+      const [edit, silentOn] of [
+        // ids-exist.
+        [(s) => s.replace("tests (three)", "tests (thre)"), /thre/],
+        // coverage: decision three keeps no entry, and the OK line names it.
+        [(s) => s.replace("\ntests (three), ", "\n"), /decision 3/],
+        // script-exists: and no step is looked up for the missing script.
+        [(s) => s.replace("check:x (one)", "check:nope (one)"), /check:nope/],
+        // issue-tracked and issue-open: and no label or title finding.
+        [(s) => s.replace("barwise-gap:", "barwise-nil:"), /barwise-nil/],
+        [(s) => s.replace("barwise-gap:", "barwise-shut:"), /barwise-shut/],
+      ]
+    ) {
+      // Staged with the generated section regenerated, so the header
+      // change is not itself a finding (a stale index).
+      stageAdr(dir, "a-concern", edit(ENFORCED_ADR));
+      const r = runArch(dir);
+      assert.equal(r.status, 0, `${silentOn}\n${r.stdout}${r.stderr}`);
+      assert.doesNotMatch(r.stdout + r.stderr, silentOn);
+      if (String(silentOn) === String(/decision 3/)) {
+        assert.match(r.stdout, /; 1 with no entry, which check:adr-model reports\. OK/);
+      }
     }
   } finally {
     rmSync(dir, { recursive: true, force: true });

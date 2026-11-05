@@ -1,6 +1,6 @@
 # ADR conformance as an ORM model
 
-Status: WS1 implemented 2026-11-04 by docs/specs/adr-gate-reader-split.spec.md (#910); WS2 implemented 2026-11-05 (RULES, scriptVerdict, and a { rule, adr, position, key } fact per fact-rule finding, with no output change); WS3 implemented 2026-11-05 (governance.orm.yaml, adr-population.mjs, check:adr-model, test:adr-model and build:core, three ci.yml steps under ${{ !cancelled() }}); WS4 started 2026-11-05 at the owner's direction.
+Status: WS1 implemented 2026-11-04 by docs/specs/adr-gate-reader-split.spec.md (#910); WS2 implemented 2026-11-05 (RULES, scriptVerdict, and a { rule, adr, position, key } fact per fact-rule finding, with no output change); WS3 implemented 2026-11-05 (governance.orm.yaml, adr-population.mjs, check:adr-model, test:adr-model and build:core, three ci.yml steps under ${{ !cancelled() }}); WS4 implemented 2026-11-05 at the owner's direction (check:adr-model judges the five fact rules; check:architecture no longer does, and keeps silent guards).
 
 Created: 2026-11-04
 Last-updated: 2026-11-05
@@ -357,7 +357,7 @@ WS3 implementation notes (2026-11-05):
   disagreements, on the real tree with the builder marking open issues not
   open.
 
-### 4. The model becomes the judge of the fact rules
+### 4. The model becomes the judge of the fact rules (done)
 
 The owner started WS4 on 2026-11-05, the night WS3 merged, rather than
 after a release cycle: WS3's record at that point was its first CI runs,

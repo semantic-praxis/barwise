@@ -530,13 +530,14 @@ jobs:
       - run: npm run audit
         if: steps.changes.outputs.docs_only != 'true'
 
-      # The ADR governance schema as a second judge beside check:architecture
-      # (docs/specs/adr-conformance-model.spec.md, WS3): core is built alone
-      # (a turbo cache hit after the full build), then both judges run on
-      # this tree and must agree. !cancelled() runs these after an earlier
-      # step failed, when a disagreement would otherwise hide, and on
-      # docs-only changes, which tracker-only changes are; npm ci above is
-      # unguarded, so their inputs are installed.
+      # The ADR governance schema judges five rules check:architecture no
+      # longer does: listed ids exist, every decision has an entry, a named
+      # script and a cited issue exist, the issue is open
+      # (docs/specs/adr-conformance-model.spec.md, WS4). Core is built alone
+      # (a turbo cache hit after the full build). !cancelled() runs these
+      # after an earlier step failed and on docs-only changes, which
+      # tracker-only changes are, so those rules are judged on every change;
+      # npm ci above is unguarded, so their inputs are installed.
       - run: npm run build:core
         if: ${{ !cancelled() }}
       - run: npm run check:adr-model

@@ -447,5 +447,8 @@ console.log(
     + ` manifests agree with INTENDED; ${adrs.length} ADRs are well-formed and every reference`
     + ` in ${citing.length} files resolves; ${held.decisions} decisions: ${held.gate} with a gate,`
     + ` ${held.testsOnly} tests and no gate, ${held.noneOnly} none only; ${held.gap} carry a gap`
-    + ` issue. OK`,
+    + ` issue${
+      // A decision with no entry is check:adr-model's to report (coverage):
+      // named here, so this OK never reads as covering it.
+      held.none > 0 ? `; ${held.none} with no entry, which check:adr-model reports` : ""}. OK`,
 );
