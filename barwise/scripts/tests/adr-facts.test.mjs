@@ -200,33 +200,37 @@ const factsOf = (adrs) =>
   );
 
 test("adr-judge: every RULES finding is a fact, keyed and placed by its entry's position", () => {
-  assert.deepEqual(
-    factsOf([
-      factAdr("a", "bogus, npm run check:gone (one, ghost, ghost), npm run check:gone (one)", [
-        "one",
-        "two",
-      ]),
-      factAdr("b", "none (barwise-zz: one), none (barwise-c: two)", ["one", "two"]),
-    ]),
-    [
-      // The malformed "bogus" is not an entry, so the first entry is at 0.
-      "ids-exist|a|0|a#ghost",
-      "ids-exist|a|0|a#ghost",
-      "script-exists|a|0|check:gone",
-      "script-exists|a|1|check:gone",
-      "coverage|a|null|a#two",
-      "issue-tracked|b|0|barwise-zz",
-      "issue-open|b|1|barwise-c",
-    ],
-  );
+  const judged = factsOf([
+    // Two identical entries, each listing an unknown id twice: the
+    // position tells them apart, and each listing is its own finding.
+    factAdr(
+      "a",
+      "bogus, npm run check:gone (one, ghost, ghost), npm run check:gone (one, ghost, ghost)",
+      ["one", "two"],
+    ),
+    factAdr("b", "none (barwise-zz: one), none (barwise-c: two)", ["one", "two"]),
+  ]);
+  assert.deepEqual(judged, [
+    // The malformed "bogus" is not an entry, so the first entry is at 0.
+    "ids-exist|a|0|a#ghost",
+    "ids-exist|a|0|a#ghost",
+    "script-exists|a|0|check:gone",
+    "ids-exist|a|1|a#ghost",
+    "ids-exist|a|1|a#ghost",
+    "script-exists|a|1|check:gone",
+    "coverage|a|null|a#two",
+    "issue-tracked|b|0|barwise-zz",
+    "issue-open|b|1|barwise-c",
+  ]);
   // Every rule in RULES has a case above, and nothing else is a fact.
-  const seen = new Set(
-    factsOf([
-      factAdr("a", "bogus, npm run check:gone (one, ghost, ghost)", ["one", "two"]),
-      factAdr("b", "none (barwise-zz: one), none (barwise-c: two)", ["one", "two"]),
-    ]).map((x) => x.split("|")[0]),
-  );
-  assert.deepEqual([...seen].sort(), RULES.map((r) => r.id).sort());
+  const rules = new Set(judged.map((x) => x.split("|")[0]));
+  assert.deepEqual([...rules].sort(), RULES.map((r) => r.id).sort());
+  // Each fact's key is the kind its rule names: a decision is <adr>#<id>.
+  const shape = { decision: /^[^#]+#[^#]+$/, script: /^[^#\s]+$/, issue: /^[^#\s]+$/ };
+  for (const x of judged) {
+    const [rule, , , key] = x.split("|");
+    assert.match(key, shape[RULES.find((r) => r.id === rule).key], x);
+  }
 });
 
 test("adr-judge: scriptVerdict is the gate-name and meta-gate check, and a rejected script is no fact", () => {

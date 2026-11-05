@@ -94,6 +94,9 @@ export function judgeDeclarations(adrs, reader, refusals) {
     }
     const name = f.slice(ADR_DIR.length, -".md".length);
     const finding = (rule, position, key, msg) => {
+      // A rule id is written at each call and in RULES: one not in RULES
+      // is a mistake in this file, not a finding about an ADR.
+      if (!RULES.some((r) => r.id === rule)) throw new Error(`adr-judge: ${rule} is not in RULES`);
       facts.push({ rule, adr: name, position, key });
       fail(msg);
     };
