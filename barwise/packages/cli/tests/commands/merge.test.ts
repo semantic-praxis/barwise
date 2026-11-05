@@ -135,4 +135,17 @@ model:
     expect(parsed.yaml).toContain("name: Vendor");
     expect(parsed.yaml).toContain("name: Supplier");
   });
+
+  it("refuses two 3.x files whose positional ids name each other's elements (barwise-xv1)", async () => {
+    // Both replay to 4.0 ids and pair by the ids their files stated, so
+    // before the refusal ot0 turned Dog into Cat and exited 0.
+    const result = await runCli([
+      "merge",
+      join(fixtures, "pets-3x.orm.yaml"),
+      join(fixtures, "pets-3x-swapped.orm.yaml"),
+    ]);
+    expect(result.exitCode).not.toBe(0);
+    expect(result.stderr).toContain('share the id "ot0" ("Dog" and "Cat")');
+    expect(result.stdout).toBe("");
+  });
 });

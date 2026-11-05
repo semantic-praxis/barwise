@@ -136,3 +136,22 @@ model:
     }
   });
 });
+
+describe("merge_models on two 3.x files with swapped positional ids (barwise-xv1)", () => {
+  it("reports the refusal, and leaves the base file as it was", () => {
+    const dir = mkdtempSync(join(tmpdir(), "barwise-mcp-merge-xv1-"));
+    try {
+      const base = join(dir, "pets.orm.yaml");
+      copyFileSync(join(fixtures, "pets-3x.orm.yaml"), base);
+      const before = readFileSync(base, "utf8");
+      const result = executeMerge(base, join(fixtures, "pets-3x-swapped.orm.yaml"));
+      const parsed = JSON.parse(result.content[0]!.text);
+      expect(parsed.valid).toBe(false);
+      expect(parsed.diagnostics.map((d: { ruleId: string; }) => d.ruleId)).toEqual(["merge-error"]);
+      expect(parsed.diagnostics[0].message).toContain('share the id "ot0" ("Dog" and "Cat")');
+      expect(readFileSync(base, "utf8")).toBe(before);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});

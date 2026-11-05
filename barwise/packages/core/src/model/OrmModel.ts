@@ -126,7 +126,8 @@ export type { IdKeyedKind, IdKind } from "./idIndex.js";
 export class DuplicateIdError extends Error {
   constructor(
     readonly id: string,
-    readonly kind: IdKind,
+    // A fact instance is not in the id index; its population holds it.
+    readonly kind: IdKind | "fact instance",
     held: string,
     adding: string,
   ) {

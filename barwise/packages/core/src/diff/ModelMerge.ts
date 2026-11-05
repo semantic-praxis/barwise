@@ -36,6 +36,7 @@ import { type FactTypeConfig, toFactTypeConfig } from "../model/FactType.js";
 import { graphOf } from "../model/graph.js";
 import { populationIdBase, suffixed } from "../model/idRules.js";
 import { mapConstraintReferences } from "../model/mint.js";
+import { localName } from "../model/name.js";
 import { aliasOf } from "../model/namespace.js";
 import { toObjectifiedFactTypeConfig } from "../model/ObjectifiedFactType.js";
 import type { ObjectType } from "../model/ObjectType.js";
@@ -116,6 +117,7 @@ export function mergeModels(
   const deltas = diff.deltas;
   refuseNameClashes(deltas, accepted);
   refuseOwnerChanges(deltas, accepted);
+  refuseCoincidentIds(existing, incoming, deltas, accepted);
   // A rebound alias is refused, accepted or not: the base's shadows behind
   // it would come to name another context, which no review of the header
   // line shows (iri-identity WS6).
@@ -1142,6 +1144,52 @@ function refuseOwnerChanges(deltas: readonly ModelDelta[], accepted: ReadonlySet
     `cannot change which domain owns ${moved.join(", ")}: the owner is part of the id, `
       + "and a merge keeps the base's ids. Diff with MERGE_DIFF_OPTIONS, which does not "
       + "offer it, or change the owner in the domains themselves.",
+  );
+}
+
+/**
+ * Refuse an accepted modification that pairs, through the ids two 3.x
+ * files stated, two object types or fact types whose names moved
+ * (barwise-xv1): each side's name is held on another element of the other
+ * side, as when two files number Dog and Cat `ot0` and `ot1` in opposite
+ * orders. Two replayed models pair by the ids their files had, so before
+ * this the merge exited 0 having turned Dog into Cat.
+ *
+ * Only a moved name is evidence. A name and reference mode changed
+ * together under a kept id is what an edited revision of one file looks
+ * like (`simple-modified.orm.yaml` renames Customer to Client, customer_id
+ * to client_id), so a difference in structure tells nothing. And models
+ * that carry no prior ids pair by their own: a shared id there is one
+ * element (model-invariants decision 1), so a rotation of names under kept
+ * ids is a set of renames (`renamedPair.law.test.ts`).
+ */
+function refuseCoincidentIds(
+  existing: OrmModel,
+  incoming: OrmModel,
+  deltas: readonly ModelDelta[],
+  accepted: ReadonlySet<number>,
+): void {
+  const prior = existing.priorIds;
+  if (prior === undefined || incoming.priorIds === undefined) return;
+  // The pair's own elements need no excluding: their local names differ.
+  const holds = (model: OrmModel, kind: string, name: string): boolean =>
+    (kind === "object_type" ? model.objectTypes : model.factTypes)
+      .some((e) => localName(e.name) === localName(name));
+  const clashes = deltas.flatMap((d, i) => {
+    if (d.kind !== "modified" || !accepted.has(i)) return [];
+    if (d.elementType !== "object_type" && d.elementType !== "fact_type") return [];
+    const [a, b] = [d.existing, d.incoming];
+    if (!a || !b || localName(a.name) === localName(b.name)) return [];
+    const moved = holds(incoming, d.elementType, a.name) || holds(existing, d.elementType, b.name);
+    return moved ? [`"${prior.get(a.id) ?? a.id}" ("${a.name}" and "${b.name}")`] : [];
+  });
+  if (clashes.length === 0) return;
+  throw new Error(
+    `the two 3.x files share the id ${clashes.join(", ")} for elements whose names each file `
+      + "holds on another element, so the ids likely coincide between unrelated files, and "
+      + "merging would turn one element into the other. Diff with --matching content to see "
+      + "how they pair by content, or give one model's elements ids of their own (barwise "
+      + "migrate).",
   );
 }
 
