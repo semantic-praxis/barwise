@@ -153,7 +153,7 @@ reuse, so the four stay on its front end, the CLI. That reverses the
 
 - `INTENDED` lists promptlab under `cli` alone, so the graph check enforces it.
 - The optimizer reaches promptlab only through the CLI, as a subprocess.
-- When another package needed promptlab code, the code moved down. `hashPrompt` (`promptHash.ts`) moved into `llm` (`artifact-resolution-parity.spec.md`, WS2), and the scorer's rubric check is `evaluateCandidate` in `learn`.
+- When another package needed promptlab code, the code moved down. `hashPrompt` (`llm/src/prompt/promptHash.ts`) moved into `llm` (`artifact-resolution-parity.spec.md`, WS2), and the scorer's rubric check is `evaluateCandidate` in `learn`.
 
 If the four are ever wanted on MCP, that is the route: the logic moves
 down into a library first, under its own spec. It is not recommended,

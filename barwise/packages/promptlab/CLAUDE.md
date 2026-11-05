@@ -21,7 +21,7 @@ packages reuse (owner, 2026-11-04). The CLI is its front end and its
 only consumer, which `INTENDED` in `barwise/scripts/lib/intended.cjs`
 enforces; that is why its commands are CLI-only in the capability
 matrix. When a package other than the CLI needs code from here, the code
-moves down into a library, as `hashPrompt` (`promptHash.ts`) moved into
+moves down into a library, as `hashPrompt` (`llm/src/prompt/promptHash.ts`) moved into
 `@barwise/llm`; do not add an export for any package but the CLI to
 import.
 
