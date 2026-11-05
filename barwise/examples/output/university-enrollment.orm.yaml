@@ -1,53 +1,53 @@
-orm_version: "1.1"
+orm_version: "4.0"
 model:
   name: University Enrollment
   object_types:
-    - id: 8f25ffa8-c400-46e7-84b1-a14a3ba88aee
+    - id: Student
       name: Student
       kind: entity
       reference_mode: student_number
       definition: A person enrolled at the university, identified by a student number assigned at admission.
-    - id: b7bbd8cd-e806-4bd9-9cfd-f3d8cc492436
+    - id: Course
       name: Course
       kind: entity
       reference_mode: course_code
       definition: A catalog entry representing an academic course, identified by a unique course code.
-    - id: 28fd5d10-44dd-4767-a60f-11dd9043390f
+    - id: CourseOffering
       name: CourseOffering
       kind: entity
       reference_mode: offering_id
       definition: A specific instance of a course offered in a particular semester.
-    - id: b70d3d5f-5b55-4294-b2af-6122745ce68e
+    - id: Instructor
       name: Instructor
       kind: entity
       reference_mode: employee_id
       definition: A faculty member who teaches course offerings, identified by employee ID.
-    - id: f2e09c79-f686-4333-b11a-e0a1e538f0d2
+    - id: Semester
       name: Semester
       kind: entity
       reference_mode: term_code
       definition: An academic term during which course offerings take place, identified by a term code.
-    - id: f98127f9-6550-4d4f-b165-96f12f80dd4e
+    - id: Title
       name: Title
       kind: value
       definition: The free-text name of a course.
-    - id: 8da96c46-6750-4f4a-8cab-d95240381081
+    - id: CreditValue
       name: CreditValue
       kind: value
       definition: The number of credits a course is worth, expressed as a whole number.
-    - id: 4cb804fd-1d0c-4259-9812-7833508c303f
+    - id: MaxCapacity
       name: MaxCapacity
       kind: value
       definition: The maximum number of students that can enroll in a course offering.
-    - id: af313148-56a7-4247-b56b-511bc72e355d
+    - id: StartDate
       name: StartDate
       kind: value
       definition: The date a semester begins.
-    - id: c7c6c4a7-9077-4972-bc7e-3daf13f27751
+    - id: EndDate
       name: EndDate
       kind: value
       definition: The date a semester ends.
-    - id: 6b77c96c-e6ea-4747-b32d-0b22722179f5
+    - id: LetterGrade
       name: LetterGrade
       kind: value
       definition: A grade awarded to a student upon completion of a course offering.
@@ -59,26 +59,26 @@ model:
           - D
           - F
   fact_types:
-    - id: 432c1472-b724-4bfa-abed-fdde163d1c95
+    - id: Student_enrolls_in_CourseOffering
       name: Student enrolls in CourseOffering
       roles:
-        - id: fb790fe3-79f6-44fe-a4e3-3632f12d97aa
-          player: 8f25ffa8-c400-46e7-84b1-a14a3ba88aee
+        - id: Student_enrolls_in_CourseOffering.enrolls_in
+          player: Student
           role_name: enrolls in
-        - id: 3888c61c-7d3a-4027-8ed8-e48b715319bb
-          player: 28fd5d10-44dd-4767-a60f-11dd9043390f
+        - id: Student_enrolls_in_CourseOffering.has_enrolled
+          player: CourseOffering
           role_name: has enrolled
       readings:
         - "{0} enrolls in {1}"
         - "{1} has enrolled {0}"
-    - id: 9f04fe14-1166-484a-bd8a-9b7465353f29
+    - id: CourseOffering_is_of_Course
       name: CourseOffering is of Course
       roles:
-        - id: bf93ce1d-726a-4fdb-adb1-397ad8b27b78
-          player: 28fd5d10-44dd-4767-a60f-11dd9043390f
+        - id: CourseOffering_is_of_Course.is_of
+          player: CourseOffering
           role_name: is of
-        - id: cfef965c-4bde-460d-9308-1108c14c7d40
-          player: b7bbd8cd-e806-4bd9-9cfd-f3d8cc492436
+        - id: CourseOffering_is_of_Course.has_offering
+          player: Course
           role_name: has offering
       readings:
         - "{0} is of {1}"
@@ -86,17 +86,21 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - bf93ce1d-726a-4fdb-adb1-397ad8b27b78
+            - CourseOffering_is_of_Course.is_of
+          id: Each_CourseOffering_is_of_at_most_one_Course
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"is of",{"name":"CourseOffering is of Course","readings":["{0} is of {1}","{1} has offering {0}"],"players":["CourseOffering","Course"]}]],"fact_type":{"name":"CourseOffering is of Course","readings":["{0} is of {1}","{1} has offering {0}"],"players":["CourseOffering","Course"]}}'
         - type: mandatory
-          role: bf93ce1d-726a-4fdb-adb1-397ad8b27b78
-    - id: 10c39ea5-f3d5-4bba-af24-3758f8c676da
+          role: CourseOffering_is_of_Course.is_of
+          id: Each_CourseOffering_is_of_at_least_one_Course
+          minted_from: '{"type":"mandatory","role":[0,"is of",{"name":"CourseOffering is of Course","readings":["{0} is of {1}","{1} has offering {0}"],"players":["CourseOffering","Course"]}],"fact_type":{"name":"CourseOffering is of Course","readings":["{0} is of {1}","{1} has offering {0}"],"players":["CourseOffering","Course"]}}'
+    - id: CourseOffering_is_in_Semester
       name: CourseOffering is in Semester
       roles:
-        - id: 0e1be2cb-ab3d-4649-a7b8-03cbe70984ec
-          player: 28fd5d10-44dd-4767-a60f-11dd9043390f
+        - id: CourseOffering_is_in_Semester.is_in
+          player: CourseOffering
           role_name: is in
-        - id: 7a6fd2d8-7513-4aca-a799-becc944dbe8c
-          player: f2e09c79-f686-4333-b11a-e0a1e538f0d2
+        - id: CourseOffering_is_in_Semester.includes
+          player: Semester
           role_name: includes
       readings:
         - "{0} is in {1}"
@@ -104,17 +108,21 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - 0e1be2cb-ab3d-4649-a7b8-03cbe70984ec
+            - CourseOffering_is_in_Semester.is_in
+          id: Each_CourseOffering_is_in_at_most_one_Semester
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"is in",{"name":"CourseOffering is in Semester","readings":["{0} is in {1}","{1} includes {0}"],"players":["CourseOffering","Semester"]}]],"fact_type":{"name":"CourseOffering is in Semester","readings":["{0} is in {1}","{1} includes {0}"],"players":["CourseOffering","Semester"]}}'
         - type: mandatory
-          role: 0e1be2cb-ab3d-4649-a7b8-03cbe70984ec
-    - id: 3de028ff-5491-4419-a495-94bcc1bfe4b3
+          role: CourseOffering_is_in_Semester.is_in
+          id: Each_CourseOffering_is_in_at_least_one_Semester
+          minted_from: '{"type":"mandatory","role":[0,"is in",{"name":"CourseOffering is in Semester","readings":["{0} is in {1}","{1} includes {0}"],"players":["CourseOffering","Semester"]}],"fact_type":{"name":"CourseOffering is in Semester","readings":["{0} is in {1}","{1} includes {0}"],"players":["CourseOffering","Semester"]}}'
+    - id: Instructor_teaches_CourseOffering
       name: Instructor teaches CourseOffering
       roles:
-        - id: ef1c9c38-f3ca-4bbc-9aa9-c48cbb3ffc94
-          player: b70d3d5f-5b55-4294-b2af-6122745ce68e
+        - id: Instructor_teaches_CourseOffering.teaches
+          player: Instructor
           role_name: teaches
-        - id: cf8680a2-6163-450f-aa04-d9d58b22c5b1
-          player: 28fd5d10-44dd-4767-a60f-11dd9043390f
+        - id: Instructor_teaches_CourseOffering.is_taught_by
+          player: CourseOffering
           role_name: is taught by
       readings:
         - "{0} teaches {1}"
@@ -122,17 +130,21 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - cf8680a2-6163-450f-aa04-d9d58b22c5b1
+            - Instructor_teaches_CourseOffering.is_taught_by
+          id: Each_CourseOffering_is_taught_by_at_most_one_Instructor
+          minted_from: '{"type":"internal_uniqueness","roles":[[1,"is taught by",{"name":"Instructor teaches CourseOffering","readings":["{0} teaches {1}","{1} is taught by {0}"],"players":["Instructor","CourseOffering"]}]],"fact_type":{"name":"Instructor teaches CourseOffering","readings":["{0} teaches {1}","{1} is taught by {0}"],"players":["Instructor","CourseOffering"]}}'
         - type: mandatory
-          role: cf8680a2-6163-450f-aa04-d9d58b22c5b1
-    - id: d214f552-f3a7-4a3e-b7a1-ac907bd5a5a3
+          role: Instructor_teaches_CourseOffering.is_taught_by
+          id: Each_CourseOffering_is_taught_by_at_least_one_Instructor
+          minted_from: '{"type":"mandatory","role":[1,"is taught by",{"name":"Instructor teaches CourseOffering","readings":["{0} teaches {1}","{1} is taught by {0}"],"players":["Instructor","CourseOffering"]}],"fact_type":{"name":"Instructor teaches CourseOffering","readings":["{0} teaches {1}","{1} is taught by {0}"],"players":["Instructor","CourseOffering"]}}'
+    - id: Course_has_Title
       name: Course has Title
       roles:
-        - id: b028fda4-1c28-4ce1-b340-69104eda90c0
-          player: b7bbd8cd-e806-4bd9-9cfd-f3d8cc492436
+        - id: Course_has_Title.has
+          player: Course
           role_name: has
-        - id: 90050d6a-a858-4264-845f-29eb2fbaa463
-          player: f98127f9-6550-4d4f-b165-96f12f80dd4e
+        - id: Course_has_Title.is_of
+          player: Title
           role_name: is of
       readings:
         - "{0} has {1}"
@@ -140,15 +152,17 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - b028fda4-1c28-4ce1-b340-69104eda90c0
-    - id: a04e11b3-e9e3-478a-be1f-62911dd7eb2b
+            - Course_has_Title.has
+          id: Each_Course_has_at_most_one_Title
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"has",{"name":"Course has Title","readings":["{0} has {1}","{1} is of {0}"],"players":["Course","Title"]}]],"fact_type":{"name":"Course has Title","readings":["{0} has {1}","{1} is of {0}"],"players":["Course","Title"]}}'
+    - id: Course_has_CreditValue
       name: Course has CreditValue
       roles:
-        - id: 63474693-757e-4de1-95fb-e85e3bf5afc8
-          player: b7bbd8cd-e806-4bd9-9cfd-f3d8cc492436
+        - id: Course_has_CreditValue.has
+          player: Course
           role_name: has
-        - id: 400a1ce4-ff2c-41fa-85c4-e3d393915986
-          player: 8da96c46-6750-4f4a-8cab-d95240381081
+        - id: Course_has_CreditValue.is_of
+          player: CreditValue
           role_name: is of
       readings:
         - "{0} has {1}"
@@ -156,15 +170,17 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - 63474693-757e-4de1-95fb-e85e3bf5afc8
-    - id: 7ae2fce1-11a8-4dd2-bd68-d297ca86f0d2
+            - Course_has_CreditValue.has
+          id: Each_Course_has_at_most_one_CreditValue
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"has",{"name":"Course has CreditValue","readings":["{0} has {1}","{1} is of {0}"],"players":["Course","CreditValue"]}]],"fact_type":{"name":"Course has CreditValue","readings":["{0} has {1}","{1} is of {0}"],"players":["Course","CreditValue"]}}'
+    - id: CourseOffering_has_MaxCapacity
       name: CourseOffering has MaxCapacity
       roles:
-        - id: 8069c8c4-d396-43db-b671-1520ff1ae3e3
-          player: 28fd5d10-44dd-4767-a60f-11dd9043390f
+        - id: CourseOffering_has_MaxCapacity.has
+          player: CourseOffering
           role_name: has
-        - id: 4c7a2255-ae66-4046-9f01-ef513107977b
-          player: 4cb804fd-1d0c-4259-9812-7833508c303f
+        - id: CourseOffering_has_MaxCapacity.is_of
+          player: MaxCapacity
           role_name: is of
       readings:
         - "{0} has {1}"
@@ -172,15 +188,17 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - 8069c8c4-d396-43db-b671-1520ff1ae3e3
-    - id: 24768033-6ca3-4cb7-9538-7ce265e202e3
+            - CourseOffering_has_MaxCapacity.has
+          id: Each_CourseOffering_has_at_most_one_MaxCapacity
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"has",{"name":"CourseOffering has MaxCapacity","readings":["{0} has {1}","{1} is of {0}"],"players":["CourseOffering","MaxCapacity"]}]],"fact_type":{"name":"CourseOffering has MaxCapacity","readings":["{0} has {1}","{1} is of {0}"],"players":["CourseOffering","MaxCapacity"]}}'
+    - id: Semester_has_StartDate
       name: Semester has StartDate
       roles:
-        - id: 7106e55d-ba29-49e7-b01e-61bc150d08f9
-          player: f2e09c79-f686-4333-b11a-e0a1e538f0d2
+        - id: Semester_has_StartDate.has
+          player: Semester
           role_name: has
-        - id: a34e25c5-3c13-4653-ab77-f3dc04bd1e1c
-          player: af313148-56a7-4247-b56b-511bc72e355d
+        - id: Semester_has_StartDate.is_of
+          player: StartDate
           role_name: is of
       readings:
         - "{0} has {1}"
@@ -188,15 +206,17 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - 7106e55d-ba29-49e7-b01e-61bc150d08f9
-    - id: 9a67b406-3667-4ebf-9d3c-9e41083d1711
+            - Semester_has_StartDate.has
+          id: Each_Semester_has_at_most_one_StartDate
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"has",{"name":"Semester has StartDate","readings":["{0} has {1}","{1} is of {0}"],"players":["Semester","StartDate"]}]],"fact_type":{"name":"Semester has StartDate","readings":["{0} has {1}","{1} is of {0}"],"players":["Semester","StartDate"]}}'
+    - id: Semester_has_EndDate
       name: Semester has EndDate
       roles:
-        - id: 1b7a1ce6-05e3-4bb5-9b2d-47400050f07a
-          player: f2e09c79-f686-4333-b11a-e0a1e538f0d2
+        - id: Semester_has_EndDate.has
+          player: Semester
           role_name: has
-        - id: 6c6b1e35-f00c-4c23-8b0c-c439e990bcb9
-          player: c7c6c4a7-9077-4972-bc7e-3daf13f27751
+        - id: Semester_has_EndDate.is_of
+          player: EndDate
           role_name: is of
       readings:
         - "{0} has {1}"
@@ -204,18 +224,20 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - 1b7a1ce6-05e3-4bb5-9b2d-47400050f07a
-    - id: 693fe85b-b9c3-433f-a59e-ec16e054b7a8
+            - Semester_has_EndDate.has
+          id: Each_Semester_has_at_most_one_EndDate
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"has",{"name":"Semester has EndDate","readings":["{0} has {1}","{1} is of {0}"],"players":["Semester","EndDate"]}]],"fact_type":{"name":"Semester has EndDate","readings":["{0} has {1}","{1} is of {0}"],"players":["Semester","EndDate"]}}'
+    - id: Student_receives_LetterGrade_for_CourseOffering
       name: Student receives LetterGrade for CourseOffering
       roles:
-        - id: 726ae31d-665b-4526-9dbf-02c47da1bb3f
-          player: 8f25ffa8-c400-46e7-84b1-a14a3ba88aee
+        - id: Student_receives_LetterGrade_for_CourseOffering.receives
+          player: Student
           role_name: receives
-        - id: 95f4fe17-c057-43ae-8456-35f1bad59281
-          player: 6b77c96c-e6ea-4747-b32d-0b22722179f5
+        - id: Student_receives_LetterGrade_for_CourseOffering.is_received_by
+          player: LetterGrade
           role_name: is received by
-        - id: e9521375-fb60-465f-82cd-4f46285df81d
-          player: 28fd5d10-44dd-4767-a60f-11dd9043390f
+        - id: Student_receives_LetterGrade_for_CourseOffering.grades
+          player: CourseOffering
           role_name: grades
       readings:
         - "{0} receives {1} for {2}"

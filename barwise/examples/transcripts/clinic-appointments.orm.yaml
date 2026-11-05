@@ -1,65 +1,69 @@
-orm_version: "1.0"
+orm_version: "4.0"
 model:
   name: Clinic Appointment Scheduling
   # NOTE(barwise): Applied with medium confidence: "Each Appointment has at most one FollowUpNote." (line 27)
   # NOTE(barwise): Applied with medium confidence: "Only a completed appointment may have a follow-up note. The set of appointmen..." (line 27)
   object_types:
-    - id: 04eaeae4-50c4-40ab-909b-b05f5215daee
+    - id: Patient
       name: Patient
       # TODO(barwise): Ask: Primary doctor subset constraint: Should the primary doctor of a patient be one of the doctors the patient has had appointments with, or can it be any doctor in the system? There is no explicit rule about this relationship. (line 35)
       # TODO(barwise): Ask: Cancelled/no-show appointments and scheduling constraints: It is unclear whether the patient and doctor no-double-booking constraints apply to cancelled or no-show appointments. Can a patient book a new appointment in the same time slot if the original was cancelled? (line 19)
       kind: entity
       reference_mode: medical_record_number
+      preferred_identifier: Each_MedicalRecordNumber_identifies_at_most_one_Patient
       definition: A person who books appointments at the clinic, identified by a medical record number assigned at registration.
-    - id: 0f321168-50ce-4b6f-accd-2a56cf810a2c
+    - id: Doctor
       name: Doctor
       # TODO(barwise): Ask: Room assignment granularity and relationship to appointments: The transcript says 'A doctor is assigned to a room for the day', but it is not stated whether an appointment inherits the room from the doctor's daily assignment or whether appointments can independently reference a room. Is there a direct link between Appointment and ExamRoom, or is it always derived through the doctor's daily room assignment? (lines 29-31)
       # TODO(barwise): Ask: Room sharing constraint on the same day: The transcript says rooms 'can be shared across doctors on different days', but it is ambiguous whether multiple doctors can share the same room on the same day. Is there a uniqueness constraint on ExamRoom + AppointmentDate preventing two doctors from using the same room on the same day? (line 31)
       kind: entity
       reference_mode: provider_id
+      preferred_identifier: Each_ProviderId_identifies_at_most_one_Doctor
       definition: A medical provider at the clinic, identified by a state-issued provider ID.
-    - id: 283bb11c-11a1-4564-aaa5-3393ffc81d94
+    - id: Appointment
       name: Appointment
       # TODO(barwise): Ask: Optionality of VisitReason: It is unclear whether every appointment must have a reason for visit. The reason is described alongside date and time slot, but only date and time slot are explicitly stated as mandatory. Can an appointment exist without a visit reason? (line 15)
       # TODO(barwise): Ask: Follow-up note constraint: The transcript says 'A completed appointment may also have a follow-up note.' This implies only completed appointments can have follow-up notes. However, this is a conditional constraint (status must be 'completed') that is difficult to express purely with ORM subset constraints between two binary fact types since the status is a value, not a role population match. Should this be modeled as a subset constraint, a business rule annotation, or some other mechanism? (line 27)
       # TODO(barwise): Ask: Temporal tracking of appointment status: The transcript mentions multiple statuses (scheduled, checked-in, in-progress, completed, cancelled, no-show) and that appointments 'start as scheduled'. It is unclear whether only the current status is stored or whether a history of status transitions should be tracked with timestamps. (line 27)
       kind: entity
       reference_mode: confirmation_number
+      preferred_identifier: Each_ConfirmationNumber_identifies_at_most_one_Appointment
       definition: A scheduled visit between a patient and a doctor, identified by a unique confirmation number.
-    - id: 14837c15-141e-41fb-8774-4a118124e8f1
+    - id: ExamRoom
       name: ExamRoom
       kind: entity
       reference_mode: room_number
+      preferred_identifier: Each_RoomNumber_identifies_at_most_one_ExamRoom
       definition: A physical examination room in the clinic, identified by a room number.
-    - id: 11fd2209-17e5-4ffd-80b3-da12fe037179
+    - id: MedicalRecordNumber
       name: MedicalRecordNumber
       kind: value
       definition: The unique identifier assigned to a patient at registration.
       data_type:
         name: text
         length: 20
-    - id: 5e870459-d065-40ca-8f01-4fab66b032ee
+    - id: ProviderId
       name: ProviderId
       kind: value
       definition: A unique identifier for a doctor issued by the state medical board.
       data_type:
         name: text
         length: 20
-    - id: c9b09321-a75e-44b2-a31c-31aaef6f7827
+    - id: ConfirmationNumber
       name: ConfirmationNumber
       kind: value
       definition: A unique confirmation number assigned to an appointment when it's created.
       data_type:
         name: text
         length: 20
-    - id: 4f00580b-df3d-4e0b-a076-364d4c151524
+    - id: RoomNumber
       name: RoomNumber
       kind: value
       definition: The number identifying an exam room.
       data_type:
         name: text
         length: 10
-    - id: 17532086-924c-4aac-a043-e92a1a9fcf2d
+    - id: Specialty
       name: Specialty
       # TODO(barwise): Ask: Specialty value constraint completeness: The Office Manager lists specialties using 'things like', suggesting the listed values (cardiology, dermatology, family medicine, orthopedics, pediatrics) are examples rather than an exhaustive list. Should the model treat these as the only allowed values, or should the constraint be open-ended to allow additional specialties? (line 7)
       kind: value
@@ -74,13 +78,13 @@ model:
       data_type:
         name: text
         length: 30
-    - id: a901d183-34a6-4057-adeb-fa99f37175e4
+    - id: AppointmentDate
       name: AppointmentDate
       kind: value
       definition: The calendar date of an appointment.
       data_type:
         name: date
-    - id: 68c857ba-2847-42e9-9a38-411b9f9feab1
+    - id: TimeSlot
       name: TimeSlot
       kind: value
       definition: A half-hour time slot during which an appointment can be scheduled.
@@ -104,14 +108,14 @@ model:
           - 16:30
       data_type:
         name: time
-    - id: 282205ac-70c3-49ed-b816-63bb3fc586dd
+    - id: VisitReason
       name: VisitReason
       kind: value
       definition: Free-text description of the reason for the patient's visit.
       data_type:
         name: text
         length: 500
-    - id: bf94daae-e067-4015-b497-093ee5746e46
+    - id: AppointmentStatus
       name: AppointmentStatus
       kind: value
       definition: The current status of an appointment.
@@ -126,7 +130,7 @@ model:
       data_type:
         name: text
         length: 20
-    - id: db140fc5-7a76-4393-9f45-212652778fc3
+    - id: FollowUpNote
       name: FollowUpNote
       kind: value
       definition: Free-text note added to a completed appointment regarding follow-up care.
@@ -134,14 +138,14 @@ model:
         name: text
         length: 500
   fact_types:
-    - id: 0e963d6e-99a0-47fa-b833-a8eede0eece9
+    - id: Patient_has_MedicalRecordNumber
       name: Patient has MedicalRecordNumber
       roles:
-        - id: 5c21828d-0970-42f0-8c3a-24d575510aa3
-          player: 04eaeae4-50c4-40ab-909b-b05f5215daee
+        - id: Patient_has_MedicalRecordNumber.has
+          player: Patient
           role_name: has
-        - id: 97dd148a-a5a9-44c0-9076-2d7e704a37d7
-          player: 11fd2209-17e5-4ffd-80b3-da12fe037179
+        - id: Patient_has_MedicalRecordNumber.identifies
+          player: MedicalRecordNumber
           role_name: identifies
       readings:
         - "{0} has {1}"
@@ -149,21 +153,26 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - 5c21828d-0970-42f0-8c3a-24d575510aa3
-          is_preferred: true
+            - Patient_has_MedicalRecordNumber.has
+          id: Each_Patient_has_at_most_one_MedicalRecordNumber
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"has",{"name":"Patient has MedicalRecordNumber","readings":["{0} has {1}","{1} identifies {0}"],"players":["Patient","MedicalRecordNumber"]}]],"fact_type":{"name":"Patient has MedicalRecordNumber","readings":["{0} has {1}","{1} identifies {0}"],"players":["Patient","MedicalRecordNumber"]}}'
         - type: internal_uniqueness
           roles:
-            - 97dd148a-a5a9-44c0-9076-2d7e704a37d7
+            - Patient_has_MedicalRecordNumber.identifies
+          id: Each_MedicalRecordNumber_identifies_at_most_one_Patient
+          minted_from: '{"type":"internal_uniqueness","roles":[[1,"identifies",{"name":"Patient has MedicalRecordNumber","readings":["{0} has {1}","{1} identifies {0}"],"players":["Patient","MedicalRecordNumber"]}]],"fact_type":{"name":"Patient has MedicalRecordNumber","readings":["{0} has {1}","{1} identifies {0}"],"players":["Patient","MedicalRecordNumber"]}}'
         - type: mandatory
-          role: 5c21828d-0970-42f0-8c3a-24d575510aa3
-    - id: 82e2ab29-8e88-41cd-8e68-cda1663c78ae
+          role: Patient_has_MedicalRecordNumber.has
+          id: Each_Patient_has_at_least_one_MedicalRecordNumber
+          minted_from: '{"type":"mandatory","role":[0,"has",{"name":"Patient has MedicalRecordNumber","readings":["{0} has {1}","{1} identifies {0}"],"players":["Patient","MedicalRecordNumber"]}],"fact_type":{"name":"Patient has MedicalRecordNumber","readings":["{0} has {1}","{1} identifies {0}"],"players":["Patient","MedicalRecordNumber"]}}'
+    - id: Doctor_has_ProviderId
       name: Doctor has ProviderId
       roles:
-        - id: cc92049a-4cbb-48d3-b921-c350277be0d5
-          player: 0f321168-50ce-4b6f-accd-2a56cf810a2c
+        - id: Doctor_has_ProviderId.has
+          player: Doctor
           role_name: has
-        - id: e38bdd6d-e616-414a-8b0e-8067a5611ea1
-          player: 5e870459-d065-40ca-8f01-4fab66b032ee
+        - id: Doctor_has_ProviderId.identifies
+          player: ProviderId
           role_name: identifies
       readings:
         - "{0} has {1}"
@@ -171,21 +180,26 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - cc92049a-4cbb-48d3-b921-c350277be0d5
-          is_preferred: true
+            - Doctor_has_ProviderId.has
+          id: Each_Doctor_has_at_most_one_ProviderId
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"has",{"name":"Doctor has ProviderId","readings":["{0} has {1}","{1} identifies {0}"],"players":["Doctor","ProviderId"]}]],"fact_type":{"name":"Doctor has ProviderId","readings":["{0} has {1}","{1} identifies {0}"],"players":["Doctor","ProviderId"]}}'
         - type: internal_uniqueness
           roles:
-            - e38bdd6d-e616-414a-8b0e-8067a5611ea1
+            - Doctor_has_ProviderId.identifies
+          id: Each_ProviderId_identifies_at_most_one_Doctor
+          minted_from: '{"type":"internal_uniqueness","roles":[[1,"identifies",{"name":"Doctor has ProviderId","readings":["{0} has {1}","{1} identifies {0}"],"players":["Doctor","ProviderId"]}]],"fact_type":{"name":"Doctor has ProviderId","readings":["{0} has {1}","{1} identifies {0}"],"players":["Doctor","ProviderId"]}}'
         - type: mandatory
-          role: cc92049a-4cbb-48d3-b921-c350277be0d5
-    - id: db06b364-21f7-4722-b842-0968014325be
+          role: Doctor_has_ProviderId.has
+          id: Each_Doctor_has_at_least_one_ProviderId
+          minted_from: '{"type":"mandatory","role":[0,"has",{"name":"Doctor has ProviderId","readings":["{0} has {1}","{1} identifies {0}"],"players":["Doctor","ProviderId"]}],"fact_type":{"name":"Doctor has ProviderId","readings":["{0} has {1}","{1} identifies {0}"],"players":["Doctor","ProviderId"]}}'
+    - id: Appointment_has_ConfirmationNumber
       name: Appointment has ConfirmationNumber
       roles:
-        - id: 45963d9c-fb8a-4647-9597-6a0d0d18db10
-          player: 283bb11c-11a1-4564-aaa5-3393ffc81d94
+        - id: Appointment_has_ConfirmationNumber.has
+          player: Appointment
           role_name: has
-        - id: c7294dda-6d1c-4956-b09e-7c1170995452
-          player: c9b09321-a75e-44b2-a31c-31aaef6f7827
+        - id: Appointment_has_ConfirmationNumber.identifies
+          player: ConfirmationNumber
           role_name: identifies
       readings:
         - "{0} has {1}"
@@ -193,21 +207,26 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - 45963d9c-fb8a-4647-9597-6a0d0d18db10
-          is_preferred: true
+            - Appointment_has_ConfirmationNumber.has
+          id: Each_Appointment_has_at_most_one_ConfirmationNumber
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"has",{"name":"Appointment has ConfirmationNumber","readings":["{0} has {1}","{1} identifies {0}"],"players":["Appointment","ConfirmationNumber"]}]],"fact_type":{"name":"Appointment has ConfirmationNumber","readings":["{0} has {1}","{1} identifies {0}"],"players":["Appointment","ConfirmationNumber"]}}'
         - type: internal_uniqueness
           roles:
-            - c7294dda-6d1c-4956-b09e-7c1170995452
+            - Appointment_has_ConfirmationNumber.identifies
+          id: Each_ConfirmationNumber_identifies_at_most_one_Appointment
+          minted_from: '{"type":"internal_uniqueness","roles":[[1,"identifies",{"name":"Appointment has ConfirmationNumber","readings":["{0} has {1}","{1} identifies {0}"],"players":["Appointment","ConfirmationNumber"]}]],"fact_type":{"name":"Appointment has ConfirmationNumber","readings":["{0} has {1}","{1} identifies {0}"],"players":["Appointment","ConfirmationNumber"]}}'
         - type: mandatory
-          role: 45963d9c-fb8a-4647-9597-6a0d0d18db10
-    - id: 9d34bcbe-29b5-43fd-952e-fe28880f8742
+          role: Appointment_has_ConfirmationNumber.has
+          id: Each_Appointment_has_at_least_one_ConfirmationNumber
+          minted_from: '{"type":"mandatory","role":[0,"has",{"name":"Appointment has ConfirmationNumber","readings":["{0} has {1}","{1} identifies {0}"],"players":["Appointment","ConfirmationNumber"]}],"fact_type":{"name":"Appointment has ConfirmationNumber","readings":["{0} has {1}","{1} identifies {0}"],"players":["Appointment","ConfirmationNumber"]}}'
+    - id: ExamRoom_has_RoomNumber
       name: ExamRoom has RoomNumber
       roles:
-        - id: 2e498720-6245-4254-b668-e1fb8979b939
-          player: 14837c15-141e-41fb-8774-4a118124e8f1
+        - id: ExamRoom_has_RoomNumber.has
+          player: ExamRoom
           role_name: has
-        - id: b97725ef-9c71-41f7-b721-8b63cfde24ef
-          player: 4f00580b-df3d-4e0b-a076-364d4c151524
+        - id: ExamRoom_has_RoomNumber.identifies
+          player: RoomNumber
           role_name: identifies
       readings:
         - "{0} has {1}"
@@ -215,21 +234,26 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - 2e498720-6245-4254-b668-e1fb8979b939
-          is_preferred: true
+            - ExamRoom_has_RoomNumber.has
+          id: Each_ExamRoom_has_at_most_one_RoomNumber
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"has",{"name":"ExamRoom has RoomNumber","readings":["{0} has {1}","{1} identifies {0}"],"players":["ExamRoom","RoomNumber"]}]],"fact_type":{"name":"ExamRoom has RoomNumber","readings":["{0} has {1}","{1} identifies {0}"],"players":["ExamRoom","RoomNumber"]}}'
         - type: internal_uniqueness
           roles:
-            - b97725ef-9c71-41f7-b721-8b63cfde24ef
+            - ExamRoom_has_RoomNumber.identifies
+          id: Each_RoomNumber_identifies_at_most_one_ExamRoom
+          minted_from: '{"type":"internal_uniqueness","roles":[[1,"identifies",{"name":"ExamRoom has RoomNumber","readings":["{0} has {1}","{1} identifies {0}"],"players":["ExamRoom","RoomNumber"]}]],"fact_type":{"name":"ExamRoom has RoomNumber","readings":["{0} has {1}","{1} identifies {0}"],"players":["ExamRoom","RoomNumber"]}}'
         - type: mandatory
-          role: 2e498720-6245-4254-b668-e1fb8979b939
-    - id: 6cf13400-6c07-4dff-92eb-c428f5a6f112
+          role: ExamRoom_has_RoomNumber.has
+          id: Each_ExamRoom_has_at_least_one_RoomNumber
+          minted_from: '{"type":"mandatory","role":[0,"has",{"name":"ExamRoom has RoomNumber","readings":["{0} has {1}","{1} identifies {0}"],"players":["ExamRoom","RoomNumber"]}],"fact_type":{"name":"ExamRoom has RoomNumber","readings":["{0} has {1}","{1} identifies {0}"],"players":["ExamRoom","RoomNumber"]}}'
+    - id: Doctor_has_Specialty
       name: Doctor has Specialty
       roles:
-        - id: e7f58f92-f9bc-41fa-b09e-0f415419b9dd
-          player: 0f321168-50ce-4b6f-accd-2a56cf810a2c
+        - id: Doctor_has_Specialty.has
+          player: Doctor
           role_name: has
-        - id: a2fc1581-eaba-4ce9-9ad4-26dad92eee83
-          player: 17532086-924c-4aac-a043-e92a1a9fcf2d
+        - id: Doctor_has_Specialty.is_of
+          player: Specialty
           role_name: is of
       readings:
         - "{0} has {1}"
@@ -237,53 +261,65 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - e7f58f92-f9bc-41fa-b09e-0f415419b9dd
+            - Doctor_has_Specialty.has
+          id: Each_Doctor_has_at_most_one_Specialty
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"has",{"name":"Doctor has Specialty","readings":["{0} has {1}","{1} is specialty of {0}"],"players":["Doctor","Specialty"]}]],"fact_type":{"name":"Doctor has Specialty","readings":["{0} has {1}","{1} is specialty of {0}"],"players":["Doctor","Specialty"]}}'
         - type: mandatory
-          role: e7f58f92-f9bc-41fa-b09e-0f415419b9dd
-    - id: a0831743-6a6a-4ad3-aa2a-80c2b3200d76
+          role: Doctor_has_Specialty.has
+          id: Each_Doctor_has_at_least_one_Specialty
+          minted_from: '{"type":"mandatory","role":[0,"has",{"name":"Doctor has Specialty","readings":["{0} has {1}","{1} is specialty of {0}"],"players":["Doctor","Specialty"]}],"fact_type":{"name":"Doctor has Specialty","readings":["{0} has {1}","{1} is specialty of {0}"],"players":["Doctor","Specialty"]}}'
+    - id: Appointment_is_for_Patient_with_Doctor_on_AppointmentDate_at_TimeSlot
       name: Appointment is for Patient with Doctor on AppointmentDate at TimeSlot
       roles:
-        - id: ab8ccb28-3355-4eac-8bde-bb7df3a9873e
-          player: 283bb11c-11a1-4564-aaa5-3393ffc81d94
+        - id: Appointment_is_for_Patient_with_Doctor_on_AppointmentDate_at_TimeSlot.is_for
+          player: Appointment
           role_name: is for
-        - id: 67c2d125-4a69-40a0-9987-4a9a52e8d5f6
-          player: 04eaeae4-50c4-40ab-909b-b05f5215daee
+        - id: Appointment_is_for_Patient_with_Doctor_on_AppointmentDate_at_TimeSlot.attends
+          player: Patient
           role_name: attends
-        - id: 3a72a4c6-8815-4ded-95cb-33dff4fd37b3
-          player: 0f321168-50ce-4b6f-accd-2a56cf810a2c
+        - id: Appointment_is_for_Patient_with_Doctor_on_AppointmentDate_at_TimeSlot.sees
+          player: Doctor
           role_name: sees
-        - id: 16f37239-d0b8-498f-a6a5-7cedcb5562e3
-          player: a901d183-34a6-4057-adeb-fa99f37175e4
+        - id: Appointment_is_for_Patient_with_Doctor_on_AppointmentDate_at_TimeSlot.is_on
+          player: AppointmentDate
           role_name: is on
-        - id: 11a0a07d-aa97-4a41-b9f5-92f258770241
-          player: 68c857ba-2847-42e9-9a38-411b9f9feab1
+        - id: Appointment_is_for_Patient_with_Doctor_on_AppointmentDate_at_TimeSlot.is_at
+          player: TimeSlot
           role_name: is at
       readings:
         - "{0} is for {1} with {2} on {3} at {4}"
       constraints:
         - type: internal_uniqueness
           roles:
-            - ab8ccb28-3355-4eac-8bde-bb7df3a9873e
+            - Appointment_is_for_Patient_with_Doctor_on_AppointmentDate_at_TimeSlot.is_for
+          id: For_each_Appointment_combination,_at_most_one_Patient_and_Doctor_and_AppointmentDate_and_TimeSlot_applies
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"is for",{"name":"Appointment is for Patient with Doctor on AppointmentDate at TimeSlot","readings":["{0} is for {1} with {2} on {3} at {4}"],"players":["Appointment","Patient","Doctor","AppointmentDate","TimeSlot"]}]],"fact_type":{"name":"Appointment is for Patient with Doctor on AppointmentDate at TimeSlot","readings":["{0} is for {1} with {2} on {3} at {4}"],"players":["Appointment","Patient","Doctor","AppointmentDate","TimeSlot"]}}'
         - type: mandatory
-          role: ab8ccb28-3355-4eac-8bde-bb7df3a9873e
+          role: Appointment_is_for_Patient_with_Doctor_on_AppointmentDate_at_TimeSlot.is_for
+          id: Each_Appointment_is_for_some_Patient_with_some_Doctor_on_some_AppointmentDate_at_some_TimeSlot
+          minted_from: '{"type":"mandatory","role":[0,"is for",{"name":"Appointment is for Patient with Doctor on AppointmentDate at TimeSlot","readings":["{0} is for {1} with {2} on {3} at {4}"],"players":["Appointment","Patient","Doctor","AppointmentDate","TimeSlot"]}],"fact_type":{"name":"Appointment is for Patient with Doctor on AppointmentDate at TimeSlot","readings":["{0} is for {1} with {2} on {3} at {4}"],"players":["Appointment","Patient","Doctor","AppointmentDate","TimeSlot"]}}'
         - type: internal_uniqueness
           roles:
-            - 67c2d125-4a69-40a0-9987-4a9a52e8d5f6
-            - 16f37239-d0b8-498f-a6a5-7cedcb5562e3
-            - 11a0a07d-aa97-4a41-b9f5-92f258770241
+            - Appointment_is_for_Patient_with_Doctor_on_AppointmentDate_at_TimeSlot.attends
+            - Appointment_is_for_Patient_with_Doctor_on_AppointmentDate_at_TimeSlot.is_on
+            - Appointment_is_for_Patient_with_Doctor_on_AppointmentDate_at_TimeSlot.is_at
+          id: For_each_Patient,_AppointmentDate_and_TimeSlot_combination,_at_most_one_Appointment_and_Doctor_applies
+          minted_from: '{"type":"internal_uniqueness","roles":[[1,"attends",{"name":"Appointment is for Patient with Doctor on AppointmentDate at TimeSlot","readings":["{0} is for {1} with {2} on {3} at {4}"],"players":["Appointment","Patient","Doctor","AppointmentDate","TimeSlot"]}],[3,"is on",{"name":"Appointment is for Patient with Doctor on AppointmentDate at TimeSlot","readings":["{0} is for {1} with {2} on {3} at {4}"],"players":["Appointment","Patient","Doctor","AppointmentDate","TimeSlot"]}],[4,"is at",{"name":"Appointment is for Patient with Doctor on AppointmentDate at TimeSlot","readings":["{0} is for {1} with {2} on {3} at {4}"],"players":["Appointment","Patient","Doctor","AppointmentDate","TimeSlot"]}]],"fact_type":{"name":"Appointment is for Patient with Doctor on AppointmentDate at TimeSlot","readings":["{0} is for {1} with {2} on {3} at {4}"],"players":["Appointment","Patient","Doctor","AppointmentDate","TimeSlot"]}}'
         - type: internal_uniqueness
           roles:
-            - 3a72a4c6-8815-4ded-95cb-33dff4fd37b3
-            - 16f37239-d0b8-498f-a6a5-7cedcb5562e3
-            - 11a0a07d-aa97-4a41-b9f5-92f258770241
-    - id: 6cb76d57-f7f7-4f83-816d-dbf50eda809e
+            - Appointment_is_for_Patient_with_Doctor_on_AppointmentDate_at_TimeSlot.sees
+            - Appointment_is_for_Patient_with_Doctor_on_AppointmentDate_at_TimeSlot.is_on
+            - Appointment_is_for_Patient_with_Doctor_on_AppointmentDate_at_TimeSlot.is_at
+          id: For_each_Doctor,_AppointmentDate_and_TimeSlot_combination,_at_most_one_Appointment_and_Patient_applies
+          minted_from: '{"type":"internal_uniqueness","roles":[[2,"sees",{"name":"Appointment is for Patient with Doctor on AppointmentDate at TimeSlot","readings":["{0} is for {1} with {2} on {3} at {4}"],"players":["Appointment","Patient","Doctor","AppointmentDate","TimeSlot"]}],[3,"is on",{"name":"Appointment is for Patient with Doctor on AppointmentDate at TimeSlot","readings":["{0} is for {1} with {2} on {3} at {4}"],"players":["Appointment","Patient","Doctor","AppointmentDate","TimeSlot"]}],[4,"is at",{"name":"Appointment is for Patient with Doctor on AppointmentDate at TimeSlot","readings":["{0} is for {1} with {2} on {3} at {4}"],"players":["Appointment","Patient","Doctor","AppointmentDate","TimeSlot"]}]],"fact_type":{"name":"Appointment is for Patient with Doctor on AppointmentDate at TimeSlot","readings":["{0} is for {1} with {2} on {3} at {4}"],"players":["Appointment","Patient","Doctor","AppointmentDate","TimeSlot"]}}'
+    - id: Appointment_has_VisitReason
       name: Appointment has VisitReason
       roles:
-        - id: f8192fe9-0e08-46dd-95bd-8e814656f634
-          player: 283bb11c-11a1-4564-aaa5-3393ffc81d94
+        - id: Appointment_has_VisitReason.has
+          player: Appointment
           role_name: has
-        - id: 373555f7-785c-42ec-ba61-05d49a597195
-          player: 282205ac-70c3-49ed-b816-63bb3fc586dd
+        - id: Appointment_has_VisitReason.is_for
+          player: VisitReason
           role_name: is for
       readings:
         - "{0} has {1}"
@@ -291,15 +327,17 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - f8192fe9-0e08-46dd-95bd-8e814656f634
-    - id: d48b991f-5932-4604-b348-de154954531a
+            - Appointment_has_VisitReason.has
+          id: Each_Appointment_has_at_most_one_VisitReason
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"has",{"name":"Appointment has VisitReason","readings":["{0} has {1}","{1} is reason for {0}"],"players":["Appointment","VisitReason"]}]],"fact_type":{"name":"Appointment has VisitReason","readings":["{0} has {1}","{1} is reason for {0}"],"players":["Appointment","VisitReason"]}}'
+    - id: Appointment_has_AppointmentStatus
       name: Appointment has AppointmentStatus
       roles:
-        - id: e013fc4a-a9bf-457c-862c-f2dadaa37ff3
-          player: 283bb11c-11a1-4564-aaa5-3393ffc81d94
+        - id: Appointment_has_AppointmentStatus.has
+          player: Appointment
           role_name: has
-        - id: 74ca6fdc-1ea5-458a-bc0d-77d4a39d8857
-          player: bf94daae-e067-4015-b497-093ee5746e46
+        - id: Appointment_has_AppointmentStatus.is_of
+          player: AppointmentStatus
           role_name: is of
       readings:
         - "{0} has {1}"
@@ -307,17 +345,21 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - e013fc4a-a9bf-457c-862c-f2dadaa37ff3
+            - Appointment_has_AppointmentStatus.has
+          id: Each_Appointment_has_at_most_one_AppointmentStatus
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"has",{"name":"Appointment has AppointmentStatus","readings":["{0} has {1}","{1} is status of {0}"],"players":["Appointment","AppointmentStatus"]}]],"fact_type":{"name":"Appointment has AppointmentStatus","readings":["{0} has {1}","{1} is status of {0}"],"players":["Appointment","AppointmentStatus"]}}'
         - type: mandatory
-          role: e013fc4a-a9bf-457c-862c-f2dadaa37ff3
-    - id: 8acdcdd9-a3c7-4ebd-ba2e-673efcac6c34
+          role: Appointment_has_AppointmentStatus.has
+          id: Each_Appointment_has_at_least_one_AppointmentStatus
+          minted_from: '{"type":"mandatory","role":[0,"has",{"name":"Appointment has AppointmentStatus","readings":["{0} has {1}","{1} is status of {0}"],"players":["Appointment","AppointmentStatus"]}],"fact_type":{"name":"Appointment has AppointmentStatus","readings":["{0} has {1}","{1} is status of {0}"],"players":["Appointment","AppointmentStatus"]}}'
+    - id: Appointment_has_FollowUpNote
       name: Appointment has FollowUpNote
       roles:
-        - id: 9c38e88d-3e3b-441a-87d5-e69a386dc779
-          player: 283bb11c-11a1-4564-aaa5-3393ffc81d94
+        - id: Appointment_has_FollowUpNote.has
+          player: Appointment
           role_name: has
-        - id: a54a4432-2424-46c5-9ae2-d33f4747e5ea
-          player: db140fc5-7a76-4393-9f45-212652778fc3
+        - id: Appointment_has_FollowUpNote.is_for
+          player: FollowUpNote
           role_name: is for
       readings:
         - "{0} has {1}"
@@ -325,39 +367,38 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - 9c38e88d-3e3b-441a-87d5-e69a386dc779
-        - type: subset
-          subset_roles:
-            - 9c38e88d-3e3b-441a-87d5-e69a386dc779
-          superset_roles:
-            - e013fc4a-a9bf-457c-862c-f2dadaa37ff3
-    - id: 8ece7c1e-ce10-4caa-a0bf-45af182c6028
+            - Appointment_has_FollowUpNote.has
+          id: Each_Appointment_has_at_most_one_FollowUpNote
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"has",{"name":"Appointment has FollowUpNote","readings":["{0} has {1}","{1} is for {0}"],"players":["Appointment","FollowUpNote"]}]],"fact_type":{"name":"Appointment has FollowUpNote","readings":["{0} has {1}","{1} is for {0}"],"players":["Appointment","FollowUpNote"]}}'
+    - id: Doctor_is_assigned_to_ExamRoom_on_AppointmentDate
       name: Doctor is assigned to ExamRoom on AppointmentDate
       roles:
-        - id: 497de7c4-e348-4200-80bf-2f42c63f1db3
-          player: 0f321168-50ce-4b6f-accd-2a56cf810a2c
+        - id: Doctor_is_assigned_to_ExamRoom_on_AppointmentDate.is_assigned_to
+          player: Doctor
           role_name: is assigned to
-        - id: fc282652-a97b-4c05-8e9a-771af6b1f519
-          player: 14837c15-141e-41fb-8774-4a118124e8f1
+        - id: Doctor_is_assigned_to_ExamRoom_on_AppointmentDate.is_used_by
+          player: ExamRoom
           role_name: is used by
-        - id: b3d709b1-c04a-4cf0-bf98-d4340788a995
-          player: a901d183-34a6-4057-adeb-fa99f37175e4
+        - id: Doctor_is_assigned_to_ExamRoom_on_AppointmentDate.is_on
+          player: AppointmentDate
           role_name: is on
       readings:
         - "{0} is assigned to {1} on {2}"
       constraints:
         - type: internal_uniqueness
           roles:
-            - 497de7c4-e348-4200-80bf-2f42c63f1db3
-            - b3d709b1-c04a-4cf0-bf98-d4340788a995
-    - id: 425080cc-5084-4b08-bdbf-83d6a307dea6
+            - Doctor_is_assigned_to_ExamRoom_on_AppointmentDate.is_assigned_to
+            - Doctor_is_assigned_to_ExamRoom_on_AppointmentDate.is_on
+          id: For_each_Doctor_and_AppointmentDate_combination,_at_most_one_ExamRoom_applies
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"is assigned to",{"name":"Doctor is assigned to ExamRoom on AppointmentDate","readings":["{0} is assigned to {1} on {2}"],"players":["Doctor","ExamRoom","AppointmentDate"]}],[2,"is on",{"name":"Doctor is assigned to ExamRoom on AppointmentDate","readings":["{0} is assigned to {1} on {2}"],"players":["Doctor","ExamRoom","AppointmentDate"]}]],"fact_type":{"name":"Doctor is assigned to ExamRoom on AppointmentDate","readings":["{0} is assigned to {1} on {2}"],"players":["Doctor","ExamRoom","AppointmentDate"]}}'
+    - id: Patient_has_primary_Doctor
       name: Patient has primary Doctor
       roles:
-        - id: 1fb3bf04-15e2-4b26-bec3-98604c5084fe
-          player: 04eaeae4-50c4-40ab-909b-b05f5215daee
+        - id: Patient_has_primary_Doctor.has_primary
+          player: Patient
           role_name: has primary
-        - id: e2a373b7-d6ab-4133-b1bc-ea7a83f6b1b5
-          player: 0f321168-50ce-4b6f-accd-2a56cf810a2c
+        - id: Patient_has_primary_Doctor.is_primary_doctor_of
+          player: Doctor
           role_name: is primary doctor of
       readings:
         - "{0} has {1} as primary doctor"
@@ -365,6 +406,18 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - 1fb3bf04-15e2-4b26-bec3-98604c5084fe
+            - Patient_has_primary_Doctor.has_primary
+          id: Each_Patient_has_at_most_one_Doctor_as_primary_doctor
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"has primary",{"name":"Patient has primary Doctor","readings":["{0} has {1} as primary doctor","{1} is primary doctor of {0}"],"players":["Patient","Doctor"]}]],"fact_type":{"name":"Patient has primary Doctor","readings":["{0} has {1} as primary doctor","{1} is primary doctor of {0}"],"players":["Patient","Doctor"]}}'
         - type: mandatory
-          role: 1fb3bf04-15e2-4b26-bec3-98604c5084fe
+          role: Patient_has_primary_Doctor.has_primary
+          id: Each_Patient_has_at_least_one_Doctor_as_primary_doctor
+          minted_from: '{"type":"mandatory","role":[0,"has primary",{"name":"Patient has primary Doctor","readings":["{0} has {1} as primary doctor","{1} is primary doctor of {0}"],"players":["Patient","Doctor"]}],"fact_type":{"name":"Patient has primary Doctor","readings":["{0} has {1} as primary doctor","{1} is primary doctor of {0}"],"players":["Patient","Doctor"]}}'
+  constraints:
+    - type: subset
+      subset_roles:
+        - Appointment_has_FollowUpNote.has
+      superset_roles:
+        - Appointment_has_AppointmentStatus.has
+      id: If_Appointment_in_Appointment_has_FollowUpNote_then_Appointment_in_Appointment_has_AppointmentStatus
+      minted_from: '{"type":"subset","subset_roles":[[0,"has",{"name":"Appointment has FollowUpNote","readings":["{0} has {1}","{1} is for {0}"],"players":["Appointment","FollowUpNote"]}]],"superset_roles":[[0,"has",{"name":"Appointment has AppointmentStatus","readings":["{0} has {1}","{1} is status of {0}"],"players":["Appointment","AppointmentStatus"]}]]}'

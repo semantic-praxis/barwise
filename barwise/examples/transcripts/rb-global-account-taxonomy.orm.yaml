@@ -1,4 +1,4 @@
-orm_version: "1.0"
+orm_version: "4.0"
 model:
   name: rb-global-account-taxonomy
   # TODO(barwise): Ask: Temporal: Audit fields (CreatedAt, CreatedBy, UpdatedAt, UpdatedBy) are required on relationship entities and recommended on primary entities. These are not modeled as explicit fact types since they are cross-cutting audit concerns. It is unclear whether they should be formalized as part of the conceptual model or treated as infrastructure metadata. (line 204)
@@ -19,7 +19,7 @@ model:
   # NOTE(barwise): Removed population for "Invitation has InvitationStatus" that duplicates a value constraint.
   # NOTE(barwise): Removed duplicate constraint "Organization parentage hierarchy must be acyclic." (ring on Organization has parent Organization).
   object_types:
-    - id: 60fda4ce-8708-4da3-95af-6b84ae4422b4
+    - id: User
       name: User
       # TODO(barwise): Ask: Identification of UserAccountMembership: The transcript states uniqueness is by (UserId, AccountId) but also mentions historical rows are allowed with EffectiveTo tracking. A surrogate MembershipId was assumed as the identifier. It is unclear whether the natural composite key (UserId, AccountId, EffectiveFrom) should be the true identifier or whether a surrogate MembershipId is used. The stakeholders should clarify whether MembershipId exists or if composite identification is intended. (line 39)
       # TODO(barwise): Ask: Temporal: The direct UserOrganizationScope (narrowing layer) is described as optional and may be deferred to a future version. It is unclear whether this should be modeled in v1. The Domain Architect flagged this as an open question. (line 143)
@@ -27,24 +27,25 @@ model:
       # TODO(barwise): Ask: Overloaded terms: The term 'role' is used in two different senses: (1) AccountRoleType for user permissions within an account (account_owner, account_admin, etc.), and (2) LinkTransactionRole for buyer/seller transaction scope on an AccountOrganizationLink. These are distinct concepts but could cause confusion. (line 51)
       kind: entity
       reference_mode: UserId
+      preferred_identifier: Each_UserId_identifies_at_most_one_User
       definition: A human identity that can authenticate and act in RB Global's digital platforms. Has one global user profile and can access multiple accounts.
       aliases:
         - person identity
-    - id: 842b39ab-3fcd-42b6-8e4c-e3327360142f
+    - id: UserId
       name: UserId
       kind: value
       definition: Globally unique, immutable identifier for a User, issued by the identity platform.
       data_type:
         name: text
         length: 50
-    - id: 497317c0-7c68-412b-8f27-3ab7881f278d
+    - id: EmailAddress
       name: EmailAddress
       kind: value
       definition: An email address used as login identifier for a User or as target for an Invitation.
       data_type:
         name: text
         length: 200
-    - id: e4c9f2be-c1b9-4d51-a4e0-6783863ec89d
+    - id: UserStatus
       name: UserStatus
       kind: value
       definition: The current status of a User in the system.
@@ -57,7 +58,7 @@ model:
       data_type:
         name: text
         length: 20
-    - id: e1122653-3fc2-45ff-b1d9-ecec0929597f
+    - id: Account
       name: Account
       # TODO(barwise): Ask: Identification of AccountOrganizationLink: The transcript describes uniqueness per (Account, Organization, OperatingRegion) for current active links, but allows historical rows. A surrogate LinkId was assumed. It is unclear whether a surrogate LinkId exists or if identification is by composite (AccountId, OrganizationId, OperatingRegion, EffectiveFrom). (line 71)
       # TODO(barwise): Ask: Optionality: Is OperatingRegion mandatory on every AccountOrganizationLink, or only for cross-border organizations? The Domain Architect explicitly flagged this as an open question. (line 276)
@@ -67,22 +68,23 @@ model:
       # TODO(barwise): Ask: Constraint completeness: The rule that 'no active membership can exist if account status is closed' and 'no active link can exist if account status is closed' are cross-entity conditional constraints. These may require formalization as external rules or triggers rather than standard ORM constraints. (line 246)
       kind: entity
       reference_mode: AccountId
+      preferred_identifier: Each_AccountId_identifies_at_most_one_Account
       definition: A commercial participation container where permissions, preferences, and transaction capabilities are managed for one or more organizations.
-    - id: 9aeccaf0-5cb7-4e31-aac2-038eeefef7dd
+    - id: AccountId
       name: AccountId
       kind: value
       definition: Globally unique, immutable identifier for an Account.
       data_type:
         name: text
         length: 50
-    - id: b89ace9b-0892-4391-9003-4b886add2e89
+    - id: AccountNumber
       name: AccountNumber
       kind: value
       definition: A unique account number used for support and invoicing displays. Immutable once account status becomes active.
       data_type:
         name: text
         length: 30
-    - id: fe6cfe49-89b2-486d-a0ec-774a3ab0636e
+    - id: AccountStatus
       name: AccountStatus
       kind: value
       definition: The current status of an Account.
@@ -95,45 +97,46 @@ model:
       data_type:
         name: text
         length: 20
-    - id: ccbbf790-be0b-4f95-8a1e-b9816c12a4ff
+    - id: Organization
       name: Organization
       # TODO(barwise): Ask: Cardinality: Is the Organization-to-OrgType relationship truly many-to-many (one OrgType value can apply to many Organizations AND one Organization can have many OrgType values), or is it one-to-many from Organization? The transcript says 'many-to-many' but since OrgType is a value type with fixed values, this is really multi-valued per Organization (each Organization can have multiple OrgType values). The uniqueness should be on the (Organization, OrgType) pair. (line 87)
       # TODO(barwise): Ask: Granularity: BuyerProfile and SellerProfile are mentioned as optional, role-specific profiles under Organization, but their attributes and lifecycle details are not specified. It is unclear what properties these profiles carry beyond the organizational identity (e.g., onboarding state, compliance controls, permissions). (line 95)
       kind: entity
       reference_mode: OrganizationId
+      preferred_identifier: Each_OrganizationId_identifies_at_most_one_Organization
       definition: A transacting entity — the legal or operating party that participates in commercial transactions on the platform.
       aliases:
         - Org
         - transacting entity
-    - id: 6f7534ba-b0d9-41f7-b0e9-ac6d72398fd8
+    - id: OrganizationId
       name: OrganizationId
       kind: value
       definition: Globally unique, immutable platform identifier for an Organization.
       data_type:
         name: text
         length: 50
-    - id: 10b02f3b-024d-4c94-a0e9-b1366d3d89e0
+    - id: LegalName
       name: LegalName
       kind: value
       definition: The legal name of an Organization. Mandatory.
       data_type:
         name: text
         length: 200
-    - id: a4aa04ba-fa05-4b34-873a-56f5d4c2c427
+    - id: LegalEntityIdentifier
       name: LegalEntityIdentifier
       kind: value
       definition: A legal entity identifier (e.g., LEI) for an Organization, conditional based on country and business process.
       data_type:
         name: text
         length: 50
-    - id: a2eac7f4-4bf5-429e-844d-06b761858f69
+    - id: TaxId
       name: TaxId
       kind: value
       definition: A tax identifier for an Organization, conditional based on jurisdiction.
       data_type:
         name: text
         length: 50
-    - id: 11f82916-88b2-4393-9cb2-5fd5a3a4d48f
+    - id: OrgType
       name: OrgType
       kind: value
       definition: A classification type for an Organization. Multiple types can apply to one organization.
@@ -146,21 +149,22 @@ model:
       data_type:
         name: text
         length: 30
-    - id: ac9f73ff-ccb7-4990-8d0c-88a70b55c155
+    - id: UserAccountMembership
       name: UserAccountMembership
       kind: entity
       reference_mode: MembershipId
+      preferred_identifier: Each_MembershipId_identifies_at_most_one_UserAccountMembership
       definition: Records the user's role and lifecycle within an account. Represents the many-to-many relationship between User and Account with attributes.
       aliases:
         - Membership
-    - id: 42da79ff-b043-40e2-a45c-6f1f73b9d5f9
+    - id: MembershipId
       name: MembershipId
       kind: value
       definition: Identifier for a UserAccountMembership instance.
       data_type:
         name: text
         length: 50
-    - id: 8a5c7c2d-c626-473f-9786-c08f88abc53f
+    - id: MembershipStatus
       name: MembershipStatus
       kind: value
       definition: The lifecycle status of a UserAccountMembership.
@@ -173,7 +177,7 @@ model:
       data_type:
         name: text
         length: 20
-    - id: 8e04ce2b-758a-4c27-8d7f-dcbbf64dff29
+    - id: AccountRoleType
       name: AccountRoleType
       kind: value
       definition: A role type that can be assigned to a user within an account membership context.
@@ -187,21 +191,22 @@ model:
       data_type:
         name: text
         length: 30
-    - id: 0c22947c-d995-4dfe-bf85-4918db482ba7
+    - id: AccountOrganizationLink
       name: AccountOrganizationLink
       kind: entity
       reference_mode: LinkId
+      preferred_identifier: Each_LinkId_identifies_at_most_one_AccountOrganizationLink
       definition: Represents the many-to-many relationship between Account and Organization, carrying operational scope and lifecycle data.
       aliases:
         - Link
-    - id: 0ef78186-1b14-4ee5-adca-771b49c77acb
+    - id: LinkId
       name: LinkId
       kind: value
       definition: Identifier for an AccountOrganizationLink instance.
       data_type:
         name: text
         length: 50
-    - id: 1d108608-8d6c-4394-923e-18b92807d99b
+    - id: LinkStatus
       name: LinkStatus
       kind: value
       definition: The lifecycle status of an AccountOrganizationLink.
@@ -214,7 +219,7 @@ model:
       data_type:
         name: text
         length: 30
-    - id: 7e058fb6-c46c-4768-af17-0ee25c2686fb
+    - id: LinkTransactionRole
       name: LinkTransactionRole
       kind: value
       definition: Represents whether an AccountOrganizationLink supports buyer, seller, or both transaction scopes.
@@ -225,38 +230,39 @@ model:
       data_type:
         name: text
         length: 20
-    - id: 0daf7ab7-c37f-41a0-a2d4-57f5a537d84d
+    - id: OperatingRegion
       name: OperatingRegion
       kind: value
       definition: The operating region associated with an AccountOrganizationLink.
       data_type:
         name: text
         length: 50
-    - id: 394931a8-c914-47d8-8628-ed88ab531b24
+    - id: EffectiveFromTimestamp
       name: EffectiveFromTimestamp
       kind: value
       definition: Timestamp marking the beginning of an effective period.
       data_type:
         name: timestamp
-    - id: 407746e3-f47e-48ff-b120-aec9b7e733ed
+    - id: EffectiveToTimestamp
       name: EffectiveToTimestamp
       kind: value
       definition: Timestamp marking the end of an effective period. Null indicates the current/active row.
       data_type:
         name: timestamp
-    - id: fe58d71f-349b-4d6c-a202-0e65c2f37ebc
+    - id: Invitation
       name: Invitation
       kind: entity
       reference_mode: InvitationId
+      preferred_identifier: Each_InvitationId_identifies_at_most_one_Invitation
       definition: An invitation sent by an existing account admin to an email address for a specific account.
-    - id: 47e625fd-02e4-4550-8497-f2397ea119b8
+    - id: InvitationId
       name: InvitationId
       kind: value
       definition: Globally unique, immutable identifier for an Invitation.
       data_type:
         name: text
         length: 50
-    - id: e5af300b-1ce5-4537-9172-ec0e8e31fa0b
+    - id: InvitationStatus
       name: InvitationStatus
       kind: value
       definition: The status of an Invitation.
@@ -269,13 +275,13 @@ model:
       data_type:
         name: text
         length: 20
-    - id: d26eae8a-a4ea-4fe4-b65e-c3ceeebe0f0c
+    - id: Timestamp
       name: Timestamp
       kind: value
       definition: A point-in-time timestamp used for audit and lifecycle tracking (e.g., CreatedAt, UpdatedAt, IssuedAt, ExpiryAt).
       data_type:
         name: timestamp
-    - id: fd9a4368-0570-4ef6-8b91-f48471f8b9ff
+    - id: SuspensionReasonCode
       name: SuspensionReasonCode
       # TODO(barwise): Ask: Granularity: SuspensionReasonCode and RevocationReasonCode are described as 'enumerated values maintained by policy' but no specific allowed values are given. The exact value lists need to be specified. (line 212)
       kind: value
@@ -283,31 +289,33 @@ model:
       data_type:
         name: text
         length: 50
-    - id: 29da202a-8ec2-46fc-b082-21877b30c9ca
+    - id: RevocationReasonCode
       name: RevocationReasonCode
       kind: value
       definition: An enumerated reason code for when a membership is revoked, maintained by policy.
       data_type:
         name: text
         length: 50
-    - id: e77a9a8a-4b23-4240-bf0a-402bc9c62567
+    - id: BuyerProfile
       name: BuyerProfile
       kind: entity
       reference_mode: BuyerProfileId
+      preferred_identifier: Each_BuyerProfileId_identifies_at_most_one_BuyerProfile
       definition: A role-specific profile under an Organization representing buyer-side capabilities, onboarding state, and compliance controls.
-    - id: 1cf46acf-3f6d-48b5-9735-eb3764473090
+    - id: BuyerProfileId
       name: BuyerProfileId
       kind: value
       definition: Identifier for a BuyerProfile.
       data_type:
         name: text
         length: 50
-    - id: 4f838232-23a7-45fa-91a3-7ae33436cda9
+    - id: SellerProfile
       name: SellerProfile
       kind: entity
       reference_mode: SellerProfileId
+      preferred_identifier: Each_SellerProfileId_identifies_at_most_one_SellerProfile
       definition: A role-specific profile under an Organization representing seller-side capabilities, onboarding state, and compliance controls.
-    - id: cdb18430-b01d-4067-8bd2-f152bdd4c7d9
+    - id: SellerProfileId
       name: SellerProfileId
       kind: value
       definition: Identifier for a SellerProfile.
@@ -315,14 +323,14 @@ model:
         name: text
         length: 50
   fact_types:
-    - id: 17ae1e44-0d9f-473c-831d-2c5ba9d13bf2
+    - id: User_has_UserId
       name: User has UserId
       roles:
-        - id: ca0efc4e-985d-42d1-9ba3-16aad8e95aff
-          player: 60fda4ce-8708-4da3-95af-6b84ae4422b4
+        - id: User_has_UserId.has
+          player: User
           role_name: has
-        - id: 8cb64708-b11d-46b6-9d7e-776f56dcdb2a
-          player: 842b39ab-3fcd-42b6-8e4c-e3327360142f
+        - id: User_has_UserId.identifies
+          player: UserId
           role_name: identifies
       readings:
         - "{0} has {1}"
@@ -330,21 +338,26 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - ca0efc4e-985d-42d1-9ba3-16aad8e95aff
-          is_preferred: true
+            - User_has_UserId.has
+          id: Each_User_has_at_most_one_UserId
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"has",{"name":"User has UserId","readings":["{0} has {1}","{1} identifies {0}"],"players":["User","UserId"]}]],"fact_type":{"name":"User has UserId","readings":["{0} has {1}","{1} identifies {0}"],"players":["User","UserId"]}}'
         - type: internal_uniqueness
           roles:
-            - 8cb64708-b11d-46b6-9d7e-776f56dcdb2a
+            - User_has_UserId.identifies
+          id: Each_UserId_identifies_at_most_one_User
+          minted_from: '{"type":"internal_uniqueness","roles":[[1,"identifies",{"name":"User has UserId","readings":["{0} has {1}","{1} identifies {0}"],"players":["User","UserId"]}]],"fact_type":{"name":"User has UserId","readings":["{0} has {1}","{1} identifies {0}"],"players":["User","UserId"]}}'
         - type: mandatory
-          role: ca0efc4e-985d-42d1-9ba3-16aad8e95aff
-    - id: ac69c95b-ef46-466f-af1f-e29ca53016b2
+          role: User_has_UserId.has
+          id: Each_User_has_at_least_one_UserId
+          minted_from: '{"type":"mandatory","role":[0,"has",{"name":"User has UserId","readings":["{0} has {1}","{1} identifies {0}"],"players":["User","UserId"]}],"fact_type":{"name":"User has UserId","readings":["{0} has {1}","{1} identifies {0}"],"players":["User","UserId"]}}'
+    - id: User_has_primary_EmailAddress
       name: User has primary EmailAddress
       roles:
-        - id: a13df530-2fe6-434b-907f-eee18f986d0a
-          player: 60fda4ce-8708-4da3-95af-6b84ae4422b4
+        - id: User_has_primary_EmailAddress.has_primary
+          player: User
           role_name: has primary
-        - id: 17f32dae-c2e6-4212-98b2-ee633c4f881f
-          player: 497317c0-7c68-412b-8f27-3ab7881f278d
+        - id: User_has_primary_EmailAddress.is_primary_email_of
+          player: EmailAddress
           role_name: is primary email of
       readings:
         - "{0} has primary {1}"
@@ -352,15 +365,17 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - a13df530-2fe6-434b-907f-eee18f986d0a
-    - id: c7860772-900d-4800-b7b8-5b69dbd29eb9
+            - User_has_primary_EmailAddress.has_primary
+          id: Each_User_has_primary_at_most_one_EmailAddress
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"has primary",{"name":"User has primary EmailAddress","readings":["{0} has primary {1}","{1} is primary email of {0}"],"players":["User","EmailAddress"]}]],"fact_type":{"name":"User has primary EmailAddress","readings":["{0} has primary {1}","{1} is primary email of {0}"],"players":["User","EmailAddress"]}}'
+    - id: User_has_UserStatus
       name: User has UserStatus
       roles:
-        - id: 042e388d-f85d-434c-bda2-17e2660bc356
-          player: 60fda4ce-8708-4da3-95af-6b84ae4422b4
+        - id: User_has_UserStatus.has
+          player: User
           role_name: has
-        - id: 24cb13cd-58a4-42f0-aab8-7525e787bb19
-          player: e4c9f2be-c1b9-4d51-a4e0-6783863ec89d
+        - id: User_has_UserStatus.is_of
+          player: UserStatus
           role_name: is of
       readings:
         - "{0} has {1}"
@@ -368,17 +383,21 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - 042e388d-f85d-434c-bda2-17e2660bc356
+            - User_has_UserStatus.has
+          id: Each_User_has_at_most_one_UserStatus
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"has",{"name":"User has UserStatus","readings":["{0} has {1}","{1} is of {0}"],"players":["User","UserStatus"]}]],"fact_type":{"name":"User has UserStatus","readings":["{0} has {1}","{1} is of {0}"],"players":["User","UserStatus"]}}'
         - type: mandatory
-          role: 042e388d-f85d-434c-bda2-17e2660bc356
-    - id: d0dce71e-cb30-4e9b-98c1-603019a9061d
+          role: User_has_UserStatus.has
+          id: Each_User_has_at_least_one_UserStatus
+          minted_from: '{"type":"mandatory","role":[0,"has",{"name":"User has UserStatus","readings":["{0} has {1}","{1} is of {0}"],"players":["User","UserStatus"]}],"fact_type":{"name":"User has UserStatus","readings":["{0} has {1}","{1} is of {0}"],"players":["User","UserStatus"]}}'
+    - id: Account_has_AccountId
       name: Account has AccountId
       roles:
-        - id: 5c16943c-a432-45a8-8e68-0b6895ee09a4
-          player: e1122653-3fc2-45ff-b1d9-ecec0929597f
+        - id: Account_has_AccountId.has
+          player: Account
           role_name: has
-        - id: 43ca3385-354a-4ba6-9f86-ba5952dfa9cb
-          player: 9aeccaf0-5cb7-4e31-aac2-038eeefef7dd
+        - id: Account_has_AccountId.identifies
+          player: AccountId
           role_name: identifies
       readings:
         - "{0} has {1}"
@@ -386,21 +405,26 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - 5c16943c-a432-45a8-8e68-0b6895ee09a4
-          is_preferred: true
+            - Account_has_AccountId.has
+          id: Each_Account_has_at_most_one_AccountId
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"has",{"name":"Account has AccountId","readings":["{0} has {1}","{1} identifies {0}"],"players":["Account","AccountId"]}]],"fact_type":{"name":"Account has AccountId","readings":["{0} has {1}","{1} identifies {0}"],"players":["Account","AccountId"]}}'
         - type: internal_uniqueness
           roles:
-            - 43ca3385-354a-4ba6-9f86-ba5952dfa9cb
+            - Account_has_AccountId.identifies
+          id: Each_AccountId_identifies_at_most_one_Account
+          minted_from: '{"type":"internal_uniqueness","roles":[[1,"identifies",{"name":"Account has AccountId","readings":["{0} has {1}","{1} identifies {0}"],"players":["Account","AccountId"]}]],"fact_type":{"name":"Account has AccountId","readings":["{0} has {1}","{1} identifies {0}"],"players":["Account","AccountId"]}}'
         - type: mandatory
-          role: 5c16943c-a432-45a8-8e68-0b6895ee09a4
-    - id: 7d5ba9a9-9a2a-4fa7-96fb-fd47b7874dd6
+          role: Account_has_AccountId.has
+          id: Each_Account_has_at_least_one_AccountId
+          minted_from: '{"type":"mandatory","role":[0,"has",{"name":"Account has AccountId","readings":["{0} has {1}","{1} identifies {0}"],"players":["Account","AccountId"]}],"fact_type":{"name":"Account has AccountId","readings":["{0} has {1}","{1} identifies {0}"],"players":["Account","AccountId"]}}'
+    - id: Account_has_AccountNumber
       name: Account has AccountNumber
       roles:
-        - id: 11c3124c-9dfa-4ff3-bfc9-19e25807268b
-          player: e1122653-3fc2-45ff-b1d9-ecec0929597f
+        - id: Account_has_AccountNumber.has
+          player: Account
           role_name: has
-        - id: 8e8dc658-264b-4a1d-ae16-c2a866d1bfa5
-          player: b89ace9b-0892-4391-9003-4b886add2e89
+        - id: Account_has_AccountNumber.is_of
+          player: AccountNumber
           role_name: is of
       readings:
         - "{0} has {1}"
@@ -408,18 +432,22 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - 11c3124c-9dfa-4ff3-bfc9-19e25807268b
+            - Account_has_AccountNumber.has
+          id: Each_Account_has_at_most_one_AccountNumber
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"has",{"name":"Account has AccountNumber","readings":["{0} has {1}","{1} is of {0}"],"players":["Account","AccountNumber"]}]],"fact_type":{"name":"Account has AccountNumber","readings":["{0} has {1}","{1} is of {0}"],"players":["Account","AccountNumber"]}}'
         - type: internal_uniqueness
           roles:
-            - 8e8dc658-264b-4a1d-ae16-c2a866d1bfa5
-    - id: 1cd83eb3-299f-4871-a6ec-856e48f7b8fd
+            - Account_has_AccountNumber.is_of
+          id: Each_AccountNumber_is_of_at_most_one_Account
+          minted_from: '{"type":"internal_uniqueness","roles":[[1,"is of",{"name":"Account has AccountNumber","readings":["{0} has {1}","{1} is of {0}"],"players":["Account","AccountNumber"]}]],"fact_type":{"name":"Account has AccountNumber","readings":["{0} has {1}","{1} is of {0}"],"players":["Account","AccountNumber"]}}'
+    - id: Account_has_AccountStatus
       name: Account has AccountStatus
       roles:
-        - id: 5781274d-4474-4b1a-9532-3ddc24ec764f
-          player: e1122653-3fc2-45ff-b1d9-ecec0929597f
+        - id: Account_has_AccountStatus.has
+          player: Account
           role_name: has
-        - id: 1f03b2ff-69d8-47d6-bc07-c9a14d110c1b
-          player: fe6cfe49-89b2-486d-a0ec-774a3ab0636e
+        - id: Account_has_AccountStatus.is_of
+          player: AccountStatus
           role_name: is of
       readings:
         - "{0} has {1}"
@@ -427,17 +455,21 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - 5781274d-4474-4b1a-9532-3ddc24ec764f
+            - Account_has_AccountStatus.has
+          id: Each_Account_has_at_most_one_AccountStatus
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"has",{"name":"Account has AccountStatus","readings":["{0} has {1}","{1} is of {0}"],"players":["Account","AccountStatus"]}]],"fact_type":{"name":"Account has AccountStatus","readings":["{0} has {1}","{1} is of {0}"],"players":["Account","AccountStatus"]}}'
         - type: mandatory
-          role: 5781274d-4474-4b1a-9532-3ddc24ec764f
-    - id: 55aed37a-7340-4cb7-9fc5-3c8e471c44a8
+          role: Account_has_AccountStatus.has
+          id: Each_Account_has_at_least_one_AccountStatus
+          minted_from: '{"type":"mandatory","role":[0,"has",{"name":"Account has AccountStatus","readings":["{0} has {1}","{1} is of {0}"],"players":["Account","AccountStatus"]}],"fact_type":{"name":"Account has AccountStatus","readings":["{0} has {1}","{1} is of {0}"],"players":["Account","AccountStatus"]}}'
+    - id: Organization_has_OrganizationId
       name: Organization has OrganizationId
       roles:
-        - id: 00000d1e-28fb-4f42-8b5c-946c298012e3
-          player: ccbbf790-be0b-4f95-8a1e-b9816c12a4ff
+        - id: Organization_has_OrganizationId.has
+          player: Organization
           role_name: has
-        - id: 640dafbb-5b82-465c-86a9-747298d5b9de
-          player: 6f7534ba-b0d9-41f7-b0e9-ac6d72398fd8
+        - id: Organization_has_OrganizationId.identifies
+          player: OrganizationId
           role_name: identifies
       readings:
         - "{0} has {1}"
@@ -445,39 +477,48 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - 00000d1e-28fb-4f42-8b5c-946c298012e3
-          is_preferred: true
+            - Organization_has_OrganizationId.has
+          id: Each_Organization_has_at_most_one_OrganizationId
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"has",{"name":"Organization has OrganizationId","readings":["{0} has {1}","{1} identifies {0}"],"players":["Organization","OrganizationId"]}]],"fact_type":{"name":"Organization has OrganizationId","readings":["{0} has {1}","{1} identifies {0}"],"players":["Organization","OrganizationId"]}}'
         - type: internal_uniqueness
           roles:
-            - 640dafbb-5b82-465c-86a9-747298d5b9de
+            - Organization_has_OrganizationId.identifies
+          id: Each_OrganizationId_identifies_at_most_one_Organization
+          minted_from: '{"type":"internal_uniqueness","roles":[[1,"identifies",{"name":"Organization has OrganizationId","readings":["{0} has {1}","{1} identifies {0}"],"players":["Organization","OrganizationId"]}]],"fact_type":{"name":"Organization has OrganizationId","readings":["{0} has {1}","{1} identifies {0}"],"players":["Organization","OrganizationId"]}}'
         - type: mandatory
-          role: 00000d1e-28fb-4f42-8b5c-946c298012e3
-    - id: c47020d3-20ea-49f8-be9e-e672f18c3b68
+          role: Organization_has_OrganizationId.has
+          id: Each_Organization_has_at_least_one_OrganizationId
+          minted_from: '{"type":"mandatory","role":[0,"has",{"name":"Organization has OrganizationId","readings":["{0} has {1}","{1} identifies {0}"],"players":["Organization","OrganizationId"]}],"fact_type":{"name":"Organization has OrganizationId","readings":["{0} has {1}","{1} identifies {0}"],"players":["Organization","OrganizationId"]}}'
+    - id: Organization_has_LegalName
       name: Organization has LegalName
       roles:
-        - id: bff0eb22-99ff-479a-909e-16f9c2773b1e
-          player: ccbbf790-be0b-4f95-8a1e-b9816c12a4ff
+        - id: Organization_has_LegalName.has
+          player: Organization
           role_name: has
-        - id: 52ec5d8d-95f3-4c37-8248-736fd0ea7ecd
-          player: 10b02f3b-024d-4c94-a0e9-b1366d3d89e0
+        - id: Organization_has_LegalName.is_of
+          player: LegalName
           role_name: is of
       readings:
         - "{0} has {1}"
         - "{1} is of {0}"
       constraints:
         - type: mandatory
-          role: bff0eb22-99ff-479a-909e-16f9c2773b1e
+          role: Organization_has_LegalName.has
+          id: Each_Organization_has_at_least_one_LegalName
+          minted_from: '{"type":"mandatory","role":[0,"has",{"name":"Organization has LegalName","readings":["{0} has {1}","{1} is of {0}"],"players":["Organization","LegalName"]}],"fact_type":{"name":"Organization has LegalName","readings":["{0} has {1}","{1} is of {0}"],"players":["Organization","LegalName"]}}'
         - type: internal_uniqueness
           roles:
-            - bff0eb22-99ff-479a-909e-16f9c2773b1e
-    - id: af8652d4-1f4a-441e-88fe-4c8723a1c80c
+            - Organization_has_LegalName.has
+          id: Each_Organization_has_at_most_one_LegalName
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"has",{"name":"Organization has LegalName","readings":["{0} has {1}","{1} is of {0}"],"players":["Organization","LegalName"]}]],"fact_type":{"name":"Organization has LegalName","readings":["{0} has {1}","{1} is of {0}"],"players":["Organization","LegalName"]}}'
+    - id: Organization_has_LegalEntityIdentifier
       name: Organization has LegalEntityIdentifier
       roles:
-        - id: 776a0f64-e57c-493c-8558-2c9e54e4abcd
-          player: ccbbf790-be0b-4f95-8a1e-b9816c12a4ff
+        - id: Organization_has_LegalEntityIdentifier.has
+          player: Organization
           role_name: has
-        - id: 0bf5c305-9937-4c47-9de0-bb2ae625dc23
-          player: a4aa04ba-fa05-4b34-873a-56f5d4c2c427
+        - id: Organization_has_LegalEntityIdentifier.is_of
+          player: LegalEntityIdentifier
           role_name: is of
       readings:
         - "{0} has {1}"
@@ -485,15 +526,17 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - 776a0f64-e57c-493c-8558-2c9e54e4abcd
-    - id: 70c8cfa0-5f2f-4f6d-9205-4eb0463971a4
+            - Organization_has_LegalEntityIdentifier.has
+          id: Each_Organization_has_at_most_one_LegalEntityIdentifier
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"has",{"name":"Organization has LegalEntityIdentifier","readings":["{0} has {1}","{1} is of {0}"],"players":["Organization","LegalEntityIdentifier"]}]],"fact_type":{"name":"Organization has LegalEntityIdentifier","readings":["{0} has {1}","{1} is of {0}"],"players":["Organization","LegalEntityIdentifier"]}}'
+    - id: Organization_has_TaxId
       name: Organization has TaxId
       roles:
-        - id: 9f393d84-abe1-43a2-b79e-8f0778526d0d
-          player: ccbbf790-be0b-4f95-8a1e-b9816c12a4ff
+        - id: Organization_has_TaxId.has
+          player: Organization
           role_name: has
-        - id: e4dfbd32-a0c7-4328-a6c2-395a613cc543
-          player: a2eac7f4-4bf5-429e-844d-06b761858f69
+        - id: Organization_has_TaxId.is_of
+          player: TaxId
           role_name: is of
       readings:
         - "{0} has {1}"
@@ -501,27 +544,29 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - 9f393d84-abe1-43a2-b79e-8f0778526d0d
-    - id: 7606daf4-417e-4bf0-bf0e-ca9896595cbb
+            - Organization_has_TaxId.has
+          id: Each_Organization_has_at_most_one_TaxId
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"has",{"name":"Organization has TaxId","readings":["{0} has {1}","{1} is of {0}"],"players":["Organization","TaxId"]}]],"fact_type":{"name":"Organization has TaxId","readings":["{0} has {1}","{1} is of {0}"],"players":["Organization","TaxId"]}}'
+    - id: Organization_has_OrgType
       name: Organization has OrgType
       roles:
-        - id: 509796fa-96bd-4b6e-aca4-2a83cf5556a3
-          player: ccbbf790-be0b-4f95-8a1e-b9816c12a4ff
+        - id: Organization_has_OrgType.has
+          player: Organization
           role_name: has
-        - id: 5ff1eb3a-eb5b-4317-9b04-58771822807c
-          player: 11f82916-88b2-4393-9cb2-5fd5a3a4d48f
+        - id: Organization_has_OrgType.is_of
+          player: OrgType
           role_name: is of
       readings:
         - "{0} has {1}"
         - "{1} is of {0}"
-    - id: d93c4a57-3c32-4b75-b659-8cd74de6b912
+    - id: UserAccountMembership_has_MembershipId
       name: UserAccountMembership has MembershipId
       roles:
-        - id: 1b35bc58-7d97-45d9-978d-81690fa85c6f
-          player: ac9f73ff-ccb7-4990-8d0c-88a70b55c155
+        - id: UserAccountMembership_has_MembershipId.has
+          player: UserAccountMembership
           role_name: has
-        - id: 39a0cec0-1f83-42ae-93f3-a042bbfc678f
-          player: 42da79ff-b043-40e2-a45c-6f1f73b9d5f9
+        - id: UserAccountMembership_has_MembershipId.identifies
+          player: MembershipId
           role_name: identifies
       readings:
         - "{0} has {1}"
@@ -529,93 +574,114 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - 1b35bc58-7d97-45d9-978d-81690fa85c6f
-          is_preferred: true
+            - UserAccountMembership_has_MembershipId.has
+          id: Each_UserAccountMembership_has_at_most_one_MembershipId
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"has",{"name":"UserAccountMembership has MembershipId","readings":["{0} has {1}","{1} identifies {0}"],"players":["UserAccountMembership","MembershipId"]}]],"fact_type":{"name":"UserAccountMembership has MembershipId","readings":["{0} has {1}","{1} identifies {0}"],"players":["UserAccountMembership","MembershipId"]}}'
         - type: internal_uniqueness
           roles:
-            - 39a0cec0-1f83-42ae-93f3-a042bbfc678f
+            - UserAccountMembership_has_MembershipId.identifies
+          id: Each_MembershipId_identifies_at_most_one_UserAccountMembership
+          minted_from: '{"type":"internal_uniqueness","roles":[[1,"identifies",{"name":"UserAccountMembership has MembershipId","readings":["{0} has {1}","{1} identifies {0}"],"players":["UserAccountMembership","MembershipId"]}]],"fact_type":{"name":"UserAccountMembership has MembershipId","readings":["{0} has {1}","{1} identifies {0}"],"players":["UserAccountMembership","MembershipId"]}}'
         - type: mandatory
-          role: 1b35bc58-7d97-45d9-978d-81690fa85c6f
-    - id: a14b2d50-341e-4e61-974e-58346ff64e30
+          role: UserAccountMembership_has_MembershipId.has
+          id: Each_UserAccountMembership_has_at_least_one_MembershipId
+          minted_from: '{"type":"mandatory","role":[0,"has",{"name":"UserAccountMembership has MembershipId","readings":["{0} has {1}","{1} identifies {0}"],"players":["UserAccountMembership","MembershipId"]}],"fact_type":{"name":"UserAccountMembership has MembershipId","readings":["{0} has {1}","{1} identifies {0}"],"players":["UserAccountMembership","MembershipId"]}}'
+    - id: UserAccountMembership_involves_User
       name: UserAccountMembership involves User
       roles:
-        - id: 02486f08-8dc0-47b0-8512-5f0afb2d7769
-          player: ac9f73ff-ccb7-4990-8d0c-88a70b55c155
+        - id: UserAccountMembership_involves_User.involves
+          player: UserAccountMembership
           role_name: involves
-        - id: 8dc6dcfb-2363-4742-b189-77ae61b7f0c3
-          player: 60fda4ce-8708-4da3-95af-6b84ae4422b4
+        - id: UserAccountMembership_involves_User.participates_in
+          player: User
           role_name: participates in
       readings:
         - "{0} involves {1}"
         - "{1} participates in {0}"
       constraints:
         - type: mandatory
-          role: 02486f08-8dc0-47b0-8512-5f0afb2d7769
+          role: UserAccountMembership_involves_User.involves
+          id: Each_UserAccountMembership_involves_at_least_one_User
+          minted_from: '{"type":"mandatory","role":[0,"involves",{"name":"UserAccountMembership involves User","readings":["{0} involves {1}","{1} participates in {0}"],"players":["UserAccountMembership","User"]}],"fact_type":{"name":"UserAccountMembership involves User","readings":["{0} involves {1}","{1} participates in {0}"],"players":["UserAccountMembership","User"]}}'
         - type: internal_uniqueness
           roles:
-            - 02486f08-8dc0-47b0-8512-5f0afb2d7769
-    - id: c30db50b-1902-4080-99e7-736471ea81c2
+            - UserAccountMembership_involves_User.involves
+          id: Each_UserAccountMembership_involves_at_most_one_User
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"involves",{"name":"UserAccountMembership involves User","readings":["{0} involves {1}","{1} participates in {0}"],"players":["UserAccountMembership","User"]}]],"fact_type":{"name":"UserAccountMembership involves User","readings":["{0} involves {1}","{1} participates in {0}"],"players":["UserAccountMembership","User"]}}'
+    - id: UserAccountMembership_involves_Account
       name: UserAccountMembership involves Account
       roles:
-        - id: 55cd1ed5-e2b9-45f9-8f0f-9a93e75f9516
-          player: ac9f73ff-ccb7-4990-8d0c-88a70b55c155
+        - id: UserAccountMembership_involves_Account.involves
+          player: UserAccountMembership
           role_name: involves
-        - id: 872b8996-4164-443f-8ca1-ecc95c85ff4b
-          player: e1122653-3fc2-45ff-b1d9-ecec0929597f
+        - id: UserAccountMembership_involves_Account.has
+          player: Account
           role_name: has
       readings:
         - "{0} involves {1}"
         - "{1} has {0}"
       constraints:
         - type: mandatory
-          role: 55cd1ed5-e2b9-45f9-8f0f-9a93e75f9516
+          role: UserAccountMembership_involves_Account.involves
+          id: Each_UserAccountMembership_involves_at_least_one_Account
+          minted_from: '{"type":"mandatory","role":[0,"involves",{"name":"UserAccountMembership involves Account","readings":["{0} involves {1}","{1} has {0}"],"players":["UserAccountMembership","Account"]}],"fact_type":{"name":"UserAccountMembership involves Account","readings":["{0} involves {1}","{1} has {0}"],"players":["UserAccountMembership","Account"]}}'
         - type: internal_uniqueness
           roles:
-            - 55cd1ed5-e2b9-45f9-8f0f-9a93e75f9516
-    - id: d0f18e2e-6e17-4a32-a9bf-111e950cc713
+            - UserAccountMembership_involves_Account.involves
+          id: Each_UserAccountMembership_involves_at_most_one_Account
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"involves",{"name":"UserAccountMembership involves Account","readings":["{0} involves {1}","{1} has {0}"],"players":["UserAccountMembership","Account"]}]],"fact_type":{"name":"UserAccountMembership involves Account","readings":["{0} involves {1}","{1} has {0}"],"players":["UserAccountMembership","Account"]}}'
+    - id: UserAccountMembership_has_MembershipStatus
       name: UserAccountMembership has MembershipStatus
       roles:
-        - id: 2b8dc38b-12bd-4e0d-bf0c-101e4783c7fd
-          player: ac9f73ff-ccb7-4990-8d0c-88a70b55c155
+        - id: UserAccountMembership_has_MembershipStatus.has
+          player: UserAccountMembership
           role_name: has
-        - id: 798b85bd-5672-4d9c-a5af-a8504014577f
-          player: 8a5c7c2d-c626-473f-9786-c08f88abc53f
+        - id: UserAccountMembership_has_MembershipStatus.is_of
+          player: MembershipStatus
           role_name: is of
       readings:
         - "{0} has {1}"
         - "{1} is of {0}"
       constraints:
         - type: mandatory
-          role: 2b8dc38b-12bd-4e0d-bf0c-101e4783c7fd
+          role: UserAccountMembership_has_MembershipStatus.has
+          id: Each_UserAccountMembership_has_at_least_one_MembershipStatus
+          minted_from: '{"type":"mandatory","role":[0,"has",{"name":"UserAccountMembership has MembershipStatus","readings":["{0} has {1}","{1} is of {0}"],"players":["UserAccountMembership","MembershipStatus"]}],"fact_type":{"name":"UserAccountMembership has MembershipStatus","readings":["{0} has {1}","{1} is of {0}"],"players":["UserAccountMembership","MembershipStatus"]}}'
         - type: internal_uniqueness
           roles:
-            - 2b8dc38b-12bd-4e0d-bf0c-101e4783c7fd
-    - id: 876af3ac-8183-4c13-80ae-372c21233be5
+            - UserAccountMembership_has_MembershipStatus.has
+          id: Each_UserAccountMembership_has_at_most_one_MembershipStatus
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"has",{"name":"UserAccountMembership has MembershipStatus","readings":["{0} has {1}","{1} is of {0}"],"players":["UserAccountMembership","MembershipStatus"]}]],"fact_type":{"name":"UserAccountMembership has MembershipStatus","readings":["{0} has {1}","{1} is of {0}"],"players":["UserAccountMembership","MembershipStatus"]}}'
+    - id: UserAccountMembership_has_EffectiveFrom
       name: UserAccountMembership has EffectiveFrom
       roles:
-        - id: 41e8e2bf-9f6a-4d3b-9ab3-c3a67183e449
-          player: ac9f73ff-ccb7-4990-8d0c-88a70b55c155
+        - id: UserAccountMembership_has_EffectiveFrom.has
+          player: UserAccountMembership
           role_name: has
-        - id: 0ab66294-055f-47b6-a52e-1f55519449df
-          player: 394931a8-c914-47d8-8628-ed88ab531b24
+        - id: UserAccountMembership_has_EffectiveFrom.is_effective-from_of
+          player: EffectiveFromTimestamp
           role_name: is effective-from of
       readings:
         - "{0} has effective-from {1}"
         - "{1} is effective-from of {0}"
       constraints:
         - type: mandatory
-          role: 41e8e2bf-9f6a-4d3b-9ab3-c3a67183e449
+          role: UserAccountMembership_has_EffectiveFrom.has
+          id: Each_UserAccountMembership_has_effective-from_at_least_one_EffectiveFromTimestamp
+          minted_from: '{"type":"mandatory","role":[0,"has",{"name":"UserAccountMembership has EffectiveFrom","readings":["{0} has effective-from {1}","{1} is effective-from of {0}"],"players":["UserAccountMembership","EffectiveFromTimestamp"]}],"fact_type":{"name":"UserAccountMembership has EffectiveFrom","readings":["{0} has effective-from {1}","{1} is effective-from of {0}"],"players":["UserAccountMembership","EffectiveFromTimestamp"]}}'
         - type: internal_uniqueness
           roles:
-            - 41e8e2bf-9f6a-4d3b-9ab3-c3a67183e449
-    - id: 50845b9c-ce28-47c9-9df9-54f9a25a5989
+            - UserAccountMembership_has_EffectiveFrom.has
+          id: Each_UserAccountMembership_has_effective-from_at_most_one_EffectiveFromTimestamp
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"has",{"name":"UserAccountMembership has EffectiveFrom","readings":["{0} has effective-from {1}","{1} is effective-from of {0}"],"players":["UserAccountMembership","EffectiveFromTimestamp"]}]],"fact_type":{"name":"UserAccountMembership has EffectiveFrom","readings":["{0} has effective-from {1}","{1} is effective-from of {0}"],"players":["UserAccountMembership","EffectiveFromTimestamp"]}}'
+    - id: UserAccountMembership_has_EffectiveTo
       name: UserAccountMembership has EffectiveTo
       roles:
-        - id: b56cba01-6b28-48cd-b973-e3dc6c4399e7
-          player: ac9f73ff-ccb7-4990-8d0c-88a70b55c155
+        - id: UserAccountMembership_has_EffectiveTo.has
+          player: UserAccountMembership
           role_name: has
-        - id: 3c20be85-7705-450a-8eb4-30297e1381e8
-          player: 407746e3-f47e-48ff-b120-aec9b7e733ed
+        - id: UserAccountMembership_has_EffectiveTo.is_effective-to_of
+          player: EffectiveToTimestamp
           role_name: is effective-to of
       readings:
         - "{0} has effective-to {1}"
@@ -623,51 +689,53 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - b56cba01-6b28-48cd-b973-e3dc6c4399e7
-    - id: 6f80ddca-67c4-4213-8c27-4a134fdd72d2
+            - UserAccountMembership_has_EffectiveTo.has
+          id: Each_UserAccountMembership_has_effective-to_at_most_one_EffectiveToTimestamp
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"has",{"name":"UserAccountMembership has EffectiveTo","readings":["{0} has effective-to {1}","{1} is effective-to of {0}"],"players":["UserAccountMembership","EffectiveToTimestamp"]}]],"fact_type":{"name":"UserAccountMembership has EffectiveTo","readings":["{0} has effective-to {1}","{1} is effective-to of {0}"],"players":["UserAccountMembership","EffectiveToTimestamp"]}}'
+    - id: UserAccountMembership_has_AccountRoleType
       name: UserAccountMembership has AccountRoleType
       roles:
-        - id: 8f5ebd93-653f-4696-b571-ff28b8819b45
-          player: ac9f73ff-ccb7-4990-8d0c-88a70b55c155
+        - id: UserAccountMembership_has_AccountRoleType.has
+          player: UserAccountMembership
           role_name: has
-        - id: 8de8272e-f90c-4a7f-9049-29e9c327bd1d
-          player: 8e04ce2b-758a-4c27-8d7f-dcbbf64dff29
+        - id: UserAccountMembership_has_AccountRoleType.is_assigned_to
+          player: AccountRoleType
           role_name: is assigned to
       readings:
         - "{0} has {1}"
         - "{1} is assigned to {0}"
-    - id: 15da2c00-e221-4084-a547-280f48bb746b
+    - id: UserAccountMembership_has_SuspensionReasonCode
       name: UserAccountMembership has SuspensionReasonCode
       roles:
-        - id: a35b73ad-4db2-4c55-86f7-403bdf4d9b5c
-          player: ac9f73ff-ccb7-4990-8d0c-88a70b55c155
+        - id: UserAccountMembership_has_SuspensionReasonCode.has
+          player: UserAccountMembership
           role_name: has
-        - id: d0157874-ee3f-455b-922d-72d57f03fff1
-          player: fd9a4368-0570-4ef6-8b91-f48471f8b9ff
+        - id: UserAccountMembership_has_SuspensionReasonCode.is_of
+          player: SuspensionReasonCode
           role_name: is of
       readings:
         - "{0} has {1}"
         - "{1} is of {0}"
-    - id: 11236b70-0261-47fa-b48b-4ddfb00dba15
+    - id: UserAccountMembership_has_RevocationReasonCode
       name: UserAccountMembership has RevocationReasonCode
       roles:
-        - id: 9ad86c5b-153f-4a55-9593-abe90f06555e
-          player: ac9f73ff-ccb7-4990-8d0c-88a70b55c155
+        - id: UserAccountMembership_has_RevocationReasonCode.has
+          player: UserAccountMembership
           role_name: has
-        - id: ce61683c-a268-4c02-b915-99ed52a3d16a
-          player: 29da202a-8ec2-46fc-b082-21877b30c9ca
+        - id: UserAccountMembership_has_RevocationReasonCode.is_of
+          player: RevocationReasonCode
           role_name: is of
       readings:
         - "{0} has {1}"
         - "{1} is of {0}"
-    - id: 91e01f62-94dd-408e-a79a-da2118272265
+    - id: AccountOrganizationLink_has_LinkId
       name: AccountOrganizationLink has LinkId
       roles:
-        - id: 517e5358-2c97-4834-8860-f4466031af49
-          player: 0c22947c-d995-4dfe-bf85-4918db482ba7
+        - id: AccountOrganizationLink_has_LinkId.has
+          player: AccountOrganizationLink
           role_name: has
-        - id: 1bad3b43-b1e8-4a64-9f04-63a115eb565d
-          player: 0ef78186-1b14-4ee5-adca-771b49c77acb
+        - id: AccountOrganizationLink_has_LinkId.identifies
+          player: LinkId
           role_name: identifies
       readings:
         - "{0} has {1}"
@@ -675,93 +743,114 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - 517e5358-2c97-4834-8860-f4466031af49
-          is_preferred: true
+            - AccountOrganizationLink_has_LinkId.has
+          id: Each_AccountOrganizationLink_has_at_most_one_LinkId
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"has",{"name":"AccountOrganizationLink has LinkId","readings":["{0} has {1}","{1} identifies {0}"],"players":["AccountOrganizationLink","LinkId"]}]],"fact_type":{"name":"AccountOrganizationLink has LinkId","readings":["{0} has {1}","{1} identifies {0}"],"players":["AccountOrganizationLink","LinkId"]}}'
         - type: internal_uniqueness
           roles:
-            - 1bad3b43-b1e8-4a64-9f04-63a115eb565d
+            - AccountOrganizationLink_has_LinkId.identifies
+          id: Each_LinkId_identifies_at_most_one_AccountOrganizationLink
+          minted_from: '{"type":"internal_uniqueness","roles":[[1,"identifies",{"name":"AccountOrganizationLink has LinkId","readings":["{0} has {1}","{1} identifies {0}"],"players":["AccountOrganizationLink","LinkId"]}]],"fact_type":{"name":"AccountOrganizationLink has LinkId","readings":["{0} has {1}","{1} identifies {0}"],"players":["AccountOrganizationLink","LinkId"]}}'
         - type: mandatory
-          role: 517e5358-2c97-4834-8860-f4466031af49
-    - id: 3e88952e-30b2-4e20-a109-f602e5710128
+          role: AccountOrganizationLink_has_LinkId.has
+          id: Each_AccountOrganizationLink_has_at_least_one_LinkId
+          minted_from: '{"type":"mandatory","role":[0,"has",{"name":"AccountOrganizationLink has LinkId","readings":["{0} has {1}","{1} identifies {0}"],"players":["AccountOrganizationLink","LinkId"]}],"fact_type":{"name":"AccountOrganizationLink has LinkId","readings":["{0} has {1}","{1} identifies {0}"],"players":["AccountOrganizationLink","LinkId"]}}'
+    - id: AccountOrganizationLink_involves_Account
       name: AccountOrganizationLink involves Account
       roles:
-        - id: 30de0fb8-006d-4a58-a137-01e65e1e3e5a
-          player: 0c22947c-d995-4dfe-bf85-4918db482ba7
+        - id: AccountOrganizationLink_involves_Account.involves
+          player: AccountOrganizationLink
           role_name: involves
-        - id: 7c95fc46-71cb-4ac9-8040-66cfd93a2a2f
-          player: e1122653-3fc2-45ff-b1d9-ecec0929597f
+        - id: AccountOrganizationLink_involves_Account.has
+          player: Account
           role_name: has
       readings:
         - "{0} involves {1}"
         - "{1} has {0}"
       constraints:
         - type: mandatory
-          role: 30de0fb8-006d-4a58-a137-01e65e1e3e5a
+          role: AccountOrganizationLink_involves_Account.involves
+          id: Each_AccountOrganizationLink_involves_at_least_one_Account
+          minted_from: '{"type":"mandatory","role":[0,"involves",{"name":"AccountOrganizationLink involves Account","readings":["{0} involves {1}","{1} has {0}"],"players":["AccountOrganizationLink","Account"]}],"fact_type":{"name":"AccountOrganizationLink involves Account","readings":["{0} involves {1}","{1} has {0}"],"players":["AccountOrganizationLink","Account"]}}'
         - type: internal_uniqueness
           roles:
-            - 30de0fb8-006d-4a58-a137-01e65e1e3e5a
-    - id: 92e91ec4-86e9-4254-a12a-e68217d729a6
+            - AccountOrganizationLink_involves_Account.involves
+          id: Each_AccountOrganizationLink_involves_at_most_one_Account
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"involves",{"name":"AccountOrganizationLink involves Account","readings":["{0} involves {1}","{1} has {0}"],"players":["AccountOrganizationLink","Account"]}]],"fact_type":{"name":"AccountOrganizationLink involves Account","readings":["{0} involves {1}","{1} has {0}"],"players":["AccountOrganizationLink","Account"]}}'
+    - id: AccountOrganizationLink_involves_Organization
       name: AccountOrganizationLink involves Organization
       roles:
-        - id: aa923be8-21e2-4ba4-9bc1-ff8f77f1037c
-          player: 0c22947c-d995-4dfe-bf85-4918db482ba7
+        - id: AccountOrganizationLink_involves_Organization.involves
+          player: AccountOrganizationLink
           role_name: involves
-        - id: 0b2ef9fb-bb31-487c-8a5e-1b43bcbe7119
-          player: ccbbf790-be0b-4f95-8a1e-b9816c12a4ff
+        - id: AccountOrganizationLink_involves_Organization.has
+          player: Organization
           role_name: has
       readings:
         - "{0} involves {1}"
         - "{1} has {0}"
       constraints:
         - type: mandatory
-          role: aa923be8-21e2-4ba4-9bc1-ff8f77f1037c
+          role: AccountOrganizationLink_involves_Organization.involves
+          id: Each_AccountOrganizationLink_involves_at_least_one_Organization
+          minted_from: '{"type":"mandatory","role":[0,"involves",{"name":"AccountOrganizationLink involves Organization","readings":["{0} involves {1}","{1} has {0}"],"players":["AccountOrganizationLink","Organization"]}],"fact_type":{"name":"AccountOrganizationLink involves Organization","readings":["{0} involves {1}","{1} has {0}"],"players":["AccountOrganizationLink","Organization"]}}'
         - type: internal_uniqueness
           roles:
-            - aa923be8-21e2-4ba4-9bc1-ff8f77f1037c
-    - id: 281b0e5b-f953-47ea-94bb-3440e48ae336
+            - AccountOrganizationLink_involves_Organization.involves
+          id: Each_AccountOrganizationLink_involves_at_most_one_Organization
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"involves",{"name":"AccountOrganizationLink involves Organization","readings":["{0} involves {1}","{1} has {0}"],"players":["AccountOrganizationLink","Organization"]}]],"fact_type":{"name":"AccountOrganizationLink involves Organization","readings":["{0} involves {1}","{1} has {0}"],"players":["AccountOrganizationLink","Organization"]}}'
+    - id: AccountOrganizationLink_has_LinkStatus
       name: AccountOrganizationLink has LinkStatus
       roles:
-        - id: 080d159e-a7f2-487b-9de2-cb0fa49eb79d
-          player: 0c22947c-d995-4dfe-bf85-4918db482ba7
+        - id: AccountOrganizationLink_has_LinkStatus.has
+          player: AccountOrganizationLink
           role_name: has
-        - id: 8b573521-6c75-4192-8f9e-6bda426b107c
-          player: 1d108608-8d6c-4394-923e-18b92807d99b
+        - id: AccountOrganizationLink_has_LinkStatus.is_of
+          player: LinkStatus
           role_name: is of
       readings:
         - "{0} has {1}"
         - "{1} is of {0}"
       constraints:
         - type: mandatory
-          role: 080d159e-a7f2-487b-9de2-cb0fa49eb79d
+          role: AccountOrganizationLink_has_LinkStatus.has
+          id: Each_AccountOrganizationLink_has_at_least_one_LinkStatus
+          minted_from: '{"type":"mandatory","role":[0,"has",{"name":"AccountOrganizationLink has LinkStatus","readings":["{0} has {1}","{1} is of {0}"],"players":["AccountOrganizationLink","LinkStatus"]}],"fact_type":{"name":"AccountOrganizationLink has LinkStatus","readings":["{0} has {1}","{1} is of {0}"],"players":["AccountOrganizationLink","LinkStatus"]}}'
         - type: internal_uniqueness
           roles:
-            - 080d159e-a7f2-487b-9de2-cb0fa49eb79d
-    - id: 272cc4a4-6f94-4641-a46e-67d24f0a8a64
+            - AccountOrganizationLink_has_LinkStatus.has
+          id: Each_AccountOrganizationLink_has_at_most_one_LinkStatus
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"has",{"name":"AccountOrganizationLink has LinkStatus","readings":["{0} has {1}","{1} is of {0}"],"players":["AccountOrganizationLink","LinkStatus"]}]],"fact_type":{"name":"AccountOrganizationLink has LinkStatus","readings":["{0} has {1}","{1} is of {0}"],"players":["AccountOrganizationLink","LinkStatus"]}}'
+    - id: AccountOrganizationLink_has_EffectiveFrom
       name: AccountOrganizationLink has EffectiveFrom
       roles:
-        - id: 0cc7d9b6-53f4-4607-90b7-199366fc09a1
-          player: 0c22947c-d995-4dfe-bf85-4918db482ba7
+        - id: AccountOrganizationLink_has_EffectiveFrom.has
+          player: AccountOrganizationLink
           role_name: has
-        - id: dc2b1a82-aaa1-4670-93fd-15fcfedac583
-          player: 394931a8-c914-47d8-8628-ed88ab531b24
+        - id: AccountOrganizationLink_has_EffectiveFrom.is_effective-from_of
+          player: EffectiveFromTimestamp
           role_name: is effective-from of
       readings:
         - "{0} has effective-from {1}"
         - "{1} is effective-from of {0}"
       constraints:
         - type: mandatory
-          role: 0cc7d9b6-53f4-4607-90b7-199366fc09a1
+          role: AccountOrganizationLink_has_EffectiveFrom.has
+          id: Each_AccountOrganizationLink_has_effective-from_at_least_one_EffectiveFromTimestamp
+          minted_from: '{"type":"mandatory","role":[0,"has",{"name":"AccountOrganizationLink has EffectiveFrom","readings":["{0} has effective-from {1}","{1} is effective-from of {0}"],"players":["AccountOrganizationLink","EffectiveFromTimestamp"]}],"fact_type":{"name":"AccountOrganizationLink has EffectiveFrom","readings":["{0} has effective-from {1}","{1} is effective-from of {0}"],"players":["AccountOrganizationLink","EffectiveFromTimestamp"]}}'
         - type: internal_uniqueness
           roles:
-            - 0cc7d9b6-53f4-4607-90b7-199366fc09a1
-    - id: f6448648-956a-4e32-b34c-77bc15aa4541
+            - AccountOrganizationLink_has_EffectiveFrom.has
+          id: Each_AccountOrganizationLink_has_effective-from_at_most_one_EffectiveFromTimestamp
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"has",{"name":"AccountOrganizationLink has EffectiveFrom","readings":["{0} has effective-from {1}","{1} is effective-from of {0}"],"players":["AccountOrganizationLink","EffectiveFromTimestamp"]}]],"fact_type":{"name":"AccountOrganizationLink has EffectiveFrom","readings":["{0} has effective-from {1}","{1} is effective-from of {0}"],"players":["AccountOrganizationLink","EffectiveFromTimestamp"]}}'
+    - id: AccountOrganizationLink_has_EffectiveTo
       name: AccountOrganizationLink has EffectiveTo
       roles:
-        - id: 0c453d83-da2c-4658-a75a-6a7913423375
-          player: 0c22947c-d995-4dfe-bf85-4918db482ba7
+        - id: AccountOrganizationLink_has_EffectiveTo.has
+          player: AccountOrganizationLink
           role_name: has
-        - id: e36931e6-c81f-4f22-a834-9cd5982a1332
-          player: 407746e3-f47e-48ff-b120-aec9b7e733ed
+        - id: AccountOrganizationLink_has_EffectiveTo.is_effective-to_of
+          player: EffectiveToTimestamp
           role_name: is effective-to of
       readings:
         - "{0} has effective-to {1}"
@@ -769,15 +858,17 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - 0c453d83-da2c-4658-a75a-6a7913423375
-    - id: 02af3182-ed1c-4cf4-8a2d-c515b74a38e8
+            - AccountOrganizationLink_has_EffectiveTo.has
+          id: Each_AccountOrganizationLink_has_effective-to_at_most_one_EffectiveToTimestamp
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"has",{"name":"AccountOrganizationLink has EffectiveTo","readings":["{0} has effective-to {1}","{1} is effective-to of {0}"],"players":["AccountOrganizationLink","EffectiveToTimestamp"]}]],"fact_type":{"name":"AccountOrganizationLink has EffectiveTo","readings":["{0} has effective-to {1}","{1} is effective-to of {0}"],"players":["AccountOrganizationLink","EffectiveToTimestamp"]}}'
+    - id: AccountOrganizationLink_has_OperatingRegion
       name: AccountOrganizationLink has OperatingRegion
       roles:
-        - id: bf4763ac-b76f-4dcd-ab15-322342b11193
-          player: 0c22947c-d995-4dfe-bf85-4918db482ba7
+        - id: AccountOrganizationLink_has_OperatingRegion.has
+          player: AccountOrganizationLink
           role_name: has
-        - id: 1a1833ec-83ef-438b-aa6b-cfe7f99c7200
-          player: 0daf7ab7-c37f-41a0-a2d4-57f5a537d84d
+        - id: AccountOrganizationLink_has_OperatingRegion.is_of
+          player: OperatingRegion
           role_name: is of
       readings:
         - "{0} has {1}"
@@ -785,27 +876,29 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - bf4763ac-b76f-4dcd-ab15-322342b11193
-    - id: 95ab3bfc-bc15-45b0-9f13-54110df9867a
+            - AccountOrganizationLink_has_OperatingRegion.has
+          id: Each_AccountOrganizationLink_has_at_most_one_OperatingRegion
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"has",{"name":"AccountOrganizationLink has OperatingRegion","readings":["{0} has {1}","{1} is of {0}"],"players":["AccountOrganizationLink","OperatingRegion"]}]],"fact_type":{"name":"AccountOrganizationLink has OperatingRegion","readings":["{0} has {1}","{1} is of {0}"],"players":["AccountOrganizationLink","OperatingRegion"]}}'
+    - id: AccountOrganizationLink_has_LinkTransactionRole
       name: AccountOrganizationLink has LinkTransactionRole
       roles:
-        - id: 935fdc09-b82d-4034-801b-6aa507af7cd9
-          player: 0c22947c-d995-4dfe-bf85-4918db482ba7
+        - id: AccountOrganizationLink_has_LinkTransactionRole.has
+          player: AccountOrganizationLink
           role_name: has
-        - id: f56a2170-c1d8-4e9b-ae51-2bb11e9f14ed
-          player: 7e058fb6-c46c-4768-af17-0ee25c2686fb
+        - id: AccountOrganizationLink_has_LinkTransactionRole.is_of
+          player: LinkTransactionRole
           role_name: is of
       readings:
         - "{0} has {1}"
         - "{1} is of {0}"
-    - id: eab2a590-f420-4bae-8c30-56de191a4bfd
+    - id: AccountOrganizationLink_has_PrimaryContactMembership
       name: AccountOrganizationLink has PrimaryContactMembership
       roles:
-        - id: 301f4807-d95c-436d-91f1-d244f88bff6b
-          player: 0c22947c-d995-4dfe-bf85-4918db482ba7
+        - id: AccountOrganizationLink_has_PrimaryContactMembership.has_primary_contact
+          player: AccountOrganizationLink
           role_name: has primary contact
-        - id: b1e0bc88-d91c-4337-9b86-6e711cccc565
-          player: ac9f73ff-ccb7-4990-8d0c-88a70b55c155
+        - id: AccountOrganizationLink_has_PrimaryContactMembership.is_primary_contact_for
+          player: UserAccountMembership
           role_name: is primary contact for
       readings:
         - "{0} has primary contact {1}"
@@ -813,20 +906,17 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - 301f4807-d95c-436d-91f1-d244f88bff6b
-        - type: subset
-          subset_roles:
-            - b1e0bc88-d91c-4337-9b86-6e711cccc565
-          superset_roles:
-            - 55cd1ed5-e2b9-45f9-8f0f-9a93e75f9516
-    - id: daa49863-1c34-422a-b75e-4d6052f76f30
+            - AccountOrganizationLink_has_PrimaryContactMembership.has_primary_contact
+          id: Each_AccountOrganizationLink_has_primary_contact_at_most_one_UserAccountMembership
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"has primary contact",{"name":"AccountOrganizationLink has PrimaryContactMembership","readings":["{0} has primary contact {1}","{1} is primary contact for {0}"],"players":["AccountOrganizationLink","UserAccountMembership"]}]],"fact_type":{"name":"AccountOrganizationLink has PrimaryContactMembership","readings":["{0} has primary contact {1}","{1} is primary contact for {0}"],"players":["AccountOrganizationLink","UserAccountMembership"]}}'
+    - id: Invitation_has_InvitationId
       name: Invitation has InvitationId
       roles:
-        - id: 1491c0b6-c67e-47ad-81ed-62e99d002e6e
-          player: fe58d71f-349b-4d6c-a202-0e65c2f37ebc
+        - id: Invitation_has_InvitationId.has
+          player: Invitation
           role_name: has
-        - id: b96092ce-5ceb-4ae2-af26-92ba16741d41
-          player: 47e625fd-02e4-4550-8497-f2397ea119b8
+        - id: Invitation_has_InvitationId.identifies
+          player: InvitationId
           role_name: identifies
       readings:
         - "{0} has {1}"
@@ -834,149 +924,182 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - 1491c0b6-c67e-47ad-81ed-62e99d002e6e
-          is_preferred: true
+            - Invitation_has_InvitationId.has
+          id: Each_Invitation_has_at_most_one_InvitationId
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"has",{"name":"Invitation has InvitationId","readings":["{0} has {1}","{1} identifies {0}"],"players":["Invitation","InvitationId"]}]],"fact_type":{"name":"Invitation has InvitationId","readings":["{0} has {1}","{1} identifies {0}"],"players":["Invitation","InvitationId"]}}'
         - type: internal_uniqueness
           roles:
-            - b96092ce-5ceb-4ae2-af26-92ba16741d41
+            - Invitation_has_InvitationId.identifies
+          id: Each_InvitationId_identifies_at_most_one_Invitation
+          minted_from: '{"type":"internal_uniqueness","roles":[[1,"identifies",{"name":"Invitation has InvitationId","readings":["{0} has {1}","{1} identifies {0}"],"players":["Invitation","InvitationId"]}]],"fact_type":{"name":"Invitation has InvitationId","readings":["{0} has {1}","{1} identifies {0}"],"players":["Invitation","InvitationId"]}}'
         - type: mandatory
-          role: 1491c0b6-c67e-47ad-81ed-62e99d002e6e
-    - id: 9ef8cd6d-7c6e-47ba-8166-cfef6561c499
+          role: Invitation_has_InvitationId.has
+          id: Each_Invitation_has_at_least_one_InvitationId
+          minted_from: '{"type":"mandatory","role":[0,"has",{"name":"Invitation has InvitationId","readings":["{0} has {1}","{1} identifies {0}"],"players":["Invitation","InvitationId"]}],"fact_type":{"name":"Invitation has InvitationId","readings":["{0} has {1}","{1} identifies {0}"],"players":["Invitation","InvitationId"]}}'
+    - id: Invitation_targets_EmailAddress
       name: Invitation targets EmailAddress
       roles:
-        - id: 7e6f0f0f-2bfa-4df1-a7b4-d43a6919b451
-          player: fe58d71f-349b-4d6c-a202-0e65c2f37ebc
+        - id: Invitation_targets_EmailAddress.targets
+          player: Invitation
           role_name: targets
-        - id: b5712371-9de7-4ea5-be57-4df556e851ee
-          player: 497317c0-7c68-412b-8f27-3ab7881f278d
+        - id: Invitation_targets_EmailAddress.is_targeted_by
+          player: EmailAddress
           role_name: is targeted by
       readings:
         - "{0} targets {1}"
         - "{1} is targeted by {0}"
       constraints:
         - type: mandatory
-          role: 7e6f0f0f-2bfa-4df1-a7b4-d43a6919b451
+          role: Invitation_targets_EmailAddress.targets
+          id: Each_Invitation_targets_at_least_one_EmailAddress
+          minted_from: '{"type":"mandatory","role":[0,"targets",{"name":"Invitation targets EmailAddress","readings":["{0} targets {1}","{1} is targeted by {0}"],"players":["Invitation","EmailAddress"]}],"fact_type":{"name":"Invitation targets EmailAddress","readings":["{0} targets {1}","{1} is targeted by {0}"],"players":["Invitation","EmailAddress"]}}'
         - type: internal_uniqueness
           roles:
-            - 7e6f0f0f-2bfa-4df1-a7b4-d43a6919b451
-    - id: 7aa99b74-a5af-403a-b176-7161b179b2d4
+            - Invitation_targets_EmailAddress.targets
+          id: Each_Invitation_targets_at_most_one_EmailAddress
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"targets",{"name":"Invitation targets EmailAddress","readings":["{0} targets {1}","{1} is targeted by {0}"],"players":["Invitation","EmailAddress"]}]],"fact_type":{"name":"Invitation targets EmailAddress","readings":["{0} targets {1}","{1} is targeted by {0}"],"players":["Invitation","EmailAddress"]}}'
+    - id: Invitation_is_sent_by_User
       name: Invitation is sent by User
       roles:
-        - id: c5803189-b5ac-46e5-b52b-6713130947df
-          player: fe58d71f-349b-4d6c-a202-0e65c2f37ebc
+        - id: Invitation_is_sent_by_User.is_sent_by
+          player: Invitation
           role_name: is sent by
-        - id: 2583d564-e5e4-4849-a245-9a3ef0725193
-          player: 60fda4ce-8708-4da3-95af-6b84ae4422b4
+        - id: Invitation_is_sent_by_User.sends
+          player: User
           role_name: sends
       readings:
         - "{0} is sent by {1}"
         - "{1} sends {0}"
       constraints:
         - type: mandatory
-          role: c5803189-b5ac-46e5-b52b-6713130947df
+          role: Invitation_is_sent_by_User.is_sent_by
+          id: Each_Invitation_is_sent_by_at_least_one_User
+          minted_from: '{"type":"mandatory","role":[0,"is sent by",{"name":"Invitation is sent by User","readings":["{0} is sent by {1}","{1} sends {0}"],"players":["Invitation","User"]}],"fact_type":{"name":"Invitation is sent by User","readings":["{0} is sent by {1}","{1} sends {0}"],"players":["Invitation","User"]}}'
         - type: internal_uniqueness
           roles:
-            - c5803189-b5ac-46e5-b52b-6713130947df
-    - id: af3910d9-5d32-4b89-989a-666e490e18d2
+            - Invitation_is_sent_by_User.is_sent_by
+          id: Each_Invitation_is_sent_by_at_most_one_User
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"is sent by",{"name":"Invitation is sent by User","readings":["{0} is sent by {1}","{1} sends {0}"],"players":["Invitation","User"]}]],"fact_type":{"name":"Invitation is sent by User","readings":["{0} is sent by {1}","{1} sends {0}"],"players":["Invitation","User"]}}'
+    - id: Invitation_is_for_Account
       name: Invitation is for Account
       roles:
-        - id: 51096ee5-01cf-4890-94c9-99ca8423b297
-          player: fe58d71f-349b-4d6c-a202-0e65c2f37ebc
+        - id: Invitation_is_for_Account.is_for
+          player: Invitation
           role_name: is for
-        - id: 3904900b-2883-4b52-bba1-71f278d192a8
-          player: e1122653-3fc2-45ff-b1d9-ecec0929597f
+        - id: Invitation_is_for_Account.has
+          player: Account
           role_name: has
       readings:
         - "{0} is for {1}"
         - "{1} has {0}"
       constraints:
         - type: mandatory
-          role: 51096ee5-01cf-4890-94c9-99ca8423b297
+          role: Invitation_is_for_Account.is_for
+          id: Each_Invitation_is_for_at_least_one_Account
+          minted_from: '{"type":"mandatory","role":[0,"is for",{"name":"Invitation is for Account","readings":["{0} is for {1}","{1} has {0}"],"players":["Invitation","Account"]}],"fact_type":{"name":"Invitation is for Account","readings":["{0} is for {1}","{1} has {0}"],"players":["Invitation","Account"]}}'
         - type: internal_uniqueness
           roles:
-            - 51096ee5-01cf-4890-94c9-99ca8423b297
-    - id: 0de27f33-c89d-49f8-b5d4-bdd54e081f79
+            - Invitation_is_for_Account.is_for
+          id: Each_Invitation_is_for_at_most_one_Account
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"is for",{"name":"Invitation is for Account","readings":["{0} is for {1}","{1} has {0}"],"players":["Invitation","Account"]}]],"fact_type":{"name":"Invitation is for Account","readings":["{0} is for {1}","{1} has {0}"],"players":["Invitation","Account"]}}'
+    - id: Invitation_has_IssuedTimestamp
       name: Invitation has IssuedTimestamp
       roles:
-        - id: 6762e1a7-5b53-40a9-b310-b185fb016ec6
-          player: fe58d71f-349b-4d6c-a202-0e65c2f37ebc
+        - id: Invitation_has_IssuedTimestamp.has_issued
+          player: Invitation
           role_name: has issued
-        - id: 667e607e-b9fa-4eaa-a4f2-2db62662e0cc
-          player: d26eae8a-a4ea-4fe4-b65e-c3ceeebe0f0c
+        - id: Invitation_has_IssuedTimestamp.is_issued-at_of
+          player: Timestamp
           role_name: is issued-at of
       readings:
         - "{0} has issued timestamp {1}"
         - "{1} is issued-at of {0}"
       constraints:
         - type: mandatory
-          role: 6762e1a7-5b53-40a9-b310-b185fb016ec6
+          role: Invitation_has_IssuedTimestamp.has_issued
+          id: Each_Invitation_has_issued_timestamp_at_least_one_Timestamp
+          minted_from: '{"type":"mandatory","role":[0,"has issued",{"name":"Invitation has IssuedTimestamp","readings":["{0} has issued timestamp {1}","{1} is issued-at of {0}"],"players":["Invitation","Timestamp"]}],"fact_type":{"name":"Invitation has IssuedTimestamp","readings":["{0} has issued timestamp {1}","{1} is issued-at of {0}"],"players":["Invitation","Timestamp"]}}'
         - type: internal_uniqueness
           roles:
-            - 6762e1a7-5b53-40a9-b310-b185fb016ec6
-    - id: 8a88892f-8e92-49c2-92ab-f42e6411083d
+            - Invitation_has_IssuedTimestamp.has_issued
+          id: Each_Invitation_has_issued_timestamp_at_most_one_Timestamp
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"has issued",{"name":"Invitation has IssuedTimestamp","readings":["{0} has issued timestamp {1}","{1} is issued-at of {0}"],"players":["Invitation","Timestamp"]}]],"fact_type":{"name":"Invitation has IssuedTimestamp","readings":["{0} has issued timestamp {1}","{1} is issued-at of {0}"],"players":["Invitation","Timestamp"]}}'
+    - id: Invitation_has_ExpiryTimestamp
       name: Invitation has ExpiryTimestamp
       roles:
-        - id: 0585dfcf-fb16-4d8b-9bbe-366331845081
-          player: fe58d71f-349b-4d6c-a202-0e65c2f37ebc
+        - id: Invitation_has_ExpiryTimestamp.has_expiry
+          player: Invitation
           role_name: has expiry
-        - id: f512ca65-151f-42d8-8c1c-c71e6f47aacf
-          player: d26eae8a-a4ea-4fe4-b65e-c3ceeebe0f0c
+        - id: Invitation_has_ExpiryTimestamp.is_expiry-at_of
+          player: Timestamp
           role_name: is expiry-at of
       readings:
         - "{0} has expiry timestamp {1}"
         - "{1} is expiry-at of {0}"
       constraints:
         - type: mandatory
-          role: 0585dfcf-fb16-4d8b-9bbe-366331845081
+          role: Invitation_has_ExpiryTimestamp.has_expiry
+          id: Each_Invitation_has_expiry_timestamp_at_least_one_Timestamp
+          minted_from: '{"type":"mandatory","role":[0,"has expiry",{"name":"Invitation has ExpiryTimestamp","readings":["{0} has expiry timestamp {1}","{1} is expiry-at of {0}"],"players":["Invitation","Timestamp"]}],"fact_type":{"name":"Invitation has ExpiryTimestamp","readings":["{0} has expiry timestamp {1}","{1} is expiry-at of {0}"],"players":["Invitation","Timestamp"]}}'
         - type: internal_uniqueness
           roles:
-            - 0585dfcf-fb16-4d8b-9bbe-366331845081
-    - id: 1643aede-62d1-4731-a752-d006ead33fb7
+            - Invitation_has_ExpiryTimestamp.has_expiry
+          id: Each_Invitation_has_expiry_timestamp_at_most_one_Timestamp
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"has expiry",{"name":"Invitation has ExpiryTimestamp","readings":["{0} has expiry timestamp {1}","{1} is expiry-at of {0}"],"players":["Invitation","Timestamp"]}]],"fact_type":{"name":"Invitation has ExpiryTimestamp","readings":["{0} has expiry timestamp {1}","{1} is expiry-at of {0}"],"players":["Invitation","Timestamp"]}}'
+    - id: Invitation_has_InvitationStatus
       name: Invitation has InvitationStatus
       roles:
-        - id: 709c246b-7a6c-470d-9343-0230e942adba
-          player: fe58d71f-349b-4d6c-a202-0e65c2f37ebc
+        - id: Invitation_has_InvitationStatus.has
+          player: Invitation
           role_name: has
-        - id: 9891efad-c766-4fe6-8179-315bcf612574
-          player: e5af300b-1ce5-4537-9172-ec0e8e31fa0b
+        - id: Invitation_has_InvitationStatus.is_of
+          player: InvitationStatus
           role_name: is of
       readings:
         - "{0} has {1}"
         - "{1} is of {0}"
       constraints:
         - type: mandatory
-          role: 709c246b-7a6c-470d-9343-0230e942adba
+          role: Invitation_has_InvitationStatus.has
+          id: Each_Invitation_has_at_least_one_InvitationStatus
+          minted_from: '{"type":"mandatory","role":[0,"has",{"name":"Invitation has InvitationStatus","readings":["{0} has {1}","{1} is of {0}"],"players":["Invitation","InvitationStatus"]}],"fact_type":{"name":"Invitation has InvitationStatus","readings":["{0} has {1}","{1} is of {0}"],"players":["Invitation","InvitationStatus"]}}'
         - type: internal_uniqueness
           roles:
-            - 709c246b-7a6c-470d-9343-0230e942adba
-    - id: eb6702dc-8928-405e-b071-67f50f862474
+            - Invitation_has_InvitationStatus.has
+          id: Each_Invitation_has_at_most_one_InvitationStatus
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"has",{"name":"Invitation has InvitationStatus","readings":["{0} has {1}","{1} is of {0}"],"players":["Invitation","InvitationStatus"]}]],"fact_type":{"name":"Invitation has InvitationStatus","readings":["{0} has {1}","{1} is of {0}"],"players":["Invitation","InvitationStatus"]}}'
+    - id: Organization_has_parent_Organization
       name: Organization has parent Organization
       roles:
-        - id: 43490dc1-f458-4e52-800c-690eaa5ba7c8
-          player: ccbbf790-be0b-4f95-8a1e-b9816c12a4ff
+        - id: Organization_has_parent_Organization.is_child_of
+          player: Organization
           role_name: is child of
-        - id: 513990f9-e8f1-4068-9b5f-81f975169675
-          player: ccbbf790-be0b-4f95-8a1e-b9816c12a4ff
+        - id: Organization_has_parent_Organization.is_parent_of
+          player: Organization
           role_name: is parent of
       readings:
         - "{0} is child of {1}"
         - "{1} is parent of {0}"
       constraints:
         - type: ring
-          role_1: 43490dc1-f458-4e52-800c-690eaa5ba7c8
-          role_2: 513990f9-e8f1-4068-9b5f-81f975169675
+          role_1: Organization_has_parent_Organization.is_child_of
+          role_2: Organization_has_parent_Organization.is_parent_of
           ring_type: irreflexive
+          id: No_Organization_is_child_of_that_same_Organization
+          minted_from: '{"type":"ring","role_1":[0,"is child of",{"name":"Organization has parent Organization","readings":["{0} is child of {1}","{1} is parent of {0}"],"players":["Organization","Organization"]}],"role_2":[1,"is parent of",{"name":"Organization has parent Organization","readings":["{0} is child of {1}","{1} is parent of {0}"],"players":["Organization","Organization"]}],"ring_type":"irreflexive","fact_type":{"name":"Organization has parent Organization","readings":["{0} is child of {1}","{1} is parent of {0}"],"players":["Organization","Organization"]}}'
         - type: internal_uniqueness
           roles:
-            - 43490dc1-f458-4e52-800c-690eaa5ba7c8
-    - id: 240626e8-efad-4488-950f-76bd9b9e5044
+            - Organization_has_parent_Organization.is_child_of
+          id: Each_Organization_is_child_of_at_most_one_Organization
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"is child of",{"name":"Organization has parent Organization","readings":["{0} is child of {1}","{1} is parent of {0}"],"players":["Organization","Organization"]}]],"fact_type":{"name":"Organization has parent Organization","readings":["{0} is child of {1}","{1} is parent of {0}"],"players":["Organization","Organization"]}}'
+    - id: BuyerProfile_has_BuyerProfileId
       name: BuyerProfile has BuyerProfileId
       roles:
-        - id: cf27a96c-4072-4a36-ba0d-343414f026a5
-          player: e77a9a8a-4b23-4240-bf0a-402bc9c62567
+        - id: BuyerProfile_has_BuyerProfileId.has
+          player: BuyerProfile
           role_name: has
-        - id: 745675c5-f45d-4d47-b894-89d32ec4e010
-          player: 1cf46acf-3f6d-48b5-9735-eb3764473090
+        - id: BuyerProfile_has_BuyerProfileId.identifies
+          player: BuyerProfileId
           role_name: identifies
       readings:
         - "{0} has {1}"
@@ -984,42 +1107,53 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - cf27a96c-4072-4a36-ba0d-343414f026a5
-          is_preferred: true
+            - BuyerProfile_has_BuyerProfileId.has
+          id: Each_BuyerProfile_has_at_most_one_BuyerProfileId
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"has",{"name":"BuyerProfile has BuyerProfileId","readings":["{0} has {1}","{1} identifies {0}"],"players":["BuyerProfile","BuyerProfileId"]}]],"fact_type":{"name":"BuyerProfile has BuyerProfileId","readings":["{0} has {1}","{1} identifies {0}"],"players":["BuyerProfile","BuyerProfileId"]}}'
         - type: internal_uniqueness
           roles:
-            - 745675c5-f45d-4d47-b894-89d32ec4e010
+            - BuyerProfile_has_BuyerProfileId.identifies
+          id: Each_BuyerProfileId_identifies_at_most_one_BuyerProfile
+          minted_from: '{"type":"internal_uniqueness","roles":[[1,"identifies",{"name":"BuyerProfile has BuyerProfileId","readings":["{0} has {1}","{1} identifies {0}"],"players":["BuyerProfile","BuyerProfileId"]}]],"fact_type":{"name":"BuyerProfile has BuyerProfileId","readings":["{0} has {1}","{1} identifies {0}"],"players":["BuyerProfile","BuyerProfileId"]}}'
         - type: mandatory
-          role: cf27a96c-4072-4a36-ba0d-343414f026a5
-    - id: f91a59b9-1a12-4812-a1cb-fdcfe89cd9a6
+          role: BuyerProfile_has_BuyerProfileId.has
+          id: Each_BuyerProfile_has_at_least_one_BuyerProfileId
+          minted_from: '{"type":"mandatory","role":[0,"has",{"name":"BuyerProfile has BuyerProfileId","readings":["{0} has {1}","{1} identifies {0}"],"players":["BuyerProfile","BuyerProfileId"]}],"fact_type":{"name":"BuyerProfile has BuyerProfileId","readings":["{0} has {1}","{1} identifies {0}"],"players":["BuyerProfile","BuyerProfileId"]}}'
+    - id: BuyerProfile_belongs_to_Organization
       name: BuyerProfile belongs to Organization
       roles:
-        - id: ffc49fd8-8fbc-4d2e-84df-fdb3de8daa7f
-          player: e77a9a8a-4b23-4240-bf0a-402bc9c62567
+        - id: BuyerProfile_belongs_to_Organization.belongs_to
+          player: BuyerProfile
           role_name: belongs to
-        - id: 1fb0d00f-ef5c-4715-b278-a50edc93b055
-          player: ccbbf790-be0b-4f95-8a1e-b9816c12a4ff
+        - id: BuyerProfile_belongs_to_Organization.has
+          player: Organization
           role_name: has
       readings:
         - "{0} belongs to {1}"
         - "{1} has {0}"
       constraints:
         - type: mandatory
-          role: ffc49fd8-8fbc-4d2e-84df-fdb3de8daa7f
+          role: BuyerProfile_belongs_to_Organization.belongs_to
+          id: Each_BuyerProfile_belongs_to_at_least_one_Organization
+          minted_from: '{"type":"mandatory","role":[0,"belongs to",{"name":"BuyerProfile belongs to Organization","readings":["{0} belongs to {1}","{1} has {0}"],"players":["BuyerProfile","Organization"]}],"fact_type":{"name":"BuyerProfile belongs to Organization","readings":["{0} belongs to {1}","{1} has {0}"],"players":["BuyerProfile","Organization"]}}'
         - type: internal_uniqueness
           roles:
-            - ffc49fd8-8fbc-4d2e-84df-fdb3de8daa7f
+            - BuyerProfile_belongs_to_Organization.belongs_to
+          id: Each_BuyerProfile_belongs_to_at_most_one_Organization
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"belongs to",{"name":"BuyerProfile belongs to Organization","readings":["{0} belongs to {1}","{1} has {0}"],"players":["BuyerProfile","Organization"]}]],"fact_type":{"name":"BuyerProfile belongs to Organization","readings":["{0} belongs to {1}","{1} has {0}"],"players":["BuyerProfile","Organization"]}}'
         - type: internal_uniqueness
           roles:
-            - 1fb0d00f-ef5c-4715-b278-a50edc93b055
-    - id: bc47b133-6c8a-4fe6-a242-3d14291f016b
+            - BuyerProfile_belongs_to_Organization.has
+          id: Each_Organization_has_at_most_one_BuyerProfile
+          minted_from: '{"type":"internal_uniqueness","roles":[[1,"has",{"name":"BuyerProfile belongs to Organization","readings":["{0} belongs to {1}","{1} has {0}"],"players":["BuyerProfile","Organization"]}]],"fact_type":{"name":"BuyerProfile belongs to Organization","readings":["{0} belongs to {1}","{1} has {0}"],"players":["BuyerProfile","Organization"]}}'
+    - id: SellerProfile_has_SellerProfileId
       name: SellerProfile has SellerProfileId
       roles:
-        - id: 194fe0c3-0968-481c-b4f9-cb2a7d210570
-          player: 4f838232-23a7-45fa-91a3-7ae33436cda9
+        - id: SellerProfile_has_SellerProfileId.has
+          player: SellerProfile
           role_name: has
-        - id: 32af60b5-b3a8-4462-bedf-51496921d131
-          player: cdb18430-b01d-4067-8bd2-f152bdd4c7d9
+        - id: SellerProfile_has_SellerProfileId.identifies
+          player: SellerProfileId
           role_name: identifies
       readings:
         - "{0} has {1}"
@@ -1027,31 +1161,50 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - 194fe0c3-0968-481c-b4f9-cb2a7d210570
-          is_preferred: true
+            - SellerProfile_has_SellerProfileId.has
+          id: Each_SellerProfile_has_at_most_one_SellerProfileId
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"has",{"name":"SellerProfile has SellerProfileId","readings":["{0} has {1}","{1} identifies {0}"],"players":["SellerProfile","SellerProfileId"]}]],"fact_type":{"name":"SellerProfile has SellerProfileId","readings":["{0} has {1}","{1} identifies {0}"],"players":["SellerProfile","SellerProfileId"]}}'
         - type: internal_uniqueness
           roles:
-            - 32af60b5-b3a8-4462-bedf-51496921d131
+            - SellerProfile_has_SellerProfileId.identifies
+          id: Each_SellerProfileId_identifies_at_most_one_SellerProfile
+          minted_from: '{"type":"internal_uniqueness","roles":[[1,"identifies",{"name":"SellerProfile has SellerProfileId","readings":["{0} has {1}","{1} identifies {0}"],"players":["SellerProfile","SellerProfileId"]}]],"fact_type":{"name":"SellerProfile has SellerProfileId","readings":["{0} has {1}","{1} identifies {0}"],"players":["SellerProfile","SellerProfileId"]}}'
         - type: mandatory
-          role: 194fe0c3-0968-481c-b4f9-cb2a7d210570
-    - id: e9ba28e1-b284-4af2-bbc2-60937e5de041
+          role: SellerProfile_has_SellerProfileId.has
+          id: Each_SellerProfile_has_at_least_one_SellerProfileId
+          minted_from: '{"type":"mandatory","role":[0,"has",{"name":"SellerProfile has SellerProfileId","readings":["{0} has {1}","{1} identifies {0}"],"players":["SellerProfile","SellerProfileId"]}],"fact_type":{"name":"SellerProfile has SellerProfileId","readings":["{0} has {1}","{1} identifies {0}"],"players":["SellerProfile","SellerProfileId"]}}'
+    - id: SellerProfile_belongs_to_Organization
       name: SellerProfile belongs to Organization
       roles:
-        - id: 116a7200-8c4d-4c18-8add-dc2e10df9d23
-          player: 4f838232-23a7-45fa-91a3-7ae33436cda9
+        - id: SellerProfile_belongs_to_Organization.belongs_to
+          player: SellerProfile
           role_name: belongs to
-        - id: 2d5b5448-2659-486a-b2b8-429e5c7375a3
-          player: ccbbf790-be0b-4f95-8a1e-b9816c12a4ff
+        - id: SellerProfile_belongs_to_Organization.has
+          player: Organization
           role_name: has
       readings:
         - "{0} belongs to {1}"
         - "{1} has {0}"
       constraints:
         - type: mandatory
-          role: 116a7200-8c4d-4c18-8add-dc2e10df9d23
+          role: SellerProfile_belongs_to_Organization.belongs_to
+          id: Each_SellerProfile_belongs_to_at_least_one_Organization
+          minted_from: '{"type":"mandatory","role":[0,"belongs to",{"name":"SellerProfile belongs to Organization","readings":["{0} belongs to {1}","{1} has {0}"],"players":["SellerProfile","Organization"]}],"fact_type":{"name":"SellerProfile belongs to Organization","readings":["{0} belongs to {1}","{1} has {0}"],"players":["SellerProfile","Organization"]}}'
         - type: internal_uniqueness
           roles:
-            - 116a7200-8c4d-4c18-8add-dc2e10df9d23
+            - SellerProfile_belongs_to_Organization.belongs_to
+          id: Each_SellerProfile_belongs_to_at_most_one_Organization
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"belongs to",{"name":"SellerProfile belongs to Organization","readings":["{0} belongs to {1}","{1} has {0}"],"players":["SellerProfile","Organization"]}]],"fact_type":{"name":"SellerProfile belongs to Organization","readings":["{0} belongs to {1}","{1} has {0}"],"players":["SellerProfile","Organization"]}}'
         - type: internal_uniqueness
           roles:
-            - 2d5b5448-2659-486a-b2b8-429e5c7375a3
+            - SellerProfile_belongs_to_Organization.has
+          id: Each_Organization_has_at_most_one_SellerProfile
+          minted_from: '{"type":"internal_uniqueness","roles":[[1,"has",{"name":"SellerProfile belongs to Organization","readings":["{0} belongs to {1}","{1} has {0}"],"players":["SellerProfile","Organization"]}]],"fact_type":{"name":"SellerProfile belongs to Organization","readings":["{0} belongs to {1}","{1} has {0}"],"players":["SellerProfile","Organization"]}}'
+  constraints:
+    - type: subset
+      subset_roles:
+        - AccountOrganizationLink_has_PrimaryContactMembership.is_primary_contact_for
+      superset_roles:
+        - UserAccountMembership_involves_Account.involves
+      id: If_UserAccountMembership_in_AccountOrganizationLink_has_PrimaryContactMembership_then_UserAccountMembership_in_UserAccountMembership_involves_Account
+      minted_from: '{"type":"subset","subset_roles":[[1,"is primary contact for",{"name":"AccountOrganizationLink has PrimaryContactMembership","readings":["{0} has primary contact {1}","{1} is primary contact for {0}"],"players":["AccountOrganizationLink","UserAccountMembership"]}]],"superset_roles":[[0,"involves",{"name":"UserAccountMembership involves Account","readings":["{0} involves {1}","{1} has {0}"],"players":["UserAccountMembership","Account"]}]]}'
