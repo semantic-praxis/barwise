@@ -6,6 +6,7 @@
  * an instance might be { "role-customer": "C001", "role-order": "O123" }.
  */
 import type { Complete } from "../util/complete.js";
+import { DuplicateIdError } from "./idIndex.js";
 import { populationIdBase } from "./idRules.js";
 export interface FactInstance {
   /** Unique identifier for this instance. */
@@ -84,10 +85,15 @@ export class Population {
   /** See `PopulationConfig.sample`. Positive evidence only when true. */
   readonly sample: boolean;
   private readonly _instances: FactInstance[] = [];
+  /** The ids `_instances` holds, so a repeat is refused in constant time. */
+  private readonly _held = new Set<string>();
   /**
    * The number the next unnamed instance takes: one past the highest this
-   * population has used, stated or given, so a number is never reused once
-   * an instance holding it is removed (iri-identity, decision 7).
+   * population has used, stated or given, so a number is not reused while
+   * the population lives. A file keeps no record of a removed instance, so
+   * after a save and reload a removed number can come back; decision 7 as
+   * amended (owner, 2026-11-05, barwise-wcg.4kp) asks only that numbers be
+   * unique at any moment.
    */
   private _next = 1;
 
@@ -118,6 +124,13 @@ export class Population {
   private createInstance(config: FactInstanceConfig): FactInstance {
     const prefix = `${this.id}.`;
     let id = config.id;
+    // Two instances never share an id (barwise-wcg.4kp): six population
+    // rules, the editor's source map and the NORMA mapping key on it. The
+    // error is the store's, so a reader reports the file as unloadable.
+    if (id !== undefined && this._held.has(id)) {
+      const held = `a fact instance of population "${this.id}"`;
+      throw new DuplicateIdError(id, "fact instance", held, "a second one");
+    }
     if (id === undefined) {
       if (!Number.isSafeInteger(this._next + 1)) {
         throw new Error(`Population "${this.id}" has no instance number left to give.`);
@@ -126,6 +139,7 @@ export class Population {
     } else {
       this.countPast(id);
     }
+    this._held.add(id);
     return { id, roleValues: { ...config.roleValues } };
   }
 
@@ -175,6 +189,7 @@ export class Population {
       );
     }
     this._instances.splice(idx, 1);
+    this._held.delete(id);
   }
 
   /** Look up a fact instance by id. */

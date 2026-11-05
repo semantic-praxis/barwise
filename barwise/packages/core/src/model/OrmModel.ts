@@ -11,11 +11,17 @@ import {
 import type { Definition } from "./Definition.js";
 import { type DiagramLayout, withoutDiagramReferences } from "./DiagramLayout.js";
 import { checkInternalConstraint, FactType, type FactTypeConfig } from "./FactType.js";
-import { IdIndex, type IdKeyedKind, IdKeyedStore, type IdKind } from "./idIndex.js";
+import {
+  DuplicateIdError,
+  IdIndex,
+  type IdKeyedKind,
+  IdKeyedStore,
+  type IdKind,
+} from "./idIndex.js";
 import { nameIdBase, populationIdBase, roleIdBase, suffixed } from "./idRules.js";
 import { checkedIri, NAMESPACE_PATTERN } from "./iri.js";
 import { mint, type Mintable } from "./mint.js";
-import { LOCAL_NAME_PATTERN, localName } from "./name.js";
+import { isNfc, LOCAL_NAME_PATTERN, localName } from "./name.js";
 import {
   objectificationRef,
   ObjectifiedFactType,
@@ -111,29 +117,8 @@ function holdsAny(ft: FactType, roleIds: readonly string[]): boolean {
 
 export type { IdKeyedKind, IdKind } from "./idIndex.js";
 
-/**
- * An `add*` was given an id its store already holds.
- *
- * Each store is a `Map` keyed by id, and `set` overwrites without a word,
- * so before this check a second element under a held id silently replaced
- * the first: an objectification evicted another in a merge, and a file
- * stating two fact types under one id loaded as one (model invariants,
- * WS3). The model cannot represent two elements under one id, so it
- * refuses rather than reports, whatever `skipPlayerValidation` says: that
- * option skips checks on what an element references, and this is a check
- * on the store itself. Both readers turn it into a `DeserializationError`.
- */
-export class DuplicateIdError extends Error {
-  constructor(
-    readonly id: string,
-    readonly kind: IdKind,
-    held: string,
-    adding: string,
-  ) {
-    super(`Id ${JSON.stringify(id)} is held by ${held}, so ${adding} cannot be added.`);
-    this.name = "DuplicateIdError";
-  }
-}
+// In the leaf module, so `Population` can throw it with no import cycle.
+export { DuplicateIdError } from "./idIndex.js";
 
 /** How `OrmModel.addFactType` adds a fact type; see its parameters. */
 export interface AddFactTypeOptions {
@@ -367,6 +352,11 @@ export class OrmModel implements ConstraintModel {
   setImport(alias: string, target: string): void {
     if (!LOCAL_NAME_PATTERN.test(alias)) {
       throw new Error(`The alias "${alias}" is not a local name.`);
+    }
+    // In NFC, as the 4.0 reader requires of an alias (barwise-wcg.6tv), so
+    // a model it builds always writes a file it reads.
+    if (!isNfc(alias)) {
+      throw new Error(`The alias "${alias}" is not in Unicode NFC form.`);
     }
     // Empty, as the 4.0 decoder refuses it (`nonEmpty`), so a file it
     // accepts always builds.

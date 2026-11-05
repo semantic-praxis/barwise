@@ -12,7 +12,12 @@ import { describe, expect, it } from "vitest";
 import { IDS_40 } from "../../src/decode/ids.js";
 import { diffModels } from "../../src/diff/ModelDiff.js";
 import { constraintRef } from "../../src/model/constraintRef.js";
-import { LOCAL_NAME_PATTERN, REFERENCE_PATTERN, ROLE_ID_PATTERN } from "../../src/model/name.js";
+import {
+  isNfc,
+  LOCAL_NAME_PATTERN,
+  REFERENCE_PATTERN,
+  ROLE_ID_PATTERN,
+} from "../../src/model/name.js";
 import { OrmModel } from "../../src/model/OrmModel.js";
 import {
   OrmYamlSerializer,
@@ -688,11 +693,34 @@ describe("the replay's reshape table, against the 4.0 decoders", () => {
     "r-1",
     "",
     "a b",
+    // Not in NFC: the shape matches, and 4.0 still refuses it (barwise-wcg.6tv).
+    "Cafe\u0301",
+    "\u212Bngstrom",
+    "a:b\u0301",
+    "a.e\u0301",
   ];
   it.each(Object.keys(leaves) as (keyof typeof leaves)[])("agrees for a %s reference", (kind) => {
     const is = Schema.is(leaves[kind]);
-    expect(samples.map((s) => [s, RESHAPE[kind].pattern.test(s)])).toEqual(
+    const reads = (s: string) => RESHAPE[kind].pattern.test(s) && isNfc(s);
+    expect(samples.map((s) => [s, reads(s)])).toEqual(
       samples.map((s) => [s, is(s)]),
     );
+  });
+});
+
+describe("a dangling reference not in NFC (barwise-wcg.6tv)", () => {
+  it("is reshaped, so the 4.0 file the replay writes reads back", () => {
+    const text = `orm_version: "3.0"
+model:
+  name: M
+  object_types:
+    - { id: p1, name: Person, kind: entity, reference_mode: nr }
+  subtype_facts:
+    - { id: sf1, subtype: p1, supertype: "Pe\u0301rson" }
+`;
+    const serializer = new OrmYamlSerializer();
+    const written = serializer.serialize(serializer.migrate(text, { lenient: true }).model);
+    expect(written).toContain("supertype: P\u00E9rson");
+    expect(() => serializer.deserialize(written, { lenient: true })).not.toThrow();
   });
 });

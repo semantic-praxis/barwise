@@ -9,7 +9,7 @@
  *   - Multiple populations per fact type
  */
 import { describe, expect, it } from "vitest";
-import { OrmModel } from "../../src/model/OrmModel.js";
+import { DuplicateIdError, OrmModel } from "../../src/model/OrmModel.js";
 import { Population } from "../../src/model/Population.js";
 
 function makeModel(): OrmModel {
@@ -194,5 +194,31 @@ describe("OrmModel population methods", () => {
     const ft = model.getFactTypeByName("Customer places Order")!;
     model.addPopulation({ factTypeId: ft.id });
     expect(model.elementCount).toBe(countBefore + 1);
+  });
+});
+
+describe("a fact instance id (barwise-wcg.4kp)", () => {
+  it("is refused when another instance of the population already holds it", () => {
+    const stated = { id: "F.population.1", roleValues: {} };
+    expect(() => new Population({ factTypeId: "F", instances: [stated, stated] })).toThrow(
+      /Id "F\.population\.1" is held by a fact instance of population "F\.population", so a second one/,
+    );
+    const pop = new Population({ factTypeId: "F", instances: [stated] });
+    expect(() => pop.addInstance(stated)).toThrow(DuplicateIdError);
+  });
+
+  it("is free again once the instance holding it is removed", () => {
+    const stated = { id: "F.population.1", roleValues: {} };
+    const pop = new Population({ factTypeId: "F", instances: [stated] });
+    pop.removeInstance("F.population.1");
+    expect(pop.addInstance(stated).id).toBe("F.population.1");
+  });
+
+  it("is never minted onto a number stated later in the same list", () => {
+    const pop = new Population({
+      factTypeId: "F",
+      instances: [{ roleValues: {} }, { id: "F.population.1", roleValues: {} }],
+    });
+    expect(pop.instances.map((i) => i.id)).toEqual(["F.population.2", "F.population.1"]);
   });
 });

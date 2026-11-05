@@ -36,6 +36,7 @@ import { type FactTypeConfig, toFactTypeConfig } from "../model/FactType.js";
 import { graphOf } from "../model/graph.js";
 import { populationIdBase, suffixed } from "../model/idRules.js";
 import { mapConstraintReferences } from "../model/mint.js";
+import { localName } from "../model/name.js";
 import { aliasOf } from "../model/namespace.js";
 import { toObjectifiedFactTypeConfig } from "../model/ObjectifiedFactType.js";
 import type { ObjectType } from "../model/ObjectType.js";
@@ -116,6 +117,7 @@ export function mergeModels(
   const deltas = diff.deltas;
   refuseNameClashes(deltas, accepted);
   refuseOwnerChanges(deltas, accepted);
+  refuseCoincidentIds(existing, incoming, deltas, accepted);
   // A rebound alias is refused, accepted or not: the base's shadows behind
   // it would come to name another context, which no review of the header
   // line shows (iri-identity WS6).
@@ -1142,6 +1144,98 @@ function refuseOwnerChanges(deltas: readonly ModelDelta[], accepted: ReadonlySet
     `cannot change which domain owns ${moved.join(", ")}: the owner is part of the id, `
       + "and a merge keeps the base's ids. Diff with MERGE_DIFF_OPTIONS, which does not "
       + "offer it, or change the owner in the domains themselves.",
+  );
+}
+
+/**
+ * Refuse accepted renames paired through the ids two 3.x files stated
+ * when the files look unrelated (barwise-xv1). Two replayed models pair
+ * by the ids their files had, so two unrelated files numbered from `ot0`
+ * would otherwise merge with exit 0, each element renamed to whatever the
+ * other file held under its number. Two signs say the ids coincide rather
+ * than name one element:
+ *
+ * - no object type or fact type keeps its name between the files, so
+ *   nothing shows they are revisions of one model (Customer and Order
+ *   against Employee and Department);
+ * - a rename's names moved, the incoming file holding the old name on
+ *   another element, or the base holding the new one on another element
+ *   it does not remove (Dog and Cat under ids swapped between two files).
+ *
+ * A changed structure is not one: an edited revision renames Customer to
+ * Client and `customer_id` to `client_id` together (`simple-modified`).
+ * And models with no prior ids pair by their own, where a shared id is one
+ * element (model-invariants decision 1), so a rotation of names under
+ * kept ids is a set of renames (`renamedPair.law.test.ts`).
+ *
+ * Both signs are heuristics, and each misreads some cases (barwise-wcg.3qv).
+ * A chain rename in one revision (Draft to Order, Order to Purchase
+ * Order) moves a name exactly as a partial swap does, so it is refused,
+ * and so is a revision that renames every element.
+ * Two unrelated files that happen to share one name under one number
+ * (each opens with Customer as `ot0`) look related, so their other
+ * coinciding numbers still merge as renames.
+ */
+function refuseCoincidentIds(
+  existing: OrmModel,
+  incoming: OrmModel,
+  deltas: readonly ModelDelta[],
+  accepted: ReadonlySet<number>,
+): void {
+  const [fromExisting, fromIncoming] = [existing.priorIds, incoming.priorIds];
+  if (fromExisting === undefined || fromIncoming === undefined) return;
+  type Kind = "object_type" | "fact_type";
+  type Named = { readonly id: string; readonly name: string; };
+  const renames: { kind: Kind; a: Named; b: Named; }[] = [];
+  const removed = new Set<string>();
+  deltas.forEach((d, i) => {
+    if (!accepted.has(i) || (d.elementType !== "object_type" && d.elementType !== "fact_type")) {
+      return;
+    }
+    if (d.kind === "removed" && d.existing) removed.add(d.existing.id);
+    if (d.kind !== "modified" || !d.existing || !d.incoming) return;
+    if (localName(d.existing.name) === localName(d.incoming.name)) return;
+    renames.push({ kind: d.elementType, a: d.existing, b: d.incoming });
+  });
+  if (renames.length === 0) return;
+
+  const elements = (model: OrmModel, kind: Kind): readonly Named[] =>
+    kind === "object_type" ? model.objectTypes : model.factTypes;
+  const KINDS: readonly Kind[] = ["object_type", "fact_type"];
+  // Each element's local name under the id its file stated.
+  const byFileId = (model: OrmModel, ids: ReadonlyMap<string, string>) =>
+    new Map(
+      KINDS.flatMap((k) =>
+        elements(model, k).map((e) => [`${k} ${ids.get(e.id) ?? e.id}`, localName(e.name)] as const)
+      ),
+    );
+  const incomingByFileId = byFileId(incoming, fromIncoming);
+  const related = [...byFileId(existing, fromExisting)].some(([key, name]) =>
+    incomingByFileId.get(key) === name
+  );
+  // The pair's own elements need no excluding: their local names differ.
+  const names = (model: OrmModel, kind: Kind, skip: ReadonlySet<string>) =>
+    new Set(elements(model, kind).filter((e) => !skip.has(e.id)).map((e) => localName(e.name)));
+  const held = new Map(KINDS.map((k) => [k, {
+    incoming: names(incoming, k, new Set()),
+    kept: names(existing, k, removed),
+  }]));
+  const clashes = renames.filter(({ kind, a, b }) =>
+    !related || held.get(kind)!.incoming.has(localName(a.name))
+    || held.get(kind)!.kept.has(localName(b.name))
+  );
+  if (clashes.length === 0) return;
+  const pairs = clashes.map(({ a, b }) =>
+    `"${fromExisting.get(a.id) ?? a.id}" ("${a.name}" and "${b.name}")`
+  );
+  const why = related
+    ? "the names are held on other elements"
+    : "no object type or fact type keeps its name between them";
+  throw new Error(
+    `the two 3.x files share the id ${pairs.join(", ")}, and ${why}, so the ids likely `
+      + "coincide between unrelated files, and merging would turn one element into the other. "
+      + "Diff them matching by content to see how they pair, or migrate one file to format "
+      + "4.0, whose ids come from names.",
   );
 }
 

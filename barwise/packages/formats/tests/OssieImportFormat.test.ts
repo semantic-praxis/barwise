@@ -916,9 +916,10 @@ ontology:
       "ai_context: barwise has no field for AI context; dropped.",
       "ontology_mappings: embedded mappings (deprecated in Ossie) are not imported; dropped.",
       "requires on the ontology is not carried as a constraint (kept in the model's note): COUNT[Person] > 0",
-      "Person: iri ex:Person dropped; barwise has no field for IRIs.",
-      "Person.walks: iri ex:walks dropped; barwise has no field for IRIs.",
       "no identify_by and no supertype, so nothing identifies them; each is given a reference mode no relationship carries: Person.",
+      // Read after the model is built, against the ids it gave (iri-identity 6f).
+      "Person: iri ex:Person dropped; barwise keeps an IRI only as the model's namespace followed by the element's id.",
+      "Person.walks: iri ex:walks dropped; barwise keeps an IRI only as the model's namespace followed by the element's id.",
     ]);
     expect(confidence).toBe("medium");
   });

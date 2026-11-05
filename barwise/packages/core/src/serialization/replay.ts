@@ -29,6 +29,7 @@ import { constraintRef } from "../model/constraintRef.js";
 import { toFactTypeConfig } from "../model/FactType.js";
 import { mapConstraintReferences, type Reference } from "../model/mint.js";
 import {
+  isNfc,
   LOCAL_NAME_PATTERN,
   localName,
   REFERENCE_PATTERN,
@@ -179,7 +180,8 @@ export function replayIds(source: OrmModel, options: ReplayOptions = {}): Replay
   for (const [kind, olds] of [...byKind].sort(([a], [b]) => a.localeCompare(b))) {
     const { pattern, shape } = RESHAPE[kind];
     for (const old of [...olds].sort()) {
-      if (pattern.test(old)) continue;
+      // Kept only where 4.0 reads it as written: its shape, and in NFC.
+      if (pattern.test(old) && isNfc(old)) continue;
       const base = shape(localName(old) || kind);
       let id = base;
       for (let n = 2; reshaped.has(id) || dangling.has(id); n++) id = `${base}_${n}`;
@@ -333,9 +335,9 @@ export type DanglingKind = "objectType" | "factType" | "role" | "subtypeFact" | 
 /**
  * What 4.0 reads at a reference of each kind, and the shape a dangling one
  * that does not match takes from its old id's local name. A constraint
- * dangles only as an entity's preferred identifier. Each pattern must
- * accept what the 4.0 decoder's leaf for that reference accepts
- * (`decode/ids.ts`, `IDS_40`); `replay.test.ts` holds them together.
+ * dangles only as an entity's preferred identifier. Each pattern, with
+ * `isNfc`, must accept what the 4.0 decoder's leaf for that reference
+ * accepts (`decode/ids.ts`, `IDS_40`); `replay.test.ts` holds them together.
  */
 export const RESHAPE: Record<DanglingKind, { pattern: RegExp; shape: (local: string) => string; }> =
   {

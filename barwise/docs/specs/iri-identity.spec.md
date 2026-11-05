@@ -27,7 +27,8 @@ rules, `imports` on the model, rename rewriting ids); 6b-3c implemented
 2026-11-03 (NORMA import names, export ids by decision 12(a)); 6d implemented
 2026-11-04 (merge keeps the base's ids, split writes alias shadows,
 `source_context` leaves 4.0); 6e implemented 2026-11-04 (lineage manifest
-version 2, renames rewrite lineage); 6f and WS7 to come
+version 2, renames rewrite lineage); 6f implemented 2026-11-04 (Ossie's
+`iri`, the namespace read back), so WS6 is complete; WS7 to come
 
 Created: 2026-10-28
 Last-updated: 2026-11-04
@@ -1598,6 +1599,29 @@ version-1 manifest would go silently empty for impact analysis.
   `equivalent_iri` when present, into Ossie's `iri` (decision 1), and the
   namespace leaves its loss block (WS4). The imports line stays: Ossie
   has no aliases, and a shadow is written by its owner's name.
+  - _6f notes._
+    - Each concept and relationship takes `iriOf(model, id)` as `iri`. A
+      shadow takes none: the export is of one model, and a shadow's
+      namespace is its owner's, which only the project knows. Decision 1's
+      `equivalent_iri` is a field no model, schema or decoder holds yet,
+      so the identity IRI is always the one written; adding the field is
+      filed as barwise-wcg.vn2.
+    - The namespace leaves the loss block only where it comes back. One
+      rule, `namespaceOfIris` (`formats/src/ossie/ossieNamespace.ts`), is
+      shared by the importer, which reads it, and the writer, which
+      predicts it: the namespace most concept IRIs agree on, each IRI that
+      ends in its concept's id at a `/` or `#` boundary, and none on a
+      tie. The model takes it if barwise can hold it (a warning says why
+      not), and each other IRI is named in the warnings and dropped. The
+      writer gives the rule the ids the importer will mint, by the suffix
+      rule in written order. So a model whose every concept is a shadow, or
+      none of whose concepts has the id the importer gives it
+      (`id-not-from-name`), still names its namespace as not written. A relationship's IRI is always dropped on import, since the
+      importer names its fact type from the Ossie name. The same rule
+      applies to an Ossie document from elsewhere: one whose concept IRIs
+      mostly agree on a namespace now imports with it.
+    - DDL comments and SVG `data-id` print local names with no change, as
+      planned (their goldens were regenerated in 6b).
 
 **6b ships in four parts** (owner, 2026-10-30), each merged on its own,
 with no release until 6f, because 6b alone is more than a session: the
@@ -1961,6 +1985,14 @@ accepted. The options stay, so a later reader sees what was weighed.
    a role separator. (b) PascalCase-join (`CustomerPlacesOrder`), which reads
    worse and collides more. **Decided: (a).** A minted name with a
    defining rule (`... defined as: ...`) is then encoded, not parsed.
+   A stated 4.0 id must be in NFC too (owner, 2026-11-05, on
+   barwise-wcg.6tv): the reader refuses one that is not, since a pattern
+   cannot test NFC; the JSON Schema accepts it, a divergence the 4.0 drift
+   test pins. So that a minted id is always NFC as well, `localName` encodes a
+   combining mark that follows an encoded character, which would otherwise
+   compose with the escape's last hex digit (`%2E` and U+0301). The
+   model's `setImport` refuses an alias not in NFC, and the 3.x replay
+   reshapes a dangling reference that is not.
 4. **An objectified fact type named like its object type.** 22 fact types in
    the corpus share their objectifying type's name (11 in
    `docs/auction.orm.yaml`, 11 in `examples/auction-project/`), from NORMA's
@@ -1987,7 +2019,12 @@ accepted. The options stay, so a later reader sees what was weighed.
    instance keeps an `id`, its population's local name plus the next number
    that population has not used (`.1`, `.2`), never reused, because six
    population rules, the editor's source map and the NORMA population
-   mapping key on it. (b) fact instances drop their id and every one of
+   mapping key on it. (Amended by the owner, 2026-11-05, on barwise-wcg.4kp:
+   "never reused" holds while a model is loaded, and a stated id another
+   instance holds is refused; a file keeps no record of a removed instance,
+   so after a save and reload a removed number can come back. The sites
+   that key on the id need it unique at any moment. It is within its
+   population; across populations it is not yet, barwise-wcg.ezo.) (b) fact instances drop their id and every one of
    those sites moves to positions. **Decided: (a).**
 8. **How diff recognizes a rename.** (a) after the id and name passes, pair
    the rest by content (same kind, roles, players and constraints) and

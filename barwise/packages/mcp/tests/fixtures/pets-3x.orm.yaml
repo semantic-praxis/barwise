@@ -1,0 +1,6 @@
+orm_version: "3.0"
+model:
+  name: Pets
+  object_types:
+    - { id: ot0, name: Dog, kind: entity, reference_mode: id }
+    - { id: ot1, name: Cat, kind: entity, reference_mode: id }
