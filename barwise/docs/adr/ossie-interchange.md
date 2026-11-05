@@ -157,21 +157,14 @@ recorded in barwise-wcg's spec, `docs/specs/iri-identity.spec.md`.
   comparison of subtype and derivation rules with `derived_by`. Decision 2's exclusion
   of mapping documents is likewise not final: whether barwise reads them
   for barwise-pf2.3 is open.
-- Decision 5 is not built. (Since iri-identity WS6, 6b-4b, barwise ids
-  are local names and `generateId()` is retired; barwise-wcg.vlv tracks
-  bringing this ADR and the determinism ADR up to date.) barwise minted
-  UUIDs (`generateId()` in `core/src/model/id.ts`) until barwise-wcg, so an Ossie
-  `iri` or `prefixes` map is named in the import warnings and dropped.
-  The change is a major `.orm.yaml` version with a migration
-  (`docs/adr/schema-versioning.md`). Two rules in force today contradict
-  it and stay in force until barwise-wcg's spec amends them:
-  `docs/adr/determinism-in-core.md` (ids minted once, at creation, and
-  diff and merge pairing elements by id first) and
-  `docs/specs/importer-role-ids.spec.md` R1 (an importer takes a role's id
-  from `generateId()`, never from a string built out of names). With identity built from
-  names, a rename changes an element's IRI. barwise-wcg's spec, decision 8,
-  settles what follows: diff reports a content pair whose names differ as a
-  possible rename, and merge never pairs one, adding it instead.
+- Decision 5 is built by `docs/specs/iri-identity.spec.md` (barwise-wcg):
+  format 4.0, a major `.orm.yaml` version with a migration
+  (`docs/adr/schema-versioning.md`), stores ids that are local names
+  minted from names, and the Ossie reader takes the namespace from an
+  Ossie `iri`. Decision 1's `equivalent_iri` is deferred (barwise-wcg.vn2).
+  With identity built from names, a rename changes an element's IRI:
+  diff reports a content pair whose names differ as a possible rename,
+  and merge never pairs one, adding it instead (iri-identity decision 8).
 - Decision 6 has no gate; that barwise keeps its ORM 2 terms is held by
   review. The translation is tested construct by construct in
   `OssieImportFormat.test.ts` and `OssieExportFormat.test.ts`. It is

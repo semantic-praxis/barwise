@@ -6,12 +6,6 @@
     "new": "import { readFileSync } from \"node:fs\";\nexport function diffModels("
   },
   {
-    "decision": "determinism-in-core#ambient-as-argument",
-    "file": "barwise/packages/core/src/diff/ModelMerge.ts",
-    "old": "export function mergeModels(",
-    "new": "const mergedAt = Date.now();\nexport function mergeModels("
-  },
-  {
     "decision": "connector-packages#connector-owns-io",
     "file": "barwise/packages/core/src/format/registry.ts",
     "old": "export function registerFormat(",
