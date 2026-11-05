@@ -15,7 +15,7 @@ import { IdIndex, type IdKeyedKind, IdKeyedStore, type IdKind } from "./idIndex.
 import { nameIdBase, populationIdBase, roleIdBase, suffixed } from "./idRules.js";
 import { checkedIri, NAMESPACE_PATTERN } from "./iri.js";
 import { mint, type Mintable } from "./mint.js";
-import { LOCAL_NAME_PATTERN, localName } from "./name.js";
+import { isNfc, LOCAL_NAME_PATTERN, localName } from "./name.js";
 import {
   objectificationRef,
   ObjectifiedFactType,
@@ -367,6 +367,11 @@ export class OrmModel implements ConstraintModel {
   setImport(alias: string, target: string): void {
     if (!LOCAL_NAME_PATTERN.test(alias)) {
       throw new Error(`The alias "${alias}" is not a local name.`);
+    }
+    // In NFC, as the 4.0 reader requires of an alias (barwise-wcg.6tv), so
+    // a model it builds always writes a file it reads.
+    if (!isNfc(alias)) {
+      throw new Error(`The alias "${alias}" is not in Unicode NFC form.`);
     }
     // Empty, as the 4.0 decoder refuses it (`nonEmpty`), so a file it
     // accepts always builds.
