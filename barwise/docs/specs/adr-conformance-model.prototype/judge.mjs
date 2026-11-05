@@ -57,23 +57,29 @@ const PATTERNS = [
   ["issue-open", /^(?<f>\S+): "(?<e>.*)": (?<i>\S+) is closed; /, (m) => m.i],
 ];
 // The code judge's findings name an entry by its text. WS2 attaches the
-// position instead; here the position is recovered from the text: the k-th
-// finding of one rule on one text is the k-th entry with that text.
+// position from judgeDeclarations' own loop index instead; this recovery is
+// the prototype's stand-in. The judge walks entries in order, so the k-th
+// finding of one rule on one text and key belongs to the entry at index
+// floor(k / per), where per is how many findings one such entry yields
+// (the times it lists the id, for ids-exist; else one).
 export function codeJudge(adrs, reader, refusals) {
   const { problems } = judgeDeclarations(adrs, reader, refusals);
   const positions = new Map(adrs.map(({ f, text }) => [
     f.slice(ADR_DIR.length, -".md".length),
-    parseEnforcedBy(text).entries.map((e) => e.text),
+    parseEnforcedBy(text).entries,
   ]));
   const seen = new Map();
   const position = (rule, adr, text, key) => {
     const k = `${rule}|${adr}|${text}|${key}`;
     const nth = seen.get(k) ?? 0;
     seen.set(k, nth + 1);
-    const at = (positions.get(adr) ?? []).map((t, i) => (t === text ? i : -1)).filter((i) =>
-      i >= 0
-    );
-    return at.length === 0 ? "?" : at[Math.min(nth, at.length - 1)];
+    const entries = positions.get(adr) ?? [];
+    const at = entries.map((e, i) => (e.text === text ? i : -1)).filter((i) => i >= 0);
+    if (at.length === 0) return "?";
+    const per = rule === "ids-exist"
+      ? Math.max(1, entries[at[0]].ids.filter((id) => `${adr}#${id}` === key).length)
+      : 1;
+    return at[Math.min(Math.floor(nth / per), at.length - 1)];
   };
   const findings = [];
   for (const p of problems) {

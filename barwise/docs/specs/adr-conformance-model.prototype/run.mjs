@@ -146,4 +146,7 @@ showR("an entry lists one unknown id twice", [
   adr("a", "npm run check:x (one, ghost, ghost)", ["one"]),
 ]);
 showR("a malformed entry before a finding", [adr("a", "bogus, npm run check:gone (one)", ["one"])]);
+showR("two identical entries, each listing one unknown id twice", [
+  adr("a", "npm run check:x (one, ghost, ghost), npm run check:x (one, ghost, ghost)", ["one"]),
+]);
 console.log(`\n${agree} of ${total} stub cases agree`);

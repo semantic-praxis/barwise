@@ -36,7 +36,7 @@ differ from the code judge's; the owner chose to prototype (2026-11-05).
 The prototype is committed beside this spec, in
 `docs/specs/adr-conformance-model.prototype/`: five rules in a format-4.0
 schema (`governance.orm.yaml`), a fact builder over the real reader
-(`build.mjs`), both judges and their comparison (`judge.mjs`), twenty-four stub cases (`run.mjs`), the real tree clean and with four violations
+(`build.mjs`), both judges and their comparison (`judge.mjs`), twenty-five stub cases (`run.mjs`), the real tree clean and with four violations
 planted into a real ADR, each plant checked to change the ADR's text
 (`real.mjs`), and the classifier's edge cases, core's one-violation-per-value count, the mandatory-coverage leak and the exit when the model cannot load (`typo.mjs`). Each runs
 with `node <file>` from that directory after `npm run build`. Every claim
@@ -83,15 +83,15 @@ entry, only its ADR), and the two judges are compared as **multisets of
 so a disagreement on a second entry with the same key is not hidden
 behind the first, and two identical entries are two findings on both
 sides. The code judge's side comes from the (rule, key, entry position)
-WS2 attaches to each finding. The prototype recovers the code side's position from the entry's text
-(the k-th finding of a rule on a text is the k-th entry with that text),
-and its cases include two identical entries and a malformed entry before
-a finding _(prototype)_. `ids-exist` counts once per time an entry lists
+WS2 attaches to each finding. The prototype recovers the code side's position from the entry's text,
+a stand-in WS2 replaces with `judgeDeclarations`' own loop index; its
+cases include two identical entries, a malformed entry before a finding,
+and two identical entries each listing an unknown id twice _(prototype)_. `ids-exist` counts once per time an entry lists
 the id, as the code judge reports it: the facts hold each id once (the
 schema's uniqueness on "Entry lists Decision"), so the expansion counts
 the entry's own list _(prototype: `(one, ghost, ghost)`)_.
 
-On that grain the two judges agreed on all twenty-four stub cases and all five
+On that grain the two judges agreed on all twenty-five stub cases and all five
 real-tree runs _(prototype)_. One case needs a rule beyond set equality:
 an issue not in the tracker is also not open, and the code judge reports
 only `issue-tracked` while the model reports both. `issue-tracked` and
@@ -304,6 +304,34 @@ Every disagreement CI reports is resolved in a commit that adds its input
 as a case here; that test file's history and the job's run count are the
 record WS4 starts from.
 
+Requirements the build must meet, from the plan's last review rounds:
+
+- **Positions come from the loop.** `judgeDeclarations` attaches each
+  finding's entry position from its own loop index over
+  `parseEnforcedBy(text).entries`, never recovered from the message text;
+  the combined case (identical entries, each listing an id twice) is a
+  test.
+- **Every import can refuse.** Under `!cancelled()` the steps also run
+  after `npm ci` fails, so `check-adr-model.mjs` loads every dependency
+  (core, `yaml`, the `scripts/lib` modules) with a dynamic import inside
+  one `try`, and a failure is the model's own refusal, exit 2. The test
+  for it runs where core is absent (`test:scripts`, before the build) and
+  makes the real import fail, through a path the check takes as an
+  argument, not through a flag that skips the import.
+- **`test:adr-model` refuses on skips, not on a file.** It runs the file
+  and exits 2 when the run's own count of skipped cases is not zero, so a
+  build that exists but does not import is not a pass.
+- **The test file registers the same tests either way.** Every case in
+  `adr-model.test.mjs` registers whether core is built or not and skips
+  with `{ skip }`, so `test:scripts`' per-file count in
+  `expected-counts.json` does not depend on whether a build exists.
+- **One condition form.** `shouldRun` understands `${{ !cancelled() }}`
+  as written and nothing more: the bare `!cancelled()` is a YAML tag, read
+  as an empty `if:` by the YAML reader and as a condition by the line
+  reader, so it stays not-understood; and no general `${{ }}` stripping,
+  which would make the wrapped docs-only guard understood and break the
+  existing test that pins it as not.
+
 ### 4. The model becomes the judge of the fact rules (provisional)
 
 The fact rules' findings leave `adr-judge.mjs`; `check:adr-model` exits 1
@@ -338,8 +366,8 @@ the owner reviews WS3's record: how many runs, and every disagreement.
   run check:adr-model`, and `npm run test:adr-model`. At the end, a
   failure in them skips no other gate; under `!cancelled()`, they run
   after a failed gate and on a docs-only change. `shouldRun`
-  (`scripts/lib/ci-gates.mjs`) learns the atom `!cancelled()`, with or
-  without its `${{ }}`, as always true locally, since `ci:local` is
+  (`scripts/lib/ci-gates.mjs`) learns exactly the condition
+  `${{ !cancelled() }}`, as always true locally, since `ci:local` is
   never cancelled; `ci-conditions.test.mjs` gains its case, so the
   real-`ci.yml` test keeps passing and `ci:local` runs the steps.
   Rejected: the same steps first, after `npm ci`, where any failure in
