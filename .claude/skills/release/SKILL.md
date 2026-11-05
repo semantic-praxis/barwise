@@ -32,7 +32,10 @@ the one path that skips CI on the commit being released (barwise-8e4).
 All commands run from `barwise/`. The `--no-workspaces-update` flag
 prevents npm from resolving workspace dependencies against the public
 registry (these packages are not published). Use `patch` for bug fixes
-and small improvements, `minor` for new features or format support:
+and small improvements, `minor` for new features or additive format
+support, and `major` when a release breaks something a user has: a
+format older builds cannot read, a removed CLI flag, or a changed
+library API (2.0.0 was all three):
 
 ```bash
 git fetch origin main   # a stale origin/main would bump from a version already shipped
@@ -96,9 +99,11 @@ until they name `<version>.md` instead (the 2.0.0 bump repointed
 twelve). The file name is plain text here, not a backticked path,
 because it exists only between releases: `check:instruction-refs`
 would fail on it after a bump, and an allowlist row for it would go
-stale, and fail, once the next release's notes start. Check that `gh` is on PATH first; the GitHub MCP tools can read
-releases but not create one. The `release.yml` workflow then builds and attaches
-the artifacts: the VS Code extension (`.vsix`), the standalone CLI
+stale, and fail, once the next release's notes start.
+
+Check that `gh` is on PATH first; the GitHub MCP tools can read
+releases but not create one. The `release.yml` workflow then builds and
+attaches the artifacts: the VS Code extension (`.vsix`), the standalone CLI
 bundle (`barwise-cli-<ver>.cjs`), the MCP server bundle
 (`barwise-mcp-<ver>.cjs`), and a `SHA256SUMS` file. The same workflow
 refreshes a rolling `edge` pre-release on every push to `main`, so a
