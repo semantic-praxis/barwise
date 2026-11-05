@@ -16,7 +16,7 @@ barwise/packages/dbt/tests/,
 +barwise/packages/cli/tests/dbtUniquenessRoundTrip.test.ts,
 +barwise/packages/cli/tests/uniquenessParity.test.ts,
 barwise/docs/IMPORT_EXPORT.md,
-barwise/docs/release-notes/unreleased.md
+barwise/docs/release-notes/2.0.0.md
 
 When barwise exports a model to dbt and imports it back, every uniqueness
 the DDL export writes as a UNIQUE clause shall come back. Today none does.

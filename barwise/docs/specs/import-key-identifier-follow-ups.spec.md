@@ -13,7 +13,7 @@ barwise/packages/formats/tests/,
 barwise/packages/cli/tests/uniquenessParity.test.ts,
 barwise/packages/cli/tests/compositeKeyParity.test.ts,
 +barwise/packages/cli/tests/workspace/preferred.ts,
-barwise/docs/release-notes/unreleased.md
+barwise/docs/release-notes/2.0.0.md
 
 This spec covers three follow-ups to annotation-preferred-identifier.spec.md:
 

@@ -10,7 +10,7 @@ Touches: barwise/packages/core/src/mapping/renderers/openapi.ts,
 barwise/packages/core/tests/mapping/openapi.test.ts,
 barwise/packages/cli/tests/characterization/golden/,
 barwise/docs/IMPORT_EXPORT.md,
-barwise/docs/release-notes/unreleased.md
+barwise/docs/release-notes/2.0.0.md
 
 When a table's primary key spans several columns, the OpenAPI export
 shall write its item path with one path parameter per key column, in key

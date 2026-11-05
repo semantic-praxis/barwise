@@ -22,7 +22,7 @@ barwise/docs/adr/ossie-interchange.md,
 barwise/docs/CLI.md,
 +barwise/packages/formats/tests/OssieSchema.test.ts,
 barwise/turbo.json,
-barwise/docs/release-notes/unreleased.md
+barwise/docs/release-notes/2.0.0.md
 
 When an imported Ossie document carries a field the pinned schema does not
 define, the importer shall name that field, by its path, in

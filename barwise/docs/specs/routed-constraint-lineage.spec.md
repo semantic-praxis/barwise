@@ -15,7 +15,7 @@ barwise/packages/core/src/annotation/constraintSpec.ts,
 barwise/packages/formats/src/ddl/DdlExportFormat.ts,
 +barwise/packages/core/tests/lineage/routedConstraints.test.ts,
 barwise/packages/core/tests/mapping/ConstraintRouting.test.ts,
-barwise/docs/release-notes/unreleased.md
+barwise/docs/release-notes/2.0.0.md
 
 This spec fixes two gaps in what the DDL export reports.
 

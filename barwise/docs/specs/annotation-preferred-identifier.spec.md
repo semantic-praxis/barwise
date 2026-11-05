@@ -11,7 +11,7 @@ barwise/packages/formats/src/ddl/DdlImportFormat.ts,
 barwise/packages/formats/src/ddl/DdlExportFormat.ts,
 barwise/packages/formats/tests/,
 barwise/packages/cli/tests/uniquenessParity.test.ts,
-barwise/docs/release-notes/unreleased.md
+barwise/docs/release-notes/2.0.0.md
 
 When barwise exports a model to annotated DDL and imports it back, every
 entity shall keep the preferred identifier it stored. Today 42 entities
