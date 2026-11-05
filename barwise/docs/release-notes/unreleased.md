@@ -1,3 +1,117 @@
+## Model file format 4.0: readable ids
+
+This release writes `.orm.yaml` files at `orm_version: "4.0"`. It is a
+major release: the file format changes in a way older barwise cannot read,
+and the library's public API loses three functions.
+
+**An element's id is now its name.** In 4.0 an object type `Order` has the
+id `Order`, a fact type `Customer places Order` has `Customer_places_Order`,
+and a role on it has `Customer_places_Order.places`. Ids are no longer
+UUIDs or hand-picked codes like `ot-customer`. A constraint, subtype fact or
+objectification gets an id from what it says. Because ids are names, a diff,
+a lineage report or a diagnostic names elements in words a reader knows,
+and two people who model the same thing write the same ids.
+
+**Older files still open, and nothing needs doing before you upgrade.**
+A file at format 1.x, 2.0 or 3.0 loads as it always did: its ids are
+replayed into 4.0's in memory, and it is written as 4.0 the next time it
+is saved. Until then, `barwise validate` and the editor name its elements
+by their 4.0 ids, which the file does not yet state, and say so once at the
+top ("This file is in a format before 4.0...").
+
+**What to do:**
+
+1. Upgrade everyone who shares the models first: the CLI, the MCP server
+   and the VS Code extension. **barwise 1.7.0 and earlier cannot read a
+   4.0 file** and refuse it with "the file was written by a newer barwise;
+   upgrade barwise to read it." Every file this release saves is 4.0.
+2. Run `barwise migrate` on your models, or on a project's
+   `.orm-project.yaml` so every domain moves together and each shared
+   object type keeps one id across domains. `barwise migrate --check`
+   lists what would change without writing anything. See `docs/CLI.md`,
+   "migrate".
+3. Keep any YAML comments you care about somewhere else first. `migrate`
+   writes each file from the model, so comments and hand layout are not
+   kept.
+4. Re-export anything you track with `barwise lineage`. Exports made
+   before 4.0 name the old ids, so `barwise lineage status` reports each
+   one stale with the reason "ids changed to 4.0", and the next export
+   records the new ids.
+
+### Renaming an element now renames its id
+
+`barwise rename` (and the MCP server's `rename_element`, which the VS Code
+extension uses) renames an object type, a fact type or a role, and gives
+it the id its new name gives. Every id that embeds it follows: a renamed
+fact type's roles, populations and instances, and, through a project, the
+copies of an object type in other domains. The lineage manifest beside each
+changed file is rewritten in the same write. See `docs/CLI.md`, "rename".
+
+### Shared object types name their owner
+
+A domain that uses an object type another domain owns (a shadow) now names
+it through an alias the file imports: `imports: { auctions: auctions }`
+and the id `auctions:Auction`. Before 4.0 a shadow carried
+`source_context: auctions` instead; `migrate` rewrites it.
+`docs/ORM_PROJECT_GUIDE.md` shows the form.
+
+### IRIs
+
+A model's `namespace` and a project's `iri_base` now give each element an
+IRI: the namespace followed by its id. The Apache Ossie export writes each
+concept's and relationship's IRI, and the Ossie import reads the namespace
+back from them. A namespace is optional: a model without one has ids but
+no IRIs.
+
+### Other changes that come with 4.0
+
+- **A stated id must be in Unicode NFC.** A 4.0 file whose id, or the key
+  of a map keyed by ids, is not in NFC is refused when it loads, naming
+  the id. The ids barwise writes always are.
+- **A fact instance id stated twice is refused.** A population that states
+  one instance id twice no longer loads, in any format, as a repeated
+  constraint id already did not.
+- **Merging two unrelated older files is refused.** Two models read from
+  files before 4.0 pair by the ids their files stated, so two unrelated
+  files that both numbered their types from `ot0` used to merge with no
+  error, turning one element into another. `barwise merge` (and the MCP and
+  VS Code merges) now refuse a pairing like that and say why. Migrate both
+  files first, and they pair by name.
+- **Lineage manifests are version 2.** A manifest written by an earlier
+  build is read as version 2, with its exports marked as made under the old
+  ids.
+
+### What changed in the file before 4.0
+
+This release is also the first to ship formats 2.0 and 3.0, which were
+never released on their own. Their changes arrive with it:
+
+- **Constraints are placed by kind (3.0).** A constraint over one fact
+  type's roles stays under that fact type. A constraint relating several
+  fact types, or subtype links, is listed once under the model's
+  `constraints`, where before it was filed under whichever fact type its
+  author chose. Subtype exclusion and totality are now constraints of their
+  own rather than `is_exclusive` and `is_exhaustive` flags on each subtype
+  fact, so a supertype can carry more than one of each.
+- **Every constraint has a stable id (3.0).** A constraint a file leaves
+  without an id used to get a random one on every load, so the same file
+  exported to NORMA twice gave different ids. It now gets the same id
+  every time.
+- **Diagrams refer to elements by id, not by name (2.0)**, and
+  **`elements: []` now means an empty view (2.0).** Both are described
+  below.
+
+### For code that uses `@barwise/core`
+
+- `generateId()`, `setIdGenerator` and `createUuidv7Generator` are removed:
+  core mints no random id and reads no clock. An element added without an
+  id is given the one its name gives.
+- `localName`, `namespaceOf`, `iriOf`, `renameInModel` and `renameInProject`
+  are new.
+- `FactType.constraints` is removed: `FactType.internalConstraints` holds a
+  fact type's own constraints, and `OrmModel.constraints` holds the rest.
+  `SubtypeFact.isExclusive`, `isExhaustive` and `isPreferred` are removed.
+
 ## Project and mapping files state their format version
 
 `.orm-project.yaml` and `.map.yaml` files now start with
@@ -12,22 +126,14 @@ them with a schema error ("must NOT have additional properties"), not the
 builds refuse a model that declares a `namespace`.
 
 Two optional fields arrive with it: `iri_base` on a project and
-`namespace` on a model, which say where element IRIs start. They change no
-element id yet; see `docs/ORM_PROJECT_GUIDE.md`.
+`namespace` on a model, which say where element IRIs start. With format
+4.0 they give each element an IRI; see "IRIs" above and
+`docs/ORM_PROJECT_GUIDE.md`.
 
-## Model file format 2.0
+## Diagrams and views (format 2.0)
 
-This release writes `.orm.yaml` files at `orm_version: "2.0"`. Files from
-earlier versions still open: they are upgraded automatically when loaded,
-and saved as 2.0 the next time they are written.
-
-**Older barwise cannot read 2.0 files.** barwise 1.7.0 and earlier refuse
-them with "the file was written by a newer barwise; upgrade barwise to
-read it." Every file this release saves is 2.0, whether or not it has
-diagrams. If a team shares models, everyone needs this release (CLI, MCP
-server and VS Code extension) before anyone saves a file with it.
-
-### What changed in the file
+These arrive with this release, as described under "What changed in the
+file before 4.0" above.
 
 - **Diagrams refer to elements by id, not by name.** A diagram's
   `elements` list and its `positions` and `orientations` keys now hold
@@ -44,6 +150,8 @@ server and VS Code extension) before anyone saves a file with it.
   a view now leaves it empty instead of turning it back into a full view,
   and `barwise validate` reports that as `structural/diagram-empty-view`
   (info).
+
+## Other changes in this release
 
 ### NORMA export and import follow view scope
 
