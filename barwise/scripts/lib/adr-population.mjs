@@ -1,19 +1,38 @@
 /**
  * The facts the ADR governance schema judges, built from what the
- * governance reader answers (docs/specs/adr-conformance-model.spec.md).
+ * governance reader answers, and the schema's verdict on them
+ * (docs/specs/adr-conformance-model.spec.md).
  *
- * The builder asks the reader exactly what the code judge asks, and no
- * more: `scripts()` only for an npm entry the shared `scriptVerdict` lets
- * through, `issues()` only for a `none` entry, never the workflow. When an
- * input cannot be read the reader answers `null` and records the refusal,
- * and the builder writes none of the facts that would oblige anything of
- * it, so the model reports nothing where the code judge cannot answer. An
- * ADR with no `Enforced-by:` header gets no facts at all, as the code judge
- * `continue`s past it.
+ * check:adr-model judges five rules with it (WS4), which check:architecture
+ * no longer judges. The builder asks the reader what check:architecture
+ * asks for the same entries, and no more: `scripts()` only for an npm
+ * entry the shared `scriptVerdict` lets through, `issues()` only for a
+ * `none` entry, never the workflow. When an input cannot be read the
+ * reader answers `null` and records the refusal, and the builder writes
+ * none of the facts that would oblige anything of it, so the model reports
+ * nothing it cannot answer. An ADR with no `Enforced-by:` header gets no
+ * facts at all: check:architecture reports the missing header.
  */
 import { decisionIds, parseEnforcedBy } from "./adr-enforcement.mjs";
 import { scriptVerdict } from "./adr-judge.mjs";
 import { ADR_DIR } from "./architecture-section.mjs";
+
+/**
+ * The five fact rules: the governance schema states each as a subset
+ * constraint whose id is the rule's id, and check:adr-model judges them.
+ * A chain is the rules one stops short, ranked in the order they are
+ * checked: an issue not in the tracker is reported only as that, not also
+ * as not open. A rule that cuts nothing short is a chain of one. The key
+ * is the one value a finding is about: the decision `<adr>#<id>`, the
+ * script, or the issue.
+ */
+export const RULES = [
+  { id: "ids-exist", chain: "ids-exist", rank: 1, key: "decision" },
+  { id: "coverage", chain: "coverage", rank: 1, key: "decision" },
+  { id: "script-exists", chain: "script-exists", rank: 1, key: "script" },
+  { id: "issue-tracked", chain: "issue", rank: 1, key: "issue" },
+  { id: "issue-open", chain: "issue", rank: 2, key: "issue" },
+];
 
 /**
  * Each fact type the builder writes: its id and its two role ids, as
@@ -56,14 +75,17 @@ export const ROLES = {
 export const entryKey = (adr, position) => `${adr}:${position}`;
 
 /**
- * The populations, by fact type id, as rows of role values; and `entries`,
- * from entry key to `{ adr, position, ids }`, so a violation of a rule
- * keyed by a decision, script or issue can be expanded to the entries that
- * carry it.
+ * The populations, by fact type id, as rows of role values; `entries`,
+ * from entry key to `{ adr, file, position, ids, text }`, so a violation of
+ * a rule keyed by a decision, script or issue can be expanded to the
+ * entries that carry it; and `decisions`, from `<adr>#<id>` to
+ * `{ file, n }`. The file, entry text and decision number are what the
+ * findings' messages quote.
  */
 export function build(adrs, reader) {
   const pops = {};
   const entries = new Map();
+  const decisions = new Map();
   const fact = (kind, a, b) => {
     const [ft, ra, rb] = ROLES[kind];
     (pops[ft] ??= []).push({ [ra]: a, [rb]: b });
@@ -80,11 +102,12 @@ export function build(adrs, reader) {
     for (const d of decisionIds(text).decisions) {
       if (d.id === null || seen.has(d.id)) continue;
       seen.add(d.id);
+      decisions.set(`${adr}#${d.id}`, { file: f, n: d.n });
       fact("has", `${adr}#${d.id}`, adr);
     }
     for (const [position, e] of parsed.entries.entries()) {
       const entry = entryKey(adr, position);
-      entries.set(entry, { adr, position, ids: e.ids });
+      entries.set(entry, { adr, file: f, position, ids: e.ids, text: e.text });
       for (const id of new Set(e.ids)) fact("lists", entry, `${adr}#${id}`);
       if (e.kind === "npm" && scriptVerdict(e, adr) === null) {
         askedScripts = true;
@@ -105,26 +128,61 @@ export function build(adrs, reader) {
       if (o.status !== "closed") fact("open", id, "beads");
     }
   }
-  return { pops, entries };
+  return { pops, entries, decisions };
 }
 
 // The entry's fact type that carries a value of each kind RULES keys a
 // rule by. A decision is carried by "Entry lists Decision"; coverage, the
-// one rule about a decision with no entry, is expanded by its ADR alone.
+// one rule about a decision with no entry, is reported by the decision.
 const CARRIED_BY = { decision: "lists", script: "names", issue: "cites" };
+
+const idOf = (key) => key.slice(key.indexOf("#") + 1);
+
+// The message each rule's finding prints: what check:architecture printed
+// before WS4, so an author sees the same words from a different gate.
+const MESSAGE = {
+  "ids-exist": ({ file, text }, key) =>
+    `${file}: "${text}" lists ${idOf(key)}, which no decision here has`,
+  coverage: ({ file, n }, key) =>
+    `${file}: decision ${n} {#${idOf(key)}} has no Enforced-by: entry`,
+  "script-exists": ({ file, text }, key) =>
+    `${file}: "${text}": barwise/package.json has no script ${key}`,
+  "issue-tracked": ({ file, text }, key) =>
+    `${file}: "${text}": ${key} is not in .beads/issues.jsonl`,
+  "issue-open": ({ file, text }, key) =>
+    `${file}: "${text}": ${key} is closed; declare the enforcer it built, or reopen it`,
+};
+
+/**
+ * The findings left once each chain is applied: one is dropped when a
+ * lower-ranked rule of its chain is violated on the same entry and key.
+ */
+export function withinChains(findings) {
+  const rule = new Map(RULES.map((r) => [r.id, r]));
+  const at = (f) => `${f.adr}|${f.position}|${f.key}`;
+  return findings.filter((f) =>
+    !findings.some((g) =>
+      at(g) === at(f)
+      && rule.get(g.rule).chain === rule.get(f.rule).chain
+      && rule.get(g.rule).rank < rule.get(f.rule).rank
+    )
+  );
+}
 
 /**
  * The model's verdict: the schema text with these facts as its
  * populations, judged by core. `core` is `@barwise/core` and `YAML` the
  * `yaml` package, passed in so this file loads without either and the
  * caller decides how a missing one is reported. Returns `findings` as
- * `rule|adr|position|key` strings, one per entry that carries a violated
- * key, and `self`: the model's own refusals (a load failure, a deontic or
- * missing rule constraint, an error or message it cannot classify). With
- * any of those it has no answer.
+ * `{ rule, adr, position, key, message }`, one per entry that carries a
+ * violated key (and per time it lists an id, for ids-exist), each chain
+ * applied, in ADR and entry order; and `self`: the model's own refusals (a
+ * load failure, a deontic or missing rule constraint, an error or message
+ * it cannot classify). With any of those some rule may have gone
+ * unjudged, so it has no answer, whatever it found.
  */
-export function modelJudge(adrs, reader, { core, YAML, schemaText, rules }) {
-  const { pops, entries } = build(adrs, reader);
+export function modelJudge(adrs, reader, { core, YAML, schemaText }) {
+  const { pops, entries, decisions } = build(adrs, reader);
   const self = [];
   let model;
   let diagnostics;
@@ -145,7 +203,7 @@ export function modelJudge(adrs, reader, { core, YAML, schemaText, rules }) {
       ],
     };
   }
-  const ruleIds = new Set(rules.map((r) => r.id));
+  const ruleIds = new Set(RULES.map((r) => r.id));
   for (const c of model.constraints) {
     // A deontic constraint's violations are warnings, not findings, so its
     // rule would never report.
@@ -171,10 +229,21 @@ export function modelJudge(adrs, reader, { core, YAML, schemaText, rules }) {
     const key = d.message.slice(start + "tuple [".length, end);
     const rule = d.elementId;
     if (rule === "coverage") {
-      findings.push(`${rule}|${key.slice(0, key.indexOf("#"))}|null|${key}`);
+      const decision = decisions.get(key);
+      if (decision === undefined) {
+        self.push(`coverage: a violation of ${key}, which is no decision it built`);
+        continue;
+      }
+      findings.push({
+        rule,
+        adr: key.slice(0, key.indexOf("#")),
+        position: null,
+        key,
+        message: MESSAGE.coverage(decision, key),
+      });
       continue;
     }
-    const carrier = ROLES[CARRIED_BY[rules.find((r) => r.id === rule).key]];
+    const carrier = ROLES[CARRIED_BY[RULES.find((r) => r.id === rule).key]];
     if (carrier === undefined) {
       self.push(`${rule}: no entry fact carries its key`);
       continue;
@@ -183,59 +252,43 @@ export function modelJudge(adrs, reader, { core, YAML, schemaText, rules }) {
     const carriers = (pops[ft] ?? []).filter((r) => r[valueRole] === key);
     // A violation no entry carries is not one of this rule's: the schema
     // states the constraint some other way (its roles reversed, say), and
-    // dropping it would read as agreement.
+    // dropping it would read as no finding.
     if (carriers.length === 0) {
       self.push(`${rule}: a violation of ${key} that no entry carries`);
       continue;
     }
     for (const row of carriers) {
-      const { adr, position, ids } = entries.get(row[entryRole]);
-      // ids-exist counts once per time the entry lists the id, as the code
-      // judge reports it; the facts hold each id once.
-      const times = rule === "ids-exist" ? ids.filter((id) => `${adr}#${id}` === key).length : 1;
-      for (let i = 0; i < times; i++) findings.push(`${rule}|${adr}|${position}|${key}`);
+      const entry = entries.get(row[entryRole]);
+      // ids-exist counts once per time the entry lists the id, as
+      // check:architecture reported it; the facts hold each id once.
+      const times = rule === "ids-exist"
+        ? entry.ids.filter((id) => `${entry.adr}#${id}` === key).length
+        : 1;
+      for (let i = 0; i < times; i++) {
+        findings.push({
+          rule,
+          adr: entry.adr,
+          position: entry.position,
+          key,
+          message: MESSAGE[rule](entry, key),
+        });
+      }
     }
   }
-  return { findings, self };
+  // In the order the ADRs were read, then entry order, then coverage after
+  // an ADR's entries in decision order. Array.sort is stable, so repeats of
+  // one entry keep the order they were found in.
+  const adrOrder = new Map(adrs.map(({ f }, i) => [f.slice(ADR_DIR.length, -".md".length), i]));
+  const rank = (x) =>
+    x.position === null
+      ? [1, decisions.get(x.key).n]
+      : [0, x.position];
+  const sorted = withinChains(findings).sort((x, y) => {
+    const byAdr = adrOrder.get(x.adr) - adrOrder.get(y.adr);
+    if (byAdr !== 0) return byAdr;
+    const [xa, xb] = rank(x);
+    const [ya, yb] = rank(y);
+    return xa - ya || xb - yb;
+  });
+  return { findings: sorted, self };
 }
-
-/** The inputs the model reads, by the label the reader gives their refusals. */
-export const MODEL_INPUTS = new Set(["barwise/package.json", ".beads/issues.jsonl"]);
-
-/**
- * The code judge's facts against the model's findings, as multisets of
- * `rule|adr|position|key`, and the two refusal lists for the inputs the
- * model reads. A model finding the code judge did not make is shadowed,
- * not a disagreement, when the code judge reported a lower-ranked rule of
- * the same chain on the same entry and key. Returns the disagreements.
- */
-export function compareJudges({ codeFacts, codeRefusals, modelFindings, modelRefusals, rules }) {
-  const count = (xs) => xs.reduce((m, x) => m.set(x, (m.get(x) ?? 0) + 1), new Map());
-  const c = count(codeFacts);
-  const m = count(modelFindings);
-  const lower = new Map(
-    rules.filter((r) => r.rank > 1).map((r) => [
-      r.id,
-      rules.filter((s) => s.chain === r.chain && s.rank < r.rank).map((s) => s.id),
-    ]),
-  );
-  const shadowed = (x) => {
-    const [rule, ...rest] = x.split("|");
-    return (lower.get(rule) ?? []).some((l) => c.has([l, ...rest].join("|")));
-  };
-  const disagreements = [...new Set([...c.keys(), ...m.keys()])]
-    .filter((x) => (c.get(x) ?? 0) !== (m.get(x) ?? 0) && !(!c.has(x) && shadowed(x)))
-    .map((x) => `${x}: code judge ${c.get(x) ?? 0}, model ${m.get(x) ?? 0}`);
-  const label = (r) => r.split(":")[0];
-  const cr = new Set(codeRefusals.map(label).filter((x) => MODEL_INPUTS.has(x)));
-  const mr = new Set(modelRefusals.map(label));
-  for (const x of new Set([...cr, ...mr])) {
-    if (cr.has(x) !== mr.has(x)) {
-      disagreements.push(`${x}: refused by the ${cr.has(x) ? "code judge" : "model"} only`);
-    }
-  }
-  return disagreements;
-}
-
-/** A code judge's facts, in the form compareJudges reads. */
-export const factStrings = (facts) => facts.map((x) => `${x.rule}|${x.adr}|${x.position}|${x.key}`);

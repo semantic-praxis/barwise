@@ -1,6 +1,6 @@
 # ADR conformance as an ORM model
 
-Status: WS1 implemented 2026-11-04 by docs/specs/adr-gate-reader-split.spec.md (#910); WS2 implemented 2026-11-05 (RULES, scriptVerdict, and a { rule, adr, position, key } fact per fact-rule finding, with no output change); WS3 implemented 2026-11-05 (governance.orm.yaml, adr-population.mjs, check:adr-model, test:adr-model and build:core, three ci.yml steps under ${{ !cancelled() }}); WS4 not started, and waits on the owner's review of WS3's record.
+Status: WS1 implemented 2026-11-04 by docs/specs/adr-gate-reader-split.spec.md (#910); WS2 implemented 2026-11-05 (RULES, scriptVerdict, and a { rule, adr, position, key } fact per fact-rule finding, with no output change); WS3 implemented 2026-11-05 (governance.orm.yaml, adr-population.mjs, check:adr-model, test:adr-model and build:core, three ci.yml steps under ${{ !cancelled() }}); WS4 implemented 2026-11-05 at the owner's direction (check:adr-model judges the five fact rules; check:architecture no longer does, and keeps silent guards).
 
 Created: 2026-11-04
 Last-updated: 2026-11-05
@@ -357,15 +357,64 @@ WS3 implementation notes (2026-11-05):
   disagreements, on the real tree with the builder marking open issues not
   open.
 
-### 4. The model becomes the judge of the fact rules (provisional)
+### 4. The model becomes the judge of the fact rules (done)
 
-The fact rules' findings leave `adr-judge.mjs`; `check:adr-model` exits 1
-on a model finding and `check:architecture` stops reporting them. A fact
-check that guards a verdict rule stays as a silent guard: the step check
-needs the script to exist, so `judgeDeclarations` still skips an entry
-whose script is undefined, without a finding, and the same defect is not
-reported by two gates. Starts after
-the owner reviews WS3's record: how many runs, and every disagreement.
+The owner started WS4 on 2026-11-05, the night WS3 merged, rather than
+after a release cycle: WS3's record at that point was its first CI runs,
+with no disagreement. The design, revised by its review:
+
+- **The judge drops the five rules.** `judgeDeclarations` no longer
+  reports `ids-exist`, `coverage`, `script-exists`, `issue-tracked` or
+  `issue-open`, and no longer records `facts`; `check:architecture`
+  stops reporting them. `RULES`, the rules' one statement in code beside
+  the schema, moves to `adr-population.mjs`, the model's side.
+  `scriptVerdict` and `needsWorkflow` stay in the judge, which still
+  decides them.
+- **Silent guards stay, and are tested.** Where one of the five cut a
+  verdict rule short, the judge still stops there, without a finding: an
+  entry whose script `package.json` lacks is not looked up in `ci.yml`,
+  and a `none` entry whose issue is missing or closed is not checked for
+  its label or title. So each defect is reported by one gate.
+  `gates.test.mjs` keeps the planted missing script, missing issue and
+  closed issue, now asserting that `check:architecture` reports nothing
+  about them (no step finding, no label or title finding), and adds that
+  a planted unknown id no longer fails it.
+- **`check:architecture` still counts every decision.** Its summary
+  counts decisions without an entry too, and names them as
+  `check:adr-model`'s to report, so its OK line never reads as covering
+  a decision it no longer judges.
+- **`check:adr-model` is the judge.** It no longer runs the code judge
+  or compares. It exits 2 on any refusal of the model's own (a schema or
+  population that does not load, a missing or deontic `RULES`
+  constraint, an error or message it cannot classify), whatever else it
+  found, since then some rule may have gone unjudged; else 1 on any
+  finding; else 2 on a reader refusal for an input the model reads; else
+  0. Each finding is printed as `check:architecture` printed it, so an
+  author sees the same message from a different gate: the builder also
+  records each entry's file and text and each decision's number, which
+  the messages quote.
+- **Chains within the model's own output.** A violated rule is not
+  reported when a lower-ranked rule of its chain is violated on the same
+  entry and key: an issue not in the tracker reports only that. One
+  function in `adr-population.mjs` decides it, from `RULES`; the
+  comparison's `compareJudges`, `factStrings` and `MODEL_INPUTS` go.
+- **Tests.** `adr-model.test.mjs` tests the model as the judge through
+  stub readers: one planted violation per `RULES` rule with its exact
+  message; repeats and positions; the chain; the negative cases WS3's
+  comparison guarded (a script `scriptVerdict` rejects, a headerless ADR,
+  a value containing `]`, an unreadable input no entry asks for: none is
+  a finding or a refusal); the reader's refusals and the model's own,
+  including a model refusal beside a finding (exit 2); and
+  `check:adr-model` end to end on a fixture repository. The facts tests
+  in `adr-facts.test.mjs` (WS2) go with the facts; the schema and
+  role-id tests stay. `expected-counts.json` is rewritten for all three
+  files in the same commit.
+- **CI keeps its place; the words around it change.** The three steps at
+  the end of the `ci` job under `${{ !cancelled() }}` now hold the five
+  rules, after a failed gate and on docs-only changes too. Their `ci.yml`
+  comment, `check-adr-model.mjs`'s header and exit table,
+  `needsWorkflow`'s docstring, and `adr-model.test.mjs`'s header stop
+  describing a comparison.
 
 ## API and migration impact
 
@@ -401,7 +450,8 @@ the owner reviews WS3's record: how many runs, and every disagreement.
   an admin change; `continue-on-error`, which makes the judge advisory;
   and steps guarded like their neighbours, which never run after a failed
   gate or on a docs-only change.
-- **How long WS3 runs before WS4.** Recommended: one release cycle, and a
-  look at every disagreement it records.
+- **How long WS3 runs before WS4** (decided by the owner, 2026-11-05: not
+  at all; WS4 started the night WS3 merged). Recommended was one release
+  cycle and a look at every disagreement.
 - **Names.** `check:adr-model` and `barwise/docs/adr/governance.orm.yaml`;
   `audit:adr-model` or a schema under `barwise/scripts/` are renames.
