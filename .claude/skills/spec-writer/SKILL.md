@@ -82,7 +82,10 @@ alongside this file.
    decision sets a rule other work must follow, record it as an ADR from
    `template.adr.md` beside this file and point the resolved heading at
    it rather than restating it; a local choice stays in the spec
-   (`docs/specs/architecture-index.spec.md`).
+   (`docs/specs/architecture-index.spec.md`). Its `Enforced-by:` header
+   declares only an enforcer seen to fail on a planted violation of the
+   decision: `adr-writing.md` beside this file has the four steps and
+   the record the PR body carries.
 7. **Edit, then run an articulation pass.** Run the edit passes in
    `editing.md` (scanning `llm-tics.md` during the voice pass), then
    invoke the `articulation` skill in critique mode over the draft --
