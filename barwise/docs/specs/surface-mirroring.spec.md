@@ -21,7 +21,9 @@ barwise/packages/vscode/src/commands/ImportTranscriptCommand.ts,
 barwise/packages/vscode/src/commands/ImportDbtCommand.ts,
 barwise/packages/vscode/src/commands/ImportCodeCommand.ts,
 barwise/packages/vscode/package.json,
-barwise/packages/vscode/tests/,
+barwise/packages/vscode/tests/unit/toolRegistration.test.ts,
++barwise/packages/vscode/tests/unit/bundledServer.test.ts,
++barwise/packages/learn/tests/generatedCatalog.test.ts,
 barwise/packages/cli/src/commands/merge.ts,
 barwise/packages/cli/src/commands/analyze.ts,
 barwise/packages/cli/src/commands/import/,
@@ -31,7 +33,7 @@ barwise/docs/MCP.md,
 barwise/package.json,
 package.json,
 .github/workflows/ci.yml,
-barwise/scripts/tests/,
++barwise/scripts/tests/history-walk-drift.test.mjs,
 +barwise/scripts/audit-surfaces.mjs,
 +barwise/scripts/regen-gym-exercises.mjs,
 +barwise/surface-parity-baseline.json
@@ -76,7 +78,7 @@ existing model is approved is the next section.
 
 - `rename` and `--matching content` read "none": every surface has them.
 - `--surrogate-keys` reaches MCP through `export_model`'s `options` and not VS Code, whose export tool drops `options`. Workstream 3 closes it.
-- `migrate` post-dates the owner's 2026-10-13 calls. The owner kept it CLI-only on 2026-11-05 ("Resolved by the owner", below).
+- `migrate` post-dates the owner's 2026-10-13 calls. Its row is open decision 1.
 
 ### Corrections to the audit
 
@@ -108,7 +110,7 @@ missing is the same review on every surface and for every import.
 
 What the review covers: a write onto an existing model file by `barwise merge --output`, `barwise import ... --output` and `barwise analyze --output`, and by their MCP and VS Code counterparts. `barwise merge` without `--output` prints to stdout, modifies nothing, and is unchanged.
 
-- **The deltas are computed against the model at the write target**, the existing file the write would change. For a merge that is its base: a merge applies the base's changes toward the incoming model, so its target must be its base, and a merge whose output path names a different existing file is refused, since that file and the base are two models and the review could show the changes to only one. For `import_transcript`, `base` stays extraction context, and the plan diffs the extraction against the target file.
+- **The deltas are computed against the model at the write target**, the existing file the write would change. For a merge that is its base: a merge applies the incoming model's changes to its base, so its target must be its base, and a merge whose output path names a different existing file is refused, since that file and the base are two models and the review could show the changes to only one. For `import_transcript`, `base` stays extraction context, and the plan diffs the extraction against the target file.
 - **CLI on a terminal.** When stdin is a terminal, the CLI walks the deltas one at a time, as `git add -p` walks hunks: accept, reject, accept the rest, reject the rest, or quit without writing. Prompts go to stderr. `--plan` and `--apply` take precedence: with either, the CLI does not walk the deltas, on a terminal or not.
 - **CLI without a terminal.** A script or CI run still has a person in the loop (owner, 2026-11-04). There is a feedback loop instead of a flag that accepts changes by kind, in the shape of `terraform plan -out` and `terraform apply`:
   - `--plan <file>` writes a plan instead of the model: the numbered deltas, each verbalized and marked `pending`, plus the fingerprint and the incoming model itself. Every delta starts `pending`, never pre-filled with its suggestion (owner, 2026-11-04), so a plan nobody opened cannot be applied. The plan carries the incoming model because an import's incoming side is an extraction a second run would not reproduce.
@@ -220,7 +222,7 @@ Out of scope:
 | `learn/src/exercise/catalog.ts`                          | Resolves the catalog from `import.meta.url`, empty in the CJS bundle                                               | Exercises generated into a module (owner, 2026-11-04)                                                                                             |
 | `mcp/src/tools/`                                         | 19 tools                                                                                                           | Adds `init_project`, `lineage_show`, `gym_show`, `model_history`, `prompt_schema`, `prompt_artifact`                                              |
 | `cli/src/commands/history.ts`                            | Git walk (about 60 lines of subprocess) plus rendering                                                             | Walk paralleled in MCP, with a drift test (owner, 2026-11-04)                                                                                     |
-| `docs/adr/surface-capability-parity.md`                  | Decision 1 names only `deliberate`; its open list says every row awaits the owner                                  | Names `not yet` with its workstream; the open list records the owner's calls                                                                      |
+| `docs/adr/surface-capability-parity.md`                  | Decision 1 names `not yet`; Context and Consequences record the owner's calls (the PR that added this spec)        | Done; each workstream edits Consequences as its gaps close                                                                                        |
 | `CLAUDE.md` capability matrix                            | Hand-maintained                                                                                                    | Kept and still hand-maintained: `audit:surfaces` checks the surfaces against each other and the baseline, not this table (barwise-xpt stays open) |
 
 ## Target architecture
@@ -276,7 +278,7 @@ VS Code parameter pin in `toolRegistration.test.ts` lands with it.
 - `import_model`, `import_transcript` and `merge_models` gain an output path on MCP and VS Code. `executeImport` writes nothing today, so the transcript path is new in the shared function and its MCP registration, not only forwarded.
 - A new file is written directly. An existing file changes only through the reviewed change set (above), on every surface, and a target that cannot be read or merged is refused. That covers `barwise analyze --output`, which overwrites today (`analyze.ts`, `writeOutput`), and the `analyze_repository` output path workstream 7 adds.
 - The VS Code palette's transcript, dbt and code imports onto an existing model get the per-delta pick, with nothing pre-selected (owner, 2026-11-04), and write nothing when the user accepts none. An import into a new file shows no pick.
-- The capability matrix's `merge` row changes with it: once `barwise merge --output <base>` is a reviewed write onto the base, "never modifies its inputs" no longer holds.
+- The capability matrix's `merge` row changes with it: `barwise merge --output <base>`, an unreviewed overwrite today, becomes a reviewed write onto the base.
 - The agent guidance moves with the behaviour: `chatPrompts.ts`'s merge instruction and `docs/MCP.md`'s `merge_models` section describe the two calls, in the commit that changes them.
 - `merge_models` keeps the base as its target and already discloses that (#637, barwise-xjf).
 - `export_model` writes the way `barwise export` does:
@@ -303,6 +305,7 @@ forwards `options`, which closes the `--surrogate-keys` row.
 
 - `validate_model` runs `projectRules` (barwise-0wa.qh3).
 - Every shipped bundle finds the gym catalog (barwise-fbi), with a test that spawns `packages/vscode/dist/mcp/index.js`: the unit suites run on source and cannot see a bundle-only failure.
+- The exercises are generated into a committed module by `npm run regen:gym-exercises` (with its root forwarder, `check:root-scripts`), and a drift test in learn's suite fails when the module and the exercise files disagree, as `regen:builtins` and llm's tests guard `builtins.generated.ts`.
 - No surface's deprecation notice points at an exporter that does not exist (barwise-0wa.ymj for MCP, barwise-zir for the CLI).
 
 ### 5. New tools for the section-1 commands (provisional)
@@ -356,11 +359,9 @@ so no eval suite enters a bundle.
 
 ## Open decisions (for review)
 
-None. Every decision this spec needed is resolved below.
-
-### Resolved by the owner (2026-11-05)
-
-- **`migrate` stays CLI-only.** MCP and VS Code already write 4.0 on the next save of a file they edit, and the editor's "Store ids" quick fix writes a file's unstored ids. A migration changes a file's format, not its model, so it produces no deltas for the per-change review to show, and a tool that rewrites files in bulk with nothing to review is the write this spec removes elsewhere. The alternative, an MCP and VS Code tool with a preview as `rename_element` has, was rejected for that reason.
+1. **Does `migrate` stay CLI-only?** Reopened on 2026-11-05. The owner kept it CLI-only that day on a reason that proved wrong: that a migration changes only a file's format, so it has nothing to review. In fact `barwise migrate` reports what the reading changed beyond the format (2.0 `is_preferred` flags it drops or cannot place), writes the ids the load minted, and already has `--check`, which writes nothing (`cli/src/commands/migrate.ts`). MCP and VS Code write 4.0 on the next save of a file they edit, and neither reads core's migration notes, so such a save reports none of those changes.
+   - Recommended: mirror it, as `rename_element` mirrors `rename`: a tool that previews with `check: true` and returns the migration notes, then writes the staged way (workstream 5). No reason in this spec's test for keeping a gap holds for it, and the tool would report what a save changes silently today.
+   - Alternative: keep it CLI-only because MCP and VS Code already migrate on save. That leaves their saves reporting nothing of what changed.
 
 ### Resolved by the owner (2026-11-04)
 
@@ -384,7 +385,7 @@ None. Every decision this spec needed is resolved below.
   - The VS Code version the extension supports does not show `confirmationMessages` for a language-model tool. The quick pick is then the only gate in VS Code, and the spec says so.
   - A realistic transcript import yields more deltas than a person will read one at a time. The review then needs grouping (by element, or by breaking level) before it ships.
 - **Unit tests run on source; users run bundles.** barwise-fbi shipped because no test spawned a bundle. Workstream 4's spawn test is the guard, and workstream 1 should read the bundled server too, not only `packages/mcp/dist`.
-- **`Touches:` omits the root `CLAUDE.md` and the ADR on purpose.** The PR that added this spec recorded the owner's decisions there, and `check:plan-review` counts any change to a listed path as implementation, so listing them would have made that PR fail its own gate. Every workstream still updates the matrix in the commit that changes a surface's reach (ADR decision 2). The history drift test (workstream 6) lives under `barwise/scripts/tests/`, since neither `cli` nor `mcp` may import the other.
+- **`Touches:` omits the root `CLAUDE.md` and the ADR on purpose.** The PR that added this spec recorded the owner's decisions there, and `check:plan-review` counts any change to a listed path as implementation, so listing them would have made that PR fail its own gate. Every workstream still updates the matrix in the commit that changes a surface's reach (ADR decision 2). The history drift test (workstream 6) is a root script test, since neither `cli` nor `mcp` may import the other.
 - **Every new guard is seen failing on its defect** through `scripts/mutate.mjs` before its workstream merges.
 - **Premortem: the check passes while a gap exists.** This happens if the option-to-parameter mapping maps a CLI option onto an unrelated parameter. Mapping rows name both sides explicitly, and a test plants an unmapped option and expects a failure.
 - **Premortem: a review that nobody reviewed.**
