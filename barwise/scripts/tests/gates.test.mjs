@@ -6473,7 +6473,7 @@ test("audit-spec-status reports commits a verdict never covered, and --write reo
  * disagreement is seen. Returns the directory and how many manifests it
  * copied, so no count is restated here.
  */
-function architectureRepo({ entry = "none" } = {}) {
+function architectureRepo() {
   const dir = tempRepo();
   const copy = (rel) => stage(dir, rel, readFileSync(join(REPO, rel), "utf8"));
   copy("CLAUDE.md");
@@ -6487,30 +6487,25 @@ function architectureRepo({ entry = "none" } = {}) {
   });
   // An ADR that declares Enforced-by: names gates, tests and issues whose
   // inputs (ci.yml, the root scripts, the live tracker) this fixture does
-  // not carry. Its header is rewritten to one open fixture issue covering
-  // every decision, so graph and shape cases keep testing what they test
-  // and never depend on the live tracker or ci.yml; the enforcement cases
-  // build their own inputs (executable-adrs.spec.md, WS3).
+  // not carry. Its header is rewritten to declare every decision tested,
+  // which check:architecture answers from no input at all, so graph and
+  // shape cases keep testing what they test and never depend on the live
+  // tracker or ci.yml; the enforcement cases build their own inputs
+  // (executable-adrs.spec.md, WS3). One fixture gap issue for every
+  // decision would break the one-decision-per-gap-issue rule
+  // (enforceable-adr-practice.spec.md, WS3).
   let declaring = 0;
   for (const rel of adrList.split("\0").filter(Boolean)) {
     const text = readFileSync(join(REPO, rel), "utf8");
     assert.ok(parseEnforcedBy(text).present, `${rel}: has no Enforced-by: header to rewrite`);
     const ids = decisionIds(text).decisions.map((d) => d.id);
     // Enforced-by: is the last header field (check:architecture holds it to
-    // that, and requires it), so it runs to the blank line. `entry: "tests"`
-    // declares every decision as tested instead, which check:architecture
-    // answers from no input at all, for a case that needs a tree with no
-    // tracker.
-    const value = entry === "tests"
-      ? `Enforced-by: tests (${ids.join(", ")})\n`
-      : `Enforced-by: none (barwise-fx1: ${ids.join(", ")})\n`;
+    // that, and requires it), so it runs to the blank line.
+    const value = `Enforced-by: tests (${ids.join(", ")})\n`;
     const rewritten = text.replace(/^Enforced-by:[^]*?\n(?=\n)/m, value);
     assert.notEqual(rewritten, text, `${rel}: its Enforced-by: header was not rewritten`);
     stage(dir, rel, rewritten);
     declaring += 1;
-  }
-  if (entry !== "tests") {
-    stage(dir, ".beads/issues.jsonl", '{"id":"barwise-fx1","status":"open","title":"fixture"}\n');
   }
   let manifests = 0;
   for (const pkg of readdirSync(join(REPO, "barwise", "packages"))) {
@@ -7025,7 +7020,7 @@ function stageAdr(dir, name, text) {
 }
 
 const ADR_OK = "# A concern\n\nScope: process\nDate: 2026-10-24\nTracking: barwise-ubc\n"
-  + "Enforced-by: none (barwise-fx1: the-rule)\n\n"
+  + "Enforced-by: tests (the-rule)\n\n"
   + "## Context\n\nWhy.\n\n## Decision\n\n1. **The rule.** {#the-rule} It holds.\n\n"
   + "## Consequences\n\nWhat follows.\n";
 
@@ -7364,9 +7359,10 @@ const ENFORCED_ROOT_PKG = JSON.stringify({
     "check:adr-tests": "node scripts/check-adr-tests.mjs",
   },
 });
-const ENFORCED_TRACKER = '{"id":"barwise-fx1","status":"open","title":"fixture"}\n'
-  + '{"id":"barwise-gap","status":"open","title":"g"}\n'
+const ENFORCED_TRACKER =
+  '{"id":"barwise-gap","status":"open","title":"Gap: a-concern decision four has no enforcer","labels":["adr-gap"]}\n'
   + '{"id":"barwise-shut","status":"closed","title":"s"}\n';
+const TRACKER_PATH = ".beads/issues.jsonl";
 
 function enforcementRepo() {
   const fixture = architectureRepo();
@@ -7500,6 +7496,27 @@ test("check:architecture names each broken Enforced-by: declaration, exit 1", ()
           (s) => s.replace("barwise-gap:", "barwise-nil:"),
           /barwise-nil is not in \.beads/,
         ],
+        // A gap issue is the decision's own (enforceable-adr-practice, WS3).
+        [
+          TRACKER_PATH,
+          (s) => s.replace(',"labels":["adr-gap"]', ""),
+          /barwise-gap does not carry the adr-gap label/,
+        ],
+        [
+          TRACKER_PATH,
+          (s) => s.replace("decision four has", "decision three has"),
+          /barwise-gap's title does not begin "Gap: a-concern decision four "/,
+        ],
+        [
+          ENFORCED_PATH,
+          (s) => s.replace("none (barwise-gap: four)", "none (barwise-gap: three, four)"),
+          /"none \(barwise-gap: three, four\)": lists 2 decisions; a none entry names one/,
+        ],
+        [
+          ENFORCED_PATH,
+          (s) => s.replace("tests (three)", "none (barwise-gap: three)"),
+          /"none \(barwise-gap: four\)": barwise-gap is also named by .*a-concern\.md: "none \(barwise-gap: three\)"/,
+        ],
       ]
     ) {
       const r = archPlanted(dir, rel, edit);
@@ -7626,10 +7643,10 @@ test("check:architecture requires Enforced-by:, and reads no ci.yml, scripts or 
   // The fixture has no ci.yml, root package.json or tracker, and every ADR
   // in it declares `tests` only, which needs none of them, so none is a
   // refusal.
-  const { dir, declaring } = architectureRepo({ entry: "tests" });
+  const { dir, declaring } = architectureRepo();
   try {
     assert.ok(!existsSync(join(dir, ".beads/issues.jsonl")), "the fixture must carry no tracker");
-    stageAdr(dir, "a-concern", ADR_OK.replace("none (barwise-fx1: the-rule)", "tests (the-rule)"));
+    stageAdr(dir, "a-concern", ADR_OK);
     execFileSync("git", ["commit", "-qm", "adr"], { cwd: dir });
     const ok = runArch(dir);
     assert.equal(ok.status, 0, ok.stdout + ok.stderr);

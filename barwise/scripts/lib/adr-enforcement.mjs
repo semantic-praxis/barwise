@@ -39,6 +39,14 @@ export const GATE_EXCEPTIONS = {
  * may be declared only by the ADRs it implements: `check:adr-tests` by
  * none, `check:architecture` by `package-graph-authority`.
  */
+/**
+ * The label a gap issue carries: the tracker issue a `none` entry names is
+ * this decision's own record of what holds nothing yet, and the label tells
+ * it from an umbrella issue that happens to have a fitting title
+ * (docs/specs/enforceable-adr-practice.spec.md, WS3).
+ */
+export const GAP_LABEL = "adr-gap";
+
 export const META_GATES = {
   "check:adr-tests": [],
   "check:architecture": ["package-graph-authority"],
@@ -90,7 +98,7 @@ function idList(text) {
  *   npm run <script> (<ids>)
  *   npm run <script> -- <args> (<ids>)
  *   tests (<ids>)
- *   none (<issue-id>: <ids>)
+ *   none (<issue-id>: <id>)
  *
  * Every entry matches its form exactly; a token left over is a problem,
  * so a dropped comma between two entries cannot hide the second.
@@ -117,7 +125,7 @@ export function parseEntry(text) {
   }
   return {
     problem: `"${text}" is not an entry (npm run <script> (<ids>), tests (<ids>),`
-      + ` or none (<issue-id>: <ids>))`,
+      + ` or none (<issue-id>: <id>))`,
   };
 }
 
