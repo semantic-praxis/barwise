@@ -1,32 +1,26 @@
 #!/usr/bin/env node
 /**
- * check:adr-model -- the ADR governance schema as a second judge
- * (docs/specs/adr-conformance-model.spec.md, WS3).
+ * check:adr-model -- the ADR governance schema as the judge of five rules
+ * (docs/specs/adr-conformance-model.spec.md, WS4).
  *
- * The five fact rules of check:architecture's declaration pass are stated
- * as subset constraints in barwise/docs/adr/governance.orm.yaml. This check
- * fills that schema's populations from the repository, lets
- * @barwise/core's population validation judge them, runs the code judge
- * (judgeDeclarations) on the same tree, and compares the two.
+ * Every entry in an ADR's Enforced-by: header lists ids its ADR has; every
+ * decision has an entry; a script an entry names is in package.json; an
+ * issue a none entry cites is in the tracker and open. These five are
+ * stated as subset constraints in barwise/docs/adr/governance.orm.yaml,
+ * and check:architecture no longer judges them: this check fills the
+ * schema's populations from the repository and @barwise/core's population
+ * validation judges them. Each finding prints the message
+ * check:architecture printed before.
  *
- * They are compared as multisets of (rule, ADR, entry position, key). Core
- * reports a subset violation once per distinct value, so each is expanded
- * to the entries that carry it, and an id an entry lists twice counts
- * twice, as the code judge reports it. A model finding the code judge
- * did not make is "shadowed", and no disagreement, when the code judge
- * reported a lower-ranked rule of the same chain on the same entry and key:
- * an untracked issue is also not open, but the code judge stops at the
- * first. Refusals are compared for the inputs the model reads.
- *
- * Exit codes (docs/adr/gate-refusal-contract.md), while the model is a
- * second judge:
- *   0  the two judges agree (whatever either found: check:architecture
- *      reports the findings)
- *   1  they disagree, named
- *   2  the model could not answer (core not built or not loadable, the
- *      schema or population would not load, a RULES constraint is deontic,
- *      an error or message it cannot classify), without comparing; or a
- *      reader refusal on either side
+ * Exit codes (docs/adr/gate-refusal-contract.md):
+ *   0  no finding
+ *   1  a finding
+ *   2  could not answer: the model's own refusal (core not built or not
+ *      loadable, the schema or population would not load, a rule's
+ *      constraint missing or deontic, an error or message it cannot
+ *      classify), whatever else it found, since a rule may have gone
+ *      unjudged; or, with no finding, an input it reads that could not be
+ *      read
  *
  * Usage: node scripts/check-adr-model.mjs [--root <repo>] [--core <path>]
  * --core names core's built entry point (default
@@ -47,7 +41,9 @@ let root, corePath;
 try {
   const { opt } = await import("./lib/args.mjs");
   root = resolve(opt("--root") ?? join(here, "..", ".."));
-  corePath = opt("--core") ?? join(root, "barwise", "packages", "core", "dist", "index.js");
+  // Core is code, not an input of the tree being judged: found beside this
+  // script, so --root names a fixture without needing a build inside it.
+  corePath = opt("--core") ?? join(here, "..", "packages", "core", "dist", "index.js");
 } catch (err) {
   refuse(err instanceof Error ? err.message : String(err));
 }
@@ -55,14 +51,13 @@ try {
 // Every import is loaded here, in one place that can refuse. The CI step
 // runs under !cancelled(), so after a failed `npm ci` too, when `yaml`
 // may be missing: an import that throws must be exit 2, never Node's
-// uncaught-error exit 1, which reads as a disagreement.
-let core, YAML, facts, judge, population, section, readFileSync;
+// uncaught-error exit 1, which reads as a finding.
+let core, YAML, facts, population, section, readFileSync;
 try {
   ({ readFileSync } = await import("node:fs"));
   core = await import(pathToFileURL(isAbsolute(corePath) ? corePath : resolve(corePath)).href);
   YAML = (await import("yaml")).default;
   facts = await import("./lib/adr-facts.mjs");
-  judge = await import("./lib/adr-judge.mjs");
   population = await import("./lib/adr-population.mjs");
   section = await import("./lib/architecture-section.mjs");
 } catch (err) {
@@ -71,8 +66,7 @@ try {
       + "  @barwise/core must be built first: npm run build:core.",
   );
 }
-const { RULES, judgeDeclarations, needsWorkflow } = judge;
-const { compareJudges, factStrings, modelJudge } = population;
+const { RULES, modelJudge } = population;
 const { createGovernanceReader } = facts;
 const { isAdr, readFiles, trackedPaths } = section;
 
@@ -83,63 +77,50 @@ async function main() {
   const schemaText = readFileSync(SCHEMA, "utf8");
   if (adrs.length === 0) refuse(`no ADR under ${join(root, "barwise", "docs", "adr")}`);
 
-  // The code judge, on a reader of its own, built as check:architecture
-  // builds it; the model, on another: each reader records an unreadable
-  // input's refusal once, into the list it was built with.
-  const codeRefusals = [];
-  const code = judgeDeclarations(
-    adrs,
-    await createGovernanceReader(root, {
-      needsWorkflow: needsWorkflow(adrs),
-      refusals: codeRefusals,
-    }),
-    codeRefusals,
-  );
-  const modelRefusals = [];
+  // The reader records an unreadable input's refusal once, at the first
+  // ask; the builder asks only for package.json and the tracker.
+  const refusals = [];
   const model = modelJudge(
     adrs,
-    await createGovernanceReader(root, { needsWorkflow: false, refusals: modelRefusals }),
-    { core, YAML, schemaText, rules: RULES },
+    await createGovernanceReader(root, { needsWorkflow: false, refusals }),
+    { core, YAML, schemaText },
   );
 
+  // Still exit 2, since a rule may have gone unjudged, but what it did find
+  // is printed, so an author can fix that while the model is repaired.
   if (model.self.length > 0) {
-    console.error("check:adr-model: the model could not answer, so nothing was compared:");
+    for (const f of model.findings) console.error(`  ${f.message}`);
+    console.error("check:adr-model: the model could not answer, so a rule may have gone unjudged:");
     for (const s of model.self) console.error(`  ${s}`);
     process.exit(2);
   }
-  const codeFacts = factStrings(code.facts);
-  const disagreements = compareJudges({
-    codeFacts,
-    codeRefusals,
-    modelFindings: model.findings,
-    modelRefusals,
-    rules: RULES,
-  });
-  if (disagreements.length > 0) {
+  if (model.findings.length > 0) {
     console.error(
-      `check:adr-model: FAIL -- the code judge and the model disagree on ${disagreements.length}`
-        + " finding(s) (rule|ADR|entry position|key):",
+      `check:adr-model: FAIL -- ${model.findings.length} Enforced-by: problem(s)`
+        + " the governance schema finds:",
     );
-    for (const d of disagreements) console.error(`  ${d}`);
+    for (const f of model.findings) console.error(`  ${f.message}`);
+    for (const r of refusals) console.error(`  cannot answer: ${r}`);
     console.error(
-      "Each disagreement is a bug in one of the two judges; fix it, and add its input as a case in"
-        + " scripts/tests/adr-model.test.mjs (docs/specs/adr-conformance-model.spec.md, WS3).",
+      "Every decision needs an entry, every listed id a decision, every named script a"
+        + " package.json script, and every cited issue an open tracker issue"
+        + " (docs/specs/adr-conformance-model.spec.md).",
     );
     process.exit(1);
   }
-  if (codeRefusals.length > 0 || modelRefusals.length > 0) {
-    console.error("check:adr-model: cannot answer for an input a judge could not read:");
-    for (const r of new Set([...codeRefusals, ...modelRefusals])) console.error(`  ${r}`);
+  if (refusals.length > 0) {
+    console.error("check:adr-model: cannot answer for an input it could not read:");
+    for (const r of refusals) console.error(`  ${r}`);
     process.exit(2);
   }
   console.log(
-    `check:adr-model: the code judge and the model agree on ${codeFacts.length} fact-rule`
-      + ` finding(s) over ${adrs.length} ADRs (${RULES.map((r) => r.id).join(", ")}). OK`,
+    `check:adr-model: ${adrs.length} ADRs hold the governance schema's rules`
+      + ` (${RULES.map((r) => r.id).join(", ")}). OK`,
   );
 }
 
 // Anything thrown past the imports is an answer this check could not give:
-// exit 2, never Node's uncaught-error exit 1, which reads as a disagreement.
+// exit 2, never Node's uncaught-error exit 1, which reads as a finding.
 try {
   await main();
 } catch (err) {

@@ -30,27 +30,9 @@ const guard = (condition) => {
 };
 
 /**
- * The fact rules: decided from facts alone, and the ones the conformance
- * model states as constraints (docs/specs/adr-conformance-model.spec.md).
- * A chain is the rules one `continue` cuts short, ranked in the order the
- * judge checks them; a rule that cuts nothing short is a chain of one. The
- * key is the one value a finding is about: the decision `<adr>#<id>`, the
- * script, or the issue.
- */
-export const RULES = [
-  { id: "ids-exist", chain: "ids-exist", rank: 1, key: "decision" },
-  { id: "coverage", chain: "coverage", rank: 1, key: "decision" },
-  { id: "script-exists", chain: "script-exists", rank: 1, key: "script" },
-  { id: "issue-tracked", chain: "issue", rank: 1, key: "issue" },
-  { id: "issue-open", chain: "issue", rank: 2, key: "issue" },
-];
-
-/**
  * Whether the code judge's reader needs the workflow reader: some ADR
  * declares a gate. ci-occurrences.mjs needs the `yaml` package, so a tree
- * with no such entry runs on builtins. check:architecture and
- * check:adr-model both build the code judge's reader with this, so the
- * second judge is compared with the judgment CI enforces.
+ * with no such entry runs on builtins.
  */
 export function needsWorkflow(adrs) {
   return adrs.some(({ text }) => parseEnforcedBy(text).entries.some((e) => e.kind === "npm"));
@@ -77,11 +59,13 @@ export function scriptVerdict(entry, adr) {
 /**
  * Each ADR's `Enforced-by:` declarations, judged (check:architecture).
  * `reader` is createGovernanceReader()'s; `refusals` is the gate's list.
- * Returns the findings; `facts`, one per finding of a rule in `RULES`, as
- * `{ rule, adr, position, key }` with the entry's index in
- * `parseEnforcedBy(text).entries` (`null` for coverage, which has no entry);
- * and `held`: how
- * the decisions are held, over every decision with an id
+ * The five fact rules (listed ids exist, every decision has an entry, the
+ * named script exists, the cited issue is tracked and open) are not judged
+ * here but by the governance schema, through check:adr-model
+ * (docs/specs/adr-conformance-model.spec.md, WS4). Where one of them cut a
+ * verdict rule short, the judge still stops there, silently, so one defect
+ * fails one gate. Returns the findings and `held`: how the decisions are
+ * held, over every decision with an id
  * (docs/specs/enforceable-adr-practice.spec.md, WS2). A decision with an
  * `npm` entry has a gate; with `tests` and no `npm`, tests and no gate;
  * with only `none`, none only; `gap` counts any `none` entry, so it
@@ -89,8 +73,7 @@ export function scriptVerdict(entry, adr) {
  */
 export function judgeDeclarations(adrs, reader, refusals) {
   const problems = [];
-  const facts = [];
-  const held = { decisions: 0, gate: 0, testsOnly: 0, noneOnly: 0, gap: 0 };
+  const held = { decisions: 0, gate: 0, testsOnly: 0, noneOnly: 0, gap: 0, none: 0 };
   // Each gap issue is one decision's own: the first entry to name an issue,
   // across every ADR, by file and entry text.
   const gapNamedBy = new Map();
@@ -104,13 +87,6 @@ export function judgeDeclarations(adrs, reader, refusals) {
       continue;
     }
     const name = f.slice(ADR_DIR.length, -".md".length);
-    const finding = (rule, position, key, msg) => {
-      // A rule id is written at each call and in RULES: one not in RULES
-      // is a mistake in this file, not a finding about an ADR.
-      if (!RULES.some((r) => r.id === rule)) throw new Error(`adr-judge: ${rule} is not in RULES`);
-      facts.push({ rule, adr: name, position, key });
-      fail(msg);
-    };
     for (const p of parsed.problems) fail(p);
     const { decisions, problems: decisionProblems } = decisionIds(text);
     for (const p of decisionProblems) fail(p);
@@ -128,16 +104,8 @@ export function judgeDeclarations(adrs, reader, refusals) {
     }
     // Each id an entry lists, with the kinds of entry that list it.
     const covered = new Map();
-    for (const [position, entry] of parsed.entries.entries()) {
+    for (const entry of parsed.entries) {
       for (const id of entry.ids) {
-        if (!ids.has(id)) {
-          finding(
-            "ids-exist",
-            position,
-            `${name}#${id}`,
-            `"${entry.text}" lists ${id}, which no decision here has`,
-          );
-        }
         if (!covered.has(id)) covered.set(id, new Set());
         covered.get(id).add(entry.kind);
       }
@@ -148,16 +116,10 @@ export function judgeDeclarations(adrs, reader, refusals) {
           fail(verdict);
           continue;
         }
+        // A silent guard: a script package.json lacks is check:adr-model's
+        // finding (script-exists), and has no step to look up.
         const scripts = reader.scripts();
-        if (scripts !== null && !Object.hasOwn(scripts, script)) {
-          finding(
-            "script-exists",
-            position,
-            script,
-            `"${entry.text}": barwise/package.json has no script ${script}`,
-          );
-          continue;
-        }
+        if (scripts !== null && !Object.hasOwn(scripts, script)) continue;
         const want = entry.args === null
           ? `npm run ${script}`
           : `npm run ${script} -- ${entry.args}`;
@@ -216,35 +178,21 @@ export function judgeDeclarations(adrs, reader, refusals) {
         const tracker = reader.issues();
         if (tracker === null) continue;
         const issue = tracker.get(entry.issue);
-        // In order: the issue exists, it is open, then what makes it this
-        // decision's own, so a closed issue reports only that it is closed.
-        if (issue === undefined) {
-          finding(
-            "issue-tracked",
-            position,
-            entry.issue,
-            `"${entry.text}": ${entry.issue} is not in .beads/issues.jsonl`,
-          );
-          continue;
-        }
-        if (issue.status === "closed") {
-          finding(
-            "issue-open",
-            position,
-            entry.issue,
-            `"${entry.text}": ${entry.issue} is closed; declare the enforcer it built, or reopen it`,
-          );
-          continue;
-        }
+        // A silent guard: an issue missing or closed is check:adr-model's
+        // finding (issue-tracked, issue-open), and reports only that, not
+        // also its label or title.
+        if (issue === undefined || issue.status === "closed") continue;
         // A labels field that is not a list is not the label, whatever it
         // holds: a string would otherwise match on a substring.
         if (!(Array.isArray(issue.labels) && issue.labels.includes(GAP_LABEL))) {
           fail(`"${entry.text}": ${entry.issue} does not carry the ${GAP_LABEL} label`);
         }
         // With more than one id there is no one decision for the title to
-        // name; the finding above covers that entry. The space after the id
-        // keeps "decision four" from matching "decision fourteen".
-        if (entry.ids.length === 1) {
+        // name; the finding above covers that entry. An id the ADR does not
+        // have is check:adr-model's finding (ids-exist), reported only as
+        // that. The space after the id keeps "decision four" from matching
+        // "decision fourteen".
+        if (entry.ids.length === 1 && ids.has(entry.ids[0])) {
           const prefix = `Gap: ${name} decision ${entry.ids[0]} `;
           if (!String(issue.title ?? "").startsWith(prefix)) {
             fail(
@@ -255,29 +203,23 @@ export function judgeDeclarations(adrs, reader, refusals) {
         }
       }
     }
-    for (const [id, d] of ids) {
-      if (!covered.has(id)) {
-        finding(
-          "coverage",
-          null,
-          `${name}#${id}`,
-          `decision ${d.n} {#${id}} has no Enforced-by: entry`,
-        );
-      }
-    }
-    // Over the decisions with an entry, so the three buckets sum to it; one
-    // with none is a finding above, and the OK line never prints beside one.
+    // Every decision counts; the three buckets sum to those with an entry,
+    // and `none` counts those without, which check:adr-model reports
+    // (coverage), so the OK line never reads as covering them.
     for (const id of ids.keys()) {
       const kinds = covered.get(id);
-      if (kinds === undefined) continue;
       held.decisions++;
+      if (kinds === undefined) {
+        held.none++;
+        continue;
+      }
       if (kinds.has("npm")) held.gate++;
       else if (kinds.has("tests")) held.testsOnly++;
       else if (kinds.has("none")) held.noneOnly++;
       if (kinds.has("none")) held.gap++;
     }
   }
-  return { problems, facts, held };
+  return { problems, held };
 }
 
 /**
