@@ -427,8 +427,10 @@ if (enforcementProblems.length > 0) {
   );
   for (const p of enforcementProblems) console.error(`  ${p}`);
   console.error(
-    "Every decision needs an entry: a gate, tests (<ids>), or none (<open gap issue>: <ids>)"
-      + " (docs/specs/executable-adrs.spec.md).",
+    "Every decision needs an entry: a gate, tests (<ids>), or none (<gap issue>: <id>) on"
+      + " the decision's own open gap issue, labelled adr-gap and titled"
+      + ' "Gap: <adr> decision <id> ..." (docs/specs/executable-adrs.spec.md,'
+      + " docs/specs/enforceable-adr-practice.spec.md).",
   );
 }
 if (refusals.length > 0) {

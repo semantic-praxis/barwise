@@ -8,6 +8,7 @@
  */
 import {
   decisionIds,
+  GAP_LABEL,
   GATE_EXCEPTIONS,
   gateName,
   META_GATES,
@@ -36,12 +37,15 @@ const guard = (condition) => {
 export function judgeDeclarations(adrs, reader, refusals) {
   const problems = [];
   let declaring = 0;
+  // Each gap issue is one decision's own: the first entry to name an issue,
+  // across every ADR, by file and entry text.
+  const gapNamedBy = new Map();
   for (const { f, text } of adrs) {
     const parsed = parseEnforcedBy(text);
     const fail = (msg) => problems.push(`${f}: ${msg}`);
     if (!parsed.present) {
       fail(
-        "no Enforced-by: header; every ADR names what holds each decision, and `none (<issue>: <ids>)` for one with no enforcer",
+        "no Enforced-by: header; every ADR names what holds each decision, and `none (<issue>: <id>)` for one with no enforcer",
       );
       continue;
     }
@@ -126,15 +130,52 @@ export function judgeDeclarations(adrs, reader, refusals) {
           : `the step "${want}" has a guard that does not run it on every code change`;
         fail(`"${entry.text}": ${why}`);
       } else if (entry.kind === "none") {
+        // These two need no tracker, so they are judged even when it is not
+        // read: one decision per entry, and one entry per gap issue.
+        if (entry.ids.length !== 1) {
+          fail(
+            `"${entry.text}": lists ${entry.ids.length} decisions; a none entry names one,`
+              + " on that decision's own gap issue",
+          );
+        }
+        const first = gapNamedBy.get(entry.issue);
+        if (first === undefined) gapNamedBy.set(entry.issue, `${f}: "${entry.text}"`);
+        else {
+          fail(
+            `"${entry.text}": ${entry.issue} is also named by ${first}; a gap issue is one decision's own`,
+          );
+        }
         const tracker = reader.issues();
         if (tracker === null) continue;
         const issue = tracker.get(entry.issue);
+        // In order: the issue exists, it is open, then what makes it this
+        // decision's own, so a closed issue reports only that it is closed.
         if (issue === undefined) {
           fail(`"${entry.text}": ${entry.issue} is not in .beads/issues.jsonl`);
-        } else if (issue.status === "closed") {
+          continue;
+        }
+        if (issue.status === "closed") {
           fail(
             `"${entry.text}": ${entry.issue} is closed; declare the enforcer it built, or reopen it`,
           );
+          continue;
+        }
+        // A labels field that is not a list is not the label, whatever it
+        // holds: a string would otherwise match on a substring.
+        if (!(Array.isArray(issue.labels) && issue.labels.includes(GAP_LABEL))) {
+          fail(`"${entry.text}": ${entry.issue} does not carry the ${GAP_LABEL} label`);
+        }
+        // With more than one id there is no one decision for the title to
+        // name; the finding above covers that entry. The space after the id
+        // keeps "decision four" from matching "decision fourteen".
+        if (entry.ids.length === 1) {
+          const prefix = `Gap: ${name} decision ${entry.ids[0]} `;
+          if (!String(issue.title ?? "").startsWith(prefix)) {
+            fail(
+              `"${entry.text}": ${entry.issue}'s title does not begin "${prefix}"`
+                + " (that prefix, a space, then what the gap is)",
+            );
+          }
         }
       }
     }
