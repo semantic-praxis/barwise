@@ -113,6 +113,22 @@ describe("reading a format 4.0 document", () => {
     ).toThrow(DeserializationError);
   });
 
+  it("refuses a fact instance id stated twice in one population (barwise-wcg.4kp)", () => {
+    const instance = {
+      id: "Person_smokes.population.1",
+      role_values: { "Person_smokes.smokes": "1" },
+    };
+    const populations = [{
+      id: "Person_smokes.population",
+      fact_type: "Person_smokes",
+      instances: [instance, { ...instance, role_values: { "Person_smokes.smokes": "2" } }],
+    }];
+    expect(() => readDocument40(doc({ populations }))).toThrow(DeserializationError);
+    expect(() => readDocument40(doc({ populations }))).toThrow(
+      /"Person_smokes\.population\.1" is held by a fact instance/,
+    );
+  });
+
   // Each kind the reader collects stated ids from, as the second holder of
   // an id another kind states, so dropping any kind from the collection
   // fails here. Role and population ids hold a dot, so they meet each other.

@@ -28,6 +28,31 @@ export type IdKeyedKind =
 /** Every kind whose id the index holds. */
 export type IdKind = IdKeyedKind | "role" | "constraint";
 
+/**
+ * An `add*` was given an id its store already holds.
+ *
+ * Each store is a `Map` keyed by id, and `set` overwrites without a word,
+ * so before this check a second element under a held id silently replaced
+ * the first: an objectification evicted another in a merge, and a file
+ * stating two fact types under one id loaded as one (model invariants,
+ * WS3). The model cannot represent two elements under one id, so it
+ * refuses rather than reports, whatever `skipPlayerValidation` says: that
+ * option skips checks on what an element references, and this is a check
+ * on the store itself. Both readers turn it into a `DeserializationError`.
+ */
+export class DuplicateIdError extends Error {
+  constructor(
+    readonly id: string,
+    // A fact instance is not in the id index; its population holds it.
+    readonly kind: IdKind | "fact instance",
+    held: string,
+    adding: string,
+  ) {
+    super(`Id ${JSON.stringify(id)} is held by ${held}, so ${adding} cannot be added.`);
+    this.name = "DuplicateIdError";
+  }
+}
+
 export class IdIndex {
   private readonly held = new Map<string, Map<IdKind, number>>();
 

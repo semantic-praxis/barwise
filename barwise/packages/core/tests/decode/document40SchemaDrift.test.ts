@@ -191,6 +191,10 @@ const DIVERGENCES: [string, (d: Record<string, any>, id: (s: string) => string) 
   ["a diagram position key", (d, id) => {
     d.model.diagrams[0].positions = { [id("Pe\u0301rson")]: { x: 1, y: 2 } };
   }],
+  // The pr-review on #913: this check had no case of its own.
+  ["a diagram orientation key", (d, id) => {
+    d.model.diagrams[0].orientations = { [id("Person_sme\u0301kes")]: "vertical" };
+  }],
 ];
 
 describe("the deliberate divergence: the decoder refuses an id not in NFC", () => {

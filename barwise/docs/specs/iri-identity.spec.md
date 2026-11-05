@@ -2019,7 +2019,12 @@ accepted. The options stay, so a later reader sees what was weighed.
    instance keeps an `id`, its population's local name plus the next number
    that population has not used (`.1`, `.2`), never reused, because six
    population rules, the editor's source map and the NORMA population
-   mapping key on it. (b) fact instances drop their id and every one of
+   mapping key on it. (Amended by the owner, 2026-11-05, on barwise-wcg.4kp:
+   "never reused" holds while a model is loaded, and a stated id another
+   instance holds is refused; a file keeps no record of a removed instance,
+   so after a save and reload a removed number can come back. The sites
+   that key on the id need it unique at any moment. It is within its
+   population; across populations it is not yet, barwise-wcg.ezo.) (b) fact instances drop their id and every one of
    those sites moves to positions. **Decided: (a).**
 8. **How diff recognizes a rename.** (a) after the id and name passes, pair
    the rest by content (same kind, roles, players and constraints) and
