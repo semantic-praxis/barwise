@@ -173,6 +173,56 @@ const CASES: [string, (d: Record<string, any>) => void, boolean][] = [
   ["orm_version 3.0", (d) => (d.orm_version = "3.0"), false],
 ];
 
+/**
+ * Where the decoder refuses what the schema accepts, on purpose: a pattern
+ * cannot test Unicode NFC (barwise-wcg.6tv), so a stated id that is not in
+ * NFC passes the schema and is refused when the file is read. Each case
+ * gives the id written in NFC too, which both accept.
+ */
+const DIVERGENCES: [string, (d: Record<string, any>, id: (s: string) => string) => void][] = [
+  ["an object type id", (d, id) => (d.model.object_types[0].id = id("Cafe\u0301"))],
+  ["a fact type id", (d, id) => (d.model.fact_types[0].id = id("\u212Bngstrom"))],
+  ["a role id", (d, id) => (d.model.fact_types[0].roles[0].id = id("Person_smokes.sme\u0301kes"))],
+  ["a reference", (d, id) => (d.model.subtype_facts[0].supertype = id("Pe\u0301rson"))],
+  ["a role value key", (d, id) => {
+    d.model.populations[0].instances[0].role_values = { [id("Person_smokes.sme\u0301kes")]: "p1" };
+  }],
+  ["an alias", (d, id) => (d.model.imports = { [id("cr\u0301m")]: "Crm" })],
+  ["a diagram position key", (d, id) => {
+    d.model.diagrams[0].positions = { [id("Pe\u0301rson")]: { x: 1, y: 2 } };
+  }],
+];
+
+describe("the deliberate divergence: the decoder refuses an id not in NFC", () => {
+  const ajv = new Ajv({ allErrors: true, strict: false });
+  const validate = ajv.compile(schema);
+  const decodes = (doc: Record<string, any>) => {
+    try {
+      runDocument40Decode(doc);
+      return "";
+    } catch (err) {
+      if (!(err instanceof DecodeError)) throw err;
+      return err.message;
+    }
+  };
+
+  it.each(DIVERGENCES)("%s: refused, naming NFC, though the schema accepts it", (_, change) => {
+    const doc = base();
+    change(doc, (s) => s);
+    expect(validate(doc)).toBe(true);
+    expect(decodes(doc)).toMatch(/Unicode NFC/);
+  });
+
+  it.each(DIVERGENCES)("%s: accepted by both when written in NFC", (_, change) => {
+    const doc = base();
+    change(doc, (s) => s.normalize("NFC"));
+    // A changed id leaves what referred to the old one dangling, which the
+    // reader does not check; only whether it reads the id is in question.
+    expect(validate(doc)).toBe(true);
+    expect(decodes(doc)).toBe("");
+  });
+});
+
 describe("the 4.0 JSON Schema and decoders accept and refuse alike", () => {
   const ajv = new Ajv({ allErrors: true, strict: false });
   const validate = ajv.compile(schema);

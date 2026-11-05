@@ -1985,6 +1985,14 @@ accepted. The options stay, so a later reader sees what was weighed.
    a role separator. (b) PascalCase-join (`CustomerPlacesOrder`), which reads
    worse and collides more. **Decided: (a).** A minted name with a
    defining rule (`... defined as: ...`) is then encoded, not parsed.
+   A stated 4.0 id must be in NFC too (owner, 2026-11-05, on
+   barwise-wcg.6tv): the reader refuses one that is not, since a pattern
+   cannot test NFC; the JSON Schema accepts it, a divergence the 4.0 drift
+   test pins. So that a minted id is always NFC as well, `localName` encodes a
+   combining mark that follows an encoded character, which would otherwise
+   compose with the escape's last hex digit (`%2E` and U+0301). The
+   model's `setImport` refuses an alias not in NFC, and the 3.x replay
+   reshapes a dangling reference that is not.
 4. **An objectified fact type named like its object type.** 22 fact types in
    the corpus share their objectifying type's name (11 in
    `docs/auction.orm.yaml`, 11 in `examples/auction-project/`), from NORMA's
