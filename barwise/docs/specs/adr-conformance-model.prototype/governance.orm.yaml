@@ -1,0 +1,207 @@
+orm_version: "4.0"
+model:
+  name: ADR governance prototype
+  domain_context: adr-governance
+  object_types:
+    - id: ADR
+      name: ADR
+      kind: entity
+      reference_mode: adr_name
+    - id: Decision
+      name: Decision
+      kind: entity
+      reference_mode: decision_key
+    - id: Entry
+      name: Entry
+      kind: entity
+      reference_mode: entry_key
+    - id: Script
+      name: Script
+      kind: entity
+      reference_mode: script_name
+    - id: Package
+      name: Package
+      kind: entity
+      reference_mode: package_name
+    - id: Issue
+      name: Issue
+      kind: entity
+      reference_mode: issue_id
+    - id: Tracker
+      name: Tracker
+      kind: entity
+      reference_mode: tracker_name
+    - id: Test
+      name: Test
+      kind: entity
+      reference_mode: test_title
+  fact_types:
+    - id: Decision_belongs_to_ADR
+      name: Decision belongs to ADR
+      roles:
+        - id: Decision_belongs_to_ADR.belongs_to
+          player: Decision
+          role_name: belongs to
+        - id: Decision_belongs_to_ADR.has
+          player: ADR
+          role_name: has
+      readings:
+        - "{0} belongs to {1}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - Decision_belongs_to_ADR.belongs_to
+          id: Each_Decision_belongs_to_at_most_one_ADR
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"belongs to",{"name":"Decision belongs to ADR","readings":["{0} belongs to {1}"],"players":["Decision","ADR"]}]],"fact_type":{"name":"Decision belongs to ADR","readings":["{0} belongs to {1}"],"players":["Decision","ADR"]}}'
+    - id: Entry_lists_Decision
+      name: Entry lists Decision
+      roles:
+        - id: Entry_lists_Decision.lists
+          player: Entry
+          role_name: lists
+        - id: Entry_lists_Decision.is_listed_by
+          player: Decision
+          role_name: is listed by
+      readings:
+        - "{0} lists {1}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - Entry_lists_Decision.lists
+            - Entry_lists_Decision.is_listed_by
+          id: Each_combination_of_Entry_and_Decision_is_unique_in_Entry_lists_Decision
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"lists",{"name":"Entry lists Decision","readings":["{0} lists {1}"],"players":["Entry","Decision"]}],[1,"is listed by",{"name":"Entry lists Decision","readings":["{0} lists {1}"],"players":["Entry","Decision"]}]],"fact_type":{"name":"Entry lists Decision","readings":["{0} lists {1}"],"players":["Entry","Decision"]}}'
+    - id: Entry_names_Script
+      name: Entry names Script
+      roles:
+        - id: Entry_names_Script.names
+          player: Entry
+          role_name: names
+        - id: Entry_names_Script.is_named_by
+          player: Script
+          role_name: is named by
+      readings:
+        - "{0} names {1}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - Entry_names_Script.names
+          id: Each_Entry_names_at_most_one_Script
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"names",{"name":"Entry names Script","readings":["{0} names {1}"],"players":["Entry","Script"]}]],"fact_type":{"name":"Entry names Script","readings":["{0} names {1}"],"players":["Entry","Script"]}}'
+    - id: Package_defines_Script
+      name: Package defines Script
+      roles:
+        - id: Package_defines_Script.is_defined_by
+          player: Script
+          role_name: is defined by
+        - id: Package_defines_Script.defines
+          player: Package
+          role_name: defines
+      readings:
+        - "{0} is defined by {1}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - Package_defines_Script.is_defined_by
+          id: Each_Script_is_defined_by_at_most_one_Package
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"is defined by",{"name":"Package defines Script","readings":["{0} is defined by {1}"],"players":["Script","Package"]}]],"fact_type":{"name":"Package defines Script","readings":["{0} is defined by {1}"],"players":["Script","Package"]}}'
+    - id: Entry_cites_Issue
+      name: Entry cites Issue
+      roles:
+        - id: Entry_cites_Issue.cites
+          player: Entry
+          role_name: cites
+        - id: Entry_cites_Issue.is_cited_by
+          player: Issue
+          role_name: is cited by
+      readings:
+        - "{0} cites {1}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - Entry_cites_Issue.cites
+          id: Each_Entry_cites_at_most_one_Issue
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"cites",{"name":"Entry cites Issue","readings":["{0} cites {1}"],"players":["Entry","Issue"]}]],"fact_type":{"name":"Entry cites Issue","readings":["{0} cites {1}"],"players":["Entry","Issue"]}}'
+    - id: Issue_is_tracked_in_Tracker
+      name: Issue is tracked in Tracker
+      roles:
+        - id: Issue_is_tracked_in_Tracker.is_tracked_in
+          player: Issue
+          role_name: is tracked in
+        - id: Issue_is_tracked_in_Tracker.tracks
+          player: Tracker
+          role_name: tracks
+      readings:
+        - "{0} is tracked in {1}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - Issue_is_tracked_in_Tracker.is_tracked_in
+          id: Each_Issue_is_tracked_in_at_most_one_Tracker
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"is tracked in",{"name":"Issue is tracked in Tracker","readings":["{0} is tracked in {1}"],"players":["Issue","Tracker"]}]],"fact_type":{"name":"Issue is tracked in Tracker","readings":["{0} is tracked in {1}"],"players":["Issue","Tracker"]}}'
+    - id: Issue_is_open_in_Tracker
+      name: Issue is open in Tracker
+      roles:
+        - id: Issue_is_open_in_Tracker.is_open_in
+          player: Issue
+          role_name: is open in
+        - id: Issue_is_open_in_Tracker.holds_open
+          player: Tracker
+          role_name: holds open
+      readings:
+        - "{0} is open in {1}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - Issue_is_open_in_Tracker.is_open_in
+          id: Each_Issue_is_open_in_at_most_one_Tracker
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"is open in",{"name":"Issue is open in Tracker","readings":["{0} is open in {1}"],"players":["Issue","Tracker"]}]],"fact_type":{"name":"Issue is open in Tracker","readings":["{0} is open in {1}"],"players":["Issue","Tracker"]}}'
+    - id: Test_is_tagged_with_Decision
+      name: Test is tagged with Decision
+      roles:
+        - id: Test_is_tagged_with_Decision.is_tagged_with
+          player: Test
+          role_name: is tagged with
+        - id: Test_is_tagged_with_Decision.tags
+          player: Decision
+          role_name: tags
+      readings:
+        - "{0} is tagged with {1}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - Test_is_tagged_with_Decision.is_tagged_with
+            - Test_is_tagged_with_Decision.tags
+          id: Each_combination_of_Test_and_Decision_is_unique_in_Test_is_tagged_with_Decision
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"is tagged with",{"name":"Test is tagged with Decision","readings":["{0} is tagged with {1}"],"players":["Test","Decision"]}],[1,"tags",{"name":"Test is tagged with Decision","readings":["{0} is tagged with {1}"],"players":["Test","Decision"]}]],"fact_type":{"name":"Test is tagged with Decision","readings":["{0} is tagged with {1}"],"players":["Test","Decision"]}}'
+  constraints:
+    - type: subset
+      subset_roles:
+        - Decision_belongs_to_ADR.belongs_to
+      superset_roles:
+        - Entry_lists_Decision.is_listed_by
+      id: coverage
+    - type: subset
+      subset_roles:
+        - Entry_lists_Decision.is_listed_by
+      superset_roles:
+        - Decision_belongs_to_ADR.belongs_to
+      id: ids-exist
+    - type: subset
+      subset_roles:
+        - Entry_names_Script.is_named_by
+      superset_roles:
+        - Package_defines_Script.is_defined_by
+      id: script-exists
+    - type: subset
+      subset_roles:
+        - Entry_cites_Issue.is_cited_by
+      superset_roles:
+        - Issue_is_tracked_in_Tracker.is_tracked_in
+      id: issue-tracked
+    - type: subset
+      subset_roles:
+        - Entry_cites_Issue.is_cited_by
+      superset_roles:
+        - Issue_is_open_in_Tracker.is_open_in
+      id: issue-open
