@@ -1,13 +1,11 @@
 # Determinism in core
 
 Scope: architecture
-Date: 2026-10-24
-Tracking: barwise-ubc, docs/specs/archive/uuid7-identifiers.spec.md,
-docs/specs/uuid7-generator-factory.spec.md,
+Date: 2026-11-05
+Tracking: barwise-ubc, barwise-wcg.vlv, docs/specs/iri-identity.spec.md,
 docs/specs/archive/architecture-analysis.spec.md
-Enforced-by: npm run purity (pure-ops, ambient-as-argument),
-none (barwise-ym8.lxl: pure-ops), none (barwise-ym8.r6i: ambient-as-argument),
-none (barwise-ym8.kys: one-layer-out), none (barwise-ym8.sit: mint-on-create)
+Enforced-by: npm run purity (pure-ops), none (barwise-ym8.lxl: pure-ops),
+none (barwise-ym8.kys: one-layer-out)
 
 ## Context
 
@@ -20,9 +18,8 @@ on it cannot be reproduced. The rule is stated as a design principle in
 the root `CLAUDE.md` and as scenarios S-DET-1 to S-DET-5 in
 `docs/architecture-scenarios.md`, and is enforced by a pattern gate.
 This ADR is the one statement of the decision; those places link to
-it. The injected-sources design for ids, and why the default id is v4,
-are in the two uuid7 specs above; the gate is from the archived
-architecture-analysis spec.
+it. How an element's id is built from its name is in the iri-identity
+spec; the gate is from the archived architecture-analysis spec.
 
 ## Decision
 
@@ -32,23 +29,18 @@ architecture-analysis spec.
    variable, working directory, locale, clock, random number or LLM
    SDK in `barwise/packages/core/src`. Orderings use a fixed comparison
    (code-unit order, or a collator with an explicit locale), never the
-   process locale.
+   process locale. An id core needs is derived from content, never
+   drawn from a clock or a random source: an element's from its name
+   (`model/mint.ts`; the readable IRI of
+   `ossie-interchange.md#readable-iri`), a constraint's from what it
+   states (`serialization/derivedId.ts`). A value core would need from a
+   clock or a random source arrives as an argument from the surface that
+   owns it.
 2. **Non-determinism lives one layer out.** {#one-layer-out} A capability that cannot be
    deterministic goes in an outer package: `@barwise/llm` for model
    calls, a connector package (`@barwise/formats`, `@barwise/dbt`,
    `@barwise/code-analysis`) for a format that owns its own I/O, and
    the tool layer (`cli`, `mcp`, `vscode`) for anything else.
-3. **When core needs a clock or randomness, it takes it as an
-   argument.** {#ambient-as-argument} The logic stays in core and the ambient source stays at
-   the surface: `createUuidv7Generator({ now, randomBytes })` is the
-   worked example, installed by each surface with `setIdGenerator(...)`.
-4. **Ids are minted only when an element is created.** {#mint-on-create} `generateId()`
-   is the one ambient source core keeps: with no generator installed it
-   falls back to `randomUUID()` (v4), which reads no clock. An
-   operation's output may depend on which ids its input carries -- diff
-   and merge pair elements by id first -- but an operation in 1 never
-   mints a fresh id into its output; an id it needs is derived from
-   content, as `serialization/derivedId.ts` derives constraint ids.
 
 ## Consequences
 
