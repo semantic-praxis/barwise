@@ -1,62 +1,72 @@
-orm_version: "1.0"
+orm_version: "4.0"
 model:
   name: payments
   domain_context: payments
+  imports:
+    parties: parties
+    auctions: auctions
   object_types:
-    - id: 38d2baaf-1c9e-4e93-a34a-e746cf06e8a4
+    - id: ARInvoice
       name: ARInvoice
       kind: entity
       reference_mode: id
-    - id: 8c60d6ec-b851-43b3-a19f-ab103b69148b
+      preferred_identifier: For_each_ARInvoice_id,_at_most_one_ARInvoice_has_that_ARInvoice_id
+    - id: SettlementEstimate
       name: SettlementEstimate
       kind: entity
       reference_mode: id
-    - id: beb852d1-5f29-4fb8-8ce0-34fb435608b8
+      preferred_identifier: For_each_SettlementEstimate_id,_at_most_one_SettlementEstimate_has_that_SettlementEstimate_id
+    - id: Purchase
       name: Purchase
       kind: entity
       reference_mode: id
-    - id: 18ca31af-e4cb-4fe3-94a7-c62c0d9dd4db
+      preferred_identifier: For_each_Purchase_id,_at_most_one_Purchase_has_that_Purchase_id
+    - id: Payout
       name: Payout
       kind: entity
       reference_mode: id
-    - id: 69925e51-532d-42ac-bf1c-cbd720400484
+      preferred_identifier: For_each_Payout_id,_at_most_one_Payout_has_that_Payout_id
+    - id: APInvoice
       name: APInvoice
       kind: entity
       reference_mode: id
-    - id: da15d41e-83bb-46fc-ae6d-592c8a9c7eea
+      preferred_identifier: For_each_APInvoice_id,_at_most_one_APInvoice_has_that_APInvoice_id
+    - id: Payment
       name: Payment
       kind: entity
       reference_mode: id
-    - id: 5ae76cab-100f-4a8b-844b-5d47670c2fb4
+      preferred_identifier: For_each_Payment_id,_at_most_one_Payment_has_that_Payment_id
+    - id: PaymentDays
       name: PaymentDays
       kind: entity
       reference_mode: payment_days_id
-    - id: e95e76bf-2806-43ab-b019-dcf4a43a090b
+    - id: Refund
       name: Refund
       kind: entity
       reference_mode: id
-    - id: 128c2b8a-b820-407c-b924-10bc07ef0183
+      preferred_identifier: For_each_Refund_id,_at_most_one_Refund_has_that_Refund_id
+    - id: ARInvoice_id
       name: ARInvoice_id
       kind: value
       data_type:
         name: auto_counter
         length: 0
         scale: 0
-    - id: d7229c6c-fd2d-42a1-95b6-9fe06884d117
+    - id: SettlementEstimate_id
       name: SettlementEstimate_id
       kind: value
       data_type:
         name: auto_counter
         length: 0
         scale: 0
-    - id: 4f2ff84a-895f-4f49-b812-7ea30f49f6f3
+    - id: Purchase_id
       name: Purchase_id
       kind: value
       data_type:
         name: auto_counter
         length: 0
         scale: 0
-    - id: 981efb22-d3ee-47c9-90de-52fa51f74c2c
+    - id: InvoiceStatus
       name: InvoiceStatus
       kind: value
       value_constraint:
@@ -67,63 +77,63 @@ model:
         name: text
         length: 0
         scale: 0
-    - id: f968343f-2686-4cb3-ac58-8788c37f3bfc
+    - id: BuyerFee
       name: BuyerFee
       kind: value
       data_type:
         name: money
         length: 0
         scale: 0
-    - id: ea53438d-b1db-4ee1-88e9-1b0e4209485d
+    - id: Payout_id
       name: Payout_id
       kind: value
       data_type:
         name: auto_counter
         length: 0
         scale: 0
-    - id: 5aa0c6f8-a8ab-48ce-a8e2-f53d8c4951f1
+    - id: APInvoice_id
       name: APInvoice_id
       kind: value
       data_type:
         name: auto_counter
         length: 0
         scale: 0
-    - id: a882396c-f38f-41e8-94f9-4c201fdc66d0
+    - id: Payment_id
       name: Payment_id
       kind: value
       data_type:
         name: auto_counter
         length: 0
         scale: 0
-    - id: 3d43039a-8aac-4e91-91ac-67991f9bc068
+    - id: Amount
       name: Amount
       kind: value
       data_type:
         name: money
         length: 0
         scale: 0
-    - id: 706035f5-bf40-45c7-9407-341ef6a527a8
+    - id: Days
       name: Days
       kind: value
       data_type:
         name: integer
         length: 0
         scale: 0
-    - id: 5490d2b9-c26f-427b-aff6-18c7fc05f5c9
+    - id: UnaffiliatedCost
       name: UnaffiliatedCost
       kind: value
       data_type:
         name: money
         length: 0
         scale: 0
-    - id: fb31cf84-3e90-4dba-8e99-589a3e630d29
+    - id: CustomerCredit
       name: CustomerCredit
       kind: value
       data_type:
         name: money
         length: 0
         scale: 0
-    - id: 2345e389-b56a-4186-851d-97ee2268c96f
+    - id: PaymentMethod
       name: PaymentMethod
       kind: value
       value_constraint:
@@ -134,24 +144,22 @@ model:
         name: text
         length: 0
         scale: 0
-    - id: 4b68dae7-83c1-4c4b-8b1e-4700e8d794bd
+    - id: Refund_id
       name: Refund_id
       kind: value
       data_type:
         name: auto_counter
         length: 0
         scale: 0
-    - id: e531a38b-e15f-455e-a3f5-ea7a2e0d24eb
+    - id: parties:Organization
       name: Organization
       kind: entity
       reference_mode: id
-      source_context: parties
-    - id: c67f96f2-6428-4c32-b4aa-c1f3358b393e
+    - id: auctions:WonItem
       name: WonItem
       kind: entity
       reference_mode: id
-      source_context: auctions
-    - id: cdae2674-a99b-41aa-b73d-3dcb732052e1
+    - id: auctions:Currency
       name: Currency
       kind: value
       value_constraint:
@@ -162,21 +170,19 @@ model:
         name: text
         length: 0
         scale: 0
-      source_context: auctions
-    - id: 00a4d43d-8efc-4402-8b06-969ccb1287f3
+    - id: auctions:Term
       name: Term
       kind: entity
       reference_mode: id
-      source_context: auctions
   fact_types:
-    - id: d486b699-661c-47cd-b9e3-dbe2f0712e22
+    - id: ARInvoiceHasARInvoiceId
       name: ARInvoiceHasARInvoiceId
       roles:
-        - id: _40CA3CE1-D979-4F4F-9B61-19C2C73C08FA
-          player: 38d2baaf-1c9e-4e93-a34a-e746cf06e8a4
+        - id: ARInvoiceHasARInvoiceId._40CA3CE1-D979-4F4F-9B61-19C2C73C08FA
+          player: ARInvoice
           role_name: _40CA3CE1-D979-4F4F-9B61-19C2C73C08FA
-        - id: _E10D3F65-C8FA-4A74-8EE0-FD3C80A34245
-          player: 128c2b8a-b820-407c-b924-10bc07ef0183
+        - id: ARInvoiceHasARInvoiceId._E10D3F65-C8FA-4A74-8EE0-FD3C80A34245
+          player: ARInvoice_id
           role_name: _E10D3F65-C8FA-4A74-8EE0-FD3C80A34245
       readings:
         - "{0} has {1}"
@@ -184,24 +190,26 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - _E10D3F65-C8FA-4A74-8EE0-FD3C80A34245
-          is_preferred: true
-          id: 8a00ddd6-b4af-4583-a902-5935eb110c75
+            - ARInvoiceHasARInvoiceId._E10D3F65-C8FA-4A74-8EE0-FD3C80A34245
+          id: For_each_ARInvoice_id,_at_most_one_ARInvoice_has_that_ARInvoice_id
+          minted_from: '{"type":"internal_uniqueness","roles":[[1,"_E10D3F65-C8FA-4A74-8EE0-FD3C80A34245",{"name":"ARInvoiceHasARInvoiceId","readings":["{0} has {1}","{0} is of {1}"],"players":["ARInvoice","ARInvoice_id"]}]],"fact_type":{"name":"ARInvoiceHasARInvoiceId","readings":["{0} has {1}","{0} is of {1}"],"players":["ARInvoice","ARInvoice_id"]}}'
         - type: internal_uniqueness
           roles:
-            - _40CA3CE1-D979-4F4F-9B61-19C2C73C08FA
-          id: fbe3f445-bbbd-4217-8cb6-ded4c7ff6c10
+            - ARInvoiceHasARInvoiceId._40CA3CE1-D979-4F4F-9B61-19C2C73C08FA
+          id: Each_ARInvoice_has_at_most_one_ARInvoice_id
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"_40CA3CE1-D979-4F4F-9B61-19C2C73C08FA",{"name":"ARInvoiceHasARInvoiceId","readings":["{0} has {1}","{0} is of {1}"],"players":["ARInvoice","ARInvoice_id"]}]],"fact_type":{"name":"ARInvoiceHasARInvoiceId","readings":["{0} has {1}","{0} is of {1}"],"players":["ARInvoice","ARInvoice_id"]}}'
         - type: mandatory
-          role: _40CA3CE1-D979-4F4F-9B61-19C2C73C08FA
-          id: ccffb215-5e09-4a31-b479-b447a254aad4
-    - id: 36457e8d-8f76-4eaf-abc0-d94877c43f4c
+          role: ARInvoiceHasARInvoiceId._40CA3CE1-D979-4F4F-9B61-19C2C73C08FA
+          id: Each_ARInvoice_has_at_least_one_ARInvoice_id
+          minted_from: '{"type":"mandatory","role":[0,"_40CA3CE1-D979-4F4F-9B61-19C2C73C08FA",{"name":"ARInvoiceHasARInvoiceId","readings":["{0} has {1}","{0} is of {1}"],"players":["ARInvoice","ARInvoice_id"]}],"fact_type":{"name":"ARInvoiceHasARInvoiceId","readings":["{0} has {1}","{0} is of {1}"],"players":["ARInvoice","ARInvoice_id"]}}'
+    - id: SettlementEstimateHasSettlementEstimateId
       name: SettlementEstimateHasSettlementEstimateId
       roles:
-        - id: _344204F9-431C-4DAB-AD80-21194E7579CA
-          player: 8c60d6ec-b851-43b3-a19f-ab103b69148b
+        - id: SettlementEstimateHasSettlementEstimateId._344204F9-431C-4DAB-AD80-21194E7579CA
+          player: SettlementEstimate
           role_name: _344204F9-431C-4DAB-AD80-21194E7579CA
-        - id: _08D8D96D-4DD2-4FE7-9774-2C61A902978D
-          player: d7229c6c-fd2d-42a1-95b6-9fe06884d117
+        - id: SettlementEstimateHasSettlementEstimateId._08D8D96D-4DD2-4FE7-9774-2C61A902978D
+          player: SettlementEstimate_id
           role_name: _08D8D96D-4DD2-4FE7-9774-2C61A902978D
       readings:
         - "{0} has {1}"
@@ -209,24 +217,26 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - _08D8D96D-4DD2-4FE7-9774-2C61A902978D
-          is_preferred: true
-          id: 0533786c-2be6-472f-a962-d05c6d9204e1
+            - SettlementEstimateHasSettlementEstimateId._08D8D96D-4DD2-4FE7-9774-2C61A902978D
+          id: For_each_SettlementEstimate_id,_at_most_one_SettlementEstimate_has_that_SettlementEstimate_id
+          minted_from: '{"type":"internal_uniqueness","roles":[[1,"_08D8D96D-4DD2-4FE7-9774-2C61A902978D",{"name":"SettlementEstimateHasSettlementEstimateId","readings":["{0} has {1}","{0} is of {1}"],"players":["SettlementEstimate","SettlementEstimate_id"]}]],"fact_type":{"name":"SettlementEstimateHasSettlementEstimateId","readings":["{0} has {1}","{0} is of {1}"],"players":["SettlementEstimate","SettlementEstimate_id"]}}'
         - type: internal_uniqueness
           roles:
-            - _344204F9-431C-4DAB-AD80-21194E7579CA
-          id: 15c636e4-6449-4d77-9426-5163b1380fe2
+            - SettlementEstimateHasSettlementEstimateId._344204F9-431C-4DAB-AD80-21194E7579CA
+          id: Each_SettlementEstimate_has_at_most_one_SettlementEstimate_id
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"_344204F9-431C-4DAB-AD80-21194E7579CA",{"name":"SettlementEstimateHasSettlementEstimateId","readings":["{0} has {1}","{0} is of {1}"],"players":["SettlementEstimate","SettlementEstimate_id"]}]],"fact_type":{"name":"SettlementEstimateHasSettlementEstimateId","readings":["{0} has {1}","{0} is of {1}"],"players":["SettlementEstimate","SettlementEstimate_id"]}}'
         - type: mandatory
-          role: _344204F9-431C-4DAB-AD80-21194E7579CA
-          id: 4c1d1bbb-6b7f-48a4-aaea-049de3a720ae
-    - id: 4638f3d7-cb75-41f7-9764-2811b2364527
+          role: SettlementEstimateHasSettlementEstimateId._344204F9-431C-4DAB-AD80-21194E7579CA
+          id: Each_SettlementEstimate_has_at_least_one_SettlementEstimate_id
+          minted_from: '{"type":"mandatory","role":[0,"_344204F9-431C-4DAB-AD80-21194E7579CA",{"name":"SettlementEstimateHasSettlementEstimateId","readings":["{0} has {1}","{0} is of {1}"],"players":["SettlementEstimate","SettlementEstimate_id"]}],"fact_type":{"name":"SettlementEstimateHasSettlementEstimateId","readings":["{0} has {1}","{0} is of {1}"],"players":["SettlementEstimate","SettlementEstimate_id"]}}'
+    - id: PurchaseHasPurchaseId
       name: PurchaseHasPurchaseId
       roles:
-        - id: _8CE8E18B-304F-4549-A448-C7FA37943C34
-          player: beb852d1-5f29-4fb8-8ce0-34fb435608b8
+        - id: PurchaseHasPurchaseId._8CE8E18B-304F-4549-A448-C7FA37943C34
+          player: Purchase
           role_name: _8CE8E18B-304F-4549-A448-C7FA37943C34
-        - id: _9DB981F7-9781-4E1E-942E-6A0F92D94991
-          player: 4f2ff84a-895f-4f49-b812-7ea30f49f6f3
+        - id: PurchaseHasPurchaseId._9DB981F7-9781-4E1E-942E-6A0F92D94991
+          player: Purchase_id
           role_name: _9DB981F7-9781-4E1E-942E-6A0F92D94991
       readings:
         - "{0} has {1}"
@@ -234,110 +244,119 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - _9DB981F7-9781-4E1E-942E-6A0F92D94991
-          is_preferred: true
-          id: c8ad9e07-1843-4c70-bc77-ccee685f2446
+            - PurchaseHasPurchaseId._9DB981F7-9781-4E1E-942E-6A0F92D94991
+          id: For_each_Purchase_id,_at_most_one_Purchase_has_that_Purchase_id
+          minted_from: '{"type":"internal_uniqueness","roles":[[1,"_9DB981F7-9781-4E1E-942E-6A0F92D94991",{"name":"PurchaseHasPurchaseId","readings":["{0} has {1}","{0} is of {1}"],"players":["Purchase","Purchase_id"]}]],"fact_type":{"name":"PurchaseHasPurchaseId","readings":["{0} has {1}","{0} is of {1}"],"players":["Purchase","Purchase_id"]}}'
         - type: internal_uniqueness
           roles:
-            - _8CE8E18B-304F-4549-A448-C7FA37943C34
-          id: 37185b2c-841c-41df-b2db-8d09a4919971
+            - PurchaseHasPurchaseId._8CE8E18B-304F-4549-A448-C7FA37943C34
+          id: Each_Purchase_has_at_most_one_Purchase_id
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"_8CE8E18B-304F-4549-A448-C7FA37943C34",{"name":"PurchaseHasPurchaseId","readings":["{0} has {1}","{0} is of {1}"],"players":["Purchase","Purchase_id"]}]],"fact_type":{"name":"PurchaseHasPurchaseId","readings":["{0} has {1}","{0} is of {1}"],"players":["Purchase","Purchase_id"]}}'
         - type: mandatory
-          role: _8CE8E18B-304F-4549-A448-C7FA37943C34
-          id: eb423388-dc7b-48af-8cf7-bb3eb6c16edc
-    - id: 1d01d4c1-9e08-4043-931f-f18cd3453561
+          role: PurchaseHasPurchaseId._8CE8E18B-304F-4549-A448-C7FA37943C34
+          id: Each_Purchase_has_at_least_one_Purchase_id
+          minted_from: '{"type":"mandatory","role":[0,"_8CE8E18B-304F-4549-A448-C7FA37943C34",{"name":"PurchaseHasPurchaseId","readings":["{0} has {1}","{0} is of {1}"],"players":["Purchase","Purchase_id"]}],"fact_type":{"name":"PurchaseHasPurchaseId","readings":["{0} has {1}","{0} is of {1}"],"players":["Purchase","Purchase_id"]}}'
+    - id: PurchaseHasOrganization
       name: PurchaseHasOrganization
       roles:
-        - id: _FA6AAC2A-0954-4E9F-BE07-5F62DE0EF92D
-          player: beb852d1-5f29-4fb8-8ce0-34fb435608b8
+        - id: PurchaseHasOrganization._FA6AAC2A-0954-4E9F-BE07-5F62DE0EF92D
+          player: Purchase
           role_name: _FA6AAC2A-0954-4E9F-BE07-5F62DE0EF92D
-        - id: _374958AA-4354-4125-AAFB-87D5A16ABD17
-          player: e531a38b-e15f-455e-a3f5-ea7a2e0d24eb
+        - id: PurchaseHasOrganization._374958AA-4354-4125-AAFB-87D5A16ABD17
+          player: parties:Organization
           role_name: _374958AA-4354-4125-AAFB-87D5A16ABD17
       readings:
         - "{0} has {1}"
       constraints:
         - type: internal_uniqueness
           roles:
-            - _FA6AAC2A-0954-4E9F-BE07-5F62DE0EF92D
-          id: 4712d790-5ce3-4393-80f6-077390dc0f29
-    - id: 7594c5e3-521d-4876-b4da-eb9c5921a453
+            - PurchaseHasOrganization._FA6AAC2A-0954-4E9F-BE07-5F62DE0EF92D
+          id: Each_Purchase_has_at_most_one_Organization
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"_FA6AAC2A-0954-4E9F-BE07-5F62DE0EF92D",{"name":"PurchaseHasOrganization","readings":["{0} has {1}"],"players":["Purchase","Organization"]}]],"fact_type":{"name":"PurchaseHasOrganization","readings":["{0} has {1}"],"players":["Purchase","Organization"]}}'
+    - id: PayoutHasOrganization
       name: PayoutHasOrganization
       roles:
-        - id: _F39A48B1-5FAF-4910-8234-C9D077C21955
-          player: 18ca31af-e4cb-4fe3-94a7-c62c0d9dd4db
+        - id: PayoutHasOrganization._F39A48B1-5FAF-4910-8234-C9D077C21955
+          player: Payout
           role_name: _F39A48B1-5FAF-4910-8234-C9D077C21955
-        - id: _2199DA10-B40F-4A4A-BB7C-EBF68A5E41BE
-          player: e531a38b-e15f-455e-a3f5-ea7a2e0d24eb
+        - id: PayoutHasOrganization._2199DA10-B40F-4A4A-BB7C-EBF68A5E41BE
+          player: parties:Organization
           role_name: _2199DA10-B40F-4A4A-BB7C-EBF68A5E41BE
       readings:
         - "{0} has {1}"
       constraints:
         - type: internal_uniqueness
           roles:
-            - _F39A48B1-5FAF-4910-8234-C9D077C21955
-          id: 55a12e1b-6337-4cff-aaf4-ec9fbcb6c7f4
-    - id: a9352611-73e2-4d46-a06f-0de589d6b324
+            - PayoutHasOrganization._F39A48B1-5FAF-4910-8234-C9D077C21955
+          id: Each_Payout_has_at_most_one_Organization
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"_F39A48B1-5FAF-4910-8234-C9D077C21955",{"name":"PayoutHasOrganization","readings":["{0} has {1}"],"players":["Payout","Organization"]}]],"fact_type":{"name":"PayoutHasOrganization","readings":["{0} has {1}"],"players":["Payout","Organization"]}}'
+    - id: ARInvoiceHasInvoiceStatus
       name: ARInvoiceHasInvoiceStatus
       roles:
-        - id: _CB31FCE2-2A58-4662-BA56-38FF319788EF
-          player: 38d2baaf-1c9e-4e93-a34a-e746cf06e8a4
+        - id: ARInvoiceHasInvoiceStatus._CB31FCE2-2A58-4662-BA56-38FF319788EF
+          player: ARInvoice
           role_name: _CB31FCE2-2A58-4662-BA56-38FF319788EF
-        - id: _D704735B-A511-488C-839D-DE7378B80901
-          player: 981efb22-d3ee-47c9-90de-52fa51f74c2c
+        - id: ARInvoiceHasInvoiceStatus._D704735B-A511-488C-839D-DE7378B80901
+          player: InvoiceStatus
           role_name: _D704735B-A511-488C-839D-DE7378B80901
       readings:
         - "{0} has {1}"
       constraints:
         - type: internal_uniqueness
           roles:
-            - _CB31FCE2-2A58-4662-BA56-38FF319788EF
-          id: 49f2b16d-1c82-42d7-8e46-1541ce253ffd
+            - ARInvoiceHasInvoiceStatus._CB31FCE2-2A58-4662-BA56-38FF319788EF
+          id: Each_ARInvoice_has_at_most_one_InvoiceStatus
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"_CB31FCE2-2A58-4662-BA56-38FF319788EF",{"name":"ARInvoiceHasInvoiceStatus","readings":["{0} has {1}"],"players":["ARInvoice","InvoiceStatus"]}]],"fact_type":{"name":"ARInvoiceHasInvoiceStatus","readings":["{0} has {1}"],"players":["ARInvoice","InvoiceStatus"]}}'
         - type: mandatory
-          role: _CB31FCE2-2A58-4662-BA56-38FF319788EF
-          id: a1363933-b45a-465d-bb3f-4fdc2b720de5
-    - id: d8bc6bc7-7ed0-4f25-b36f-d88a23f2cdef
+          role: ARInvoiceHasInvoiceStatus._CB31FCE2-2A58-4662-BA56-38FF319788EF
+          id: Each_ARInvoice_has_at_least_one_InvoiceStatus
+          minted_from: '{"type":"mandatory","role":[0,"_CB31FCE2-2A58-4662-BA56-38FF319788EF",{"name":"ARInvoiceHasInvoiceStatus","readings":["{0} has {1}"],"players":["ARInvoice","InvoiceStatus"]}],"fact_type":{"name":"ARInvoiceHasInvoiceStatus","readings":["{0} has {1}"],"players":["ARInvoice","InvoiceStatus"]}}'
+    - id: ARInvoicePartiallyCoversPurchase
       name: ARInvoicePartiallyCoversPurchase
       roles:
-        - id: _B01E8C8B-E4C8-4E5F-951D-184873CF63E4
-          player: 38d2baaf-1c9e-4e93-a34a-e746cf06e8a4
+        - id: ARInvoicePartiallyCoversPurchase._B01E8C8B-E4C8-4E5F-951D-184873CF63E4
+          player: ARInvoice
           role_name: _B01E8C8B-E4C8-4E5F-951D-184873CF63E4
-        - id: _499431A9-CED3-4B36-B3B4-C0345864757E
-          player: beb852d1-5f29-4fb8-8ce0-34fb435608b8
+        - id: ARInvoicePartiallyCoversPurchase._499431A9-CED3-4B36-B3B4-C0345864757E
+          player: Purchase
           role_name: _499431A9-CED3-4B36-B3B4-C0345864757E
       readings:
         - "{0} partially covers {1}"
       constraints:
         - type: internal_uniqueness
           roles:
-            - _B01E8C8B-E4C8-4E5F-951D-184873CF63E4
-          id: 375487cb-b1e1-43a1-9968-d59996918d32
+            - ARInvoicePartiallyCoversPurchase._B01E8C8B-E4C8-4E5F-951D-184873CF63E4
+          id: Each_ARInvoice_partially_covers_at_most_one_Purchase
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"_B01E8C8B-E4C8-4E5F-951D-184873CF63E4",{"name":"ARInvoicePartiallyCoversPurchase","readings":["{0} partially covers {1}"],"players":["ARInvoice","Purchase"]}]],"fact_type":{"name":"ARInvoicePartiallyCoversPurchase","readings":["{0} partially covers {1}"],"players":["ARInvoice","Purchase"]}}'
         - type: mandatory
-          role: _B01E8C8B-E4C8-4E5F-951D-184873CF63E4
-          id: 23f1b2b2-48d8-462e-b372-0f38a470b722
-    - id: af8a3e15-ccbc-4aec-9ab4-f54b06af72c7
+          role: ARInvoicePartiallyCoversPurchase._B01E8C8B-E4C8-4E5F-951D-184873CF63E4
+          id: Each_ARInvoice_partially_covers_at_least_one_Purchase
+          minted_from: '{"type":"mandatory","role":[0,"_B01E8C8B-E4C8-4E5F-951D-184873CF63E4",{"name":"ARInvoicePartiallyCoversPurchase","readings":["{0} partially covers {1}"],"players":["ARInvoice","Purchase"]}],"fact_type":{"name":"ARInvoicePartiallyCoversPurchase","readings":["{0} partially covers {1}"],"players":["ARInvoice","Purchase"]}}'
+    - id: APInvoiceIsForOrganization
       name: APInvoiceIsForOrganization
       roles:
-        - id: _70EE3433-970D-4FD5-8500-87A8AB8DD77C
-          player: 69925e51-532d-42ac-bf1c-cbd720400484
+        - id: APInvoiceIsForOrganization._70EE3433-970D-4FD5-8500-87A8AB8DD77C
+          player: APInvoice
           role_name: _70EE3433-970D-4FD5-8500-87A8AB8DD77C
-        - id: _7C707320-83C3-4A1C-96D6-4600A94C63C2
-          player: e531a38b-e15f-455e-a3f5-ea7a2e0d24eb
+        - id: APInvoiceIsForOrganization._7C707320-83C3-4A1C-96D6-4600A94C63C2
+          player: parties:Organization
           role_name: _7C707320-83C3-4A1C-96D6-4600A94C63C2
       readings:
         - "{0} is for {1}"
       constraints:
         - type: internal_uniqueness
           roles:
-            - _70EE3433-970D-4FD5-8500-87A8AB8DD77C
-          id: 8784de21-30bb-4c97-b220-675497117ba1
-    - id: e3cecb70-dba6-4be9-af6d-d119da02466a
+            - APInvoiceIsForOrganization._70EE3433-970D-4FD5-8500-87A8AB8DD77C
+          id: Each_APInvoice_is_for_at_most_one_Organization
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"_70EE3433-970D-4FD5-8500-87A8AB8DD77C",{"name":"APInvoiceIsForOrganization","readings":["{0} is for {1}"],"players":["APInvoice","Organization"]}]],"fact_type":{"name":"APInvoiceIsForOrganization","readings":["{0} is for {1}"],"players":["APInvoice","Organization"]}}'
+    - id: PayoutHasPayoutId
       name: PayoutHasPayoutId
       roles:
-        - id: _596015A5-95DF-42A4-869E-9829383260A6
-          player: 18ca31af-e4cb-4fe3-94a7-c62c0d9dd4db
+        - id: PayoutHasPayoutId._596015A5-95DF-42A4-869E-9829383260A6
+          player: Payout
           role_name: _596015A5-95DF-42A4-869E-9829383260A6
-        - id: _6A196757-1D2D-4A0F-AD46-28154F818F13
-          player: ea53438d-b1db-4ee1-88e9-1b0e4209485d
+        - id: PayoutHasPayoutId._6A196757-1D2D-4A0F-AD46-28154F818F13
+          player: Payout_id
           role_name: _6A196757-1D2D-4A0F-AD46-28154F818F13
       readings:
         - "{0} has {1}"
@@ -345,24 +364,26 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - _6A196757-1D2D-4A0F-AD46-28154F818F13
-          is_preferred: true
-          id: 13d99fb6-cce1-4773-bf54-ffeceb686489
+            - PayoutHasPayoutId._6A196757-1D2D-4A0F-AD46-28154F818F13
+          id: For_each_Payout_id,_at_most_one_Payout_has_that_Payout_id
+          minted_from: '{"type":"internal_uniqueness","roles":[[1,"_6A196757-1D2D-4A0F-AD46-28154F818F13",{"name":"PayoutHasPayoutId","readings":["{0} has {1}","{0} is of {1}"],"players":["Payout","Payout_id"]}]],"fact_type":{"name":"PayoutHasPayoutId","readings":["{0} has {1}","{0} is of {1}"],"players":["Payout","Payout_id"]}}'
         - type: internal_uniqueness
           roles:
-            - _596015A5-95DF-42A4-869E-9829383260A6
-          id: 84f1f337-40be-47cd-8528-9a2b77d9edb7
+            - PayoutHasPayoutId._596015A5-95DF-42A4-869E-9829383260A6
+          id: Each_Payout_has_at_most_one_Payout_id
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"_596015A5-95DF-42A4-869E-9829383260A6",{"name":"PayoutHasPayoutId","readings":["{0} has {1}","{0} is of {1}"],"players":["Payout","Payout_id"]}]],"fact_type":{"name":"PayoutHasPayoutId","readings":["{0} has {1}","{0} is of {1}"],"players":["Payout","Payout_id"]}}'
         - type: mandatory
-          role: _596015A5-95DF-42A4-869E-9829383260A6
-          id: 11badc1e-9526-42e2-b370-354e45595e32
-    - id: 0ee9e74c-1634-4d0e-8fa8-da6a28dae1e1
+          role: PayoutHasPayoutId._596015A5-95DF-42A4-869E-9829383260A6
+          id: Each_Payout_has_at_least_one_Payout_id
+          minted_from: '{"type":"mandatory","role":[0,"_596015A5-95DF-42A4-869E-9829383260A6",{"name":"PayoutHasPayoutId","readings":["{0} has {1}","{0} is of {1}"],"players":["Payout","Payout_id"]}],"fact_type":{"name":"PayoutHasPayoutId","readings":["{0} has {1}","{0} is of {1}"],"players":["Payout","Payout_id"]}}'
+    - id: APInvoiceHasAPInvoiceId
       name: APInvoiceHasAPInvoiceId
       roles:
-        - id: _2B789837-AF5A-4F1D-A0AA-FD9E15E6F517
-          player: 69925e51-532d-42ac-bf1c-cbd720400484
+        - id: APInvoiceHasAPInvoiceId._2B789837-AF5A-4F1D-A0AA-FD9E15E6F517
+          player: APInvoice
           role_name: _2B789837-AF5A-4F1D-A0AA-FD9E15E6F517
-        - id: _49BA2C22-034D-4CCE-82E8-18260E15B3C3
-          player: 5aa0c6f8-a8ab-48ce-a8e2-f53d8c4951f1
+        - id: APInvoiceHasAPInvoiceId._49BA2C22-034D-4CCE-82E8-18260E15B3C3
+          player: APInvoice_id
           role_name: _49BA2C22-034D-4CCE-82E8-18260E15B3C3
       readings:
         - "{0} has {1}"
@@ -370,43 +391,47 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - _49BA2C22-034D-4CCE-82E8-18260E15B3C3
-          is_preferred: true
-          id: e874b104-83f7-4c01-97c8-fe01dc01891a
+            - APInvoiceHasAPInvoiceId._49BA2C22-034D-4CCE-82E8-18260E15B3C3
+          id: For_each_APInvoice_id,_at_most_one_APInvoice_has_that_APInvoice_id
+          minted_from: '{"type":"internal_uniqueness","roles":[[1,"_49BA2C22-034D-4CCE-82E8-18260E15B3C3",{"name":"APInvoiceHasAPInvoiceId","readings":["{0} has {1}","{0} is of {1}"],"players":["APInvoice","APInvoice_id"]}]],"fact_type":{"name":"APInvoiceHasAPInvoiceId","readings":["{0} has {1}","{0} is of {1}"],"players":["APInvoice","APInvoice_id"]}}'
         - type: internal_uniqueness
           roles:
-            - _2B789837-AF5A-4F1D-A0AA-FD9E15E6F517
-          id: 56b87dab-8641-4cb0-88d1-d43ddab0bae7
+            - APInvoiceHasAPInvoiceId._2B789837-AF5A-4F1D-A0AA-FD9E15E6F517
+          id: Each_APInvoice_has_at_most_one_APInvoice_id
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"_2B789837-AF5A-4F1D-A0AA-FD9E15E6F517",{"name":"APInvoiceHasAPInvoiceId","readings":["{0} has {1}","{0} is of {1}"],"players":["APInvoice","APInvoice_id"]}]],"fact_type":{"name":"APInvoiceHasAPInvoiceId","readings":["{0} has {1}","{0} is of {1}"],"players":["APInvoice","APInvoice_id"]}}'
         - type: mandatory
-          role: _2B789837-AF5A-4F1D-A0AA-FD9E15E6F517
-          id: 7340a23f-fe16-44f5-933b-af230eaad396
-    - id: 2f7fbf6d-d10b-414d-8e54-ee9711e5d540
+          role: APInvoiceHasAPInvoiceId._2B789837-AF5A-4F1D-A0AA-FD9E15E6F517
+          id: Each_APInvoice_has_at_least_one_APInvoice_id
+          minted_from: '{"type":"mandatory","role":[0,"_2B789837-AF5A-4F1D-A0AA-FD9E15E6F517",{"name":"APInvoiceHasAPInvoiceId","readings":["{0} has {1}","{0} is of {1}"],"players":["APInvoice","APInvoice_id"]}],"fact_type":{"name":"APInvoiceHasAPInvoiceId","readings":["{0} has {1}","{0} is of {1}"],"players":["APInvoice","APInvoice_id"]}}'
+    - id: APInvoiceHasInvoiceStatus
       name: APInvoiceHasInvoiceStatus
       roles:
-        - id: _0038F269-EAB8-4443-B8D6-F61FDE20F36F
-          player: 69925e51-532d-42ac-bf1c-cbd720400484
+        - id: APInvoiceHasInvoiceStatus._0038F269-EAB8-4443-B8D6-F61FDE20F36F
+          player: APInvoice
           role_name: _0038F269-EAB8-4443-B8D6-F61FDE20F36F
-        - id: _5185F9EC-4AB9-4A64-8733-B52CD16C5970
-          player: 981efb22-d3ee-47c9-90de-52fa51f74c2c
+        - id: APInvoiceHasInvoiceStatus._5185F9EC-4AB9-4A64-8733-B52CD16C5970
+          player: InvoiceStatus
           role_name: _5185F9EC-4AB9-4A64-8733-B52CD16C5970
       readings:
         - "{0} has {1}"
       constraints:
         - type: internal_uniqueness
           roles:
-            - _0038F269-EAB8-4443-B8D6-F61FDE20F36F
-          id: 287957ba-4c06-4477-b3ee-853ce8938542
+            - APInvoiceHasInvoiceStatus._0038F269-EAB8-4443-B8D6-F61FDE20F36F
+          id: Each_APInvoice_has_at_most_one_InvoiceStatus
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"_0038F269-EAB8-4443-B8D6-F61FDE20F36F",{"name":"APInvoiceHasInvoiceStatus","readings":["{0} has {1}"],"players":["APInvoice","InvoiceStatus"]}]],"fact_type":{"name":"APInvoiceHasInvoiceStatus","readings":["{0} has {1}"],"players":["APInvoice","InvoiceStatus"]}}'
         - type: mandatory
-          role: _0038F269-EAB8-4443-B8D6-F61FDE20F36F
-          id: 9fe84a1e-fe8b-48ce-beca-f0be13e0f06a
-    - id: 32f78357-1008-4e7b-b8ae-734d7a4e9a02
+          role: APInvoiceHasInvoiceStatus._0038F269-EAB8-4443-B8D6-F61FDE20F36F
+          id: Each_APInvoice_has_at_least_one_InvoiceStatus
+          minted_from: '{"type":"mandatory","role":[0,"_0038F269-EAB8-4443-B8D6-F61FDE20F36F",{"name":"APInvoiceHasInvoiceStatus","readings":["{0} has {1}"],"players":["APInvoice","InvoiceStatus"]}],"fact_type":{"name":"APInvoiceHasInvoiceStatus","readings":["{0} has {1}"],"players":["APInvoice","InvoiceStatus"]}}'
+    - id: PaymentHasPaymentId
       name: PaymentHasPaymentId
       roles:
-        - id: _46FF5568-40D5-41E4-BCFF-F2D4701F443D
-          player: da15d41e-83bb-46fc-ae6d-592c8a9c7eea
+        - id: PaymentHasPaymentId._46FF5568-40D5-41E4-BCFF-F2D4701F443D
+          player: Payment
           role_name: _46FF5568-40D5-41E4-BCFF-F2D4701F443D
-        - id: _7931D8EF-9144-4072-83C7-2DD78B5FDA20
-          player: a882396c-f38f-41e8-94f9-4c201fdc66d0
+        - id: PaymentHasPaymentId._7931D8EF-9144-4072-83C7-2DD78B5FDA20
+          player: Payment_id
           role_name: _7931D8EF-9144-4072-83C7-2DD78B5FDA20
       readings:
         - "{0} has {1}"
@@ -414,286 +439,293 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - _7931D8EF-9144-4072-83C7-2DD78B5FDA20
-          is_preferred: true
-          id: 83fe82f7-4d8f-4bed-a247-936eec50bfba
+            - PaymentHasPaymentId._7931D8EF-9144-4072-83C7-2DD78B5FDA20
+          id: For_each_Payment_id,_at_most_one_Payment_has_that_Payment_id
+          minted_from: '{"type":"internal_uniqueness","roles":[[1,"_7931D8EF-9144-4072-83C7-2DD78B5FDA20",{"name":"PaymentHasPaymentId","readings":["{0} has {1}","{0} is of {1}"],"players":["Payment","Payment_id"]}]],"fact_type":{"name":"PaymentHasPaymentId","readings":["{0} has {1}","{0} is of {1}"],"players":["Payment","Payment_id"]}}'
         - type: internal_uniqueness
           roles:
-            - _46FF5568-40D5-41E4-BCFF-F2D4701F443D
-          id: b476ba95-b379-4e3c-88b6-43f2d2ad7721
+            - PaymentHasPaymentId._46FF5568-40D5-41E4-BCFF-F2D4701F443D
+          id: Each_Payment_has_at_most_one_Payment_id
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"_46FF5568-40D5-41E4-BCFF-F2D4701F443D",{"name":"PaymentHasPaymentId","readings":["{0} has {1}","{0} is of {1}"],"players":["Payment","Payment_id"]}]],"fact_type":{"name":"PaymentHasPaymentId","readings":["{0} has {1}","{0} is of {1}"],"players":["Payment","Payment_id"]}}'
         - type: mandatory
-          role: _46FF5568-40D5-41E4-BCFF-F2D4701F443D
-          id: ed21ad67-239e-4cfa-97fa-e987811a3915
-    - id: 34b187ba-0a6c-4586-8d5e-d01d912249bc
+          role: PaymentHasPaymentId._46FF5568-40D5-41E4-BCFF-F2D4701F443D
+          id: Each_Payment_has_at_least_one_Payment_id
+          minted_from: '{"type":"mandatory","role":[0,"_46FF5568-40D5-41E4-BCFF-F2D4701F443D",{"name":"PaymentHasPaymentId","readings":["{0} has {1}","{0} is of {1}"],"players":["Payment","Payment_id"]}],"fact_type":{"name":"PaymentHasPaymentId","readings":["{0} has {1}","{0} is of {1}"],"players":["Payment","Payment_id"]}}'
+    - id: APInvoiceCoversPayout
       name: APInvoiceCoversPayout
       roles:
-        - id: _E5201FC2-6D7D-4CDE-BB1D-48B540A37D00
-          player: 69925e51-532d-42ac-bf1c-cbd720400484
+        - id: APInvoiceCoversPayout._E5201FC2-6D7D-4CDE-BB1D-48B540A37D00
+          player: APInvoice
           role_name: _E5201FC2-6D7D-4CDE-BB1D-48B540A37D00
-        - id: _055CD0B3-8F9C-4BD4-A44E-2E6C045AF462
-          player: 18ca31af-e4cb-4fe3-94a7-c62c0d9dd4db
+        - id: APInvoiceCoversPayout._055CD0B3-8F9C-4BD4-A44E-2E6C045AF462
+          player: Payout
           role_name: _055CD0B3-8F9C-4BD4-A44E-2E6C045AF462
       readings:
         - "{0} covers {1}"
       constraints:
         - type: internal_uniqueness
           roles:
-            - _E5201FC2-6D7D-4CDE-BB1D-48B540A37D00
-          id: 0e0d012c-c6ab-4a97-a601-55635b3491cb
-    - id: f54cc3aa-4dc4-4594-90ee-17d6db0ddc9c
+            - APInvoiceCoversPayout._E5201FC2-6D7D-4CDE-BB1D-48B540A37D00
+          id: Each_APInvoice_covers_at_most_one_Payout
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"_E5201FC2-6D7D-4CDE-BB1D-48B540A37D00",{"name":"APInvoiceCoversPayout","readings":["{0} covers {1}"],"players":["APInvoice","Payout"]}]],"fact_type":{"name":"APInvoiceCoversPayout","readings":["{0} covers {1}"],"players":["APInvoice","Payout"]}}'
+    - id: ARInvoiceCoversPayout
       name: ARInvoiceCoversPayout
       roles:
-        - id: _D28B56F8-D4D0-4272-B5C3-CC5FD58117CF
-          player: 38d2baaf-1c9e-4e93-a34a-e746cf06e8a4
+        - id: ARInvoiceCoversPayout._D28B56F8-D4D0-4272-B5C3-CC5FD58117CF
+          player: ARInvoice
           role_name: _D28B56F8-D4D0-4272-B5C3-CC5FD58117CF
-        - id: _23824A04-9031-408A-9D98-A7F56C7B99E1
-          player: 18ca31af-e4cb-4fe3-94a7-c62c0d9dd4db
+        - id: ARInvoiceCoversPayout._23824A04-9031-408A-9D98-A7F56C7B99E1
+          player: Payout
           role_name: _23824A04-9031-408A-9D98-A7F56C7B99E1
       readings:
         - "{0} covers {1}"
       constraints:
         - type: internal_uniqueness
           roles:
-            - _D28B56F8-D4D0-4272-B5C3-CC5FD58117CF
-          id: b2a9790a-6dff-4278-bb76-7ecbef9f1859
-    - id: 53d49dfa-59a8-43b4-982c-01af4f0785e5
+            - ARInvoiceCoversPayout._D28B56F8-D4D0-4272-B5C3-CC5FD58117CF
+          id: Each_ARInvoice_covers_at_most_one_Payout
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"_D28B56F8-D4D0-4272-B5C3-CC5FD58117CF",{"name":"ARInvoiceCoversPayout","readings":["{0} covers {1}"],"players":["ARInvoice","Payout"]}]],"fact_type":{"name":"ARInvoiceCoversPayout","readings":["{0} covers {1}"],"players":["ARInvoice","Payout"]}}'
+    - id: PaymentDaysHasDays
       name: PaymentDaysHasDays
       roles:
-        - id: _7F0AB829-B482-411D-8CBC-D57C2F285C23
-          player: 5ae76cab-100f-4a8b-844b-5d47670c2fb4
+        - id: PaymentDaysHasDays._7F0AB829-B482-411D-8CBC-D57C2F285C23
+          player: PaymentDays
           role_name: _7F0AB829-B482-411D-8CBC-D57C2F285C23
-        - id: _DAD6FDF2-C721-4F5F-B982-8D8AC788A577
-          player: 706035f5-bf40-45c7-9407-341ef6a527a8
+        - id: PaymentDaysHasDays._DAD6FDF2-C721-4F5F-B982-8D8AC788A577
+          player: Days
           role_name: _DAD6FDF2-C721-4F5F-B982-8D8AC788A577
       readings:
         - "{0} has {1}"
       constraints:
         - type: internal_uniqueness
           roles:
-            - _7F0AB829-B482-411D-8CBC-D57C2F285C23
-          id: 8b97b597-7fc9-4a6c-a08e-1b03f338d882
+            - PaymentDaysHasDays._7F0AB829-B482-411D-8CBC-D57C2F285C23
+          id: Each_PaymentDays_has_at_most_one_Days
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"_7F0AB829-B482-411D-8CBC-D57C2F285C23",{"name":"PaymentDaysHasDays","readings":["{0} has {1}"],"players":["PaymentDays","Days"]}]],"fact_type":{"name":"PaymentDaysHasDays","readings":["{0} has {1}"],"players":["PaymentDays","Days"]}}'
         - type: mandatory
-          role: _7F0AB829-B482-411D-8CBC-D57C2F285C23
-          id: c0cdf7a9-bfda-42c2-904e-f52a36b03647
-    - id: ecf446d2-64bc-4e2e-b97a-ab1f3ac73511
+          role: PaymentDaysHasDays._7F0AB829-B482-411D-8CBC-D57C2F285C23
+          id: Each_PaymentDays_has_at_least_one_Days
+          minted_from: '{"type":"mandatory","role":[0,"_7F0AB829-B482-411D-8CBC-D57C2F285C23",{"name":"PaymentDaysHasDays","readings":["{0} has {1}"],"players":["PaymentDays","Days"]}],"fact_type":{"name":"PaymentDaysHasDays","readings":["{0} has {1}"],"players":["PaymentDays","Days"]}}'
+    - id: SettlementEstimateContainsWonItem
       name: SettlementEstimateContainsWonItem
       roles:
-        - id: _A0E4F71F-2534-46E5-846B-5C0FE43764BD
-          player: 8c60d6ec-b851-43b3-a19f-ab103b69148b
+        - id: SettlementEstimateContainsWonItem._A0E4F71F-2534-46E5-846B-5C0FE43764BD
+          player: SettlementEstimate
           role_name: _A0E4F71F-2534-46E5-846B-5C0FE43764BD
-        - id: _5AE70EB1-F45C-426D-85B0-4E336DCDFEE1
-          player: c67f96f2-6428-4c32-b4aa-c1f3358b393e
+        - id: SettlementEstimateContainsWonItem._5AE70EB1-F45C-426D-85B0-4E336DCDFEE1
+          player: auctions:WonItem
           role_name: _5AE70EB1-F45C-426D-85B0-4E336DCDFEE1
       readings:
         - "{0} contains {1}"
       constraints:
         - type: internal_uniqueness
           roles:
-            - _5AE70EB1-F45C-426D-85B0-4E336DCDFEE1
-          id: afbfd11c-585e-4f50-a154-3207c6b7d47b
-        - type: disjunctive_mandatory
-          roles:
-            - _6A502A16-880B-40DE-AEE2-6BE99E298ED4
-            - _A0E4F71F-2534-46E5-846B-5C0FE43764BD
-            - _7D1DFAE9-7F3A-46CD-840D-09BC34F7CE30
-    - id: 8e42ee9a-65e2-4015-a2ad-6c729651877a
+            - SettlementEstimateContainsWonItem._5AE70EB1-F45C-426D-85B0-4E336DCDFEE1
+          id: For_each_WonItem,_at_most_one_SettlementEstimate_contains_that_WonItem
+          minted_from: '{"type":"internal_uniqueness","roles":[[1,"_5AE70EB1-F45C-426D-85B0-4E336DCDFEE1",{"name":"SettlementEstimateContainsWonItem","readings":["{0} contains {1}"],"players":["SettlementEstimate","WonItem"]}]],"fact_type":{"name":"SettlementEstimateContainsWonItem","readings":["{0} contains {1}"],"players":["SettlementEstimate","WonItem"]}}'
+    - id: PayoutContainsWonItem
       name: PayoutContainsWonItem
       roles:
-        - id: _4461817B-55B4-4088-9461-CB264FCC5001
-          player: 18ca31af-e4cb-4fe3-94a7-c62c0d9dd4db
+        - id: PayoutContainsWonItem._4461817B-55B4-4088-9461-CB264FCC5001
+          player: Payout
           role_name: _4461817B-55B4-4088-9461-CB264FCC5001
-        - id: _405143CF-C4E7-44FF-8A7A-569647257239
-          player: c67f96f2-6428-4c32-b4aa-c1f3358b393e
+        - id: PayoutContainsWonItem._405143CF-C4E7-44FF-8A7A-569647257239
+          player: auctions:WonItem
           role_name: _405143CF-C4E7-44FF-8A7A-569647257239
       readings:
         - "{0} contains {1}"
       constraints:
         - type: internal_uniqueness
           roles:
-            - _405143CF-C4E7-44FF-8A7A-569647257239
-          id: 464fd67b-70ec-4675-b636-e987016f99c2
-        - type: disjunctive_mandatory
-          roles:
-            - _EF4A12A8-2A24-49A3-8653-F6D09541A9EC
-            - _4461817B-55B4-4088-9461-CB264FCC5001
-    - id: fe64a153-9a61-4725-859d-a3bf489a3a74
+            - PayoutContainsWonItem._405143CF-C4E7-44FF-8A7A-569647257239
+          id: For_each_WonItem,_at_most_one_Payout_contains_that_WonItem
+          minted_from: '{"type":"internal_uniqueness","roles":[[1,"_405143CF-C4E7-44FF-8A7A-569647257239",{"name":"PayoutContainsWonItem","readings":["{0} contains {1}"],"players":["Payout","WonItem"]}]],"fact_type":{"name":"PayoutContainsWonItem","readings":["{0} contains {1}"],"players":["Payout","WonItem"]}}'
+    - id: SettlementEstimateContainsUnaffiliatedCost
       name: SettlementEstimateContainsUnaffiliatedCost
       roles:
-        - id: _7D1DFAE9-7F3A-46CD-840D-09BC34F7CE30
-          player: 8c60d6ec-b851-43b3-a19f-ab103b69148b
+        - id: SettlementEstimateContainsUnaffiliatedCost._7D1DFAE9-7F3A-46CD-840D-09BC34F7CE30
+          player: SettlementEstimate
           role_name: _7D1DFAE9-7F3A-46CD-840D-09BC34F7CE30
-        - id: _E52F97CE-2053-400F-86F5-E63F6476A0F8
-          player: 5490d2b9-c26f-427b-aff6-18c7fc05f5c9
+        - id: SettlementEstimateContainsUnaffiliatedCost._E52F97CE-2053-400F-86F5-E63F6476A0F8
+          player: UnaffiliatedCost
           role_name: _E52F97CE-2053-400F-86F5-E63F6476A0F8
       readings:
         - "{0} contains {1}"
       constraints:
         - type: internal_uniqueness
           roles:
-            - _7D1DFAE9-7F3A-46CD-840D-09BC34F7CE30
-          id: 7ba12dcc-8dad-42c3-9ae7-cee2dd2997fe
-    - id: c3dfb311-caa8-4271-86d1-a088948b29d5
+            - SettlementEstimateContainsUnaffiliatedCost._7D1DFAE9-7F3A-46CD-840D-09BC34F7CE30
+          id: Each_SettlementEstimate_contains_at_most_one_UnaffiliatedCost
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"_7D1DFAE9-7F3A-46CD-840D-09BC34F7CE30",{"name":"SettlementEstimateContainsUnaffiliatedCost","readings":["{0} contains {1}"],"players":["SettlementEstimate","UnaffiliatedCost"]}]],"fact_type":{"name":"SettlementEstimateContainsUnaffiliatedCost","readings":["{0} contains {1}"],"players":["SettlementEstimate","UnaffiliatedCost"]}}'
+    - id: SettlementEstimateContainsCustomerCredit
       name: SettlementEstimateContainsCustomerCredit
       roles:
-        - id: _6A502A16-880B-40DE-AEE2-6BE99E298ED4
-          player: 8c60d6ec-b851-43b3-a19f-ab103b69148b
+        - id: SettlementEstimateContainsCustomerCredit._6A502A16-880B-40DE-AEE2-6BE99E298ED4
+          player: SettlementEstimate
           role_name: _6A502A16-880B-40DE-AEE2-6BE99E298ED4
-        - id: _2348961C-BB9C-470E-AD8F-84D19CCDBB8C
-          player: fb31cf84-3e90-4dba-8e99-589a3e630d29
+        - id: SettlementEstimateContainsCustomerCredit._2348961C-BB9C-470E-AD8F-84D19CCDBB8C
+          player: CustomerCredit
           role_name: _2348961C-BB9C-470E-AD8F-84D19CCDBB8C
       readings:
         - "{0} contains {1}"
       constraints:
         - type: internal_uniqueness
           roles:
-            - _6A502A16-880B-40DE-AEE2-6BE99E298ED4
-          id: 0a0531b1-b473-4052-8d1c-5ebcd66e35e3
-    - id: c1417882-3a77-4488-85c5-1afb0fe7bdf4
+            - SettlementEstimateContainsCustomerCredit._6A502A16-880B-40DE-AEE2-6BE99E298ED4
+          id: Each_SettlementEstimate_contains_at_most_one_CustomerCredit
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"_6A502A16-880B-40DE-AEE2-6BE99E298ED4",{"name":"SettlementEstimateContainsCustomerCredit","readings":["{0} contains {1}"],"players":["SettlementEstimate","CustomerCredit"]}]],"fact_type":{"name":"SettlementEstimateContainsCustomerCredit","readings":["{0} contains {1}"],"players":["SettlementEstimate","CustomerCredit"]}}'
+    - id: PayoutContainsCustomerCredit
       name: PayoutContainsCustomerCredit
       roles:
-        - id: _EF4A12A8-2A24-49A3-8653-F6D09541A9EC
-          player: 18ca31af-e4cb-4fe3-94a7-c62c0d9dd4db
+        - id: PayoutContainsCustomerCredit._EF4A12A8-2A24-49A3-8653-F6D09541A9EC
+          player: Payout
           role_name: _EF4A12A8-2A24-49A3-8653-F6D09541A9EC
-        - id: _4EBD19E9-8336-449F-A6F5-EE539B0EEE8E
-          player: fb31cf84-3e90-4dba-8e99-589a3e630d29
+        - id: PayoutContainsCustomerCredit._4EBD19E9-8336-449F-A6F5-EE539B0EEE8E
+          player: CustomerCredit
           role_name: _4EBD19E9-8336-449F-A6F5-EE539B0EEE8E
       readings:
         - "{0} contains {1}"
       constraints:
         - type: internal_uniqueness
           roles:
-            - _EF4A12A8-2A24-49A3-8653-F6D09541A9EC
-          id: 3e7f06ad-8f75-4aa1-b974-466fceeaae1f
-    - id: 8269f761-8bb6-416b-8dde-5ec13dc04ab9
+            - PayoutContainsCustomerCredit._EF4A12A8-2A24-49A3-8653-F6D09541A9EC
+          id: Each_Payout_contains_at_most_one_CustomerCredit
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"_EF4A12A8-2A24-49A3-8653-F6D09541A9EC",{"name":"PayoutContainsCustomerCredit","readings":["{0} contains {1}"],"players":["Payout","CustomerCredit"]}]],"fact_type":{"name":"PayoutContainsCustomerCredit","readings":["{0} contains {1}"],"players":["Payout","CustomerCredit"]}}'
+    - id: PayoutContainsUnaffiliatedCost
       name: PayoutContainsUnaffiliatedCost
       roles:
-        - id: _6B8A958A-883C-4D11-8034-55ED95702C45
-          player: 18ca31af-e4cb-4fe3-94a7-c62c0d9dd4db
+        - id: PayoutContainsUnaffiliatedCost._6B8A958A-883C-4D11-8034-55ED95702C45
+          player: Payout
           role_name: _6B8A958A-883C-4D11-8034-55ED95702C45
-        - id: _D6DE709D-FEC3-4DE7-9274-4F339563374D
-          player: 5490d2b9-c26f-427b-aff6-18c7fc05f5c9
+        - id: PayoutContainsUnaffiliatedCost._D6DE709D-FEC3-4DE7-9274-4F339563374D
+          player: UnaffiliatedCost
           role_name: _D6DE709D-FEC3-4DE7-9274-4F339563374D
       readings:
         - "{0} contains {1}"
       constraints:
         - type: internal_uniqueness
           roles:
-            - _6B8A958A-883C-4D11-8034-55ED95702C45
-          id: 8a9dca39-b13d-4cc9-80bb-f7c657c1428a
-    - id: 9ff38d95-afb8-4b59-a9d6-ccd232bb8933
+            - PayoutContainsUnaffiliatedCost._6B8A958A-883C-4D11-8034-55ED95702C45
+          id: Each_Payout_contains_at_most_one_UnaffiliatedCost
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"_6B8A958A-883C-4D11-8034-55ED95702C45",{"name":"PayoutContainsUnaffiliatedCost","readings":["{0} contains {1}"],"players":["Payout","UnaffiliatedCost"]}]],"fact_type":{"name":"PayoutContainsUnaffiliatedCost","readings":["{0} contains {1}"],"players":["Payout","UnaffiliatedCost"]}}'
+    - id: PurchaseContainsCustomerCredit
       name: PurchaseContainsCustomerCredit
       roles:
-        - id: _4476D7F0-E991-41BE-9870-EA0BF0AF673B
-          player: beb852d1-5f29-4fb8-8ce0-34fb435608b8
+        - id: PurchaseContainsCustomerCredit._4476D7F0-E991-41BE-9870-EA0BF0AF673B
+          player: Purchase
           role_name: _4476D7F0-E991-41BE-9870-EA0BF0AF673B
-        - id: _4DD285E0-37D4-4D27-B980-723AF8A05475
-          player: fb31cf84-3e90-4dba-8e99-589a3e630d29
+        - id: PurchaseContainsCustomerCredit._4DD285E0-37D4-4D27-B980-723AF8A05475
+          player: CustomerCredit
           role_name: _4DD285E0-37D4-4D27-B980-723AF8A05475
       readings:
         - "{0} contains {1}"
       constraints:
         - type: internal_uniqueness
           roles:
-            - _4476D7F0-E991-41BE-9870-EA0BF0AF673B
-          id: 05449eaf-6f65-45e9-86a9-0e11abf2c122
-    - id: 9d2e1d91-9fb8-4492-9dc4-59a983ca4c52
+            - PurchaseContainsCustomerCredit._4476D7F0-E991-41BE-9870-EA0BF0AF673B
+          id: Each_Purchase_contains_at_most_one_CustomerCredit
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"_4476D7F0-E991-41BE-9870-EA0BF0AF673B",{"name":"PurchaseContainsCustomerCredit","readings":["{0} contains {1}"],"players":["Purchase","CustomerCredit"]}]],"fact_type":{"name":"PurchaseContainsCustomerCredit","readings":["{0} contains {1}"],"players":["Purchase","CustomerCredit"]}}'
+    - id: PurchaseContainsWonItem
       name: PurchaseContainsWonItem
       roles:
-        - id: _0FC1C963-290B-417E-A18C-8F4C41152BE5
-          player: beb852d1-5f29-4fb8-8ce0-34fb435608b8
+        - id: PurchaseContainsWonItem._0FC1C963-290B-417E-A18C-8F4C41152BE5
+          player: Purchase
           role_name: _0FC1C963-290B-417E-A18C-8F4C41152BE5
-        - id: _57EFC021-00F4-4CCB-8DC0-A979F06AAF11
-          player: c67f96f2-6428-4c32-b4aa-c1f3358b393e
+        - id: PurchaseContainsWonItem._57EFC021-00F4-4CCB-8DC0-A979F06AAF11
+          player: auctions:WonItem
           role_name: _57EFC021-00F4-4CCB-8DC0-A979F06AAF11
       readings:
         - "{0} contains {1}"
       constraints:
         - type: internal_uniqueness
           roles:
-            - _0FC1C963-290B-417E-A18C-8F4C41152BE5
-          id: fd8b0d89-0935-4b48-8cff-abfe48956ded
-        - type: disjunctive_mandatory
-          roles:
-            - _0FC1C963-290B-417E-A18C-8F4C41152BE5
-            - _F5CC643A-6497-4EF2-92E1-B494FE41E3BC
-    - id: 428f6a59-5f65-4e4e-80f0-0c5fbcd0e96d
+            - PurchaseContainsWonItem._0FC1C963-290B-417E-A18C-8F4C41152BE5
+          id: Each_Purchase_contains_at_most_one_WonItem
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"_0FC1C963-290B-417E-A18C-8F4C41152BE5",{"name":"PurchaseContainsWonItem","readings":["{0} contains {1}"],"players":["Purchase","WonItem"]}]],"fact_type":{"name":"PurchaseContainsWonItem","readings":["{0} contains {1}"],"players":["Purchase","WonItem"]}}'
+    - id: PurchaseContainsUnaffiliatedCost
       name: PurchaseContainsUnaffiliatedCost
       roles:
-        - id: _F5CC643A-6497-4EF2-92E1-B494FE41E3BC
-          player: beb852d1-5f29-4fb8-8ce0-34fb435608b8
+        - id: PurchaseContainsUnaffiliatedCost._F5CC643A-6497-4EF2-92E1-B494FE41E3BC
+          player: Purchase
           role_name: _F5CC643A-6497-4EF2-92E1-B494FE41E3BC
-        - id: _EEABF20F-F3C7-4E84-8E05-FDFFFA26C410
-          player: 5490d2b9-c26f-427b-aff6-18c7fc05f5c9
+        - id: PurchaseContainsUnaffiliatedCost._EEABF20F-F3C7-4E84-8E05-FDFFFA26C410
+          player: UnaffiliatedCost
           role_name: _EEABF20F-F3C7-4E84-8E05-FDFFFA26C410
       readings:
         - "{0} contains {1}"
       constraints:
         - type: internal_uniqueness
           roles:
-            - _F5CC643A-6497-4EF2-92E1-B494FE41E3BC
-          id: d0fffefb-e993-47be-8c2f-3977ef6583c5
-    - id: 2b96f16e-2331-4416-b85b-e0250f840b4a
+            - PurchaseContainsUnaffiliatedCost._F5CC643A-6497-4EF2-92E1-B494FE41E3BC
+          id: Each_Purchase_contains_at_most_one_UnaffiliatedCost
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"_F5CC643A-6497-4EF2-92E1-B494FE41E3BC",{"name":"PurchaseContainsUnaffiliatedCost","readings":["{0} contains {1}"],"players":["Purchase","UnaffiliatedCost"]}]],"fact_type":{"name":"PurchaseContainsUnaffiliatedCost","readings":["{0} contains {1}"],"players":["Purchase","UnaffiliatedCost"]}}'
+    - id: PaymentCoversPurchase
       name: PaymentCoversPurchase
       roles:
-        - id: _A3F93C52-D1D7-4A0D-A009-ABAD28695C85
-          player: da15d41e-83bb-46fc-ae6d-592c8a9c7eea
+        - id: PaymentCoversPurchase._A3F93C52-D1D7-4A0D-A009-ABAD28695C85
+          player: Payment
           role_name: _A3F93C52-D1D7-4A0D-A009-ABAD28695C85
-        - id: _C110FE61-88B1-4B87-A4CE-5A034E767FB9
-          player: beb852d1-5f29-4fb8-8ce0-34fb435608b8
+        - id: PaymentCoversPurchase._C110FE61-88B1-4B87-A4CE-5A034E767FB9
+          player: Purchase
           role_name: _C110FE61-88B1-4B87-A4CE-5A034E767FB9
       readings:
         - "{0} covers {1}"
       constraints:
         - type: internal_uniqueness
           roles:
-            - _A3F93C52-D1D7-4A0D-A009-ABAD28695C85
-          id: c5fb6e78-c362-4f20-8b5e-f9b02d6aba8f
-    - id: 8b5b991b-a0f2-4a15-bd35-6f45ee39d488
+            - PaymentCoversPurchase._A3F93C52-D1D7-4A0D-A009-ABAD28695C85
+          id: Each_Payment_covers_at_most_one_Purchase
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"_A3F93C52-D1D7-4A0D-A009-ABAD28695C85",{"name":"PaymentCoversPurchase","readings":["{0} covers {1}"],"players":["Payment","Purchase"]}]],"fact_type":{"name":"PaymentCoversPurchase","readings":["{0} covers {1}"],"players":["Payment","Purchase"]}}'
+    - id: PaymentHasTotalAmount
       name: PaymentHasTotalAmount
       roles:
-        - id: _005294B3-96CB-4D87-96EE-27A4D126EFBC
-          player: da15d41e-83bb-46fc-ae6d-592c8a9c7eea
+        - id: PaymentHasTotalAmount._005294B3-96CB-4D87-96EE-27A4D126EFBC
+          player: Payment
           role_name: _005294B3-96CB-4D87-96EE-27A4D126EFBC
-        - id: _1F0E545C-F511-4EAD-B93E-DDD31F9E2EFA
-          player: 3d43039a-8aac-4e91-91ac-67991f9bc068
+        - id: PaymentHasTotalAmount._1F0E545C-F511-4EAD-B93E-DDD31F9E2EFA
+          player: Amount
           role_name: _1F0E545C-F511-4EAD-B93E-DDD31F9E2EFA
       readings:
         - "{0} has total- {1}"
       constraints:
         - type: internal_uniqueness
           roles:
-            - _005294B3-96CB-4D87-96EE-27A4D126EFBC
-          id: 136794e4-fa98-4fb6-8fc5-f4baba6baa2e
+            - PaymentHasTotalAmount._005294B3-96CB-4D87-96EE-27A4D126EFBC
+          id: Each_Payment_has_at_most_one_total_Amount
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"_005294B3-96CB-4D87-96EE-27A4D126EFBC",{"name":"PaymentHasTotalAmount","readings":["{0} has total- {1}"],"players":["Payment","Amount"]}]],"fact_type":{"name":"PaymentHasTotalAmount","readings":["{0} has total- {1}"],"players":["Payment","Amount"]}}'
         - type: mandatory
-          role: _005294B3-96CB-4D87-96EE-27A4D126EFBC
-          id: 5d92be42-266d-4e0a-a2c1-ad370e3bceb3
-    - id: 38e92c77-5a53-4527-bca1-4681cf97604b
+          role: PaymentHasTotalAmount._005294B3-96CB-4D87-96EE-27A4D126EFBC
+          id: Each_Payment_has_at_least_one_total_Amount
+          minted_from: '{"type":"mandatory","role":[0,"_005294B3-96CB-4D87-96EE-27A4D126EFBC",{"name":"PaymentHasTotalAmount","readings":["{0} has total- {1}"],"players":["Payment","Amount"]}],"fact_type":{"name":"PaymentHasTotalAmount","readings":["{0} has total- {1}"],"players":["Payment","Amount"]}}'
+    - id: PaymentHasPaymentMethod
       name: PaymentHasPaymentMethod
       roles:
-        - id: _CD4FBCE0-FDF3-4051-930B-26CBEBA0F77D
-          player: da15d41e-83bb-46fc-ae6d-592c8a9c7eea
+        - id: PaymentHasPaymentMethod._CD4FBCE0-FDF3-4051-930B-26CBEBA0F77D
+          player: Payment
           role_name: _CD4FBCE0-FDF3-4051-930B-26CBEBA0F77D
-        - id: _5B972908-27B3-49F0-8102-BFF08B89FA52
-          player: 2345e389-b56a-4186-851d-97ee2268c96f
+        - id: PaymentHasPaymentMethod._5B972908-27B3-49F0-8102-BFF08B89FA52
+          player: PaymentMethod
           role_name: _5B972908-27B3-49F0-8102-BFF08B89FA52
       readings:
         - "{0} has {1}"
       constraints:
         - type: internal_uniqueness
           roles:
-            - _CD4FBCE0-FDF3-4051-930B-26CBEBA0F77D
-          id: b502c6ef-51ed-4d4f-b196-e2744877c681
+            - PaymentHasPaymentMethod._CD4FBCE0-FDF3-4051-930B-26CBEBA0F77D
+          id: Each_Payment_has_at_most_one_PaymentMethod
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"_CD4FBCE0-FDF3-4051-930B-26CBEBA0F77D",{"name":"PaymentHasPaymentMethod","readings":["{0} has {1}"],"players":["Payment","PaymentMethod"]}]],"fact_type":{"name":"PaymentHasPaymentMethod","readings":["{0} has {1}"],"players":["Payment","PaymentMethod"]}}'
         - type: mandatory
-          role: _CD4FBCE0-FDF3-4051-930B-26CBEBA0F77D
-          id: f9cbcc14-6e70-4684-a1f1-83cfafcac774
-    - id: b7fc5fd1-e744-496b-9efc-1adfa083fb81
+          role: PaymentHasPaymentMethod._CD4FBCE0-FDF3-4051-930B-26CBEBA0F77D
+          id: Each_Payment_has_at_least_one_PaymentMethod
+          minted_from: '{"type":"mandatory","role":[0,"_CD4FBCE0-FDF3-4051-930B-26CBEBA0F77D",{"name":"PaymentHasPaymentMethod","readings":["{0} has {1}"],"players":["Payment","PaymentMethod"]}],"fact_type":{"name":"PaymentHasPaymentMethod","readings":["{0} has {1}"],"players":["Payment","PaymentMethod"]}}'
+    - id: RefundHasRefundId
       name: RefundHasRefundId
       roles:
-        - id: _585EEB79-E9B4-4230-AF53-71066836B1A1
-          player: e95e76bf-2806-43ab-b019-dcf4a43a090b
+        - id: RefundHasRefundId._585EEB79-E9B4-4230-AF53-71066836B1A1
+          player: Refund
           role_name: _585EEB79-E9B4-4230-AF53-71066836B1A1
-        - id: _FC0C16AA-133B-42CF-9EA3-E83EF2C5075A
-          player: 4b68dae7-83c1-4c4b-8b1e-4700e8d794bd
+        - id: RefundHasRefundId._FC0C16AA-133B-42CF-9EA3-E83EF2C5075A
+          player: Refund_id
           role_name: _FC0C16AA-133B-42CF-9EA3-E83EF2C5075A
       readings:
         - "{0} has {1}"
@@ -701,71 +733,99 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - _FC0C16AA-133B-42CF-9EA3-E83EF2C5075A
-          is_preferred: true
-          id: b4b492d7-6548-45af-b53b-dad1fe322cab
+            - RefundHasRefundId._FC0C16AA-133B-42CF-9EA3-E83EF2C5075A
+          id: For_each_Refund_id,_at_most_one_Refund_has_that_Refund_id
+          minted_from: '{"type":"internal_uniqueness","roles":[[1,"_FC0C16AA-133B-42CF-9EA3-E83EF2C5075A",{"name":"RefundHasRefundId","readings":["{0} has {1}","{0} is of {1}"],"players":["Refund","Refund_id"]}]],"fact_type":{"name":"RefundHasRefundId","readings":["{0} has {1}","{0} is of {1}"],"players":["Refund","Refund_id"]}}'
         - type: internal_uniqueness
           roles:
-            - _585EEB79-E9B4-4230-AF53-71066836B1A1
-          id: a9b33295-d086-451a-97d5-6a79873d223c
+            - RefundHasRefundId._585EEB79-E9B4-4230-AF53-71066836B1A1
+          id: Each_Refund_has_at_most_one_Refund_id
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"_585EEB79-E9B4-4230-AF53-71066836B1A1",{"name":"RefundHasRefundId","readings":["{0} has {1}","{0} is of {1}"],"players":["Refund","Refund_id"]}]],"fact_type":{"name":"RefundHasRefundId","readings":["{0} has {1}","{0} is of {1}"],"players":["Refund","Refund_id"]}}'
         - type: mandatory
-          role: _585EEB79-E9B4-4230-AF53-71066836B1A1
-          id: 934350c8-1ad1-40bd-95a5-aa2c21204203
-    - id: 91f3e962-8df0-45f7-bc2e-11ba71370dcb
+          role: RefundHasRefundId._585EEB79-E9B4-4230-AF53-71066836B1A1
+          id: Each_Refund_has_at_least_one_Refund_id
+          minted_from: '{"type":"mandatory","role":[0,"_585EEB79-E9B4-4230-AF53-71066836B1A1",{"name":"RefundHasRefundId","readings":["{0} has {1}","{0} is of {1}"],"players":["Refund","Refund_id"]}],"fact_type":{"name":"RefundHasRefundId","readings":["{0} has {1}","{0} is of {1}"],"players":["Refund","Refund_id"]}}'
+    - id: RefundHasAmount
       name: RefundHasAmount
       roles:
-        - id: _01947F13-0B4F-414E-9A83-B1D98060CE42
-          player: e95e76bf-2806-43ab-b019-dcf4a43a090b
+        - id: RefundHasAmount._01947F13-0B4F-414E-9A83-B1D98060CE42
+          player: Refund
           role_name: _01947F13-0B4F-414E-9A83-B1D98060CE42
-        - id: _1D1CD704-CDD6-4CB8-B1FB-F6A70F4B7E8B
-          player: 3d43039a-8aac-4e91-91ac-67991f9bc068
+        - id: RefundHasAmount._1D1CD704-CDD6-4CB8-B1FB-F6A70F4B7E8B
+          player: Amount
           role_name: _1D1CD704-CDD6-4CB8-B1FB-F6A70F4B7E8B
       readings:
         - "{0} has {1}"
       constraints:
         - type: internal_uniqueness
           roles:
-            - _01947F13-0B4F-414E-9A83-B1D98060CE42
-          id: e5b2fb30-e532-4c65-8225-6b0de7bcf942
+            - RefundHasAmount._01947F13-0B4F-414E-9A83-B1D98060CE42
+          id: Each_Refund_has_at_most_one_Amount
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"_01947F13-0B4F-414E-9A83-B1D98060CE42",{"name":"RefundHasAmount","readings":["{0} has {1}"],"players":["Refund","Amount"]}]],"fact_type":{"name":"RefundHasAmount","readings":["{0} has {1}"],"players":["Refund","Amount"]}}'
         - type: mandatory
-          role: _01947F13-0B4F-414E-9A83-B1D98060CE42
-          id: 8b5d5939-4eea-44f2-b5ab-dca6afa0eb48
-    - id: d8214604-9730-4f45-902b-e73ff16fc7e8
+          role: RefundHasAmount._01947F13-0B4F-414E-9A83-B1D98060CE42
+          id: Each_Refund_has_at_least_one_Amount
+          minted_from: '{"type":"mandatory","role":[0,"_01947F13-0B4F-414E-9A83-B1D98060CE42",{"name":"RefundHasAmount","readings":["{0} has {1}"],"players":["Refund","Amount"]}],"fact_type":{"name":"RefundHasAmount","readings":["{0} has {1}"],"players":["Refund","Amount"]}}'
+    - id: PaymentReceivesRefund
       name: PaymentReceivesRefund
       roles:
-        - id: _6D9B4139-8E9F-4666-B3A2-5B7BE1393CD9
-          player: da15d41e-83bb-46fc-ae6d-592c8a9c7eea
+        - id: PaymentReceivesRefund._6D9B4139-8E9F-4666-B3A2-5B7BE1393CD9
+          player: Payment
           role_name: _6D9B4139-8E9F-4666-B3A2-5B7BE1393CD9
-        - id: _08E0EBCE-5332-44A2-8E81-2CF085F52734
-          player: e95e76bf-2806-43ab-b019-dcf4a43a090b
+        - id: PaymentReceivesRefund._08E0EBCE-5332-44A2-8E81-2CF085F52734
+          player: Refund
           role_name: _08E0EBCE-5332-44A2-8E81-2CF085F52734
       readings:
         - "{0} receives {1}"
       constraints:
         - type: internal_uniqueness
           roles:
-            - _08E0EBCE-5332-44A2-8E81-2CF085F52734
-          id: a3fa8ebf-0c1c-44ff-8c4a-13c7e23312c6
-    - id: 26b311f7-ea6b-4678-90fb-c230583f3a62
+            - PaymentReceivesRefund._08E0EBCE-5332-44A2-8E81-2CF085F52734
+          id: For_each_Refund,_at_most_one_Payment_receives_that_Refund
+          minted_from: '{"type":"internal_uniqueness","roles":[[1,"_08E0EBCE-5332-44A2-8E81-2CF085F52734",{"name":"PaymentReceivesRefund","readings":["{0} receives {1}"],"players":["Payment","Refund"]}]],"fact_type":{"name":"PaymentReceivesRefund","readings":["{0} receives {1}"],"players":["Payment","Refund"]}}'
+    - id: PaymentHasCurrency
       name: PaymentHasCurrency
       roles:
-        - id: _E8BC0880-2A2F-48E0-9579-1839C04E397D
-          player: da15d41e-83bb-46fc-ae6d-592c8a9c7eea
+        - id: PaymentHasCurrency._E8BC0880-2A2F-48E0-9579-1839C04E397D
+          player: Payment
           role_name: _E8BC0880-2A2F-48E0-9579-1839C04E397D
-        - id: _E5554133-9EEE-4681-AA8D-A94A7751E6BA
-          player: cdae2674-a99b-41aa-b73d-3dcb732052e1
+        - id: PaymentHasCurrency._E5554133-9EEE-4681-AA8D-A94A7751E6BA
+          player: auctions:Currency
           role_name: _E5554133-9EEE-4681-AA8D-A94A7751E6BA
       readings:
         - "{0} has {1}"
       constraints:
         - type: internal_uniqueness
           roles:
-            - _E8BC0880-2A2F-48E0-9579-1839C04E397D
-          id: 616f9d23-5d16-44e1-aaee-680f51446a6c
+            - PaymentHasCurrency._E8BC0880-2A2F-48E0-9579-1839C04E397D
+          id: Each_Payment_has_at_most_one_Currency
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"_E8BC0880-2A2F-48E0-9579-1839C04E397D",{"name":"PaymentHasCurrency","readings":["{0} has {1}"],"players":["Payment","Currency"]}]],"fact_type":{"name":"PaymentHasCurrency","readings":["{0} has {1}"],"players":["Payment","Currency"]}}'
         - type: mandatory
-          role: _E8BC0880-2A2F-48E0-9579-1839C04E397D
-          id: 8707330e-0261-4012-a6bc-a5264aa8048c
+          role: PaymentHasCurrency._E8BC0880-2A2F-48E0-9579-1839C04E397D
+          id: Each_Payment_has_at_least_one_Currency
+          minted_from: '{"type":"mandatory","role":[0,"_E8BC0880-2A2F-48E0-9579-1839C04E397D",{"name":"PaymentHasCurrency","readings":["{0} has {1}"],"players":["Payment","Currency"]}],"fact_type":{"name":"PaymentHasCurrency","readings":["{0} has {1}"],"players":["Payment","Currency"]}}'
+  constraints:
+    - type: disjunctive_mandatory
+      roles:
+        - SettlementEstimateContainsCustomerCredit._6A502A16-880B-40DE-AEE2-6BE99E298ED4
+        - SettlementEstimateContainsWonItem._A0E4F71F-2534-46E5-846B-5C0FE43764BD
+        - SettlementEstimateContainsUnaffiliatedCost._7D1DFAE9-7F3A-46CD-840D-09BC34F7CE30
+      id: Each_SettlementEstimate_contains_some_CustomerCredit,_contains_some_WonItem_or_contains_some_UnaffiliatedCost
+      minted_from: '{"type":"disjunctive_mandatory","roles":[[0,"_6A502A16-880B-40DE-AEE2-6BE99E298ED4",{"name":"SettlementEstimateContainsCustomerCredit","readings":["{0} contains {1}"],"players":["SettlementEstimate","CustomerCredit"]}],[0,"_A0E4F71F-2534-46E5-846B-5C0FE43764BD",{"name":"SettlementEstimateContainsWonItem","readings":["{0} contains {1}"],"players":["SettlementEstimate","WonItem"]}],[0,"_7D1DFAE9-7F3A-46CD-840D-09BC34F7CE30",{"name":"SettlementEstimateContainsUnaffiliatedCost","readings":["{0} contains {1}"],"players":["SettlementEstimate","UnaffiliatedCost"]}]]}'
+    - type: disjunctive_mandatory
+      roles:
+        - PayoutContainsCustomerCredit._EF4A12A8-2A24-49A3-8653-F6D09541A9EC
+        - PayoutContainsWonItem._4461817B-55B4-4088-9461-CB264FCC5001
+      id: Each_Payout_contains_some_CustomerCredit_or_contains_some_WonItem
+      minted_from: '{"type":"disjunctive_mandatory","roles":[[0,"_EF4A12A8-2A24-49A3-8653-F6D09541A9EC",{"name":"PayoutContainsCustomerCredit","readings":["{0} contains {1}"],"players":["Payout","CustomerCredit"]}],[0,"_4461817B-55B4-4088-9461-CB264FCC5001",{"name":"PayoutContainsWonItem","readings":["{0} contains {1}"],"players":["Payout","WonItem"]}]]}'
+    - type: disjunctive_mandatory
+      roles:
+        - PurchaseContainsWonItem._0FC1C963-290B-417E-A18C-8F4C41152BE5
+        - PurchaseContainsUnaffiliatedCost._F5CC643A-6497-4EF2-92E1-B494FE41E3BC
+      id: Each_Purchase_contains_some_WonItem_or_contains_some_UnaffiliatedCost
+      minted_from: '{"type":"disjunctive_mandatory","roles":[[0,"_0FC1C963-290B-417E-A18C-8F4C41152BE5",{"name":"PurchaseContainsWonItem","readings":["{0} contains {1}"],"players":["Purchase","WonItem"]}],[0,"_F5CC643A-6497-4EF2-92E1-B494FE41E3BC",{"name":"PurchaseContainsUnaffiliatedCost","readings":["{0} contains {1}"],"players":["Purchase","UnaffiliatedCost"]}]]}'
   subtype_facts:
-    - id: d9c01f1a-e557-4887-92f8-d406d700e2cc
-      subtype: 5ae76cab-100f-4a8b-844b-5d47670c2fb4
-      supertype: 00a4d43d-8efc-4402-8b06-969ccb1287f3
+    - id: PaymentDays_is_a_subtype_of_Term
+      minted_from: '{"subtype":"PaymentDays","supertype":"Term","defining_rule":null}'
+      subtype: PaymentDays
+      supertype: auctions:Term

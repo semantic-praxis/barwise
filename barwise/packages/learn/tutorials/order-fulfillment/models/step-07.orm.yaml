@@ -1,165 +1,165 @@
-orm_version: "1.1"
-
+orm_version: "4.0"
 model:
-  name: "Order Fulfillment"
-  domain_context: "order-fulfillment"
-
+  name: Order Fulfillment
+  domain_context: order-fulfillment
   object_types:
-    - id: "ot-customer"
-      name: "Customer"
-      kind: "entity"
-      reference_mode: "customer_number"
-      definition: "A person or organization that places orders with us."
-
-    - id: "ot-order"
-      name: "Order"
-      kind: "entity"
-      reference_mode: "order_number"
-      definition: "A single request to buy, identified by an order number."
-
-    - id: "ot-product"
-      name: "Product"
-      kind: "entity"
-      reference_mode: "product_code"
-      definition: "An item we sell, identified by a product code."
-
-    - id: "ot-status"
-      name: "OrderStatus"
-      kind: "value"
+    - id: Customer
+      name: Customer
+      kind: entity
+      reference_mode: customer_number
+      definition: A person or organization that places orders with us.
+    - id: Order
+      name: Order
+      kind: entity
+      reference_mode: order_number
+      definition: A single request to buy, identified by an order number.
+    - id: Product
+      name: Product
+      kind: entity
+      reference_mode: product_code
+      definition: An item we sell, identified by a product code.
+    - id: OrderStatus
+      name: OrderStatus
+      kind: value
       data_type:
-        name: "text"
-
-    - id: "ot-priority-order"
-      name: "PriorityOrder"
-      kind: "entity"
-      reference_mode: "order_number"
-      definition: "An order flagged for expedited handling."
-
-    - id: "ot-courier"
-      name: "Courier"
-      kind: "entity"
-      reference_mode: "courier_id"
-      definition: "A delivery service that carries priority orders."
-
+        name: text
+    - id: PriorityOrder
+      name: PriorityOrder
+      kind: entity
+      reference_mode: order_number
+      definition: An order flagged for expedited handling.
+    - id: Courier
+      name: Courier
+      kind: entity
+      reference_mode: courier_id
+      definition: A delivery service that carries priority orders.
   fact_types:
-    - id: "ft-places"
-      name: "Customer places Order"
+    - id: Customer_places_Order
+      name: Customer places Order
       roles:
-        - id: "r-places-customer"
-          player: "ot-customer"
-          role_name: "places"
-        - id: "r-places-order"
-          player: "ot-order"
-          role_name: "is placed by"
+        - id: Customer_places_Order.places
+          player: Customer
+          role_name: places
+        - id: Customer_places_Order.is_placed_by
+          player: Order
+          role_name: is placed by
       readings:
         - "{0} places {1}"
         - "{1} is placed by {0}"
       constraints:
-        - id: "c-uc-places-order"
-          type: "internal_uniqueness"
-          roles: ["r-places-order"]
-        - id: "c-mand-places-order"
-          type: "mandatory"
-          role: "r-places-order"
-
-    - id: "ft-includes"
-      name: "Order includes Product"
+        - type: internal_uniqueness
+          roles:
+            - Customer_places_Order.is_placed_by
+          id: Each_Order_is_placed_by_at_most_one_Customer
+          minted_from: '{"type":"internal_uniqueness","roles":[[1,"is placed by",{"name":"Customer places Order","readings":["{0} places {1}","{1} is placed by {0}"],"players":["Customer","Order"]}]],"fact_type":{"name":"Customer places Order","readings":["{0} places {1}","{1} is placed by {0}"],"players":["Customer","Order"]}}'
+        - type: mandatory
+          role: Customer_places_Order.is_placed_by
+          id: Each_Order_is_placed_by_at_least_one_Customer
+          minted_from: '{"type":"mandatory","role":[1,"is placed by",{"name":"Customer places Order","readings":["{0} places {1}","{1} is placed by {0}"],"players":["Customer","Order"]}],"fact_type":{"name":"Customer places Order","readings":["{0} places {1}","{1} is placed by {0}"],"players":["Customer","Order"]}}'
+    - id: Order_includes_Product
+      name: Order includes Product
       roles:
-        - id: "r-includes-order"
-          player: "ot-order"
-          role_name: "includes"
-        - id: "r-includes-product"
-          player: "ot-product"
-          role_name: "is included in"
+        - id: Order_includes_Product.includes
+          player: Order
+          role_name: includes
+        - id: Order_includes_Product.is_included_in
+          player: Product
+          role_name: is included in
       readings:
         - "{0} includes {1}"
         - "{1} is included in {0}"
       constraints:
-        - id: "c-uc-includes"
-          type: "internal_uniqueness"
-          roles: ["r-includes-order", "r-includes-product"]
-
-    - id: "ft-status"
-      name: "Order has OrderStatus"
+        - type: internal_uniqueness
+          roles:
+            - Order_includes_Product.includes
+            - Order_includes_Product.is_included_in
+          id: Each_combination_of_Order_and_Product_is_unique_in_Order_includes_Product
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"includes",{"name":"Order includes Product","readings":["{0} includes {1}","{1} is included in {0}"],"players":["Order","Product"]}],[1,"is included in",{"name":"Order includes Product","readings":["{0} includes {1}","{1} is included in {0}"],"players":["Order","Product"]}]],"fact_type":{"name":"Order includes Product","readings":["{0} includes {1}","{1} is included in {0}"],"players":["Order","Product"]}}'
+    - id: Order_has_OrderStatus
+      name: Order has OrderStatus
       roles:
-        - id: "r-status-order"
-          player: "ot-order"
-          role_name: "has"
-        - id: "r-status-value"
-          player: "ot-status"
-          role_name: "is of"
+        - id: Order_has_OrderStatus.has
+          player: Order
+          role_name: has
+        - id: Order_has_OrderStatus.is_of
+          player: OrderStatus
+          role_name: is of
       readings:
         - "{0} has {1}"
       constraints:
-        - id: "c-uc-status-order"
-          type: "internal_uniqueness"
-          roles: ["r-status-order"]
-        - id: "c-val-status"
-          type: "value_constraint"
-          role: "r-status-value"
-          values: ["open", "shipped", "cancelled"]
-
-    - id: "ft-assigned"
-      name: "PriorityOrder is assigned to Courier"
+        - type: internal_uniqueness
+          roles:
+            - Order_has_OrderStatus.has
+          id: Each_Order_has_at_most_one_OrderStatus
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"has",{"name":"Order has OrderStatus","readings":["{0} has {1}"],"players":["Order","OrderStatus"]}]],"fact_type":{"name":"Order has OrderStatus","readings":["{0} has {1}"],"players":["Order","OrderStatus"]}}'
+        - type: value_constraint
+          values:
+            - open
+            - shipped
+            - cancelled
+          role: Order_has_OrderStatus.is_of
+          id: The_possible_values_of_OrderStatus_are%3A_%7B'open',_'shipped',_'cancelled'%7D
+          minted_from: '{"type":"value_constraint","values":["open","shipped","cancelled"],"role":[1,"is of",{"name":"Order has OrderStatus","readings":["{0} has {1}"],"players":["Order","OrderStatus"]}],"fact_type":{"name":"Order has OrderStatus","readings":["{0} has {1}"],"players":["Order","OrderStatus"]}}'
+    - id: PriorityOrder_is_assigned_to_Courier
+      name: PriorityOrder is assigned to Courier
       roles:
-        - id: "r-assigned-porder"
-          player: "ot-priority-order"
-          role_name: "is assigned to"
-        - id: "r-assigned-courier"
-          player: "ot-courier"
-          role_name: "carries"
+        - id: PriorityOrder_is_assigned_to_Courier.is_assigned_to
+          player: PriorityOrder
+          role_name: is assigned to
+        - id: PriorityOrder_is_assigned_to_Courier.carries
+          player: Courier
+          role_name: carries
       readings:
         - "{0} is assigned to {1}"
       constraints:
-        - id: "c-uc-assigned"
-          type: "internal_uniqueness"
-          roles: ["r-assigned-porder"]
-
+        - type: internal_uniqueness
+          roles:
+            - PriorityOrder_is_assigned_to_Courier.is_assigned_to
+          id: Each_PriorityOrder_is_assigned_to_at_most_one_Courier
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"is assigned to",{"name":"PriorityOrder is assigned to Courier","readings":["{0} is assigned to {1}"],"players":["PriorityOrder","Courier"]}]],"fact_type":{"name":"PriorityOrder is assigned to Courier","readings":["{0} is assigned to {1}"],"players":["PriorityOrder","Courier"]}}'
   subtype_facts:
-    - id: "sf-priority"
-      subtype: "ot-priority-order"
-      supertype: "ot-order"
-
+    - id: PriorityOrder_is_a_subtype_of_Order
+      minted_from: '{"subtype":"PriorityOrder","supertype":"Order","defining_rule":null}'
+      subtype: PriorityOrder
+      supertype: Order
   populations:
-    - id: "pop-places"
-      fact_type: "ft-places"
-      description: "Who placed which order"
+    - id: Customer_places_Order.population
+      fact_type: Customer_places_Order
       instances:
-        - id: "inst-p1"
+        - id: Customer_places_Order.population.1
           role_values:
-            r-places-customer: "C-1001"
-            r-places-order: "O-501"
-        - id: "inst-p3"
+            Customer_places_Order.places: C-1001
+            Customer_places_Order.is_placed_by: O-501
+        - id: Customer_places_Order.population.2
           role_values:
-            r-places-customer: "C-1002"
-            r-places-order: "O-502"
-
-    - id: "pop-includes"
-      fact_type: "ft-includes"
-      description: "What each order contains"
+            Customer_places_Order.places: C-1002
+            Customer_places_Order.is_placed_by: O-502
+      description: Who placed which order
+    - id: Order_includes_Product.population
+      fact_type: Order_includes_Product
       instances:
-        - id: "inst-i1"
+        - id: Order_includes_Product.population.1
           role_values:
-            r-includes-order: "O-501"
-            r-includes-product: "P-9001"
-        - id: "inst-i2"
+            Order_includes_Product.includes: O-501
+            Order_includes_Product.is_included_in: P-9001
+        - id: Order_includes_Product.population.2
           role_values:
-            r-includes-order: "O-501"
-            r-includes-product: "P-9002"
-        - id: "inst-i3"
+            Order_includes_Product.includes: O-501
+            Order_includes_Product.is_included_in: P-9002
+        - id: Order_includes_Product.population.3
           role_values:
-            r-includes-order: "O-502"
-            r-includes-product: "P-9001"
-
-    - id: "pop-status"
-      fact_type: "ft-status"
-      description: "Where each order stands"
+            Order_includes_Product.includes: O-502
+            Order_includes_Product.is_included_in: P-9001
+      description: What each order contains
+    - id: Order_has_OrderStatus.population
+      fact_type: Order_has_OrderStatus
       instances:
-        - id: "inst-s1"
+        - id: Order_has_OrderStatus.population.1
           role_values:
-            r-status-order: "O-501"
-            r-status-value: "open"
-        - id: "inst-s2"
+            Order_has_OrderStatus.has: O-501
+            Order_has_OrderStatus.is_of: open
+        - id: Order_has_OrderStatus.population.2
           role_values:
-            r-status-order: "O-502"
-            r-status-value: "shipped"
+            Order_has_OrderStatus.has: O-502
+            Order_has_OrderStatus.is_of: shipped
+      description: Where each order stands

@@ -1,4 +1,4 @@
-orm_version: "1.0"
+orm_version: "4.0"
 model:
   name: pii-redaction
   # TODO(barwise): Skipped constraint: "Each reviewer has exactly one clearance level (standard OR elevated OR restri..." -- Fact type "ClearanceLevel" not found in model. (lines 35-43)
@@ -10,20 +10,21 @@ model:
   # NOTE(barwise): Applied with medium confidence: "Each Release records a RedactedContentHash for integrity verification (unique..." (line 97)
   # NOTE(barwise): Entity "ReviewDecision" has a reference_mode but no identifier fact type was found.
   object_types:
-    - id: 6e0d1386-6da7-495c-b47d-b06bf4d08f78
+    - id: Document
       name: Document
       kind: entity
       reference_mode: document_id
+      preferred_identifier: Each_DocumentId_identifies_at_most_one_Document
       definition: An incoming document submitted from a source system that undergoes PII scanning, review, redaction, and release.
       aliases:
         - doc
-    - id: a639cacc-d182-48fa-95be-602e5cbea3b7
+    - id: DocumentId
       name: DocumentId
       kind: value
       definition: System-generated UUID assigned to each document upon arrival.
       data_type:
         name: uuid
-    - id: 25d01383-d43e-41b0-904b-1f092a1e587e
+    - id: SourceSystem
       name: SourceSystem
       kind: value
       definition: Controlled code indicating which source system provided the document (customer-support, lending, health-intake, survey).
@@ -36,44 +37,44 @@ model:
       data_type:
         name: text
         length: 50
-    - id: 10e19877-8b27-4631-b91e-606299bb81c1
+    - id: ReceivedTimestamp
       name: ReceivedTimestamp
       kind: value
       definition: Timestamp when the document was received.
       data_type:
         name: datetime
-    - id: 0446b66f-7505-4a8d-8c58-f2bf7d08c652
+    - id: RawText
       name: RawText
       kind: value
       definition: The original document content as raw text, retained for audit purposes.
       data_type:
         name: text
         length: 500
-    - id: fd60ab67-7d91-4e80-9b35-96796b987960
+    - id: Finding
       name: Finding
       # TODO(barwise): Ask: How do you uniquely identify a Finding?
       kind: entity
       reference_mode: (ambiguous)
       definition: A detected PII occurrence within a specific document and scan version, identified by document + scan version + start position.
-    - id: a23b581a-5c65-4ac7-80cf-8a143be0de3d
+    - id: StartPosition
       name: StartPosition
       kind: value
       definition: Start character index of the PII occurrence in the document text.
       data_type:
         name: integer
-    - id: 3b58c9fe-79d3-4dc3-a863-93c58076eac6
+    - id: EndPosition
       name: EndPosition
       kind: value
       definition: End character index of the PII occurrence in the document text.
       data_type:
         name: integer
-    - id: b811d4e8-3c0c-4908-a489-30690abe93d6
+    - id: ScanVersion
       name: ScanVersion
       kind: value
       definition: Integer version of the scan that produced the finding.
       data_type:
         name: integer
-    - id: 55a11493-dff7-40d8-9497-54b8379cc125
+    - id: PIICategory
       name: PIICategory
       kind: value
       definition: Categorical type of PII detected in a finding (e.g., full-name, email-address, etc.).
@@ -92,7 +93,7 @@ model:
       data_type:
         name: text
         length: 50
-    - id: 03dd29c5-faaf-44a8-b218-5c9cdaeedd0d
+    - id: ConfidenceScore
       name: ConfidenceScore
       kind: value
       definition: Confidence score (0..1) assigned by the scanner to a finding.
@@ -100,7 +101,7 @@ model:
         name: decimal
         length: 3
         scale: 2
-    - id: 635fcd85-5d99-4e70-a048-e1761dacb7c2
+    - id: Reviewer
       name: Reviewer
       # TODO(barwise): Ask: How do you uniquely identify a Reviewer?
       kind: entity
@@ -108,21 +109,21 @@ model:
       definition: An employee who reviews findings in the compliance department.
       aliases:
         - reviewer_id
-    - id: 0f4c26e8-e1bb-4d2c-901b-99539a265c18
+    - id: EmployeeId
       name: EmployeeId
       kind: value
       definition: Identifier for a reviewer (employee).
       data_type:
         name: text
         length: 20
-    - id: f7601dce-24c7-4583-8b2f-ee8c44be72f2
+    - id: ReviewerName
       name: ReviewerName
       kind: value
       definition: Reviewer's full name.
       data_type:
         name: text
         length: 100
-    - id: 303938ff-9fdb-429a-b217-503987d895a4
+    - id: ClearanceLevel
       name: ClearanceLevel
       kind: value
       definition: "Reviewer clearance level: standard, elevated, or restricted."
@@ -134,13 +135,13 @@ model:
       data_type:
         name: text
         length: 20
-    - id: 0b8e87ca-853b-488e-a66f-cf492b8fee60
+    - id: ReviewDecision
       name: ReviewDecision
       # TODO(barwise): Ask: How do you uniquely identify a ReviewDecision?
       kind: entity
       reference_mode: (ambiguous)
       definition: A decision made by a reviewer on a single finding, recording the decision type, timestamp and optional note.
-    - id: 7e6fe522-f0f3-419f-8fbb-9198ec7a4ca7
+    - id: DecisionType
       name: DecisionType
       kind: value
       definition: "Type of review decision: confirm, reject, or reclassify."
@@ -152,20 +153,20 @@ model:
       data_type:
         name: text
         length: 20
-    - id: 78d0838d-2fdf-446d-8c51-206f660d09d7
+    - id: DecisionTimestamp
       name: DecisionTimestamp
       kind: value
       definition: Timestamp of the review decision.
       data_type:
         name: datetime
-    - id: ccbe994f-69dc-40f4-8deb-fd3bd9494f93
+    - id: DecisionNote
       name: DecisionNote
       kind: value
       definition: Optional note explaining the rationale for the review decision.
       data_type:
         name: text
         length: 500
-    - id: 358b3b11-b3b1-4826-baf2-ffafda571085
+    - id: DocumentStatus
       name: DocumentStatus
       kind: value
       definition: "Status of the document in its lifecycle: queued, scanned, reviewed, redacted, failed, on-hold."
@@ -180,40 +181,40 @@ model:
       data_type:
         name: text
         length: 20
-    - id: 5ce3698d-1ea3-4a17-9057-26a73021fcca
+    - id: RedactedText
       name: RedactedText
       kind: value
       definition: The document text after redaction with category-tagged tokens.
       data_type:
         name: text
         length: 1000
-    - id: 16ee349a-72f4-478c-90f5-80aaac3bb9de
+    - id: AuditEntry
       name: AuditEntry
       # TODO(barwise): Ask: How do you uniquely identify a AuditEntry?
       kind: entity
       reference_mode: audit_id
       definition: A logged action on a document capturing who performed it, when, and details.
-    - id: 24ff3aec-11a3-4b47-95ee-255925f15d53
+    - id: AuditId
       name: AuditId
       kind: value
       definition: Identifier for audit entries.
       data_type:
         name: text
         length: 36
-    - id: 05f778fe-e67c-45e9-a01d-39f081413843
+    - id: AuditTimestamp
       name: AuditTimestamp
       kind: value
       definition: Timestamp of the audit entry.
       data_type:
         name: datetime
-    - id: e27db98d-f135-47c1-af97-e95d038548e5
+    - id: AuditDetail
       name: AuditDetail
       kind: value
       definition: Optional detail text for audit entries.
       data_type:
         name: text
         length: 500
-    - id: 4ee453e1-9467-4b2b-a24a-e22c571c4a88
+    - id: ActionType
       name: ActionType
       kind: value
       definition: "Type of action recorded in audit: scan-initiated, scan-completed, review-assigned, review-completed, redaction-applied, document-released, status-changed."
@@ -229,20 +230,20 @@ model:
       data_type:
         name: text
         length: 50
-    - id: 6119d56d-1782-4da9-b14c-69e6a5835d5c
+    - id: ModelVersion
       name: ModelVersion
       kind: value
       definition: Model version string for the PII detection model that produced a scan.
       data_type:
         name: text
         length: 50
-    - id: 7a290595-e44f-4545-b019-7cd694a8f0d3
+    - id: Scan
       name: Scan
       # TODO(barwise): Ask: How do you uniquely identify a Scan?
       kind: entity
       reference_mode: scan_version
       definition: A scan operation run over a document using a model version that produces findings; scans have an integer scan version.
-    - id: 4320db47-3ada-42a6-bbad-63dbf7b8bd99
+    - id: DownstreamSystem
       name: DownstreamSystem
       kind: value
       definition: Identifier for downstream systems receiving redacted documents (analytics-warehouse, customer-portal, regulatory-filing, partner-api).
@@ -255,19 +256,19 @@ model:
       data_type:
         name: text
         length: 50
-    - id: 510a6c60-7478-4daf-a620-5b3763836371
+    - id: Release
       name: Release
       # TODO(barwise): Ask: How do you uniquely identify a Release?
       kind: entity
       reference_mode: (ambiguous)
       definition: A record that a redacted document was released to a downstream system, identified by document and downstream system.
-    - id: 4219948f-507d-487b-a871-5a26bb9b3f92
+    - id: ReleaseTimestamp
       name: ReleaseTimestamp
       kind: value
       definition: Timestamp when the document was released to a downstream system.
       data_type:
         name: datetime
-    - id: 54353e07-0aa0-4577-8a8f-05f217895b68
+    - id: RedactedContentHash
       name: RedactedContentHash
       kind: value
       definition: Hash of the redacted content used to verify integrity.
@@ -275,14 +276,14 @@ model:
         name: text
         length: 128
   fact_types:
-    - id: 61e82fd4-f446-4745-857e-26fa32a051c6
+    - id: Document_has_DocumentId
       name: Document has DocumentId
       roles:
-        - id: 119a194b-3b50-4ad7-b390-6e13a37c6bc3
-          player: 6e0d1386-6da7-495c-b47d-b06bf4d08f78
+        - id: Document_has_DocumentId.has
+          player: Document
           role_name: has
-        - id: afc7f8f7-f899-4f65-aa7a-6b87819bf94b
-          player: a639cacc-d182-48fa-95be-602e5cbea3b7
+        - id: Document_has_DocumentId.identifies
+          player: DocumentId
           role_name: identifies
       readings:
         - "{0} has {1}"
@@ -290,21 +291,26 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - 119a194b-3b50-4ad7-b390-6e13a37c6bc3
-          is_preferred: true
+            - Document_has_DocumentId.has
+          id: Each_Document_has_at_most_one_DocumentId
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"has",{"name":"Document has DocumentId","readings":["{0} has {1}","{1} identifies {0}"],"players":["Document","DocumentId"]}]],"fact_type":{"name":"Document has DocumentId","readings":["{0} has {1}","{1} identifies {0}"],"players":["Document","DocumentId"]}}'
         - type: internal_uniqueness
           roles:
-            - afc7f8f7-f899-4f65-aa7a-6b87819bf94b
+            - Document_has_DocumentId.identifies
+          id: Each_DocumentId_identifies_at_most_one_Document
+          minted_from: '{"type":"internal_uniqueness","roles":[[1,"identifies",{"name":"Document has DocumentId","readings":["{0} has {1}","{1} identifies {0}"],"players":["Document","DocumentId"]}]],"fact_type":{"name":"Document has DocumentId","readings":["{0} has {1}","{1} identifies {0}"],"players":["Document","DocumentId"]}}'
         - type: mandatory
-          role: 119a194b-3b50-4ad7-b390-6e13a37c6bc3
-    - id: 6f4506d2-87f6-47ca-9c2a-bbece6ca472b
+          role: Document_has_DocumentId.has
+          id: Each_Document_has_at_least_one_DocumentId
+          minted_from: '{"type":"mandatory","role":[0,"has",{"name":"Document has DocumentId","readings":["{0} has {1}","{1} identifies {0}"],"players":["Document","DocumentId"]}],"fact_type":{"name":"Document has DocumentId","readings":["{0} has {1}","{1} identifies {0}"],"players":["Document","DocumentId"]}}'
+    - id: Document_originatesFrom_SourceSystem
       name: Document originatesFrom SourceSystem
       roles:
-        - id: 3269382e-f3e1-4071-87e0-42967e890c8e
-          player: 6e0d1386-6da7-495c-b47d-b06bf4d08f78
+        - id: Document_originatesFrom_SourceSystem.originates_from
+          player: Document
           role_name: originates from
-        - id: 12bec64e-cbde-4e97-a609-6369bfb24b6b
-          player: 25d01383-d43e-41b0-904b-1f092a1e587e
+        - id: Document_originatesFrom_SourceSystem.is_source_system_of
+          player: SourceSystem
           role_name: is source system of
       readings:
         - "{0} originates from {1}"
@@ -316,80 +322,84 @@ model:
             - lending
             - health-intake
             - survey
-          role: 12bec64e-cbde-4e97-a609-6369bfb24b6b
-    - id: 1a8ed8ad-71e9-42f0-a289-957a1e388011
+          role: Document_originatesFrom_SourceSystem.is_source_system_of
+          id: The_possible_values_of_SourceSystem_are%3A_%7B'customer-support',_'lending',_'health-intake',_'survey'%7D
+          minted_from: '{"type":"value_constraint","values":["customer-support","lending","health-intake","survey"],"role":[1,"is source system of",{"name":"Document originatesFrom SourceSystem","readings":["{0} originates from {1}","{1} is source system of {0}"],"players":["Document","SourceSystem"]}],"fact_type":{"name":"Document originatesFrom SourceSystem","readings":["{0} originates from {1}","{1} is source system of {0}"],"players":["Document","SourceSystem"]}}'
+    - id: Document_receivedAt_ReceivedTimestamp
       name: Document receivedAt ReceivedTimestamp
       roles:
-        - id: 8251d349-c636-4d70-a888-dd7bbcfd0b75
-          player: 6e0d1386-6da7-495c-b47d-b06bf4d08f78
+        - id: Document_receivedAt_ReceivedTimestamp.was_received_at
+          player: Document
           role_name: was received at
-        - id: 90e637e5-377f-4ea4-997a-8c3de07bf8f9
-          player: 10e19877-8b27-4631-b91e-606299bb81c1
+        - id: Document_receivedAt_ReceivedTimestamp.records
+          player: ReceivedTimestamp
           role_name: records
       readings:
         - "{0} was received at {1}"
         - "{1} records {0}"
-    - id: d2cfd7c1-8bf7-4058-8a29-9410e2a2043b
+    - id: Document_has_RawText
       name: Document has RawText
       roles:
-        - id: 3dd8b8d2-1939-42fe-904b-8b0f8d80c5f8
-          player: 6e0d1386-6da7-495c-b47d-b06bf4d08f78
+        - id: Document_has_RawText.has
+          player: Document
           role_name: has
-        - id: 64d83a7e-83e6-434d-8979-1a62481b3f08
-          player: 0446b66f-7505-4a8d-8c58-f2bf7d08c652
+        - id: Document_has_RawText.is_raw_text_of
+          player: RawText
           role_name: is raw text of
       readings:
         - "{0} has {1}"
         - "{1} is raw text of {0}"
-    - id: fdb6fff5-9e0e-4545-94ba-978e650db5de
+    - id: Document_has_DocumentStatus
       name: Document has DocumentStatus
       roles:
-        - id: a9e8df02-d6ae-470c-93f0-2ef0c0bb9904
-          player: 6e0d1386-6da7-495c-b47d-b06bf4d08f78
+        - id: Document_has_DocumentStatus.has_status
+          player: Document
           role_name: has status
-        - id: f89bcfa2-0e9e-4d8d-8efb-4254c5a26dd0
-          player: 358b3b11-b3b1-4826-baf2-ffafda571085
+        - id: Document_has_DocumentStatus.is_status_of
+          player: DocumentStatus
           role_name: is status of
       readings:
         - "{0} has status {1}"
         - "{1} is status of {0}"
       constraints:
         - type: frequency
-          role: a9e8df02-d6ae-470c-93f0-2ef0c0bb9904
+          role: Document_has_DocumentStatus.has_status
           min: 1
           max: 1
-    - id: 5fa5ce9a-6bb5-43a7-8570-bb9cf271be8a
+          id: Each_Document_that_has_status_some_DocumentStatus_has_status_exactly_1_instance_of_DocumentStatus
+          minted_from: '{"type":"frequency","role":[0,"has status",{"name":"Document has DocumentStatus","readings":["{0} has status {1}","{1} is status of {0}"],"players":["Document","DocumentStatus"]}],"min":1,"max":1,"fact_type":{"name":"Document has DocumentStatus","readings":["{0} has status {1}","{1} is status of {0}"],"players":["Document","DocumentStatus"]}}'
+    - id: Document_has_Scan
       name: Document has Scan
       roles:
-        - id: d8700400-bd7d-4b27-adbb-dcb521201f64
-          player: 6e0d1386-6da7-495c-b47d-b06bf4d08f78
+        - id: Document_has_Scan.has_scan
+          player: Document
           role_name: has scan
-        - id: bd0cdc97-80a1-4d26-a31e-f54eab580065
-          player: 7a290595-e44f-4545-b019-7cd694a8f0d3
+        - id: Document_has_Scan.is_scan_of
+          player: Scan
           role_name: is scan of
       readings:
         - "{0} has scan {1}"
         - "{1} is scan of {0}"
-    - id: 95f1e779-55fb-4a67-ac62-70e5b23643ab
+    - id: Scan_produced_Finding
       name: Scan produced Finding
       roles:
-        - id: 4011e00f-9f92-45da-8d66-73a8090a90b7
-          player: 7a290595-e44f-4545-b019-7cd694a8f0d3
+        - id: Scan_produced_Finding.produced
+          player: Scan
           role_name: produced
-        - id: cc8e806d-1a26-415a-aad5-8538b31e72a3
-          player: fd60ab67-7d91-4e80-9b35-96796b987960
+        - id: Scan_produced_Finding.is_produced_by
+          player: Finding
           role_name: is produced by
       readings:
         - "{0} produced {1}"
         - "{1} is produced by {0}"
-    - id: 8f8c2a9c-7328-4e7e-bd52-2f4a0bfd3414
+    - id: Finding_has_StartPosition
       name: Finding has StartPosition
       roles:
-        - id: c1223d7f-274d-4fe8-8337-3a1bd2bb68d6
-          player: fd60ab67-7d91-4e80-9b35-96796b987960
+        - id: Finding_has_StartPosition.has_start_position
+          player: Finding
           role_name: has start position
-        - id: d4aec66c-ec27-4422-9982-c84e5f2bd98b
-          player: a23b581a-5c65-4ac7-80cf-8a143be0de3d
+        - id: Finding_has_StartPosition.is_start_position_of
+          player: StartPosition
           role_name: is start position of
       readings:
         - "{0} has start position {1}"
@@ -397,32 +407,38 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - c1223d7f-274d-4fe8-8337-3a1bd2bb68d6
+            - Finding_has_StartPosition.has_start_position
+          id: Each_Finding_has_start_position_at_most_one_StartPosition
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"has start position",{"name":"Finding has StartPosition","readings":["{0} has start position {1}","{1} is start position of {0}"],"players":["Finding","StartPosition"]}]],"fact_type":{"name":"Finding has StartPosition","readings":["{0} has start position {1}","{1} is start position of {0}"],"players":["Finding","StartPosition"]}}'
         - type: mandatory
-          role: c1223d7f-274d-4fe8-8337-3a1bd2bb68d6
-    - id: 9b9b875a-2ec0-4eb2-974d-2bdcda1a8611
+          role: Finding_has_StartPosition.has_start_position
+          id: Each_Finding_has_start_position_at_least_one_StartPosition
+          minted_from: '{"type":"mandatory","role":[0,"has start position",{"name":"Finding has StartPosition","readings":["{0} has start position {1}","{1} is start position of {0}"],"players":["Finding","StartPosition"]}],"fact_type":{"name":"Finding has StartPosition","readings":["{0} has start position {1}","{1} is start position of {0}"],"players":["Finding","StartPosition"]}}'
+    - id: Finding_has_EndPosition
       name: Finding has EndPosition
       roles:
-        - id: dc7e4dfb-a7b2-44a7-987d-3dddb30ae467
-          player: fd60ab67-7d91-4e80-9b35-96796b987960
+        - id: Finding_has_EndPosition.has_end_position
+          player: Finding
           role_name: has end position
-        - id: 3a6c1463-48d8-433a-8491-7f9a9643cffb
-          player: 3b58c9fe-79d3-4dc3-a863-93c58076eac6
+        - id: Finding_has_EndPosition.is_end_position_of
+          player: EndPosition
           role_name: is end position of
       readings:
         - "{0} has end position {1}"
         - "{1} is end position of {0}"
       constraints:
         - type: mandatory
-          role: dc7e4dfb-a7b2-44a7-987d-3dddb30ae467
-    - id: 3ceb8a9b-e70e-4293-b104-7336b9734bf2
+          role: Finding_has_EndPosition.has_end_position
+          id: Each_Finding_has_end_position_at_least_one_EndPosition
+          minted_from: '{"type":"mandatory","role":[0,"has end position",{"name":"Finding has EndPosition","readings":["{0} has end position {1}","{1} is end position of {0}"],"players":["Finding","EndPosition"]}],"fact_type":{"name":"Finding has EndPosition","readings":["{0} has end position {1}","{1} is end position of {0}"],"players":["Finding","EndPosition"]}}'
+    - id: Finding_has_PIICategory
       name: Finding has PIICategory
       roles:
-        - id: f748c4a6-bee0-423f-8cdb-24ad144cf941
-          player: fd60ab67-7d91-4e80-9b35-96796b987960
+        - id: Finding_has_PIICategory.has_category
+          player: Finding
           role_name: has category
-        - id: 83237f8a-0bd6-4596-aa10-8bdd6ea5cd49
-          player: 55a11493-dff7-40d8-9497-54b8379cc125
+        - id: Finding_has_PIICategory.is_category_of
+          player: PIICategory
           role_name: is category of
       readings:
         - "{0} has category {1}"
@@ -440,81 +456,87 @@ model:
             - ip-address
             - passport-number
             - drivers_license_number
-          role: 83237f8a-0bd6-4596-aa10-8bdd6ea5cd49
-    - id: 011246e2-46fa-4693-80a5-81f878bd70b6
+          role: Finding_has_PIICategory.is_category_of
+          id: The_possible_values_of_PIICategory_are%3A_%7B'full-name',_'email-address',_'phone-number',_'date-of-birth',_'social-security-number',_'credit-card-number',_'mailing-address',_'ip-address',_'passport-number',_'drivers_license_number'%7D
+          minted_from: '{"type":"value_constraint","values":["full-name","email-address","phone-number","date-of-birth","social-security-number","credit-card-number","mailing-address","ip-address","passport-number","drivers_license_number"],"role":[1,"is category of",{"name":"Finding has PIICategory","readings":["{0} has category {1}","{1} is category of {0}"],"players":["Finding","PIICategory"]}],"fact_type":{"name":"Finding has PIICategory","readings":["{0} has category {1}","{1} is category of {0}"],"players":["Finding","PIICategory"]}}'
+    - id: Finding_has_ConfidenceScore
       name: Finding has ConfidenceScore
       roles:
-        - id: fe51d1a5-a754-4982-be66-3a2d62795ab5
-          player: fd60ab67-7d91-4e80-9b35-96796b987960
+        - id: Finding_has_ConfidenceScore.has_confidence_score
+          player: Finding
           role_name: has confidence score
-        - id: e46485fb-18cf-46c9-8bf3-ee3fb7cae7de
-          player: 03dd29c5-faaf-44a8-b218-5c9cdaeedd0d
+        - id: Finding_has_ConfidenceScore.is_confidence_of
+          player: ConfidenceScore
           role_name: is confidence of
       readings:
         - "{0} has confidence score {1}"
         - "{1} is confidence score of {0}"
-    - id: 3c821c8f-c2bd-4570-856b-d34370b7d39c
+    - id: Finding_reviewedBy_Reviewer
       name: Finding reviewedBy Reviewer
       roles:
-        - id: 6e1ca356-dca2-495b-b099-e93004517709
-          player: fd60ab67-7d91-4e80-9b35-96796b987960
+        - id: Finding_reviewedBy_Reviewer.is_reviewed_by
+          player: Finding
           role_name: is reviewed by
-        - id: eddcac65-f607-453d-81cd-0717c3dbbf96
-          player: 635fcd85-5d99-4e70-a048-e1761dacb7c2
+        - id: Finding_reviewedBy_Reviewer.reviews
+          player: Reviewer
           role_name: reviews
       readings:
         - "{0} is reviewed by {1}"
         - "{1} reviews {0}"
       constraints:
         - type: mandatory
-          role: 6e1ca356-dca2-495b-b099-e93004517709
-    - id: 1875b69e-d864-4faa-84dd-4e60407b0c1f
+          role: Finding_reviewedBy_Reviewer.is_reviewed_by
+          id: Each_Finding_is_reviewed_by_at_least_one_Reviewer
+          minted_from: '{"type":"mandatory","role":[0,"is reviewed by",{"name":"Finding reviewedBy Reviewer","readings":["{0} is reviewed by {1}","{1} reviews {0}"],"players":["Finding","Reviewer"]}],"fact_type":{"name":"Finding reviewedBy Reviewer","readings":["{0} is reviewed by {1}","{1} reviews {0}"],"players":["Finding","Reviewer"]}}'
+    - id: ReviewDecision_isDecisionOf_Finding
       name: ReviewDecision isDecisionOf Finding
       roles:
-        - id: 7fe529e2-99ab-4aff-a899-8bc22c65b946
-          player: 0b8e87ca-853b-488e-a66f-cf492b8fee60
+        - id: ReviewDecision_isDecisionOf_Finding.is_decision_of
+          player: ReviewDecision
           role_name: is decision of
-        - id: 70da20a9-a351-4b62-aa47-2b86a8654e5e
-          player: fd60ab67-7d91-4e80-9b35-96796b987960
+        - id: ReviewDecision_isDecisionOf_Finding.has_decision_about
+          player: Finding
           role_name: has decision about
       readings:
         - "{0} is decision of {1}"
         - "{1} has decision {0}"
       constraints:
         - type: mandatory
-          role: 7fe529e2-99ab-4aff-a899-8bc22c65b946
-    - id: c27b0aa4-08fa-4990-ade6-7aa0f217a234
+          role: ReviewDecision_isDecisionOf_Finding.is_decision_of
+          id: Each_ReviewDecision_is_decision_of_at_least_one_Finding
+          minted_from: '{"type":"mandatory","role":[0,"is decision of",{"name":"ReviewDecision isDecisionOf Finding","readings":["{0} is decision of {1}","{1} has decision {0}"],"players":["ReviewDecision","Finding"]}],"fact_type":{"name":"ReviewDecision isDecisionOf Finding","readings":["{0} is decision of {1}","{1} has decision {0}"],"players":["ReviewDecision","Finding"]}}'
+    - id: Reviewer_has_EmployeeId
       name: Reviewer has EmployeeId
       roles:
-        - id: 17d1484f-1d5d-4ff0-a27a-68b66e34ced9
-          player: 635fcd85-5d99-4e70-a048-e1761dacb7c2
+        - id: Reviewer_has_EmployeeId.has_employee_id
+          player: Reviewer
           role_name: has employee id
-        - id: 5c46515f-fa45-45ac-958e-14b04a1b84ae
-          player: 0f4c26e8-e1bb-4d2c-901b-99539a265c18
+        - id: Reviewer_has_EmployeeId.identifies
+          player: EmployeeId
           role_name: identifies
       readings:
         - "{0} has {1}"
         - "{1} identifies {0}"
-    - id: 01d2fc61-0df1-4ae2-af2c-603659510383
+    - id: Reviewer_has_ReviewerName
       name: Reviewer has ReviewerName
       roles:
-        - id: f249776c-7105-4a78-84f0-588d887909df
-          player: 635fcd85-5d99-4e70-a048-e1761dacb7c2
+        - id: Reviewer_has_ReviewerName.has_name
+          player: Reviewer
           role_name: has name
-        - id: 13450a8f-a51d-4ec1-ac59-fc7155d5c594
-          player: f7601dce-24c7-4583-8b2f-ee8c44be72f2
+        - id: Reviewer_has_ReviewerName.is_name_of
+          player: ReviewerName
           role_name: is name of
       readings:
         - "{0} has name {1}"
         - "{1} is name of {0}"
-    - id: df486655-d557-4200-bf9a-465ee049b8ab
+    - id: Reviewer_has_ClearanceLevel
       name: Reviewer has ClearanceLevel
       roles:
-        - id: 91882056-cc2b-4125-9cb8-82136763a57b
-          player: 635fcd85-5d99-4e70-a048-e1761dacb7c2
+        - id: Reviewer_has_ClearanceLevel.has_clearance_level
+          player: Reviewer
           role_name: has clearance level
-        - id: d77de1f2-66f3-483e-afb7-befc60f938cd
-          player: 303938ff-9fdb-429a-b217-503987d895a4
+        - id: Reviewer_has_ClearanceLevel.is_clearance_level_of
+          player: ClearanceLevel
           role_name: is clearance level of
       readings:
         - "{0} has clearance level {1}"
@@ -525,111 +547,121 @@ model:
             - standard
             - elevated
             - restricted
-          role: d77de1f2-66f3-483e-afb7-befc60f938cd
-    - id: e77241bf-dd14-475c-a42e-c6b20308fc13
+          role: Reviewer_has_ClearanceLevel.is_clearance_level_of
+          id: The_possible_values_of_ClearanceLevel_are%3A_%7B'standard',_'elevated',_'restricted'%7D
+          minted_from: '{"type":"value_constraint","values":["standard","elevated","restricted"],"role":[1,"is clearance level of",{"name":"Reviewer has ClearanceLevel","readings":["{0} has clearance level {1}","{1} is clearance level of {0}"],"players":["Reviewer","ClearanceLevel"]}],"fact_type":{"name":"Reviewer has ClearanceLevel","readings":["{0} has clearance level {1}","{1} is clearance level of {0}"],"players":["Reviewer","ClearanceLevel"]}}'
+    - id: Document_has_RedactedText
       name: Document has RedactedText
       roles:
-        - id: c298155d-5b4c-4bd5-87b8-ad52f4922815
-          player: 6e0d1386-6da7-495c-b47d-b06bf4d08f78
+        - id: Document_has_RedactedText.has_redacted_text
+          player: Document
           role_name: has redacted text
-        - id: 91e275cd-fec8-47fe-a3fd-164537bdba86
-          player: 5ce3698d-1ea3-4a17-9057-26a73021fcca
+        - id: Document_has_RedactedText.is_redacted_text_of
+          player: RedactedText
           role_name: is redacted text of
       readings:
         - "{0} has redacted text {1}"
         - "{1} is redacted text of {0}"
       constraints:
         - type: mandatory
-          role: c298155d-5b4c-4bd5-87b8-ad52f4922815
-    - id: 72cca336-4aa4-4c09-a562-3793d481b10e
+          role: Document_has_RedactedText.has_redacted_text
+          id: Each_Document_has_redacted_text_at_least_one_RedactedText
+          minted_from: '{"type":"mandatory","role":[0,"has redacted text",{"name":"Document has RedactedText","readings":["{0} has redacted text {1}","{1} is redacted text of {0}"],"players":["Document","RedactedText"]}],"fact_type":{"name":"Document has RedactedText","readings":["{0} has redacted text {1}","{1} is redacted text of {0}"],"players":["Document","RedactedText"]}}'
+    - id: AuditEntry_about_Document
       name: AuditEntry about Document
       roles:
-        - id: 0e860657-a256-44c4-88ac-d685ae77b3d2
-          player: 16ee349a-72f4-478c-90f5-80aaac3bb9de
+        - id: AuditEntry_about_Document.is_about
+          player: AuditEntry
           role_name: is about
-        - id: 167dfacd-55c4-49f8-a858-21fb39b5c2e2
-          player: 6e0d1386-6da7-495c-b47d-b06bf4d08f78
+        - id: AuditEntry_about_Document.applies_to
+          player: Document
           role_name: applies to
       readings:
         - "{0} is about {1}"
         - "{1} has audit entry {0}"
       constraints:
         - type: mandatory
-          role: 0e860657-a256-44c4-88ac-d685ae77b3d2
-    - id: 1b422114-da9e-43f2-a2a6-08cc964a1d68
+          role: AuditEntry_about_Document.is_about
+          id: Each_AuditEntry_is_about_at_least_one_Document
+          minted_from: '{"type":"mandatory","role":[0,"is about",{"name":"AuditEntry about Document","readings":["{0} is about {1}","{1} has audit entry {0}"],"players":["AuditEntry","Document"]}],"fact_type":{"name":"AuditEntry about Document","readings":["{0} is about {1}","{1} has audit entry {0}"],"players":["AuditEntry","Document"]}}'
+    - id: AuditEntry_performedBy_Reviewer
       name: AuditEntry performedBy Reviewer
       roles:
-        - id: c07908ee-b040-4c00-95f2-b4e025477733
-          player: 16ee349a-72f4-478c-90f5-80aaac3bb9de
+        - id: AuditEntry_performedBy_Reviewer.performed_by
+          player: AuditEntry
           role_name: performed by
-        - id: 527d8963-33ff-49d8-a5f4-e90f7e76d407
-          player: 635fcd85-5d99-4e70-a048-e1761dacb7c2
+        - id: AuditEntry_performedBy_Reviewer.performed
+          player: Reviewer
           role_name: performed
       readings:
         - "{0} performed by {1}"
         - "{1} performed {0}"
-    - id: 9de47574-170c-47f3-8436-8f0b98809312
+    - id: AuditEntry_has_ActionType
       name: AuditEntry has ActionType
       roles:
-        - id: 20195386-bc81-4d72-bda2-e7f65bb89af8
-          player: 16ee349a-72f4-478c-90f5-80aaac3bb9de
+        - id: AuditEntry_has_ActionType.has_action_type
+          player: AuditEntry
           role_name: has action type
-        - id: f5206308-410a-4ecc-8cfd-ab3d1f2c26a1
-          player: 4ee453e1-9467-4b2b-a24a-e22c571c4a88
+        - id: AuditEntry_has_ActionType.is_action_type_of
+          player: ActionType
           role_name: is action type of
       readings:
         - "{0} has action type {1}"
         - "{1} is action type of {0}"
-    - id: 4e463283-7f07-4653-8f8e-779b529ad437
+    - id: Scan_has_ModelVersion
       name: Scan has ModelVersion
       roles:
-        - id: 7e085921-ae92-4721-9215-ba7d02839a56
-          player: 7a290595-e44f-4545-b019-7cd694a8f0d3
+        - id: Scan_has_ModelVersion.uses_model_version
+          player: Scan
           role_name: uses model version
-        - id: 4561d5b3-ed7d-4136-957b-0c762ea49dab
-          player: 6119d56d-1782-4da9-b14c-69e6a5835d5c
+        - id: Scan_has_ModelVersion.is_model_version_of
+          player: ModelVersion
           role_name: is model version of
       readings:
         - "{0} uses model version {1}"
         - "{1} is model version of {0}"
       constraints:
         - type: mandatory
-          role: 7e085921-ae92-4721-9215-ba7d02839a56
-    - id: 352c390f-7b67-454c-8043-2fa6729e9be6
+          role: Scan_has_ModelVersion.uses_model_version
+          id: Each_Scan_uses_model_version_at_least_one_ModelVersion
+          minted_from: '{"type":"mandatory","role":[0,"uses model version",{"name":"Scan has ModelVersion","readings":["{0} uses model version {1}","{1} is model version of {0}"],"players":["Scan","ModelVersion"]}],"fact_type":{"name":"Scan has ModelVersion","readings":["{0} uses model version {1}","{1} is model version of {0}"],"players":["Scan","ModelVersion"]}}'
+    - id: Document_releasedTo_DownstreamSystem_via_Release
       name: Document releasedTo DownstreamSystem via Release
       roles:
-        - id: ca17ffbc-772d-4614-b135-b3b0c0a4a326
-          player: 6e0d1386-6da7-495c-b47d-b06bf4d08f78
+        - id: Document_releasedTo_DownstreamSystem_via_Release.is_released_to
+          player: Document
           role_name: is released to
-        - id: 1cd4973e-5b34-4433-8050-fc9558fe3532
-          player: 4320db47-3ada-42a6-bbad-63dbf7b8bd99
+        - id: Document_releasedTo_DownstreamSystem_via_Release.receives
+          player: DownstreamSystem
           role_name: receives
       readings:
         - "{0} is released to {1}"
         - "{1} receives {0}"
-    - id: fe6bbe65-c747-42d7-8d6c-2249171d05a5
+    - id: Release_has_ReleaseTimestamp
       name: Release has ReleaseTimestamp
       roles:
-        - id: 0322e5d6-f77f-403d-9cdc-1fed0fa3283d
-          player: 510a6c60-7478-4daf-a620-5b3763836371
+        - id: Release_has_ReleaseTimestamp.has_timestamp
+          player: Release
           role_name: has timestamp
-        - id: 2f7c31a9-e1e0-4706-991d-fc21199a708b
-          player: 4219948f-507d-487b-a871-5a26bb9b3f92
+        - id: Release_has_ReleaseTimestamp.is_timestamp_of
+          player: ReleaseTimestamp
           role_name: is timestamp of
       readings:
         - "{0} has timestamp {1}"
         - "{1} is timestamp of {0}"
       constraints:
         - type: mandatory
-          role: 0322e5d6-f77f-403d-9cdc-1fed0fa3283d
-    - id: e7ef19dd-4d76-4d8f-8dc1-6185ee97711f
+          role: Release_has_ReleaseTimestamp.has_timestamp
+          id: Each_Release_has_timestamp_at_least_one_ReleaseTimestamp
+          minted_from: '{"type":"mandatory","role":[0,"has timestamp",{"name":"Release has ReleaseTimestamp","readings":["{0} has timestamp {1}","{1} is timestamp of {0}"],"players":["Release","ReleaseTimestamp"]}],"fact_type":{"name":"Release has ReleaseTimestamp","readings":["{0} has timestamp {1}","{1} is timestamp of {0}"],"players":["Release","ReleaseTimestamp"]}}'
+    - id: Release_has_RedactedContentHash
       name: Release has RedactedContentHash
       roles:
-        - id: 4fef177c-c763-4a02-a3f1-d0385a0d80c8
-          player: 510a6c60-7478-4daf-a620-5b3763836371
+        - id: Release_has_RedactedContentHash.has_content_hash
+          player: Release
           role_name: has content hash
-        - id: a02adbfe-5dfd-490d-b61c-2b473e16f2ab
-          player: 54353e07-0aa0-4577-8a8f-05f217895b68
+        - id: Release_has_RedactedContentHash.is_content_hash_of
+          player: RedactedContentHash
           role_name: is content hash of
       readings:
         - "{0} has content hash {1}"
@@ -637,8 +669,11 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - 4fef177c-c763-4a02-a3f1-d0385a0d80c8
+            - Release_has_RedactedContentHash.has_content_hash
+          id: Each_Release_has_content_hash_at_most_one_RedactedContentHash
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"has content hash",{"name":"Release has RedactedContentHash","readings":["{0} has content hash {1}","{1} is content hash of {0}"],"players":["Release","RedactedContentHash"]}]],"fact_type":{"name":"Release has RedactedContentHash","readings":["{0} has content hash {1}","{1} is content hash of {0}"],"players":["Release","RedactedContentHash"]}}'
   objectified_fact_types:
-    - id: 23cb1008-c2a4-4067-b9d8-c83421e67fcd
-      fact_type: 352c390f-7b67-454c-8043-2fa6729e9be6
-      object_type: 510a6c60-7478-4daf-a620-5b3763836371
+    - id: Release_is_where_Document_is_released_to_DownstreamSystem
+      minted_from: '{"fact_type":{"name":"Document releasedTo DownstreamSystem via Release","readings":["{0} is released to {1}","{1} receives {0}"],"players":["Document","DownstreamSystem"]},"object_type":"Release"}'
+      fact_type: Document_releasedTo_DownstreamSystem_via_Release
+      object_type: Release

@@ -1146,8 +1146,10 @@ describe("NORMA export of a file that omits constraint ids", () => {
   });
 
   it("writes the same document on every export", () => {
+    // A 2.0 file that omits its constraint ids: the example is 4.0 now
+    // and states them all, so the frozen 2.0 copy core's tests keep.
     const shop = readFileSync(
-      resolve(here, "../../../examples/getting-started/shop.orm.yaml"),
+      resolve(here, "../../core/tests/fixtures/shop-2.0.orm.yaml"),
       "utf-8",
     );
     const first = exportXml(new OrmYamlSerializer().deserialize(shop));

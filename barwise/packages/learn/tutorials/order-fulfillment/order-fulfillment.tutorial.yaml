@@ -90,7 +90,7 @@ steps:
     model: "models/step-03.orm.yaml"
     motivation:
       kind: "counterexample"
-      constraintId: "c-uc-places-order"
+      constraintId: "Each_Order_is_placed_by_at_most_one_Customer"
     concept: >
       A *uniqueness constraint* over a role says: in the population,
       each instance plays that role at most once. Spanning just the
@@ -113,7 +113,7 @@ steps:
     model: "models/step-04.orm.yaml"
     motivation:
       kind: "counterexample"
-      constraintId: "c-uc-includes"
+      constraintId: "Each_combination_of_Order_and_Product_is_unique_in_Order_includes_Product"
     concept: >
       "Order includes Product" is genuinely many-to-many: an order
       holds many products, a product appears in many orders. It is
@@ -134,7 +134,7 @@ steps:
     model: "models/step-05.orm.yaml"
     motivation:
       kind: "counterexample"
-      constraintId: "c-mand-places-order"
+      constraintId: "Each_Order_is_placed_by_at_least_one_Customer"
     concept: >
       Uniqueness says "at most"; *mandatory* says "at least". Without
       it, an order can exist in the model -- appear in "Order includes
@@ -156,7 +156,7 @@ steps:
     model: "models/step-06.orm.yaml"
     motivation:
       kind: "counterexample"
-      constraintId: "c-val-status"
+      constraintId: "The_possible_values_of_OrderStatus_are%3A_%7B'open',_'shipped',_'cancelled'%7D"
     concept: >
       OrderStatus is a *value type*: its instances are the values
       themselves, so the type is constrained by listing them. A *value
@@ -203,7 +203,7 @@ steps:
     model: "models/step-08.orm.yaml"
     motivation:
       kind: "counterexample"
-      constraintId: "c-freq-includes"
+      constraintId: "Each_Order_that_includes_some_Product_includes_at_least_1_and_at_most_5_instances_of_Product"
     concept: >
       The warehouse packs at most five distinct products per order;
       bigger requests are split. Uniqueness cannot say this -- it only

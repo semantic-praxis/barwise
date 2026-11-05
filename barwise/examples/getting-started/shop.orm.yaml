@@ -1,111 +1,140 @@
-orm_version: "2.0"
+orm_version: "4.0"
 model:
   name: Shop
   domain_context: shop
   object_types:
-    - id: customer
+    - id: Customer
       name: Customer
       kind: entity
       reference_mode: customer_number
+      preferred_identifier: Each_CustomerNumber_is_of_at_most_one_Customer
       definition: A person or organization that buys from the shop.
-    - id: customer-number
+    - id: CustomerNumber
       name: CustomerNumber
       kind: value
       definition: The number the shop assigns to a customer when they first order.
       data_type:
         name: integer
-    - id: sales-order
+    - id: SalesOrder
       name: SalesOrder
       kind: entity
       reference_mode: order_number
+      preferred_identifier: Each_OrderNumber_is_of_at_most_one_SalesOrder
       definition: A request by one customer for goods, from checkout to delivery.
-    - id: order-number
+    - id: OrderNumber
       name: OrderNumber
       kind: value
       definition: The number printed on the order confirmation.
       data_type:
         name: integer
-    - id: order-status
+    - id: OrderStatus
       name: OrderStatus
       kind: value
       definition: Where an order is in fulfillment.
+      value_constraint:
+        values:
+          - pending
+          - shipped
+          - delivered
       data_type:
         name: text
         length: 10
-      value_constraint:
-        values: [pending, shipped, delivered]
   fact_types:
-    - id: customer-has-number
+    - id: Customer_has_CustomerNumber
       name: Customer has CustomerNumber
       roles:
-        - id: customer-has-number.customer
-          player: customer
+        - id: Customer_has_CustomerNumber.has
+          player: Customer
           role_name: has
-        - id: customer-has-number.number
-          player: customer-number
+        - id: Customer_has_CustomerNumber.is_of
+          player: CustomerNumber
           role_name: is of
       readings:
         - "{0} has {1}"
         - "{1} is of {0}"
       constraints:
         - type: internal_uniqueness
-          roles: [customer-has-number.number]
-          is_preferred: true
+          roles:
+            - Customer_has_CustomerNumber.is_of
+          id: Each_CustomerNumber_is_of_at_most_one_Customer
+          minted_from: '{"type":"internal_uniqueness","roles":[[1,"is of",{"name":"Customer has CustomerNumber","readings":["{0} has {1}","{1} is of {0}"],"players":["Customer","CustomerNumber"]}]],"fact_type":{"name":"Customer has CustomerNumber","readings":["{0} has {1}","{1} is of {0}"],"players":["Customer","CustomerNumber"]}}'
         - type: internal_uniqueness
-          roles: [customer-has-number.customer]
+          roles:
+            - Customer_has_CustomerNumber.has
+          id: Each_Customer_has_at_most_one_CustomerNumber
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"has",{"name":"Customer has CustomerNumber","readings":["{0} has {1}","{1} is of {0}"],"players":["Customer","CustomerNumber"]}]],"fact_type":{"name":"Customer has CustomerNumber","readings":["{0} has {1}","{1} is of {0}"],"players":["Customer","CustomerNumber"]}}'
         - type: mandatory
-          role: customer-has-number.customer
-    - id: order-has-number
+          role: Customer_has_CustomerNumber.has
+          id: Each_Customer_has_at_least_one_CustomerNumber
+          minted_from: '{"type":"mandatory","role":[0,"has",{"name":"Customer has CustomerNumber","readings":["{0} has {1}","{1} is of {0}"],"players":["Customer","CustomerNumber"]}],"fact_type":{"name":"Customer has CustomerNumber","readings":["{0} has {1}","{1} is of {0}"],"players":["Customer","CustomerNumber"]}}'
+    - id: SalesOrder_has_OrderNumber
       name: SalesOrder has OrderNumber
       roles:
-        - id: order-has-number.order
-          player: sales-order
+        - id: SalesOrder_has_OrderNumber.has
+          player: SalesOrder
           role_name: has
-        - id: order-has-number.number
-          player: order-number
+        - id: SalesOrder_has_OrderNumber.is_of
+          player: OrderNumber
           role_name: is of
       readings:
         - "{0} has {1}"
         - "{1} is of {0}"
       constraints:
         - type: internal_uniqueness
-          roles: [order-has-number.number]
-          is_preferred: true
+          roles:
+            - SalesOrder_has_OrderNumber.is_of
+          id: Each_OrderNumber_is_of_at_most_one_SalesOrder
+          minted_from: '{"type":"internal_uniqueness","roles":[[1,"is of",{"name":"SalesOrder has OrderNumber","readings":["{0} has {1}","{1} is of {0}"],"players":["SalesOrder","OrderNumber"]}]],"fact_type":{"name":"SalesOrder has OrderNumber","readings":["{0} has {1}","{1} is of {0}"],"players":["SalesOrder","OrderNumber"]}}'
         - type: internal_uniqueness
-          roles: [order-has-number.order]
+          roles:
+            - SalesOrder_has_OrderNumber.has
+          id: Each_SalesOrder_has_at_most_one_OrderNumber
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"has",{"name":"SalesOrder has OrderNumber","readings":["{0} has {1}","{1} is of {0}"],"players":["SalesOrder","OrderNumber"]}]],"fact_type":{"name":"SalesOrder has OrderNumber","readings":["{0} has {1}","{1} is of {0}"],"players":["SalesOrder","OrderNumber"]}}'
         - type: mandatory
-          role: order-has-number.order
-    - id: customer-places-order
+          role: SalesOrder_has_OrderNumber.has
+          id: Each_SalesOrder_has_at_least_one_OrderNumber
+          minted_from: '{"type":"mandatory","role":[0,"has",{"name":"SalesOrder has OrderNumber","readings":["{0} has {1}","{1} is of {0}"],"players":["SalesOrder","OrderNumber"]}],"fact_type":{"name":"SalesOrder has OrderNumber","readings":["{0} has {1}","{1} is of {0}"],"players":["SalesOrder","OrderNumber"]}}'
+    - id: Customer_places_SalesOrder
       name: Customer places SalesOrder
       roles:
-        - id: customer-places-order.customer
-          player: customer
+        - id: Customer_places_SalesOrder.places
+          player: Customer
           role_name: places
-        - id: customer-places-order.order
-          player: sales-order
+        - id: Customer_places_SalesOrder.is_placed_by
+          player: SalesOrder
           role_name: is placed by
       readings:
         - "{0} places {1}"
         - "{1} is placed by {0}"
       constraints:
         - type: internal_uniqueness
-          roles: [customer-places-order.order]
+          roles:
+            - Customer_places_SalesOrder.is_placed_by
+          id: Each_SalesOrder_is_placed_by_at_most_one_Customer
+          minted_from: '{"type":"internal_uniqueness","roles":[[1,"is placed by",{"name":"Customer places SalesOrder","readings":["{0} places {1}","{1} is placed by {0}"],"players":["Customer","SalesOrder"]}]],"fact_type":{"name":"Customer places SalesOrder","readings":["{0} places {1}","{1} is placed by {0}"],"players":["Customer","SalesOrder"]}}'
         - type: mandatory
-          role: customer-places-order.order
-    - id: order-has-status
+          role: Customer_places_SalesOrder.is_placed_by
+          id: Each_SalesOrder_is_placed_by_at_least_one_Customer
+          minted_from: '{"type":"mandatory","role":[1,"is placed by",{"name":"Customer places SalesOrder","readings":["{0} places {1}","{1} is placed by {0}"],"players":["Customer","SalesOrder"]}],"fact_type":{"name":"Customer places SalesOrder","readings":["{0} places {1}","{1} is placed by {0}"],"players":["Customer","SalesOrder"]}}'
+    - id: SalesOrder_has_OrderStatus
       name: SalesOrder has OrderStatus
       roles:
-        - id: order-has-status.order
-          player: sales-order
+        - id: SalesOrder_has_OrderStatus.has
+          player: SalesOrder
           role_name: has
-        - id: order-has-status.status
-          player: order-status
+        - id: SalesOrder_has_OrderStatus.is_of
+          player: OrderStatus
           role_name: is of
       readings:
         - "{0} has {1}"
         - "{1} is of {0}"
       constraints:
         - type: internal_uniqueness
-          roles: [order-has-status.order]
+          roles:
+            - SalesOrder_has_OrderStatus.has
+          id: Each_SalesOrder_has_at_most_one_OrderStatus
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"has",{"name":"SalesOrder has OrderStatus","readings":["{0} has {1}","{1} is of {0}"],"players":["SalesOrder","OrderStatus"]}]],"fact_type":{"name":"SalesOrder has OrderStatus","readings":["{0} has {1}","{1} is of {0}"],"players":["SalesOrder","OrderStatus"]}}'
         - type: mandatory
-          role: order-has-status.order
+          role: SalesOrder_has_OrderStatus.has
+          id: Each_SalesOrder_has_at_least_one_OrderStatus
+          minted_from: '{"type":"mandatory","role":[0,"has",{"name":"SalesOrder has OrderStatus","readings":["{0} has {1}","{1} is of {0}"],"players":["SalesOrder","OrderStatus"]}],"fact_type":{"name":"SalesOrder has OrderStatus","readings":["{0} has {1}","{1} is of {0}"],"players":["SalesOrder","OrderStatus"]}}'

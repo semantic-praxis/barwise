@@ -1,207 +1,215 @@
-orm_version: "1.0"
+orm_version: "4.0"
 model:
   name: catalog
   domain_context: catalog
+  imports:
+    auctions: auctions
+    parties: parties
   object_types:
-    - id: 90fee62d-e7fd-4a2d-8584-3de4e9f989c7
+    - id: Asset
       name: Asset
       kind: entity
       reference_mode: id
-    - id: 14df0c2c-67f6-4f72-8289-80d53c6a3bda
+      preferred_identifier: For_each_Asset_id,_at_most_one_Asset_has_that_Asset_id
+    - id: ConsignmentAsset
       name: ConsignmentAsset
       kind: entity
       reference_mode: id
-    - id: 82e3736b-6edc-416b-a84c-8555a83821aa
+      preferred_identifier: For_each_ConsignmentAsset_id,_at_most_one_ConsignmentAsset_has_that_ConsignmentAsset_id
+    - id: Service
       name: Service
       kind: entity
       reference_mode: id
-    - id: d4854fd5-78ee-47f9-8d16-b87451da8ba3
+      preferred_identifier: For_each_Service_id,_at_most_one_Service_has_that_Service_id
+    - id: SimpleItem
       name: SimpleItem
       kind: entity
       reference_mode: simple_item_id
-    - id: 1acacb95-49ec-4ef8-b74e-80189d45cf6e
+    - id: GroupItem
       name: GroupItem
       kind: entity
       reference_mode: group_item_id
-    - id: 00ca8f65-b08a-46ea-8bfd-581029549392
+    - id: Inspection
       name: Inspection
       kind: entity
       reference_mode: inspection_id
-    - id: e5bc8da8-6436-447c-8345-37be3854772c
+    - id: RefurbishmentAndRepair
       name: RefurbishmentAndRepair
       kind: entity
       reference_mode: refurbishment_and_repair_id
-    - id: 8f685150-b875-426b-951f-6ed7a3815116
+    - id: Transportation
       name: Transportation
       kind: entity
       reference_mode: transportation_id
-    - id: f73d7bce-6558-45ec-99bb-091a2a8b4d66
+    - id: LienSearch
       name: LienSearch
       kind: entity
       reference_mode: lien_search_id
-    - id: 54ba2f24-05ea-4993-b227-05f2346600fd
+    - id: TitleTransfer
       name: TitleTransfer
       kind: entity
       reference_mode: title_transfer_id
-    - id: 10be50fd-ffe9-4bb1-b9f3-2dba0114cf07
+    - id: Consignment
       name: Consignment
       kind: entity
       reference_mode: consignment_id
-    - id: 625204de-6b43-49c5-9734-558102935e03
+    - id: Classification
       name: Classification
       kind: entity
       reference_mode: id
-    - id: 36477f7a-7044-406e-a23e-3e65de48d004
+      preferred_identifier: For_each_Classification_id,_at_most_one_Classification_has_that_Classification_id
+    - id: InspectionReport
       name: InspectionReport
       kind: entity
       reference_mode: id
-    - id: 96927b24-c7fb-4f10-8e86-c2464e55a0f9
+      preferred_identifier: For_each_InspectionReport_id,_at_most_one_InspectionReport_has_that_InspectionReport_id
+    - id: Checklist
       name: Checklist
       kind: entity
       reference_mode: id
-    - id: ea149990-c328-4451-a1a7-cc3f15c051a9
+      preferred_identifier: For_each_Checklist_id,_at_most_one_Checklist_has_that_Checklist_id
+    - id: Industry
       name: Industry
       kind: entity
       reference_mode: name
-    - id: 34409e9e-b4dd-4279-b3bd-29bf36de3f1d
+      preferred_identifier: For_each_Industry_name,_at_most_one_Industry_has_that_Industry_name
+    - id: Category
       name: Category
       kind: entity
       reference_mode: name
-    - id: 07c143de-6eb3-47c1-984d-ca4880fef8ef
+      preferred_identifier: For_each_Category_name,_at_most_one_Category_has_that_Category_name
+    - id: Make
       name: Make
       kind: entity
       reference_mode: id
-    - id: d704fb1c-3597-489d-937a-2f3a6ba7a149
+      preferred_identifier: For_each_Make_id,_at_most_one_Make_has_that_Make_id
+    - id: Model
       name: Model
       kind: entity
       reference_mode: model_id
-    - id: bdd9d288-a842-4456-abe6-fe680f2e02c2
+    - id: AssetType
       name: AssetType
       kind: entity
       reference_mode: id
-    - id: e97b74a4-5b32-444d-a19c-3c812691dc1f
+      preferred_identifier: For_each_AssetType_id,_at_most_one_AssetType_has_that_AssetType_id
+    - id: Asset_id
       name: Asset_id
       kind: value
       data_type:
         name: auto_counter
         length: 0
         scale: 0
-    - id: 43e425f0-6aaa-4a73-885c-e127b32c8225
+    - id: ConsignmentAsset_id
       name: ConsignmentAsset_id
       kind: value
       data_type:
         name: auto_counter
         length: 0
         scale: 0
-    - id: 1b3c51de-6ce6-4406-beb9-23c6a73bb39f
+    - id: Service_id
       name: Service_id
       kind: value
       data_type:
         name: auto_counter
         length: 0
         scale: 0
-    - id: daf1d061-9e51-4018-8218-0eb84bf8ece7
+    - id: Classification_id
       name: Classification_id
       kind: value
       data_type:
         name: auto_counter
         length: 0
         scale: 0
-    - id: 44f2b166-2c52-4656-9043-0071d13cbfe7
+    - id: InspectionReport_id
       name: InspectionReport_id
       kind: value
       data_type:
         name: auto_counter
         length: 0
         scale: 0
-    - id: 20081566-15dc-4263-82f1-d409f6f3723c
+    - id: Checklist_id
       name: Checklist_id
       kind: value
       data_type:
         name: auto_counter
         length: 0
         scale: 0
-    - id: 889e5825-2024-49fb-9514-9f3d9d99a85f
+    - id: Industry_name
       name: Industry_name
       kind: value
       data_type:
         name: text
         length: 0
         scale: 0
-    - id: ff1fcd02-a864-463d-98b4-8c4e30ce03f5
+    - id: Category_name
       name: Category_name
       kind: value
       data_type:
         name: text
         length: 0
         scale: 0
-    - id: 30e61f85-06a1-4e55-adde-36c3fe3fdc98
+    - id: Make_id
       name: Make_id
       kind: value
       data_type:
         name: auto_counter
         length: 0
         scale: 0
-    - id: ac5baa4b-f391-4983-8878-64e0f1eb6f26
+    - id: Model_id
       name: Model_id
       kind: value
       data_type:
         name: text
         length: 0
         scale: 0
-    - id: ae46e11a-39d0-4c6c-959b-28831c64c7fb
+    - id: AssetType_id
       name: AssetType_id
       kind: value
       data_type:
         name: auto_counter
         length: 0
         scale: 0
-    - id: fc5ff711-69ca-4afe-af08-7f5c890d8e1f
+    - id: OfferingSelectedForAssetCreatesConsignmentAsset
       name: OfferingSelectedForAssetCreatesConsignmentAsset
       kind: entity
       reference_mode: offering_selected_for_asset_creates_consignment_asset_id
-    - id: ea46d508-e12a-4acc-85f1-21ae6dd687f1
+      preferred_identifier: For_each_Asset_and_Offering_combination,_at_most_one_ConsignmentAsset_applies
+    - id: auctions:Offering
       name: Offering
       kind: entity
       reference_mode: id
-      source_context: auctions
-    - id: 2a13df2b-ec46-4007-aa49-a23f73bf6563
+    - id: auctions:Channel
       name: Channel
       kind: entity
       reference_mode: id
-      source_context: auctions
-    - id: 39a503b7-4caa-4c25-9eea-d9817bf69a30
+    - id: auctions:Auction
       name: Auction
       kind: entity
       reference_mode: id
-      source_context: auctions
-    - id: d38e013f-2e99-4869-8876-2a5537b86b22
+    - id: parties:Location
       name: Location
       kind: entity
       reference_mode: id
-      source_context: parties
-    - id: b8ee656e-f276-4cdc-ba57-11a8a6fac7c9
+    - id: auctions:Listing
       name: Listing
       kind: entity
       reference_mode: id
-      source_context: auctions
-    - id: d94005c2-028a-49e9-98e8-a58e28f18aec
+    - id: auctions:Price
       name: Price
       kind: value
       data_type:
         name: money
         length: 0
         scale: 0
-      source_context: auctions
   fact_types:
-    - id: d278a8a8-965f-4ec9-90fb-1e9962b39544
+    - id: AssetHasAssetId
       name: AssetHasAssetId
       roles:
-        - id: _46E6C298-904C-4262-BB47-DA3D59D54739
-          player: 90fee62d-e7fd-4a2d-8584-3de4e9f989c7
+        - id: AssetHasAssetId._46E6C298-904C-4262-BB47-DA3D59D54739
+          player: Asset
           role_name: _46E6C298-904C-4262-BB47-DA3D59D54739
-        - id: _8E403161-FBDA-46FA-A148-A789E2D08B9F
-          player: e97b74a4-5b32-444d-a19c-3c812691dc1f
+        - id: AssetHasAssetId._8E403161-FBDA-46FA-A148-A789E2D08B9F
+          player: Asset_id
           role_name: _8E403161-FBDA-46FA-A148-A789E2D08B9F
       readings:
         - "{0} has {1}"
@@ -209,24 +217,26 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - _8E403161-FBDA-46FA-A148-A789E2D08B9F
-          is_preferred: true
-          id: bf62c27f-9eb1-467b-a3f4-ad0ae41b1098
+            - AssetHasAssetId._8E403161-FBDA-46FA-A148-A789E2D08B9F
+          id: For_each_Asset_id,_at_most_one_Asset_has_that_Asset_id
+          minted_from: '{"type":"internal_uniqueness","roles":[[1,"_8E403161-FBDA-46FA-A148-A789E2D08B9F",{"name":"AssetHasAssetId","readings":["{0} has {1}","{0} is of {1}"],"players":["Asset","Asset_id"]}]],"fact_type":{"name":"AssetHasAssetId","readings":["{0} has {1}","{0} is of {1}"],"players":["Asset","Asset_id"]}}'
         - type: internal_uniqueness
           roles:
-            - _46E6C298-904C-4262-BB47-DA3D59D54739
-          id: 901fe62e-521b-47eb-91d6-626c199cbb6a
+            - AssetHasAssetId._46E6C298-904C-4262-BB47-DA3D59D54739
+          id: Each_Asset_has_at_most_one_Asset_id
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"_46E6C298-904C-4262-BB47-DA3D59D54739",{"name":"AssetHasAssetId","readings":["{0} has {1}","{0} is of {1}"],"players":["Asset","Asset_id"]}]],"fact_type":{"name":"AssetHasAssetId","readings":["{0} has {1}","{0} is of {1}"],"players":["Asset","Asset_id"]}}'
         - type: mandatory
-          role: _46E6C298-904C-4262-BB47-DA3D59D54739
-          id: 17a3c5fc-4c4e-47c2-90a8-8062ade7378e
-    - id: 97c945f1-2de5-49f1-b0f0-7896611ade5e
+          role: AssetHasAssetId._46E6C298-904C-4262-BB47-DA3D59D54739
+          id: Each_Asset_has_at_least_one_Asset_id
+          minted_from: '{"type":"mandatory","role":[0,"_46E6C298-904C-4262-BB47-DA3D59D54739",{"name":"AssetHasAssetId","readings":["{0} has {1}","{0} is of {1}"],"players":["Asset","Asset_id"]}],"fact_type":{"name":"AssetHasAssetId","readings":["{0} has {1}","{0} is of {1}"],"players":["Asset","Asset_id"]}}'
+    - id: ConsignmentAssetHasConsignmentAssetId
       name: ConsignmentAssetHasConsignmentAssetId
       roles:
-        - id: _B1810FE5-125F-416A-8ED5-2966DAE19351
-          player: 14df0c2c-67f6-4f72-8289-80d53c6a3bda
+        - id: ConsignmentAssetHasConsignmentAssetId._B1810FE5-125F-416A-8ED5-2966DAE19351
+          player: ConsignmentAsset
           role_name: _B1810FE5-125F-416A-8ED5-2966DAE19351
-        - id: _85D105A4-7BD1-4522-A2B9-395C37C11EDE
-          player: 43e425f0-6aaa-4a73-885c-e127b32c8225
+        - id: ConsignmentAssetHasConsignmentAssetId._85D105A4-7BD1-4522-A2B9-395C37C11EDE
+          player: ConsignmentAsset_id
           role_name: _85D105A4-7BD1-4522-A2B9-395C37C11EDE
       readings:
         - "{0} has {1}"
@@ -234,24 +244,26 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - _85D105A4-7BD1-4522-A2B9-395C37C11EDE
-          is_preferred: true
-          id: 1ed1f82c-1f92-4c93-9d5d-3c82b218499f
+            - ConsignmentAssetHasConsignmentAssetId._85D105A4-7BD1-4522-A2B9-395C37C11EDE
+          id: For_each_ConsignmentAsset_id,_at_most_one_ConsignmentAsset_has_that_ConsignmentAsset_id
+          minted_from: '{"type":"internal_uniqueness","roles":[[1,"_85D105A4-7BD1-4522-A2B9-395C37C11EDE",{"name":"ConsignmentAssetHasConsignmentAssetId","readings":["{0} has {1}","{0} is of {1}"],"players":["ConsignmentAsset","ConsignmentAsset_id"]}]],"fact_type":{"name":"ConsignmentAssetHasConsignmentAssetId","readings":["{0} has {1}","{0} is of {1}"],"players":["ConsignmentAsset","ConsignmentAsset_id"]}}'
         - type: internal_uniqueness
           roles:
-            - _B1810FE5-125F-416A-8ED5-2966DAE19351
-          id: b4271afd-02ea-4f56-9266-29df6b2f7297
+            - ConsignmentAssetHasConsignmentAssetId._B1810FE5-125F-416A-8ED5-2966DAE19351
+          id: Each_ConsignmentAsset_has_at_most_one_ConsignmentAsset_id
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"_B1810FE5-125F-416A-8ED5-2966DAE19351",{"name":"ConsignmentAssetHasConsignmentAssetId","readings":["{0} has {1}","{0} is of {1}"],"players":["ConsignmentAsset","ConsignmentAsset_id"]}]],"fact_type":{"name":"ConsignmentAssetHasConsignmentAssetId","readings":["{0} has {1}","{0} is of {1}"],"players":["ConsignmentAsset","ConsignmentAsset_id"]}}'
         - type: mandatory
-          role: _B1810FE5-125F-416A-8ED5-2966DAE19351
-          id: 6ef77bdb-5cbf-4db7-affd-8c7eb85bfbc1
-    - id: da7d065c-f758-494e-83c5-03c5351ff21e
+          role: ConsignmentAssetHasConsignmentAssetId._B1810FE5-125F-416A-8ED5-2966DAE19351
+          id: Each_ConsignmentAsset_has_at_least_one_ConsignmentAsset_id
+          minted_from: '{"type":"mandatory","role":[0,"_B1810FE5-125F-416A-8ED5-2966DAE19351",{"name":"ConsignmentAssetHasConsignmentAssetId","readings":["{0} has {1}","{0} is of {1}"],"players":["ConsignmentAsset","ConsignmentAsset_id"]}],"fact_type":{"name":"ConsignmentAssetHasConsignmentAssetId","readings":["{0} has {1}","{0} is of {1}"],"players":["ConsignmentAsset","ConsignmentAsset_id"]}}'
+    - id: ServiceHasServiceId
       name: ServiceHasServiceId
       roles:
-        - id: _1929E031-35AF-4B33-BEC0-35324C3AA5CE
-          player: 82e3736b-6edc-416b-a84c-8555a83821aa
+        - id: ServiceHasServiceId._1929E031-35AF-4B33-BEC0-35324C3AA5CE
+          player: Service
           role_name: _1929E031-35AF-4B33-BEC0-35324C3AA5CE
-        - id: _F308B23A-EB06-4E4C-84D7-461BA9A1E1D9
-          player: 1b3c51de-6ce6-4406-beb9-23c6a73bb39f
+        - id: ServiceHasServiceId._F308B23A-EB06-4E4C-84D7-461BA9A1E1D9
+          player: Service_id
           role_name: _F308B23A-EB06-4E4C-84D7-461BA9A1E1D9
       readings:
         - "{0} has {1}"
@@ -259,24 +271,26 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - _F308B23A-EB06-4E4C-84D7-461BA9A1E1D9
-          is_preferred: true
-          id: 79e82654-b8e5-4264-b78c-98412fc5fa98
+            - ServiceHasServiceId._F308B23A-EB06-4E4C-84D7-461BA9A1E1D9
+          id: For_each_Service_id,_at_most_one_Service_has_that_Service_id
+          minted_from: '{"type":"internal_uniqueness","roles":[[1,"_F308B23A-EB06-4E4C-84D7-461BA9A1E1D9",{"name":"ServiceHasServiceId","readings":["{0} has {1}","{0} is of {1}"],"players":["Service","Service_id"]}]],"fact_type":{"name":"ServiceHasServiceId","readings":["{0} has {1}","{0} is of {1}"],"players":["Service","Service_id"]}}'
         - type: internal_uniqueness
           roles:
-            - _1929E031-35AF-4B33-BEC0-35324C3AA5CE
-          id: bec70eda-902e-415c-bb17-4561a0cb49c3
+            - ServiceHasServiceId._1929E031-35AF-4B33-BEC0-35324C3AA5CE
+          id: Each_Service_has_at_most_one_Service_id
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"_1929E031-35AF-4B33-BEC0-35324C3AA5CE",{"name":"ServiceHasServiceId","readings":["{0} has {1}","{0} is of {1}"],"players":["Service","Service_id"]}]],"fact_type":{"name":"ServiceHasServiceId","readings":["{0} has {1}","{0} is of {1}"],"players":["Service","Service_id"]}}'
         - type: mandatory
-          role: _1929E031-35AF-4B33-BEC0-35324C3AA5CE
-          id: 93878400-fd0d-4cf6-b0b7-561abc3f4ee1
-    - id: 037b1533-06e0-4790-81c9-c507d67e738a
+          role: ServiceHasServiceId._1929E031-35AF-4B33-BEC0-35324C3AA5CE
+          id: Each_Service_has_at_least_one_Service_id
+          minted_from: '{"type":"mandatory","role":[0,"_1929E031-35AF-4B33-BEC0-35324C3AA5CE",{"name":"ServiceHasServiceId","readings":["{0} has {1}","{0} is of {1}"],"players":["Service","Service_id"]}],"fact_type":{"name":"ServiceHasServiceId","readings":["{0} has {1}","{0} is of {1}"],"players":["Service","Service_id"]}}'
+    - id: GroupItemHasChildSimpleItem
       name: GroupItemHasChildSimpleItem
       roles:
-        - id: _18FCFF20-C048-4978-AD92-F79E7A52850B
-          player: 1acacb95-49ec-4ef8-b74e-80189d45cf6e
+        - id: GroupItemHasChildSimpleItem._18FCFF20-C048-4978-AD92-F79E7A52850B
+          player: GroupItem
           role_name: _18FCFF20-C048-4978-AD92-F79E7A52850B
-        - id: _A0622BC8-2175-48C7-8CCD-5E43F6553474
-          player: d4854fd5-78ee-47f9-8d16-b87451da8ba3
+        - id: GroupItemHasChildSimpleItem._A0622BC8-2175-48C7-8CCD-5E43F6553474
+          player: SimpleItem
           role_name: _A0622BC8-2175-48C7-8CCD-5E43F6553474
       readings:
         - "{0} has child- {1}"
@@ -284,19 +298,21 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - _A0622BC8-2175-48C7-8CCD-5E43F6553474
-          id: beb36fd0-0815-4af8-ae28-e1d3624f6e8d
+            - GroupItemHasChildSimpleItem._A0622BC8-2175-48C7-8CCD-5E43F6553474
+          id: For_each_child_SimpleItem,_at_most_one_GroupItem_has_that_child_SimpleItem
+          minted_from: '{"type":"internal_uniqueness","roles":[[1,"_A0622BC8-2175-48C7-8CCD-5E43F6553474",{"name":"GroupItemHasChildSimpleItem","readings":["{0} has child- {1}","{0} has parent- {1}"],"players":["GroupItem","SimpleItem"]}]],"fact_type":{"name":"GroupItemHasChildSimpleItem","readings":["{0} has child- {1}","{0} has parent- {1}"],"players":["GroupItem","SimpleItem"]}}'
         - type: mandatory
-          role: _18FCFF20-C048-4978-AD92-F79E7A52850B
-          id: 9d448024-7ac0-43bd-b06c-e0c638b1b024
-    - id: 3daa0f5a-6248-4b08-92f2-0c7753ef159a
+          role: GroupItemHasChildSimpleItem._18FCFF20-C048-4978-AD92-F79E7A52850B
+          id: Each_GroupItem_has_at_least_one_child_SimpleItem
+          minted_from: '{"type":"mandatory","role":[0,"_18FCFF20-C048-4978-AD92-F79E7A52850B",{"name":"GroupItemHasChildSimpleItem","readings":["{0} has child- {1}","{0} has parent- {1}"],"players":["GroupItem","SimpleItem"]}],"fact_type":{"name":"GroupItemHasChildSimpleItem","readings":["{0} has child- {1}","{0} has parent- {1}"],"players":["GroupItem","SimpleItem"]}}'
+    - id: ClassificationHasClassificationId
       name: ClassificationHasClassificationId
       roles:
-        - id: _66329EE9-065E-43DB-838E-53251161B89C
-          player: 625204de-6b43-49c5-9734-558102935e03
+        - id: ClassificationHasClassificationId._66329EE9-065E-43DB-838E-53251161B89C
+          player: Classification
           role_name: _66329EE9-065E-43DB-838E-53251161B89C
-        - id: _22FE26C5-BE0F-43D0-9D9D-103452EC3328
-          player: daf1d061-9e51-4018-8218-0eb84bf8ece7
+        - id: ClassificationHasClassificationId._22FE26C5-BE0F-43D0-9D9D-103452EC3328
+          player: Classification_id
           role_name: _22FE26C5-BE0F-43D0-9D9D-103452EC3328
       readings:
         - "{0} has {1}"
@@ -304,43 +320,47 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - _22FE26C5-BE0F-43D0-9D9D-103452EC3328
-          is_preferred: true
-          id: 90cfef49-cc28-4f2d-89ba-856eb3209886
+            - ClassificationHasClassificationId._22FE26C5-BE0F-43D0-9D9D-103452EC3328
+          id: For_each_Classification_id,_at_most_one_Classification_has_that_Classification_id
+          minted_from: '{"type":"internal_uniqueness","roles":[[1,"_22FE26C5-BE0F-43D0-9D9D-103452EC3328",{"name":"ClassificationHasClassificationId","readings":["{0} has {1}","{0} is of {1}"],"players":["Classification","Classification_id"]}]],"fact_type":{"name":"ClassificationHasClassificationId","readings":["{0} has {1}","{0} is of {1}"],"players":["Classification","Classification_id"]}}'
         - type: internal_uniqueness
           roles:
-            - _66329EE9-065E-43DB-838E-53251161B89C
-          id: 057a8502-d19b-44a5-b352-a71b26a8ad3b
+            - ClassificationHasClassificationId._66329EE9-065E-43DB-838E-53251161B89C
+          id: Each_Classification_has_at_most_one_Classification_id
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"_66329EE9-065E-43DB-838E-53251161B89C",{"name":"ClassificationHasClassificationId","readings":["{0} has {1}","{0} is of {1}"],"players":["Classification","Classification_id"]}]],"fact_type":{"name":"ClassificationHasClassificationId","readings":["{0} has {1}","{0} is of {1}"],"players":["Classification","Classification_id"]}}'
         - type: mandatory
-          role: _66329EE9-065E-43DB-838E-53251161B89C
-          id: fcf800f2-a2b4-4c9d-8a25-64ec84ec5ac7
-    - id: 8437fa58-7cac-4216-9124-4f8157fcfb9e
+          role: ClassificationHasClassificationId._66329EE9-065E-43DB-838E-53251161B89C
+          id: Each_Classification_has_at_least_one_Classification_id
+          minted_from: '{"type":"mandatory","role":[0,"_66329EE9-065E-43DB-838E-53251161B89C",{"name":"ClassificationHasClassificationId","readings":["{0} has {1}","{0} is of {1}"],"players":["Classification","Classification_id"]}],"fact_type":{"name":"ClassificationHasClassificationId","readings":["{0} has {1}","{0} is of {1}"],"players":["Classification","Classification_id"]}}'
+    - id: AssetHasClassification
       name: AssetHasClassification
       roles:
-        - id: _5313A00A-E50F-41CB-A4C7-BBC32F45AD29
-          player: 90fee62d-e7fd-4a2d-8584-3de4e9f989c7
+        - id: AssetHasClassification._5313A00A-E50F-41CB-A4C7-BBC32F45AD29
+          player: Asset
           role_name: _5313A00A-E50F-41CB-A4C7-BBC32F45AD29
-        - id: _BA1AF058-B1EA-440D-9A20-BB8E4F901E34
-          player: 625204de-6b43-49c5-9734-558102935e03
+        - id: AssetHasClassification._BA1AF058-B1EA-440D-9A20-BB8E4F901E34
+          player: Classification
           role_name: _BA1AF058-B1EA-440D-9A20-BB8E4F901E34
       readings:
         - "{0} has {1}"
       constraints:
         - type: internal_uniqueness
           roles:
-            - _5313A00A-E50F-41CB-A4C7-BBC32F45AD29
-          id: cf1cb4db-7d2e-41ff-ad1f-5069d3a67a58
+            - AssetHasClassification._5313A00A-E50F-41CB-A4C7-BBC32F45AD29
+          id: Each_Asset_has_at_most_one_Classification
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"_5313A00A-E50F-41CB-A4C7-BBC32F45AD29",{"name":"AssetHasClassification","readings":["{0} has {1}"],"players":["Asset","Classification"]}]],"fact_type":{"name":"AssetHasClassification","readings":["{0} has {1}"],"players":["Asset","Classification"]}}'
         - type: mandatory
-          role: _5313A00A-E50F-41CB-A4C7-BBC32F45AD29
-          id: 89d38552-207d-45d9-a25f-b70a17e378fd
-    - id: 9874afa6-2b01-4c77-ad8f-1c65e7eed3d9
+          role: AssetHasClassification._5313A00A-E50F-41CB-A4C7-BBC32F45AD29
+          id: Each_Asset_has_at_least_one_Classification
+          minted_from: '{"type":"mandatory","role":[0,"_5313A00A-E50F-41CB-A4C7-BBC32F45AD29",{"name":"AssetHasClassification","readings":["{0} has {1}"],"players":["Asset","Classification"]}],"fact_type":{"name":"AssetHasClassification","readings":["{0} has {1}"],"players":["Asset","Classification"]}}'
+    - id: InspectionReportHasInspectionReportId
       name: InspectionReportHasInspectionReportId
       roles:
-        - id: _369E70CF-C07B-4003-927D-D5D57EAEF878
-          player: 36477f7a-7044-406e-a23e-3e65de48d004
+        - id: InspectionReportHasInspectionReportId._369E70CF-C07B-4003-927D-D5D57EAEF878
+          player: InspectionReport
           role_name: _369E70CF-C07B-4003-927D-D5D57EAEF878
-        - id: _632E8887-4381-42C2-A75E-C35B2E76B58C
-          player: 44f2b166-2c52-4656-9043-0071d13cbfe7
+        - id: InspectionReportHasInspectionReportId._632E8887-4381-42C2-A75E-C35B2E76B58C
+          player: InspectionReport_id
           role_name: _632E8887-4381-42C2-A75E-C35B2E76B58C
       readings:
         - "{0} has {1}"
@@ -348,40 +368,43 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - _632E8887-4381-42C2-A75E-C35B2E76B58C
-          is_preferred: true
-          id: 1407eb9a-bea3-4e99-96dc-5121f64e8372
+            - InspectionReportHasInspectionReportId._632E8887-4381-42C2-A75E-C35B2E76B58C
+          id: For_each_InspectionReport_id,_at_most_one_InspectionReport_has_that_InspectionReport_id
+          minted_from: '{"type":"internal_uniqueness","roles":[[1,"_632E8887-4381-42C2-A75E-C35B2E76B58C",{"name":"InspectionReportHasInspectionReportId","readings":["{0} has {1}","{0} is of {1}"],"players":["InspectionReport","InspectionReport_id"]}]],"fact_type":{"name":"InspectionReportHasInspectionReportId","readings":["{0} has {1}","{0} is of {1}"],"players":["InspectionReport","InspectionReport_id"]}}'
         - type: internal_uniqueness
           roles:
-            - _369E70CF-C07B-4003-927D-D5D57EAEF878
-          id: f7f6a164-2397-4bcf-b45b-44170d2a67ac
+            - InspectionReportHasInspectionReportId._369E70CF-C07B-4003-927D-D5D57EAEF878
+          id: Each_InspectionReport_has_at_most_one_InspectionReport_id
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"_369E70CF-C07B-4003-927D-D5D57EAEF878",{"name":"InspectionReportHasInspectionReportId","readings":["{0} has {1}","{0} is of {1}"],"players":["InspectionReport","InspectionReport_id"]}]],"fact_type":{"name":"InspectionReportHasInspectionReportId","readings":["{0} has {1}","{0} is of {1}"],"players":["InspectionReport","InspectionReport_id"]}}'
         - type: mandatory
-          role: _369E70CF-C07B-4003-927D-D5D57EAEF878
-          id: 32d5a2e2-15ce-4aa5-8f97-378502f0bd7f
-    - id: 73cee7dc-aea9-4c18-9b34-d3d72aaf400a
+          role: InspectionReportHasInspectionReportId._369E70CF-C07B-4003-927D-D5D57EAEF878
+          id: Each_InspectionReport_has_at_least_one_InspectionReport_id
+          minted_from: '{"type":"mandatory","role":[0,"_369E70CF-C07B-4003-927D-D5D57EAEF878",{"name":"InspectionReportHasInspectionReportId","readings":["{0} has {1}","{0} is of {1}"],"players":["InspectionReport","InspectionReport_id"]}],"fact_type":{"name":"InspectionReportHasInspectionReportId","readings":["{0} has {1}","{0} is of {1}"],"players":["InspectionReport","InspectionReport_id"]}}'
+    - id: InspectionProvidesInspectionReport
       name: InspectionProvidesInspectionReport
       roles:
-        - id: _C3B44D30-1FA6-4BC9-BB8D-6D214AE5D08C
-          player: 00ca8f65-b08a-46ea-8bfd-581029549392
+        - id: InspectionProvidesInspectionReport._C3B44D30-1FA6-4BC9-BB8D-6D214AE5D08C
+          player: Inspection
           role_name: _C3B44D30-1FA6-4BC9-BB8D-6D214AE5D08C
-        - id: _1AF64890-E7B4-4010-87DD-BD8BCB45EA18
-          player: 36477f7a-7044-406e-a23e-3e65de48d004
+        - id: InspectionProvidesInspectionReport._1AF64890-E7B4-4010-87DD-BD8BCB45EA18
+          player: InspectionReport
           role_name: _1AF64890-E7B4-4010-87DD-BD8BCB45EA18
       readings:
         - "{0} provides {1}"
       constraints:
         - type: internal_uniqueness
           roles:
-            - _C3B44D30-1FA6-4BC9-BB8D-6D214AE5D08C
-          id: f7b9fc76-8c2c-4c4c-91d4-09a8f016dc2e
-    - id: d66acd54-28d9-439b-8005-6dc4d0827d46
+            - InspectionProvidesInspectionReport._C3B44D30-1FA6-4BC9-BB8D-6D214AE5D08C
+          id: Each_Inspection_provides_at_most_one_InspectionReport
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"_C3B44D30-1FA6-4BC9-BB8D-6D214AE5D08C",{"name":"InspectionProvidesInspectionReport","readings":["{0} provides {1}"],"players":["Inspection","InspectionReport"]}]],"fact_type":{"name":"InspectionProvidesInspectionReport","readings":["{0} provides {1}"],"players":["Inspection","InspectionReport"]}}'
+    - id: ChecklistHasChecklistId
       name: ChecklistHasChecklistId
       roles:
-        - id: _73F9CB7E-64DA-45BE-9860-8C82485E3A41
-          player: 96927b24-c7fb-4f10-8e86-c2464e55a0f9
+        - id: ChecklistHasChecklistId._73F9CB7E-64DA-45BE-9860-8C82485E3A41
+          player: Checklist
           role_name: _73F9CB7E-64DA-45BE-9860-8C82485E3A41
-        - id: _F1E10AD7-6261-437C-932D-DE15179DA719
-          player: 20081566-15dc-4263-82f1-d409f6f3723c
+        - id: ChecklistHasChecklistId._F1E10AD7-6261-437C-932D-DE15179DA719
+          player: Checklist_id
           role_name: _F1E10AD7-6261-437C-932D-DE15179DA719
       readings:
         - "{0} has {1}"
@@ -389,43 +412,47 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - _F1E10AD7-6261-437C-932D-DE15179DA719
-          is_preferred: true
-          id: 072c1fec-5d5d-4f9f-b8f4-e46bfec6ea95
+            - ChecklistHasChecklistId._F1E10AD7-6261-437C-932D-DE15179DA719
+          id: For_each_Checklist_id,_at_most_one_Checklist_has_that_Checklist_id
+          minted_from: '{"type":"internal_uniqueness","roles":[[1,"_F1E10AD7-6261-437C-932D-DE15179DA719",{"name":"ChecklistHasChecklistId","readings":["{0} has {1}","{0} is of {1}"],"players":["Checklist","Checklist_id"]}]],"fact_type":{"name":"ChecklistHasChecklistId","readings":["{0} has {1}","{0} is of {1}"],"players":["Checklist","Checklist_id"]}}'
         - type: internal_uniqueness
           roles:
-            - _73F9CB7E-64DA-45BE-9860-8C82485E3A41
-          id: 85deb04d-77e9-416c-899a-2c899de53439
+            - ChecklistHasChecklistId._73F9CB7E-64DA-45BE-9860-8C82485E3A41
+          id: Each_Checklist_has_at_most_one_Checklist_id
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"_73F9CB7E-64DA-45BE-9860-8C82485E3A41",{"name":"ChecklistHasChecklistId","readings":["{0} has {1}","{0} is of {1}"],"players":["Checklist","Checklist_id"]}]],"fact_type":{"name":"ChecklistHasChecklistId","readings":["{0} has {1}","{0} is of {1}"],"players":["Checklist","Checklist_id"]}}'
         - type: mandatory
-          role: _73F9CB7E-64DA-45BE-9860-8C82485E3A41
-          id: e309a420-8f7a-46d8-a248-c671f6f2f039
-    - id: 3b202c90-4681-48f2-a219-b1c2e49120ef
+          role: ChecklistHasChecklistId._73F9CB7E-64DA-45BE-9860-8C82485E3A41
+          id: Each_Checklist_has_at_least_one_Checklist_id
+          minted_from: '{"type":"mandatory","role":[0,"_73F9CB7E-64DA-45BE-9860-8C82485E3A41",{"name":"ChecklistHasChecklistId","readings":["{0} has {1}","{0} is of {1}"],"players":["Checklist","Checklist_id"]}],"fact_type":{"name":"ChecklistHasChecklistId","readings":["{0} has {1}","{0} is of {1}"],"players":["Checklist","Checklist_id"]}}'
+    - id: InspectionHasChecklist
       name: InspectionHasChecklist
       roles:
-        - id: _509D6D97-8E94-4541-91E7-FD2E732AE544
-          player: 00ca8f65-b08a-46ea-8bfd-581029549392
+        - id: InspectionHasChecklist._509D6D97-8E94-4541-91E7-FD2E732AE544
+          player: Inspection
           role_name: _509D6D97-8E94-4541-91E7-FD2E732AE544
-        - id: _FF24AFB3-9229-4EDE-B12A-73A281FB4C4D
-          player: 96927b24-c7fb-4f10-8e86-c2464e55a0f9
+        - id: InspectionHasChecklist._FF24AFB3-9229-4EDE-B12A-73A281FB4C4D
+          player: Checklist
           role_name: _FF24AFB3-9229-4EDE-B12A-73A281FB4C4D
       readings:
         - "{0} has {1}"
       constraints:
         - type: internal_uniqueness
           roles:
-            - _509D6D97-8E94-4541-91E7-FD2E732AE544
-          id: a15fe089-e5ed-44f2-98c3-51a403f23b8e
+            - InspectionHasChecklist._509D6D97-8E94-4541-91E7-FD2E732AE544
+          id: Each_Inspection_has_at_most_one_Checklist
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"_509D6D97-8E94-4541-91E7-FD2E732AE544",{"name":"InspectionHasChecklist","readings":["{0} has {1}"],"players":["Inspection","Checklist"]}]],"fact_type":{"name":"InspectionHasChecklist","readings":["{0} has {1}"],"players":["Inspection","Checklist"]}}'
         - type: mandatory
-          role: _509D6D97-8E94-4541-91E7-FD2E732AE544
-          id: 6d1cee28-1df4-4582-abc9-623596ad2c4a
-    - id: 25d63c4f-6667-4efb-9444-acdb788e5485
+          role: InspectionHasChecklist._509D6D97-8E94-4541-91E7-FD2E732AE544
+          id: Each_Inspection_has_at_least_one_Checklist
+          minted_from: '{"type":"mandatory","role":[0,"_509D6D97-8E94-4541-91E7-FD2E732AE544",{"name":"InspectionHasChecklist","readings":["{0} has {1}"],"players":["Inspection","Checklist"]}],"fact_type":{"name":"InspectionHasChecklist","readings":["{0} has {1}"],"players":["Inspection","Checklist"]}}'
+    - id: IndustryHasIndustryName
       name: IndustryHasIndustryName
       roles:
-        - id: _D0C60B46-EFBE-40AD-9928-78748AF4DC4B
-          player: ea149990-c328-4451-a1a7-cc3f15c051a9
+        - id: IndustryHasIndustryName._D0C60B46-EFBE-40AD-9928-78748AF4DC4B
+          player: Industry
           role_name: _D0C60B46-EFBE-40AD-9928-78748AF4DC4B
-        - id: _0C258B58-B552-4EC9-8F8D-482867D3D5A2
-          player: 889e5825-2024-49fb-9514-9f3d9d99a85f
+        - id: IndustryHasIndustryName._0C258B58-B552-4EC9-8F8D-482867D3D5A2
+          player: Industry_name
           role_name: _0C258B58-B552-4EC9-8F8D-482867D3D5A2
       readings:
         - "{0} has {1}"
@@ -433,24 +460,26 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - _0C258B58-B552-4EC9-8F8D-482867D3D5A2
-          is_preferred: true
-          id: 67124631-0a9f-499a-b336-3e9a9fb55347
+            - IndustryHasIndustryName._0C258B58-B552-4EC9-8F8D-482867D3D5A2
+          id: For_each_Industry_name,_at_most_one_Industry_has_that_Industry_name
+          minted_from: '{"type":"internal_uniqueness","roles":[[1,"_0C258B58-B552-4EC9-8F8D-482867D3D5A2",{"name":"IndustryHasIndustryName","readings":["{0} has {1}","{0} is of {1}"],"players":["Industry","Industry_name"]}]],"fact_type":{"name":"IndustryHasIndustryName","readings":["{0} has {1}","{0} is of {1}"],"players":["Industry","Industry_name"]}}'
         - type: internal_uniqueness
           roles:
-            - _D0C60B46-EFBE-40AD-9928-78748AF4DC4B
-          id: fbc47262-a18f-4efc-a667-bdccaf5184a1
+            - IndustryHasIndustryName._D0C60B46-EFBE-40AD-9928-78748AF4DC4B
+          id: Each_Industry_has_at_most_one_Industry_name
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"_D0C60B46-EFBE-40AD-9928-78748AF4DC4B",{"name":"IndustryHasIndustryName","readings":["{0} has {1}","{0} is of {1}"],"players":["Industry","Industry_name"]}]],"fact_type":{"name":"IndustryHasIndustryName","readings":["{0} has {1}","{0} is of {1}"],"players":["Industry","Industry_name"]}}'
         - type: mandatory
-          role: _D0C60B46-EFBE-40AD-9928-78748AF4DC4B
-          id: e729047a-f3aa-413b-a273-75361b137f5d
-    - id: 72265725-df1e-4020-b304-8eaaeb8ff45c
+          role: IndustryHasIndustryName._D0C60B46-EFBE-40AD-9928-78748AF4DC4B
+          id: Each_Industry_has_at_least_one_Industry_name
+          minted_from: '{"type":"mandatory","role":[0,"_D0C60B46-EFBE-40AD-9928-78748AF4DC4B",{"name":"IndustryHasIndustryName","readings":["{0} has {1}","{0} is of {1}"],"players":["Industry","Industry_name"]}],"fact_type":{"name":"IndustryHasIndustryName","readings":["{0} has {1}","{0} is of {1}"],"players":["Industry","Industry_name"]}}'
+    - id: CategoryHasCategoryName
       name: CategoryHasCategoryName
       roles:
-        - id: _4CB38D4E-B820-42B2-A2B8-4922F1C2A9A0
-          player: 34409e9e-b4dd-4279-b3bd-29bf36de3f1d
+        - id: CategoryHasCategoryName._4CB38D4E-B820-42B2-A2B8-4922F1C2A9A0
+          player: Category
           role_name: _4CB38D4E-B820-42B2-A2B8-4922F1C2A9A0
-        - id: _5E001A53-83F4-4643-B665-28D4F7B93225
-          player: ff1fcd02-a864-463d-98b4-8c4e30ce03f5
+        - id: CategoryHasCategoryName._5E001A53-83F4-4643-B665-28D4F7B93225
+          player: Category_name
           role_name: _5E001A53-83F4-4643-B665-28D4F7B93225
       readings:
         - "{0} has {1}"
@@ -458,24 +487,26 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - _5E001A53-83F4-4643-B665-28D4F7B93225
-          is_preferred: true
-          id: c97b5d51-c5e0-492a-9895-d7daf47f5d66
+            - CategoryHasCategoryName._5E001A53-83F4-4643-B665-28D4F7B93225
+          id: For_each_Category_name,_at_most_one_Category_has_that_Category_name
+          minted_from: '{"type":"internal_uniqueness","roles":[[1,"_5E001A53-83F4-4643-B665-28D4F7B93225",{"name":"CategoryHasCategoryName","readings":["{0} has {1}","{0} is of {1}"],"players":["Category","Category_name"]}]],"fact_type":{"name":"CategoryHasCategoryName","readings":["{0} has {1}","{0} is of {1}"],"players":["Category","Category_name"]}}'
         - type: internal_uniqueness
           roles:
-            - _4CB38D4E-B820-42B2-A2B8-4922F1C2A9A0
-          id: 20da7700-34f5-42ee-ab8c-7e7c00e15b03
+            - CategoryHasCategoryName._4CB38D4E-B820-42B2-A2B8-4922F1C2A9A0
+          id: Each_Category_has_at_most_one_Category_name
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"_4CB38D4E-B820-42B2-A2B8-4922F1C2A9A0",{"name":"CategoryHasCategoryName","readings":["{0} has {1}","{0} is of {1}"],"players":["Category","Category_name"]}]],"fact_type":{"name":"CategoryHasCategoryName","readings":["{0} has {1}","{0} is of {1}"],"players":["Category","Category_name"]}}'
         - type: mandatory
-          role: _4CB38D4E-B820-42B2-A2B8-4922F1C2A9A0
-          id: 856d73d8-2a06-4ffa-a930-a5b15961804d
-    - id: 3344170b-5165-448c-b956-d26d1fbd0b1f
+          role: CategoryHasCategoryName._4CB38D4E-B820-42B2-A2B8-4922F1C2A9A0
+          id: Each_Category_has_at_least_one_Category_name
+          minted_from: '{"type":"mandatory","role":[0,"_4CB38D4E-B820-42B2-A2B8-4922F1C2A9A0",{"name":"CategoryHasCategoryName","readings":["{0} has {1}","{0} is of {1}"],"players":["Category","Category_name"]}],"fact_type":{"name":"CategoryHasCategoryName","readings":["{0} has {1}","{0} is of {1}"],"players":["Category","Category_name"]}}'
+    - id: MakeHasMakeId
       name: MakeHasMakeId
       roles:
-        - id: _B03BBA1E-E7F1-48EC-B465-0553C02B3D02
-          player: 07c143de-6eb3-47c1-984d-ca4880fef8ef
+        - id: MakeHasMakeId._B03BBA1E-E7F1-48EC-B465-0553C02B3D02
+          player: Make
           role_name: _B03BBA1E-E7F1-48EC-B465-0553C02B3D02
-        - id: _7B7BAB3D-0A4A-4452-ABD3-CAAC212E4E1F
-          player: 30e61f85-06a1-4e55-adde-36c3fe3fdc98
+        - id: MakeHasMakeId._7B7BAB3D-0A4A-4452-ABD3-CAAC212E4E1F
+          player: Make_id
           role_name: _7B7BAB3D-0A4A-4452-ABD3-CAAC212E4E1F
       readings:
         - "{0} has {1}"
@@ -483,82 +514,85 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - _7B7BAB3D-0A4A-4452-ABD3-CAAC212E4E1F
-          is_preferred: true
-          id: a059b827-07fb-46e6-a2b0-0a12291be53f
+            - MakeHasMakeId._7B7BAB3D-0A4A-4452-ABD3-CAAC212E4E1F
+          id: For_each_Make_id,_at_most_one_Make_has_that_Make_id
+          minted_from: '{"type":"internal_uniqueness","roles":[[1,"_7B7BAB3D-0A4A-4452-ABD3-CAAC212E4E1F",{"name":"MakeHasMakeId","readings":["{0} has {1}","{0} is of {1}"],"players":["Make","Make_id"]}]],"fact_type":{"name":"MakeHasMakeId","readings":["{0} has {1}","{0} is of {1}"],"players":["Make","Make_id"]}}'
         - type: internal_uniqueness
           roles:
-            - _B03BBA1E-E7F1-48EC-B465-0553C02B3D02
-          id: ffef75c4-46f9-4bd2-84c2-a62de5c7fbf7
+            - MakeHasMakeId._B03BBA1E-E7F1-48EC-B465-0553C02B3D02
+          id: Each_Make_has_at_most_one_Make_id
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"_B03BBA1E-E7F1-48EC-B465-0553C02B3D02",{"name":"MakeHasMakeId","readings":["{0} has {1}","{0} is of {1}"],"players":["Make","Make_id"]}]],"fact_type":{"name":"MakeHasMakeId","readings":["{0} has {1}","{0} is of {1}"],"players":["Make","Make_id"]}}'
         - type: mandatory
-          role: _B03BBA1E-E7F1-48EC-B465-0553C02B3D02
-          id: c77a68f0-2313-481c-8d18-fdad11e9af85
-    - id: 2a8b1154-7e84-4656-869d-7d1eeb0a5814
+          role: MakeHasMakeId._B03BBA1E-E7F1-48EC-B465-0553C02B3D02
+          id: Each_Make_has_at_least_one_Make_id
+          minted_from: '{"type":"mandatory","role":[0,"_B03BBA1E-E7F1-48EC-B465-0553C02B3D02",{"name":"MakeHasMakeId","readings":["{0} has {1}","{0} is of {1}"],"players":["Make","Make_id"]}],"fact_type":{"name":"MakeHasMakeId","readings":["{0} has {1}","{0} is of {1}"],"players":["Make","Make_id"]}}'
+    - id: ModelHasModelId
       name: ModelHasModelId
       roles:
-        - id: _321EE1EF-047E-4851-8FE8-2685E919B2BF
-          player: d704fb1c-3597-489d-937a-2f3a6ba7a149
+        - id: ModelHasModelId._321EE1EF-047E-4851-8FE8-2685E919B2BF
+          player: Model
           role_name: _321EE1EF-047E-4851-8FE8-2685E919B2BF
-        - id: _219CBB23-16CD-44E3-AD04-D3B2EA604084
-          player: ac5baa4b-f391-4983-8878-64e0f1eb6f26
+        - id: ModelHasModelId._219CBB23-16CD-44E3-AD04-D3B2EA604084
+          player: Model_id
           role_name: _219CBB23-16CD-44E3-AD04-D3B2EA604084
       readings:
         - "{0} has {1}"
       constraints:
         - type: internal_uniqueness
           roles:
-            - _321EE1EF-047E-4851-8FE8-2685E919B2BF
-          id: 12fd6726-9c3e-4b66-9859-5e0ee2f58b6d
+            - ModelHasModelId._321EE1EF-047E-4851-8FE8-2685E919B2BF
+          id: Each_Model_has_at_most_one_Model_id
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"_321EE1EF-047E-4851-8FE8-2685E919B2BF",{"name":"ModelHasModelId","readings":["{0} has {1}"],"players":["Model","Model_id"]}]],"fact_type":{"name":"ModelHasModelId","readings":["{0} has {1}"],"players":["Model","Model_id"]}}'
         - type: mandatory
-          role: _321EE1EF-047E-4851-8FE8-2685E919B2BF
-          id: 7a398f63-3f01-4a15-86aa-bc9b01214574
-        - type: external_uniqueness
-          roles:
-            - _E4F47F2B-B040-416C-8E95-87FEF96E0BCD
-            - _219CBB23-16CD-44E3-AD04-D3B2EA604084
-    - id: 3301835e-6398-4d2b-b002-64a7be2f24e3
+          role: ModelHasModelId._321EE1EF-047E-4851-8FE8-2685E919B2BF
+          id: Each_Model_has_at_least_one_Model_id
+          minted_from: '{"type":"mandatory","role":[0,"_321EE1EF-047E-4851-8FE8-2685E919B2BF",{"name":"ModelHasModelId","readings":["{0} has {1}"],"players":["Model","Model_id"]}],"fact_type":{"name":"ModelHasModelId","readings":["{0} has {1}"],"players":["Model","Model_id"]}}'
+    - id: MakeProvidesModel
       name: MakeProvidesModel
       roles:
-        - id: _E4F47F2B-B040-416C-8E95-87FEF96E0BCD
-          player: 07c143de-6eb3-47c1-984d-ca4880fef8ef
+        - id: MakeProvidesModel._E4F47F2B-B040-416C-8E95-87FEF96E0BCD
+          player: Make
           role_name: _E4F47F2B-B040-416C-8E95-87FEF96E0BCD
-        - id: _5C926691-41DB-4409-B521-6FB5D32EFA38
-          player: d704fb1c-3597-489d-937a-2f3a6ba7a149
+        - id: MakeProvidesModel._5C926691-41DB-4409-B521-6FB5D32EFA38
+          player: Model
           role_name: _5C926691-41DB-4409-B521-6FB5D32EFA38
       readings:
         - "{0} provides {1}"
       constraints:
         - type: internal_uniqueness
           roles:
-            - _5C926691-41DB-4409-B521-6FB5D32EFA38
-          id: 63af49c3-630c-4744-af50-cf227635e7b3
+            - MakeProvidesModel._5C926691-41DB-4409-B521-6FB5D32EFA38
+          id: For_each_Model,_at_most_one_Make_provides_that_Model
+          minted_from: '{"type":"internal_uniqueness","roles":[[1,"_5C926691-41DB-4409-B521-6FB5D32EFA38",{"name":"MakeProvidesModel","readings":["{0} provides {1}"],"players":["Make","Model"]}]],"fact_type":{"name":"MakeProvidesModel","readings":["{0} provides {1}"],"players":["Make","Model"]}}'
         - type: mandatory
-          role: _5C926691-41DB-4409-B521-6FB5D32EFA38
-          id: 476aa90d-50da-4503-a701-5c40945ac794
-    - id: 681108ce-1f10-4de5-8616-b81aff34151f
+          role: MakeProvidesModel._5C926691-41DB-4409-B521-6FB5D32EFA38
+          id: For_each_Model,_some_Make_provides_that_Model
+          minted_from: '{"type":"mandatory","role":[1,"_5C926691-41DB-4409-B521-6FB5D32EFA38",{"name":"MakeProvidesModel","readings":["{0} provides {1}"],"players":["Make","Model"]}],"fact_type":{"name":"MakeProvidesModel","readings":["{0} provides {1}"],"players":["Make","Model"]}}'
+    - id: CategoryIsPartOfIndustry
       name: CategoryIsPartOfIndustry
       roles:
-        - id: _ADF203C9-EF86-49ED-A4FC-8FFC500EA7C0
-          player: 34409e9e-b4dd-4279-b3bd-29bf36de3f1d
+        - id: CategoryIsPartOfIndustry._ADF203C9-EF86-49ED-A4FC-8FFC500EA7C0
+          player: Category
           role_name: _ADF203C9-EF86-49ED-A4FC-8FFC500EA7C0
-        - id: _C9BAF26A-D738-4EF9-AD5C-FF8AD0C2DA78
-          player: ea149990-c328-4451-a1a7-cc3f15c051a9
+        - id: CategoryIsPartOfIndustry._C9BAF26A-D738-4EF9-AD5C-FF8AD0C2DA78
+          player: Industry
           role_name: _C9BAF26A-D738-4EF9-AD5C-FF8AD0C2DA78
       readings:
         - "{0} is part of {1}"
       constraints:
         - type: internal_uniqueness
           roles:
-            - _ADF203C9-EF86-49ED-A4FC-8FFC500EA7C0
-          id: 6fb53776-e169-46f2-aabf-77860698a0e1
-    - id: fdf636e0-37ad-43f0-9faa-1b540af7d1a7
+            - CategoryIsPartOfIndustry._ADF203C9-EF86-49ED-A4FC-8FFC500EA7C0
+          id: Each_Category_is_part_of_at_most_one_Industry
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"_ADF203C9-EF86-49ED-A4FC-8FFC500EA7C0",{"name":"CategoryIsPartOfIndustry","readings":["{0} is part of {1}"],"players":["Category","Industry"]}]],"fact_type":{"name":"CategoryIsPartOfIndustry","readings":["{0} is part of {1}"],"players":["Category","Industry"]}}'
+    - id: AssetTypeHasAssetTypeId
       name: AssetTypeHasAssetTypeId
       roles:
-        - id: _209D6FC8-C0E3-45EF-AEBF-A7AF694B2B65
-          player: bdd9d288-a842-4456-abe6-fe680f2e02c2
+        - id: AssetTypeHasAssetTypeId._209D6FC8-C0E3-45EF-AEBF-A7AF694B2B65
+          player: AssetType
           role_name: _209D6FC8-C0E3-45EF-AEBF-A7AF694B2B65
-        - id: _7771ABD9-F149-4A8F-A4A3-65ECE33F708E
-          player: ae46e11a-39d0-4c6c-959b-28831c64c7fb
+        - id: AssetTypeHasAssetTypeId._7771ABD9-F149-4A8F-A4A3-65ECE33F708E
+          player: AssetType_id
           role_name: _7771ABD9-F149-4A8F-A4A3-65ECE33F708E
       readings:
         - "{0} has {1}"
@@ -566,293 +600,337 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - _7771ABD9-F149-4A8F-A4A3-65ECE33F708E
-          is_preferred: true
-          id: 7995402a-4b7a-4ec4-a810-8d59c0b105c6
+            - AssetTypeHasAssetTypeId._7771ABD9-F149-4A8F-A4A3-65ECE33F708E
+          id: For_each_AssetType_id,_at_most_one_AssetType_has_that_AssetType_id
+          minted_from: '{"type":"internal_uniqueness","roles":[[1,"_7771ABD9-F149-4A8F-A4A3-65ECE33F708E",{"name":"AssetTypeHasAssetTypeId","readings":["{0} has {1}","{0} is of {1}"],"players":["AssetType","AssetType_id"]}]],"fact_type":{"name":"AssetTypeHasAssetTypeId","readings":["{0} has {1}","{0} is of {1}"],"players":["AssetType","AssetType_id"]}}'
         - type: internal_uniqueness
           roles:
-            - _209D6FC8-C0E3-45EF-AEBF-A7AF694B2B65
-          id: dc422df0-47b9-490d-b0ec-bf1123b7d773
+            - AssetTypeHasAssetTypeId._209D6FC8-C0E3-45EF-AEBF-A7AF694B2B65
+          id: Each_AssetType_has_at_most_one_AssetType_id
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"_209D6FC8-C0E3-45EF-AEBF-A7AF694B2B65",{"name":"AssetTypeHasAssetTypeId","readings":["{0} has {1}","{0} is of {1}"],"players":["AssetType","AssetType_id"]}]],"fact_type":{"name":"AssetTypeHasAssetTypeId","readings":["{0} has {1}","{0} is of {1}"],"players":["AssetType","AssetType_id"]}}'
         - type: mandatory
-          role: _209D6FC8-C0E3-45EF-AEBF-A7AF694B2B65
-          id: ca0852d9-b80b-4f31-b2f4-65bd816c4813
-    - id: 7a4e338c-0894-41cc-8777-59e9da366725
+          role: AssetTypeHasAssetTypeId._209D6FC8-C0E3-45EF-AEBF-A7AF694B2B65
+          id: Each_AssetType_has_at_least_one_AssetType_id
+          minted_from: '{"type":"mandatory","role":[0,"_209D6FC8-C0E3-45EF-AEBF-A7AF694B2B65",{"name":"AssetTypeHasAssetTypeId","readings":["{0} has {1}","{0} is of {1}"],"players":["AssetType","AssetType_id"]}],"fact_type":{"name":"AssetTypeHasAssetTypeId","readings":["{0} has {1}","{0} is of {1}"],"players":["AssetType","AssetType_id"]}}'
+    - id: AssetTypeShowsUpInCategory
       name: AssetTypeShowsUpInCategory
       roles:
-        - id: _FD7E13EA-B581-4DB0-8EDE-2EFF098C9D01
-          player: bdd9d288-a842-4456-abe6-fe680f2e02c2
+        - id: AssetTypeShowsUpInCategory._FD7E13EA-B581-4DB0-8EDE-2EFF098C9D01
+          player: AssetType
           role_name: _FD7E13EA-B581-4DB0-8EDE-2EFF098C9D01
-        - id: _A838896A-E84B-4E43-AD2A-00243FEDEC4E
-          player: 34409e9e-b4dd-4279-b3bd-29bf36de3f1d
+        - id: AssetTypeShowsUpInCategory._A838896A-E84B-4E43-AD2A-00243FEDEC4E
+          player: Category
           role_name: _A838896A-E84B-4E43-AD2A-00243FEDEC4E
       readings:
         - "{0} shows up in {1}"
       constraints:
         - type: internal_uniqueness
           roles:
-            - _FD7E13EA-B581-4DB0-8EDE-2EFF098C9D01
-          id: f39ffa5e-e42f-4908-9567-38ba85f862f5
-    - id: 1840bbe8-d89e-46c9-ae19-20b928b6bd4e
+            - AssetTypeShowsUpInCategory._FD7E13EA-B581-4DB0-8EDE-2EFF098C9D01
+          id: Each_AssetType_shows_up_in_at_most_one_Category
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"_FD7E13EA-B581-4DB0-8EDE-2EFF098C9D01",{"name":"AssetTypeShowsUpInCategory","readings":["{0} shows up in {1}"],"players":["AssetType","Category"]}]],"fact_type":{"name":"AssetTypeShowsUpInCategory","readings":["{0} shows up in {1}"],"players":["AssetType","Category"]}}'
+    - id: ModelClassifiesAssetType
       name: ModelClassifiesAssetType
       roles:
-        - id: _8F20D733-A59D-428A-8E75-0B95950A6868
-          player: d704fb1c-3597-489d-937a-2f3a6ba7a149
+        - id: ModelClassifiesAssetType._8F20D733-A59D-428A-8E75-0B95950A6868
+          player: Model
           role_name: _8F20D733-A59D-428A-8E75-0B95950A6868
-        - id: _EEA6B8FC-D26B-4D00-8986-5D7C5E37BD68
-          player: bdd9d288-a842-4456-abe6-fe680f2e02c2
+        - id: ModelClassifiesAssetType._EEA6B8FC-D26B-4D00-8986-5D7C5E37BD68
+          player: AssetType
           role_name: _EEA6B8FC-D26B-4D00-8986-5D7C5E37BD68
       readings:
         - "{0} classifies {1}"
       constraints:
         - type: internal_uniqueness
           roles:
-            - _EEA6B8FC-D26B-4D00-8986-5D7C5E37BD68
-          id: 72904f68-29b6-467c-8657-9bc3383e8845
+            - ModelClassifiesAssetType._EEA6B8FC-D26B-4D00-8986-5D7C5E37BD68
+          id: For_each_AssetType,_at_most_one_Model_classifies_that_AssetType
+          minted_from: '{"type":"internal_uniqueness","roles":[[1,"_EEA6B8FC-D26B-4D00-8986-5D7C5E37BD68",{"name":"ModelClassifiesAssetType","readings":["{0} classifies {1}"],"players":["Model","AssetType"]}]],"fact_type":{"name":"ModelClassifiesAssetType","readings":["{0} classifies {1}"],"players":["Model","AssetType"]}}'
         - type: internal_uniqueness
           roles:
-            - _8F20D733-A59D-428A-8E75-0B95950A6868
-          id: 97463838-6b0a-41c0-9ac7-248b26eb6eba
-    - id: 85918bdc-588d-431c-a954-5d3c58e57795
+            - ModelClassifiesAssetType._8F20D733-A59D-428A-8E75-0B95950A6868
+          id: Each_Model_classifies_at_most_one_AssetType
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"_8F20D733-A59D-428A-8E75-0B95950A6868",{"name":"ModelClassifiesAssetType","readings":["{0} classifies {1}"],"players":["Model","AssetType"]}]],"fact_type":{"name":"ModelClassifiesAssetType","readings":["{0} classifies {1}"],"players":["Model","AssetType"]}}'
+    - id: ClassificationHasIndustry
       name: ClassificationHasIndustry
       roles:
-        - id: _90417B30-2580-4023-B399-356156E8813C
-          player: 625204de-6b43-49c5-9734-558102935e03
+        - id: ClassificationHasIndustry._90417B30-2580-4023-B399-356156E8813C
+          player: Classification
           role_name: _90417B30-2580-4023-B399-356156E8813C
-        - id: _E3D80510-BE8D-4913-91DE-872BD056D633
-          player: ea149990-c328-4451-a1a7-cc3f15c051a9
+        - id: ClassificationHasIndustry._E3D80510-BE8D-4913-91DE-872BD056D633
+          player: Industry
           role_name: _E3D80510-BE8D-4913-91DE-872BD056D633
       readings:
         - "{0} has {1}"
       constraints:
         - type: internal_uniqueness
           roles:
-            - _90417B30-2580-4023-B399-356156E8813C
-          id: 9272a2df-ee16-41d5-8fb5-d5370dfe7143
-        - type: disjunctive_mandatory
-          roles:
-            - _90417B30-2580-4023-B399-356156E8813C
-            - _8F372D77-8A98-4FEC-9C3D-E943F33AB0C2
-        - type: subset
-          subset_roles:
-            - _C92815F2-80CD-4D51-871A-115AEC5833E2
-          superset_roles:
-            - _90417B30-2580-4023-B399-356156E8813C
-    - id: d2527a6b-521c-48a9-af8e-6986b349b40e
+            - ClassificationHasIndustry._90417B30-2580-4023-B399-356156E8813C
+          id: Each_Classification_has_at_most_one_Industry
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"_90417B30-2580-4023-B399-356156E8813C",{"name":"ClassificationHasIndustry","readings":["{0} has {1}"],"players":["Classification","Industry"]}]],"fact_type":{"name":"ClassificationHasIndustry","readings":["{0} has {1}"],"players":["Classification","Industry"]}}'
+    - id: ClassificationHasCategory
       name: ClassificationHasCategory
       roles:
-        - id: _C92815F2-80CD-4D51-871A-115AEC5833E2
-          player: 625204de-6b43-49c5-9734-558102935e03
+        - id: ClassificationHasCategory._C92815F2-80CD-4D51-871A-115AEC5833E2
+          player: Classification
           role_name: _C92815F2-80CD-4D51-871A-115AEC5833E2
-        - id: _73D8E4A9-C11D-43A7-8EEF-F11EBC2FE0CC
-          player: 34409e9e-b4dd-4279-b3bd-29bf36de3f1d
+        - id: ClassificationHasCategory._73D8E4A9-C11D-43A7-8EEF-F11EBC2FE0CC
+          player: Category
           role_name: _73D8E4A9-C11D-43A7-8EEF-F11EBC2FE0CC
       readings:
         - "{0} has {1}"
       constraints:
         - type: internal_uniqueness
           roles:
-            - _C92815F2-80CD-4D51-871A-115AEC5833E2
-          id: 197738d0-44f8-4022-9872-7a9f2825dc02
-        - type: subset
-          subset_roles:
-            - _FD945FCD-8680-4A9A-B117-BD767B1F241F
-          superset_roles:
-            - _C92815F2-80CD-4D51-871A-115AEC5833E2
-    - id: d0529ae3-6f8a-4e36-8e9d-0d0c775aa151
+            - ClassificationHasCategory._C92815F2-80CD-4D51-871A-115AEC5833E2
+          id: Each_Classification_has_at_most_one_Category
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"_C92815F2-80CD-4D51-871A-115AEC5833E2",{"name":"ClassificationHasCategory","readings":["{0} has {1}"],"players":["Classification","Category"]}]],"fact_type":{"name":"ClassificationHasCategory","readings":["{0} has {1}"],"players":["Classification","Category"]}}'
+    - id: ClassificationHasMake
       name: ClassificationHasMake
       roles:
-        - id: _8F372D77-8A98-4FEC-9C3D-E943F33AB0C2
-          player: 625204de-6b43-49c5-9734-558102935e03
+        - id: ClassificationHasMake._8F372D77-8A98-4FEC-9C3D-E943F33AB0C2
+          player: Classification
           role_name: _8F372D77-8A98-4FEC-9C3D-E943F33AB0C2
-        - id: _03029445-32FD-45B6-801A-C9F08EF977A9
-          player: 07c143de-6eb3-47c1-984d-ca4880fef8ef
+        - id: ClassificationHasMake._03029445-32FD-45B6-801A-C9F08EF977A9
+          player: Make
           role_name: _03029445-32FD-45B6-801A-C9F08EF977A9
       readings:
         - "{0} has {1}"
       constraints:
         - type: internal_uniqueness
           roles:
-            - _8F372D77-8A98-4FEC-9C3D-E943F33AB0C2
-          id: 1ca1b5cf-0fc9-4249-8fff-3dda38bfed23
-        - type: subset
-          subset_roles:
-            - _B486C852-9FA5-461A-94E4-186C26DE36A2
-          superset_roles:
-            - _8F372D77-8A98-4FEC-9C3D-E943F33AB0C2
-    - id: 3a7c6d69-6cd6-440b-b5b6-d3b57122759d
+            - ClassificationHasMake._8F372D77-8A98-4FEC-9C3D-E943F33AB0C2
+          id: Each_Classification_has_at_most_one_Make
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"_8F372D77-8A98-4FEC-9C3D-E943F33AB0C2",{"name":"ClassificationHasMake","readings":["{0} has {1}"],"players":["Classification","Make"]}]],"fact_type":{"name":"ClassificationHasMake","readings":["{0} has {1}"],"players":["Classification","Make"]}}'
+    - id: ClassificationHasAssetType
       name: ClassificationHasAssetType
       roles:
-        - id: _FD945FCD-8680-4A9A-B117-BD767B1F241F
-          player: 625204de-6b43-49c5-9734-558102935e03
+        - id: ClassificationHasAssetType._FD945FCD-8680-4A9A-B117-BD767B1F241F
+          player: Classification
           role_name: _FD945FCD-8680-4A9A-B117-BD767B1F241F
-        - id: _70B199EB-EE3C-4D0D-A617-576B407D4DB3
-          player: bdd9d288-a842-4456-abe6-fe680f2e02c2
+        - id: ClassificationHasAssetType._70B199EB-EE3C-4D0D-A617-576B407D4DB3
+          player: AssetType
           role_name: _70B199EB-EE3C-4D0D-A617-576B407D4DB3
       readings:
         - "{0} has {1}"
       constraints:
         - type: internal_uniqueness
           roles:
-            - _FD945FCD-8680-4A9A-B117-BD767B1F241F
-          id: 85c16305-d402-4002-bb6c-d333a9e014f0
-    - id: 43e494fa-da20-4140-a0e9-76958e54c6dd
+            - ClassificationHasAssetType._FD945FCD-8680-4A9A-B117-BD767B1F241F
+          id: Each_Classification_has_at_most_one_AssetType
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"_FD945FCD-8680-4A9A-B117-BD767B1F241F",{"name":"ClassificationHasAssetType","readings":["{0} has {1}"],"players":["Classification","AssetType"]}]],"fact_type":{"name":"ClassificationHasAssetType","readings":["{0} has {1}"],"players":["Classification","AssetType"]}}'
+    - id: ClassificationHasModel
       name: ClassificationHasModel
       roles:
-        - id: _B486C852-9FA5-461A-94E4-186C26DE36A2
-          player: 625204de-6b43-49c5-9734-558102935e03
+        - id: ClassificationHasModel._B486C852-9FA5-461A-94E4-186C26DE36A2
+          player: Classification
           role_name: _B486C852-9FA5-461A-94E4-186C26DE36A2
-        - id: _F2ABCB64-ADE4-4F03-8A61-E1FF50B8DDC7
-          player: d704fb1c-3597-489d-937a-2f3a6ba7a149
+        - id: ClassificationHasModel._F2ABCB64-ADE4-4F03-8A61-E1FF50B8DDC7
+          player: Model
           role_name: _F2ABCB64-ADE4-4F03-8A61-E1FF50B8DDC7
       readings:
         - "{0} has {1}"
       constraints:
         - type: internal_uniqueness
           roles:
-            - _B486C852-9FA5-461A-94E4-186C26DE36A2
-          id: e24b3bae-8f49-4373-b8e4-7654a4a9d344
-    - id: 3051a000-0e9d-49f2-98d7-a91959dc37d4
+            - ClassificationHasModel._B486C852-9FA5-461A-94E4-186C26DE36A2
+          id: Each_Classification_has_at_most_one_Model
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"_B486C852-9FA5-461A-94E4-186C26DE36A2",{"name":"ClassificationHasModel","readings":["{0} has {1}"],"players":["Classification","Model"]}]],"fact_type":{"name":"ClassificationHasModel","readings":["{0} has {1}"],"players":["Classification","Model"]}}'
+    - id: Offering_selected_for_Asset_creates_ConsignmentAsset
       name: OfferingSelectedForAssetCreatesConsignmentAsset
       roles:
-        - id: _BEFBB9A9-B964-4C3E-967D-F81BCC8D49F1
-          player: ea46d508-e12a-4acc-85f1-21ae6dd687f1
+        - id: Offering_selected_for_Asset_creates_ConsignmentAsset._BEFBB9A9-B964-4C3E-967D-F81BCC8D49F1
+          player: auctions:Offering
           role_name: _BEFBB9A9-B964-4C3E-967D-F81BCC8D49F1
-        - id: _2C62E001-E341-481F-B476-3524580F5839
-          player: 90fee62d-e7fd-4a2d-8584-3de4e9f989c7
+        - id: Offering_selected_for_Asset_creates_ConsignmentAsset._2C62E001-E341-481F-B476-3524580F5839
+          player: Asset
           role_name: _2C62E001-E341-481F-B476-3524580F5839
-        - id: _E5F99091-5B8E-4D09-8A82-BAF24564B58F
-          player: 14df0c2c-67f6-4f72-8289-80d53c6a3bda
+        - id: Offering_selected_for_Asset_creates_ConsignmentAsset._E5F99091-5B8E-4D09-8A82-BAF24564B58F
+          player: ConsignmentAsset
           role_name: _E5F99091-5B8E-4D09-8A82-BAF24564B58F
       readings:
         - "{0} selected for {1} creates {2}"
       constraints:
         - type: internal_uniqueness
           roles:
-            - _2C62E001-E341-481F-B476-3524580F5839
-            - _BEFBB9A9-B964-4C3E-967D-F81BCC8D49F1
-          is_preferred: true
-          id: cbec3579-ae1a-4daf-9074-40b6d69c87e2
+            - Offering_selected_for_Asset_creates_ConsignmentAsset._2C62E001-E341-481F-B476-3524580F5839
+            - Offering_selected_for_Asset_creates_ConsignmentAsset._BEFBB9A9-B964-4C3E-967D-F81BCC8D49F1
+          id: For_each_Asset_and_Offering_combination,_at_most_one_ConsignmentAsset_applies
+          minted_from: '{"type":"internal_uniqueness","roles":[[1,"_2C62E001-E341-481F-B476-3524580F5839",{"name":"OfferingSelectedForAssetCreatesConsignmentAsset","readings":["{0} selected for {1} creates {2}"],"players":["Offering","Asset","ConsignmentAsset"]}],[0,"_BEFBB9A9-B964-4C3E-967D-F81BCC8D49F1",{"name":"OfferingSelectedForAssetCreatesConsignmentAsset","readings":["{0} selected for {1} creates {2}"],"players":["Offering","Asset","ConsignmentAsset"]}]],"fact_type":{"name":"OfferingSelectedForAssetCreatesConsignmentAsset","readings":["{0} selected for {1} creates {2}"],"players":["Offering","Asset","ConsignmentAsset"]}}'
         - type: mandatory
-          role: _E5F99091-5B8E-4D09-8A82-BAF24564B58F
-          id: a06df7db-e178-433e-8e46-4ff1980df5a5
-    - id: 1ac6a8a1-dfe1-4806-b1e4-55568733f937
+          role: Offering_selected_for_Asset_creates_ConsignmentAsset._E5F99091-5B8E-4D09-8A82-BAF24564B58F
+          id: For_each_ConsignmentAsset,_some_Offering_selected_for_some_Asset_creates_that_ConsignmentAsset
+          minted_from: '{"type":"mandatory","role":[2,"_E5F99091-5B8E-4D09-8A82-BAF24564B58F",{"name":"OfferingSelectedForAssetCreatesConsignmentAsset","readings":["{0} selected for {1} creates {2}"],"players":["Offering","Asset","ConsignmentAsset"]}],"fact_type":{"name":"OfferingSelectedForAssetCreatesConsignmentAsset","readings":["{0} selected for {1} creates {2}"],"players":["Offering","Asset","ConsignmentAsset"]}}'
+    - id: ConsignmentAssetIsSoldThroughChannel
       name: ConsignmentAssetIsSoldThroughChannel
       roles:
-        - id: _91A5AA5C-FFC7-4327-9D05-537D106FFFD9
-          player: 14df0c2c-67f6-4f72-8289-80d53c6a3bda
+        - id: ConsignmentAssetIsSoldThroughChannel._91A5AA5C-FFC7-4327-9D05-537D106FFFD9
+          player: ConsignmentAsset
           role_name: _91A5AA5C-FFC7-4327-9D05-537D106FFFD9
-        - id: _6A6819F9-6EFB-4BCB-BB5A-1E64B3F87F2D
-          player: 2a13df2b-ec46-4007-aa49-a23f73bf6563
+        - id: ConsignmentAssetIsSoldThroughChannel._6A6819F9-6EFB-4BCB-BB5A-1E64B3F87F2D
+          player: auctions:Channel
           role_name: _6A6819F9-6EFB-4BCB-BB5A-1E64B3F87F2D
       readings:
         - "{0} is sold through {1}"
       constraints:
         - type: internal_uniqueness
           roles:
-            - _91A5AA5C-FFC7-4327-9D05-537D106FFFD9
-          id: abef36aa-4263-4d51-815f-23166f7adb7c
+            - ConsignmentAssetIsSoldThroughChannel._91A5AA5C-FFC7-4327-9D05-537D106FFFD9
+          id: Each_ConsignmentAsset_is_sold_through_at_most_one_Channel
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"_91A5AA5C-FFC7-4327-9D05-537D106FFFD9",{"name":"ConsignmentAssetIsSoldThroughChannel","readings":["{0} is sold through {1}"],"players":["ConsignmentAsset","Channel"]}]],"fact_type":{"name":"ConsignmentAssetIsSoldThroughChannel","readings":["{0} is sold through {1}"],"players":["ConsignmentAsset","Channel"]}}'
         - type: mandatory
-          role: _91A5AA5C-FFC7-4327-9D05-537D106FFFD9
-          id: 1b72de7f-2e06-438f-acd1-e3ea6b1d1580
-    - id: 2e39548a-bfb3-443d-8744-67f3d26d4025
+          role: ConsignmentAssetIsSoldThroughChannel._91A5AA5C-FFC7-4327-9D05-537D106FFFD9
+          id: Each_ConsignmentAsset_is_sold_through_at_least_one_Channel
+          minted_from: '{"type":"mandatory","role":[0,"_91A5AA5C-FFC7-4327-9D05-537D106FFFD9",{"name":"ConsignmentAssetIsSoldThroughChannel","readings":["{0} is sold through {1}"],"players":["ConsignmentAsset","Channel"]}],"fact_type":{"name":"ConsignmentAssetIsSoldThroughChannel","readings":["{0} is sold through {1}"],"players":["ConsignmentAsset","Channel"]}}'
+    - id: ConsignmentAssetIsSoldInAuction
       name: ConsignmentAssetIsSoldInAuction
       roles:
-        - id: _10F80488-1FF6-43CA-B561-120F40B57723
-          player: 14df0c2c-67f6-4f72-8289-80d53c6a3bda
+        - id: ConsignmentAssetIsSoldInAuction._10F80488-1FF6-43CA-B561-120F40B57723
+          player: ConsignmentAsset
           role_name: _10F80488-1FF6-43CA-B561-120F40B57723
-        - id: _7D5E48F6-67F3-4C39-BD6E-DA1F00134680
-          player: 39a503b7-4caa-4c25-9eea-d9817bf69a30
+        - id: ConsignmentAssetIsSoldInAuction._7D5E48F6-67F3-4C39-BD6E-DA1F00134680
+          player: auctions:Auction
           role_name: _7D5E48F6-67F3-4C39-BD6E-DA1F00134680
       readings:
         - "{0} is sold in {1}"
       constraints:
         - type: internal_uniqueness
           roles:
-            - _10F80488-1FF6-43CA-B561-120F40B57723
-          id: ef61728c-8db0-4ae0-9d65-484d7460b8e6
-    - id: 3eb6a100-f5f5-41c0-b964-18c1ce6e3897
+            - ConsignmentAssetIsSoldInAuction._10F80488-1FF6-43CA-B561-120F40B57723
+          id: Each_ConsignmentAsset_is_sold_in_at_most_one_Auction
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"_10F80488-1FF6-43CA-B561-120F40B57723",{"name":"ConsignmentAssetIsSoldInAuction","readings":["{0} is sold in {1}"],"players":["ConsignmentAsset","Auction"]}]],"fact_type":{"name":"ConsignmentAssetIsSoldInAuction","readings":["{0} is sold in {1}"],"players":["ConsignmentAsset","Auction"]}}'
+    - id: ConsignmentAssetIsSoldFromLocation
       name: ConsignmentAssetIsSoldFromLocation
       roles:
-        - id: _A5DE3E4F-E392-4DF0-A23C-B63A9A851004
-          player: 14df0c2c-67f6-4f72-8289-80d53c6a3bda
+        - id: ConsignmentAssetIsSoldFromLocation._A5DE3E4F-E392-4DF0-A23C-B63A9A851004
+          player: ConsignmentAsset
           role_name: _A5DE3E4F-E392-4DF0-A23C-B63A9A851004
-        - id: _14602BFC-8BCC-486F-B6B1-3E2A451400F2
-          player: d38e013f-2e99-4869-8876-2a5537b86b22
+        - id: ConsignmentAssetIsSoldFromLocation._14602BFC-8BCC-486F-B6B1-3E2A451400F2
+          player: parties:Location
           role_name: _14602BFC-8BCC-486F-B6B1-3E2A451400F2
       readings:
         - "{0} is sold from {1}"
       constraints:
         - type: internal_uniqueness
           roles:
-            - _A5DE3E4F-E392-4DF0-A23C-B63A9A851004
-          id: 11e0537c-88e6-4ad3-9fe9-11a37e5475e7
+            - ConsignmentAssetIsSoldFromLocation._A5DE3E4F-E392-4DF0-A23C-B63A9A851004
+          id: Each_ConsignmentAsset_is_sold_from_at_most_one_Location
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"_A5DE3E4F-E392-4DF0-A23C-B63A9A851004",{"name":"ConsignmentAssetIsSoldFromLocation","readings":["{0} is sold from {1}"],"players":["ConsignmentAsset","Location"]}]],"fact_type":{"name":"ConsignmentAssetIsSoldFromLocation","readings":["{0} is sold from {1}"],"players":["ConsignmentAsset","Location"]}}'
         - type: mandatory
-          role: _A5DE3E4F-E392-4DF0-A23C-B63A9A851004
-          id: b883e07f-bfcd-4f49-90f8-342967c665cf
-    - id: a15942a6-9821-4679-9213-e23d4cc02707
+          role: ConsignmentAssetIsSoldFromLocation._A5DE3E4F-E392-4DF0-A23C-B63A9A851004
+          id: Each_ConsignmentAsset_is_sold_from_at_least_one_Location
+          minted_from: '{"type":"mandatory","role":[0,"_A5DE3E4F-E392-4DF0-A23C-B63A9A851004",{"name":"ConsignmentAssetIsSoldFromLocation","readings":["{0} is sold from {1}"],"players":["ConsignmentAsset","Location"]}],"fact_type":{"name":"ConsignmentAssetIsSoldFromLocation","readings":["{0} is sold from {1}"],"players":["ConsignmentAsset","Location"]}}'
+    - id: ConsignmentAssetHasListing
       name: ConsignmentAssetHasListing
       roles:
-        - id: _0CA3AA8C-5CFD-4DE8-AFCF-791DBBA695DA
-          player: 14df0c2c-67f6-4f72-8289-80d53c6a3bda
+        - id: ConsignmentAssetHasListing._0CA3AA8C-5CFD-4DE8-AFCF-791DBBA695DA
+          player: ConsignmentAsset
           role_name: _0CA3AA8C-5CFD-4DE8-AFCF-791DBBA695DA
-        - id: _251C7626-B0C8-44F7-AAC2-CC89F5DC1D1F
-          player: b8ee656e-f276-4cdc-ba57-11a8a6fac7c9
+        - id: ConsignmentAssetHasListing._251C7626-B0C8-44F7-AAC2-CC89F5DC1D1F
+          player: auctions:Listing
           role_name: _251C7626-B0C8-44F7-AAC2-CC89F5DC1D1F
       readings:
         - "{0} has {1}"
       constraints:
         - type: internal_uniqueness
           roles:
-            - _251C7626-B0C8-44F7-AAC2-CC89F5DC1D1F
-          id: e1d4d0c9-c6ff-443d-b511-0f1655689fc5
+            - ConsignmentAssetHasListing._251C7626-B0C8-44F7-AAC2-CC89F5DC1D1F
+          id: For_each_Listing,_at_most_one_ConsignmentAsset_has_that_Listing
+          minted_from: '{"type":"internal_uniqueness","roles":[[1,"_251C7626-B0C8-44F7-AAC2-CC89F5DC1D1F",{"name":"ConsignmentAssetHasListing","readings":["{0} has {1}"],"players":["ConsignmentAsset","Listing"]}]],"fact_type":{"name":"ConsignmentAssetHasListing","readings":["{0} has {1}"],"players":["ConsignmentAsset","Listing"]}}'
         - type: mandatory
-          role: _251C7626-B0C8-44F7-AAC2-CC89F5DC1D1F
-          id: 8f7cf618-c12f-4442-a60a-80962b3f368a
-    - id: cdac66c0-bead-4df0-9685-04827b55bf6a
+          role: ConsignmentAssetHasListing._251C7626-B0C8-44F7-AAC2-CC89F5DC1D1F
+          id: For_each_Listing,_some_ConsignmentAsset_has_that_Listing
+          minted_from: '{"type":"mandatory","role":[1,"_251C7626-B0C8-44F7-AAC2-CC89F5DC1D1F",{"name":"ConsignmentAssetHasListing","readings":["{0} has {1}"],"players":["ConsignmentAsset","Listing"]}],"fact_type":{"name":"ConsignmentAssetHasListing","readings":["{0} has {1}"],"players":["ConsignmentAsset","Listing"]}}'
+    - id: ConsignmentAssetHasShootPrice
       name: ConsignmentAssetHasShootPrice
       roles:
-        - id: _1C967E8A-82A6-424C-887D-38B268F0BCC6
-          player: 14df0c2c-67f6-4f72-8289-80d53c6a3bda
+        - id: ConsignmentAssetHasShootPrice._1C967E8A-82A6-424C-887D-38B268F0BCC6
+          player: ConsignmentAsset
           role_name: _1C967E8A-82A6-424C-887D-38B268F0BCC6
-        - id: _38FFFB50-FA94-4E01-AE1B-B45DA213626F
-          player: d94005c2-028a-49e9-98e8-a58e28f18aec
+        - id: ConsignmentAssetHasShootPrice._38FFFB50-FA94-4E01-AE1B-B45DA213626F
+          player: auctions:Price
           role_name: _38FFFB50-FA94-4E01-AE1B-B45DA213626F
       readings:
         - "{0} has shoot- {1}"
       constraints:
         - type: internal_uniqueness
           roles:
-            - _1C967E8A-82A6-424C-887D-38B268F0BCC6
-          id: e8877de8-ab73-47a9-b3d6-4a2f878fd288
+            - ConsignmentAssetHasShootPrice._1C967E8A-82A6-424C-887D-38B268F0BCC6
+          id: Each_ConsignmentAsset_has_at_most_one_shoot_Price
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"_1C967E8A-82A6-424C-887D-38B268F0BCC6",{"name":"ConsignmentAssetHasShootPrice","readings":["{0} has shoot- {1}"],"players":["ConsignmentAsset","Price"]}]],"fact_type":{"name":"ConsignmentAssetHasShootPrice","readings":["{0} has shoot- {1}"],"players":["ConsignmentAsset","Price"]}}'
         - type: mandatory
-          role: _1C967E8A-82A6-424C-887D-38B268F0BCC6
-          id: d01bc6c9-fc72-4334-9e5c-99dac7cd5b9c
+          role: ConsignmentAssetHasShootPrice._1C967E8A-82A6-424C-887D-38B268F0BCC6
+          id: Each_ConsignmentAsset_has_at_least_one_shoot_Price
+          minted_from: '{"type":"mandatory","role":[0,"_1C967E8A-82A6-424C-887D-38B268F0BCC6",{"name":"ConsignmentAssetHasShootPrice","readings":["{0} has shoot- {1}"],"players":["ConsignmentAsset","Price"]}],"fact_type":{"name":"ConsignmentAssetHasShootPrice","readings":["{0} has shoot- {1}"],"players":["ConsignmentAsset","Price"]}}'
+  constraints:
+    - type: external_uniqueness
+      roles:
+        - MakeProvidesModel._E4F47F2B-B040-416C-8E95-87FEF96E0BCD
+        - ModelHasModelId._219CBB23-16CD-44E3-AD04-D3B2EA604084
+      id: The_combination_of_Make_and_Model_id_is_unique_across_fact_types
+      minted_from: '{"type":"external_uniqueness","roles":[[0,"_E4F47F2B-B040-416C-8E95-87FEF96E0BCD",{"name":"MakeProvidesModel","readings":["{0} provides {1}"],"players":["Make","Model"]}],[1,"_219CBB23-16CD-44E3-AD04-D3B2EA604084",{"name":"ModelHasModelId","readings":["{0} has {1}"],"players":["Model","Model_id"]}]]}'
+    - type: disjunctive_mandatory
+      roles:
+        - ClassificationHasIndustry._90417B30-2580-4023-B399-356156E8813C
+        - ClassificationHasMake._8F372D77-8A98-4FEC-9C3D-E943F33AB0C2
+      id: Each_Classification_has_some_Industry_or_has_some_Make
+      minted_from: '{"type":"disjunctive_mandatory","roles":[[0,"_90417B30-2580-4023-B399-356156E8813C",{"name":"ClassificationHasIndustry","readings":["{0} has {1}"],"players":["Classification","Industry"]}],[0,"_8F372D77-8A98-4FEC-9C3D-E943F33AB0C2",{"name":"ClassificationHasMake","readings":["{0} has {1}"],"players":["Classification","Make"]}]]}'
+    - type: subset
+      subset_roles:
+        - ClassificationHasCategory._C92815F2-80CD-4D51-871A-115AEC5833E2
+      superset_roles:
+        - ClassificationHasIndustry._90417B30-2580-4023-B399-356156E8813C
+      id: If_Classification_in_ClassificationHasCategory_then_Classification_in_ClassificationHasIndustry
+      minted_from: '{"type":"subset","subset_roles":[[0,"_C92815F2-80CD-4D51-871A-115AEC5833E2",{"name":"ClassificationHasCategory","readings":["{0} has {1}"],"players":["Classification","Category"]}]],"superset_roles":[[0,"_90417B30-2580-4023-B399-356156E8813C",{"name":"ClassificationHasIndustry","readings":["{0} has {1}"],"players":["Classification","Industry"]}]]}'
+    - type: subset
+      subset_roles:
+        - ClassificationHasAssetType._FD945FCD-8680-4A9A-B117-BD767B1F241F
+      superset_roles:
+        - ClassificationHasCategory._C92815F2-80CD-4D51-871A-115AEC5833E2
+      id: If_Classification_in_ClassificationHasAssetType_then_Classification_in_ClassificationHasCategory
+      minted_from: '{"type":"subset","subset_roles":[[0,"_FD945FCD-8680-4A9A-B117-BD767B1F241F",{"name":"ClassificationHasAssetType","readings":["{0} has {1}"],"players":["Classification","AssetType"]}]],"superset_roles":[[0,"_C92815F2-80CD-4D51-871A-115AEC5833E2",{"name":"ClassificationHasCategory","readings":["{0} has {1}"],"players":["Classification","Category"]}]]}'
+    - type: subset
+      subset_roles:
+        - ClassificationHasModel._B486C852-9FA5-461A-94E4-186C26DE36A2
+      superset_roles:
+        - ClassificationHasMake._8F372D77-8A98-4FEC-9C3D-E943F33AB0C2
+      id: If_Classification_in_ClassificationHasModel_then_Classification_in_ClassificationHasMake
+      minted_from: '{"type":"subset","subset_roles":[[0,"_B486C852-9FA5-461A-94E4-186C26DE36A2",{"name":"ClassificationHasModel","readings":["{0} has {1}"],"players":["Classification","Model"]}]],"superset_roles":[[0,"_8F372D77-8A98-4FEC-9C3D-E943F33AB0C2",{"name":"ClassificationHasMake","readings":["{0} has {1}"],"players":["Classification","Make"]}]]}'
   subtype_facts:
-    - id: 8dcaa753-cd8b-492b-b3dd-3e37bc601521
-      subtype: 1acacb95-49ec-4ef8-b74e-80189d45cf6e
-      supertype: 14df0c2c-67f6-4f72-8289-80d53c6a3bda
-    - id: 9f066293-f09c-4e8e-86e4-2684b054d39d
-      subtype: d4854fd5-78ee-47f9-8d16-b87451da8ba3
-      supertype: 14df0c2c-67f6-4f72-8289-80d53c6a3bda
-    - id: 9319da4c-95fa-4f8a-aada-9b1d79a20c32
-      subtype: e5bc8da8-6436-447c-8345-37be3854772c
-      supertype: 82e3736b-6edc-416b-a84c-8555a83821aa
-    - id: d6caea08-f18f-4c73-a0a8-d98f10d320a8
-      subtype: 00ca8f65-b08a-46ea-8bfd-581029549392
-      supertype: 82e3736b-6edc-416b-a84c-8555a83821aa
-    - id: ec17e317-2871-4aa8-9f98-f254606d8045
-      subtype: f73d7bce-6558-45ec-99bb-091a2a8b4d66
-      supertype: 82e3736b-6edc-416b-a84c-8555a83821aa
-    - id: 7394faae-0d0b-44ad-b56c-b1f286c401f9
-      subtype: 54ba2f24-05ea-4993-b227-05f2346600fd
-      supertype: 82e3736b-6edc-416b-a84c-8555a83821aa
-    - id: 72f585e9-8157-450b-b323-b483f28dc6dd
-      subtype: 8f685150-b875-426b-951f-6ed7a3815116
-      supertype: 82e3736b-6edc-416b-a84c-8555a83821aa
-    - id: 0423e62b-756f-4b63-8ca8-c408053ebbc0
-      subtype: 10be50fd-ffe9-4bb1-b9f3-2dba0114cf07
-      supertype: 82e3736b-6edc-416b-a84c-8555a83821aa
+    - id: GroupItem_is_a_subtype_of_ConsignmentAsset
+      minted_from: '{"subtype":"GroupItem","supertype":"ConsignmentAsset","defining_rule":null}'
+      subtype: GroupItem
+      supertype: ConsignmentAsset
+    - id: SimpleItem_is_a_subtype_of_ConsignmentAsset
+      minted_from: '{"subtype":"SimpleItem","supertype":"ConsignmentAsset","defining_rule":null}'
+      subtype: SimpleItem
+      supertype: ConsignmentAsset
+    - id: RefurbishmentAndRepair_is_a_subtype_of_Service
+      minted_from: '{"subtype":"RefurbishmentAndRepair","supertype":"Service","defining_rule":null}'
+      subtype: RefurbishmentAndRepair
+      supertype: Service
+    - id: Inspection_is_a_subtype_of_Service
+      minted_from: '{"subtype":"Inspection","supertype":"Service","defining_rule":null}'
+      subtype: Inspection
+      supertype: Service
+    - id: LienSearch_is_a_subtype_of_Service
+      minted_from: '{"subtype":"LienSearch","supertype":"Service","defining_rule":null}'
+      subtype: LienSearch
+      supertype: Service
+    - id: TitleTransfer_is_a_subtype_of_Service
+      minted_from: '{"subtype":"TitleTransfer","supertype":"Service","defining_rule":null}'
+      subtype: TitleTransfer
+      supertype: Service
+    - id: Transportation_is_a_subtype_of_Service
+      minted_from: '{"subtype":"Transportation","supertype":"Service","defining_rule":null}'
+      subtype: Transportation
+      supertype: Service
+    - id: Consignment_is_a_subtype_of_Service
+      minted_from: '{"subtype":"Consignment","supertype":"Service","defining_rule":null}'
+      subtype: Consignment
+      supertype: Service
   objectified_fact_types:
-    - id: e0b4dee3-5177-4c66-9f75-3ea1458b7441
-      fact_type: 3051a000-0e9d-49f2-98d7-a91959dc37d4
-      object_type: fc5ff711-69ca-4afe-af08-7f5c890d8e1f
+    - id: OfferingSelectedForAssetCreatesConsignmentAsset_is_where_Offering_selected_for_Asset_creates_ConsignmentAsset
+      minted_from: '{"fact_type":{"name":"OfferingSelectedForAssetCreatesConsignmentAsset","readings":["{0} selected for {1} creates {2}"],"players":["Offering","Asset","ConsignmentAsset"]},"object_type":"OfferingSelectedForAssetCreatesConsignmentAsset"}'
+      fact_type: Offering_selected_for_Asset_creates_ConsignmentAsset
+      object_type: OfferingSelectedForAssetCreatesConsignmentAsset

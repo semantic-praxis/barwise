@@ -1,11 +1,12 @@
 # Enforceable ADR practice
 
-Status: WS1 implemented 2026-11-04 (check:adr-tests refuses a decision whose tagged tests all skipped; credential-handling#gitleaks-detects declared through its probe tests). WS2-WS5 not started.
+Status: WS1 implemented 2026-11-04 (check:adr-tests refuses a decision whose tagged tests all skipped; credential-handling#gitleaks-detects declared through its probe tests); WS3 implemented 2026-11-05 (the 87 gap issues labelled adr-gap; check:architecture requires the label, the title prefix, one decision per none entry, and one entry per gap issue). WS2, WS4 and WS5 not started.
 
 Created: 2026-11-04
-Last-updated: 2026-11-04
+Last-updated: 2026-11-05
 Tracking: barwise-ym8.gxp (barwise-ym8.krj, barwise-ym8.kva, barwise-ym8.gc9; follows docs/specs/executable-adrs.spec.md)
 Touches: barwise/scripts/check-adr-tests.mjs, barwise/scripts/check-architecture.mjs, barwise/scripts/lib/adr-enforcement.mjs,
+barwise/scripts/lib/adr-judge.mjs,
 barwise/scripts/mutate.mjs, barwise/scripts/tests/check-adr-tests.test.mjs,
 barwise/scripts/tests/gates.test.mjs, barwise/scripts/tests/expected-counts.json,
 barwise/docs/adr/credential-handling.md, barwise/docs/ARCHITECTURE.md,
@@ -214,6 +215,18 @@ nothing and is removed. `template.adr.md`'s comment, which writes
 one entry, and one issue named twice, each exit 1 naming the entry; they
 join an existing case where they can, and `expected-counts.json` is
 rewritten with `--write` for whatever count changes.
+
+WS3 implementation note (2026-11-05). The `none` branch this section
+places in `check-architecture.mjs` has lived in `scripts/lib/adr-judge.mjs`
+since the reader/judge split (#910, `docs/specs/adr-gate-reader-split.spec.md`),
+so the checks went there, and the label is `GAP_LABEL` in
+`adr-enforcement.mjs`. The issue-named-twice check needs no tracker, so it
+runs before the tracker is read and is judged even when the tracker is
+not. With two ids the title is not checked, since there is no one
+decision for it to name; the one-id finding covers that entry. Each new
+case was seen red: the test fails with each check disabled in turn, and
+`check:architecture` exits 1 on the real tree with one real issue's label
+removed.
 
 ### 4. The authoring step
 

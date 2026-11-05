@@ -14,10 +14,10 @@ import { OrmYamlSerializer } from "../../src/serialization/OrmYamlSerializer.js"
 
 const UUID_V8 = /^[0-9a-f]{8}-[0-9a-f]{4}-8[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 
-const shopPath = resolve(
-  dirname(fileURLToPath(import.meta.url)),
-  "../../../../examples/getting-started/shop.orm.yaml",
-);
+// The getting-started shop as it stood at format 2.0, which omits its
+// constraint ids; the example itself is 4.0 now (iri-identity WS7), so
+// the 2.0 copy is kept here for this test.
+const shopPath = resolve(dirname(fileURLToPath(import.meta.url)), "../fixtures/shop-2.0.orm.yaml");
 
 function withConstraints(constraints: string): string {
   return `orm_version: "2.0"

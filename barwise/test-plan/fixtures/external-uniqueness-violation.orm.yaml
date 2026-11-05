@@ -1,5 +1,4 @@
-orm_version: "1.0"
-
+orm_version: "4.0"
 # Exercises the external-uniqueness feature (WS4c): a Room is identified by
 # the combination of its Building and its RoomNumber -- two roles that live
 # in different fact types, joined on the common Room. The population below
@@ -9,88 +8,94 @@ orm_version: "1.0"
 # `verbalize --counterexamples`; the external-uniqueness counterexample mints
 # two Rooms that collide on the combination.
 model:
-  name: "Room Identification (external uniqueness, VIOLATING)"
-
+  name: Room Identification (external uniqueness, VIOLATING)
   object_types:
-    - id: "ot-room"
-      name: "Room"
-      kind: "entity"
-      reference_mode: "room_id"
-    - id: "ot-building"
-      name: "Building"
-      kind: "entity"
-      reference_mode: "building_code"
-    - id: "ot-roomnumber"
-      name: "RoomNumber"
-      kind: "value"
-
+    - id: Room
+      name: Room
+      kind: entity
+      reference_mode: room_id
+    - id: Building
+      name: Building
+      kind: entity
+      reference_mode: building_code
+    - id: RoomNumber
+      name: RoomNumber
+      kind: value
   fact_types:
-    - id: "ft-room-in-building"
-      name: "Room is in Building"
+    - id: Room_is_in_Building
+      name: Room is in Building
       roles:
-        - id: "r-room-in"
-          player: "ot-room"
-          role_name: "is in"
-        - id: "r-building-houses"
-          player: "ot-building"
-          role_name: "houses"
+        - id: Room_is_in_Building.is_in
+          player: Room
+          role_name: is in
+        - id: Room_is_in_Building.houses
+          player: Building
+          role_name: houses
       readings:
         - "{0} is in {1}"
         - "{1} houses {0}"
       constraints:
-        - type: "internal_uniqueness"
-          roles: ["r-room-in"]
-        # External uniqueness: Building + RoomNumber jointly identify a Room.
-        - type: "external_uniqueness"
-          roles: ["r-building-houses", "r-roomnumber-numbers"]
-
-    - id: "ft-room-has-number"
-      name: "Room has RoomNumber"
+        - type: internal_uniqueness
+          roles:
+            - Room_is_in_Building.is_in
+          id: Each_Room_is_in_at_most_one_Building
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"is in",{"name":"Room is in Building","readings":["{0} is in {1}","{1} houses {0}"],"players":["Room","Building"]}]],"fact_type":{"name":"Room is in Building","readings":["{0} is in {1}","{1} houses {0}"],"players":["Room","Building"]}}'
+    - id: Room_has_RoomNumber
+      name: Room has RoomNumber
       roles:
-        - id: "r-room-has"
-          player: "ot-room"
-          role_name: "has"
-        - id: "r-roomnumber-numbers"
-          player: "ot-roomnumber"
-          role_name: "numbers"
+        - id: Room_has_RoomNumber.has
+          player: Room
+          role_name: has
+        - id: Room_has_RoomNumber.numbers
+          player: RoomNumber
+          role_name: numbers
       readings:
         - "{0} has {1}"
         - "{1} numbers {0}"
       constraints:
-        - type: "internal_uniqueness"
-          roles: ["r-room-has"]
-
+        - type: internal_uniqueness
+          roles:
+            - Room_has_RoomNumber.has
+          id: Each_Room_has_at_most_one_RoomNumber
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"has",{"name":"Room has RoomNumber","readings":["{0} has {1}","{1} numbers {0}"],"players":["Room","RoomNumber"]}]],"fact_type":{"name":"Room has RoomNumber","readings":["{0} has {1}","{1} numbers {0}"],"players":["Room","RoomNumber"]}}'
+  constraints:
+    # External uniqueness: Building + RoomNumber jointly identify a Room.
+    - type: external_uniqueness
+      roles:
+        - Room_is_in_Building.houses
+        - Room_has_RoomNumber.numbers
+      id: The_combination_of_Building_and_RoomNumber_is_unique_across_fact_types
+      minted_from: '{"type":"external_uniqueness","roles":[[1,"houses",{"name":"Room is in Building","readings":["{0} is in {1}","{1} houses {0}"],"players":["Room","Building"]}],[1,"numbers",{"name":"Room has RoomNumber","readings":["{0} has {1}","{1} numbers {0}"],"players":["Room","RoomNumber"]}]]}'
   populations:
-    - id: "pop-rooms-in-buildings"
-      fact_type: "ft-room-in-building"
-      description: "Which building each room is in"
+    - id: Room_is_in_Building.population
+      fact_type: Room_is_in_Building
       instances:
-        - id: "inst-rb-1"
+        - id: Room_is_in_Building.population.1
           role_values:
-            r-room-in: "R1"
-            r-building-houses: "B1"
-        - id: "inst-rb-2"
+            Room_is_in_Building.is_in: R1
+            Room_is_in_Building.houses: B1
+        - id: Room_is_in_Building.population.2
           role_values:
-            r-room-in: "R2"
-            r-building-houses: "B1"
-        - id: "inst-rb-3"
+            Room_is_in_Building.is_in: R2
+            Room_is_in_Building.houses: B1
+        - id: Room_is_in_Building.population.3
           role_values:
-            r-room-in: "R3"
-            r-building-houses: "B2"
-
-    - id: "pop-room-numbers"
-      fact_type: "ft-room-has-number"
-      description: "Each room's number (distinct within a building)"
+            Room_is_in_Building.is_in: R3
+            Room_is_in_Building.houses: B2
+      description: Which building each room is in
+    - id: Room_has_RoomNumber.population
+      fact_type: Room_has_RoomNumber
       instances:
-        - id: "inst-rn-1"
+        - id: Room_has_RoomNumber.population.1
           role_values:
-            r-room-has: "R1"
-            r-roomnumber-numbers: "101"
-        - id: "inst-rn-2"
+            Room_has_RoomNumber.has: R1
+            Room_has_RoomNumber.numbers: "101"
+        - id: Room_has_RoomNumber.population.2
           role_values:
-            r-room-has: "R2"
-            r-roomnumber-numbers: "101"
-        - id: "inst-rn-3"
+            Room_has_RoomNumber.has: R2
+            Room_has_RoomNumber.numbers: "101"
+        - id: Room_has_RoomNumber.population.3
           role_values:
-            r-room-has: "R3"
-            r-roomnumber-numbers: "101"
+            Room_has_RoomNumber.has: R3
+            Room_has_RoomNumber.numbers: "101"
+      description: Each room's number (distinct within a building)

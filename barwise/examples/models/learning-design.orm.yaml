@@ -1,25 +1,27 @@
-orm_version: "1.0"
+orm_version: "4.0"
 model:
   name: Learning Design Standard
   object_types:
-    - id: 61d1151e-0188-50af-9ab9-8c4216a3bed1
+    - id: LearningModule
       name: LearningModule
       kind: entity
       reference_mode: module_name
+      preferred_identifier: Each_ModuleName_identifies_at_most_one_LearningModule
       definition: A unit of learning content authored to the standard -- a deck subdeck, a gym exercise, or a tutorial chapter.
-    - id: 4afe101c-c633-5fe6-b019-1513fc8d6a17
+    - id: ModuleName
       name: ModuleName
       kind: value
       definition: The unique name of a learning module.
       data_type:
         name: text
         length: 100
-    - id: 3f78b57e-ce69-5557-8cfc-8555e4607dde
+    - id: ProficiencyLevel
       name: ProficiencyLevel
       kind: entity
       reference_mode: level_name
+      preferred_identifier: Each_LevelName_identifies_at_most_one_ProficiencyLevel
       definition: A rung on the six-level proficiency scale the standard's transitions are named on.
-    - id: 74bf467e-4281-53ad-8333-6bb8b2578db4
+    - id: LevelName
       name: LevelName
       kind: value
       definition: The name of a proficiency level.
@@ -34,24 +36,26 @@ model:
       data_type:
         name: text
         length: 100
-    - id: 06daba0b-9a47-523b-b775-7a600b25d97c
+    - id: ReductiveBias
       name: ReductiveBias
       kind: entity
       reference_mode: bias_name
+      preferred_identifier: Each_BiasName_identifies_at_most_one_ReductiveBias
       definition: A known wrong reading of ORM imported from another modeling tradition, catalogued with the trap that exposes it.
-    - id: 1f0a19ca-617f-5cfb-8902-698261907df3
+    - id: BiasName
       name: BiasName
       kind: value
       definition: The short name of a reductive bias in the catalog.
       data_type:
         name: text
         length: 100
-    - id: ccba718f-496a-51c7-b06e-7c1f9adf2c92
+    - id: CheckKind
       name: CheckKind
       kind: entity
       reference_mode: check_kind_name
+      preferred_identifier: Each_CheckKindName_identifies_at_most_one_CheckKind
       definition: A deterministic evaluator check kind provided by the barwise gym.
-    - id: eaa7467f-0e2f-5a25-84fd-f55adbd7aef5
+    - id: CheckKindName
       name: CheckKindName
       kind: value
       definition: The name of a gym check kind.
@@ -64,50 +68,53 @@ model:
       data_type:
         name: text
         length: 100
-    - id: 043071ce-9ba1-5e42-94f0-fa55206bb4a5
+    - id: GymCheck
       name: GymCheck
       kind: entity
       reference_mode: check_ref
+      preferred_identifier: Each_CheckRef_identifies_at_most_one_GymCheck
       definition: One authored check inside a gym exercise's rubric.
-    - id: 6f440eb9-66ef-5661-b28a-107f8a0dc9b7
+    - id: CheckRef
       name: CheckRef
       kind: value
       definition: The reference that identifies a check within its exercise.
       data_type:
         name: text
         length: 100
-    - id: 99d87a20-cb9e-5546-9444-ac062884ffcc
+    - id: MissCard
       name: MissCard
       kind: entity
       reference_mode: card_ref
+      preferred_identifier: Each_MissCardRef_identifies_at_most_one_MissCard
       definition: A spaced-repetition card emitted because a learner's candidate failed a gym check.
-    - id: e12ddde9-e5c1-5bec-a985-4a0bc614cb46
+    - id: MissCardRef
       name: MissCardRef
       kind: value
       definition: The reference that identifies an emitted miss card.
       data_type:
         name: text
         length: 100
-    - id: 9c57a9fa-a60b-5a59-ab34-e23fb12545b7
+    - id: DeckCard
       name: DeckCard
       kind: entity
       reference_mode: card_ref
+      preferred_identifier: Each_DeckCardRef_identifies_at_most_one_DeckCard
       definition: An authored card in the static deck tiers.
-    - id: c6a3d8d5-207d-503f-ad3b-6b6bfdacc5a4
+    - id: DeckCardRef
       name: DeckCardRef
       kind: value
       definition: The reference that identifies a deck card.
       data_type:
         name: text
         length: 100
-    - id: 78678e9d-85df-5a22-a334-a6d202c35656
+    - id: ExitPerformance
       name: ExitPerformance
       kind: value
       definition: The observable can-do statement that marks the far side of a module's transition.
       data_type:
         name: text
         length: 500
-    - id: 9fbe8f6f-8ee7-5741-98db-924a0ad85e87
+    - id: Tier
       name: Tier
       kind: value
       definition: The cognitive act a deck card demands.
@@ -120,21 +127,21 @@ model:
       data_type:
         name: text
         length: 20
-    - id: fe3700b1-50b6-5674-8483-223d3477361f
+    - id: Hint
       name: Hint
       kind: value
       definition: Guidance toward the fix, shown while a check is failing and on a miss card's front.
       data_type:
         name: text
         length: 500
-    - id: d4eeb69f-1d88-56ff-b6b8-bf3afc0c9642
+    - id: Diagnosis
       name: Diagnosis
       kind: value
       definition: The authored explanation of why the reading that produced the failure was wrong; a miss card's back.
       data_type:
         name: text
         length: 500
-    - id: 135a722b-47a2-5e89-860c-860734f96917
+    - id: ReadingReference
       name: ReadingReference
       kind: value
       definition: A section or subsection of the ORM literature to study.
@@ -142,14 +149,14 @@ model:
         name: text
         length: 100
   fact_types:
-    - id: 029f7251-42ad-5ada-a83c-bf5f483662d3
+    - id: LearningModule_has_ModuleName
       name: LearningModule has ModuleName
       roles:
-        - id: c49d212d-55ed-566f-9bbb-a2e0367649b4
-          player: 61d1151e-0188-50af-9ab9-8c4216a3bed1
+        - id: LearningModule_has_ModuleName.has
+          player: LearningModule
           role_name: has
-        - id: cbe6081e-3c7b-5c89-af79-0c22be98602e
-          player: 4afe101c-c633-5fe6-b019-1513fc8d6a17
+        - id: LearningModule_has_ModuleName.identifies
+          player: ModuleName
           role_name: identifies
       readings:
         - "{0} has {1}"
@@ -157,21 +164,26 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - c49d212d-55ed-566f-9bbb-a2e0367649b4
-          is_preferred: true
+            - LearningModule_has_ModuleName.has
+          id: Each_LearningModule_has_at_most_one_ModuleName
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"has",{"name":"LearningModule has ModuleName","readings":["{0} has {1}","{1} identifies {0}"],"players":["LearningModule","ModuleName"]}]],"fact_type":{"name":"LearningModule has ModuleName","readings":["{0} has {1}","{1} identifies {0}"],"players":["LearningModule","ModuleName"]}}'
         - type: internal_uniqueness
           roles:
-            - cbe6081e-3c7b-5c89-af79-0c22be98602e
+            - LearningModule_has_ModuleName.identifies
+          id: Each_ModuleName_identifies_at_most_one_LearningModule
+          minted_from: '{"type":"internal_uniqueness","roles":[[1,"identifies",{"name":"LearningModule has ModuleName","readings":["{0} has {1}","{1} identifies {0}"],"players":["LearningModule","ModuleName"]}]],"fact_type":{"name":"LearningModule has ModuleName","readings":["{0} has {1}","{1} identifies {0}"],"players":["LearningModule","ModuleName"]}}'
         - type: mandatory
-          role: c49d212d-55ed-566f-9bbb-a2e0367649b4
-    - id: 24c93fa4-5722-5d8e-85f3-3826b21a5182
+          role: LearningModule_has_ModuleName.has
+          id: Each_LearningModule_has_at_least_one_ModuleName
+          minted_from: '{"type":"mandatory","role":[0,"has",{"name":"LearningModule has ModuleName","readings":["{0} has {1}","{1} identifies {0}"],"players":["LearningModule","ModuleName"]}],"fact_type":{"name":"LearningModule has ModuleName","readings":["{0} has {1}","{1} identifies {0}"],"players":["LearningModule","ModuleName"]}}'
+    - id: ProficiencyLevel_has_LevelName
       name: ProficiencyLevel has LevelName
       roles:
-        - id: a6f1a70d-7b63-55af-bea6-9b498de22bb9
-          player: 3f78b57e-ce69-5557-8cfc-8555e4607dde
+        - id: ProficiencyLevel_has_LevelName.has
+          player: ProficiencyLevel
           role_name: has
-        - id: 083c0b99-ee66-5a1f-93ea-2cd4449c883d
-          player: 74bf467e-4281-53ad-8333-6bb8b2578db4
+        - id: ProficiencyLevel_has_LevelName.identifies
+          player: LevelName
           role_name: identifies
       readings:
         - "{0} has {1}"
@@ -179,21 +191,26 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - a6f1a70d-7b63-55af-bea6-9b498de22bb9
-          is_preferred: true
+            - ProficiencyLevel_has_LevelName.has
+          id: Each_ProficiencyLevel_has_at_most_one_LevelName
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"has",{"name":"ProficiencyLevel has LevelName","readings":["{0} has {1}","{1} identifies {0}"],"players":["ProficiencyLevel","LevelName"]}]],"fact_type":{"name":"ProficiencyLevel has LevelName","readings":["{0} has {1}","{1} identifies {0}"],"players":["ProficiencyLevel","LevelName"]}}'
         - type: internal_uniqueness
           roles:
-            - 083c0b99-ee66-5a1f-93ea-2cd4449c883d
+            - ProficiencyLevel_has_LevelName.identifies
+          id: Each_LevelName_identifies_at_most_one_ProficiencyLevel
+          minted_from: '{"type":"internal_uniqueness","roles":[[1,"identifies",{"name":"ProficiencyLevel has LevelName","readings":["{0} has {1}","{1} identifies {0}"],"players":["ProficiencyLevel","LevelName"]}]],"fact_type":{"name":"ProficiencyLevel has LevelName","readings":["{0} has {1}","{1} identifies {0}"],"players":["ProficiencyLevel","LevelName"]}}'
         - type: mandatory
-          role: a6f1a70d-7b63-55af-bea6-9b498de22bb9
-    - id: 18857147-e244-5717-a4f0-330d6e693017
+          role: ProficiencyLevel_has_LevelName.has
+          id: Each_ProficiencyLevel_has_at_least_one_LevelName
+          minted_from: '{"type":"mandatory","role":[0,"has",{"name":"ProficiencyLevel has LevelName","readings":["{0} has {1}","{1} identifies {0}"],"players":["ProficiencyLevel","LevelName"]}],"fact_type":{"name":"ProficiencyLevel has LevelName","readings":["{0} has {1}","{1} identifies {0}"],"players":["ProficiencyLevel","LevelName"]}}'
+    - id: ReductiveBias_has_BiasName
       name: ReductiveBias has BiasName
       roles:
-        - id: 37d10e16-208b-5fdf-955b-6c04c131869f
-          player: 06daba0b-9a47-523b-b775-7a600b25d97c
+        - id: ReductiveBias_has_BiasName.has
+          player: ReductiveBias
           role_name: has
-        - id: e4cfadba-d9f1-51db-9da7-005d31aa7ce5
-          player: 1f0a19ca-617f-5cfb-8902-698261907df3
+        - id: ReductiveBias_has_BiasName.identifies
+          player: BiasName
           role_name: identifies
       readings:
         - "{0} has {1}"
@@ -201,21 +218,26 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - 37d10e16-208b-5fdf-955b-6c04c131869f
-          is_preferred: true
+            - ReductiveBias_has_BiasName.has
+          id: Each_ReductiveBias_has_at_most_one_BiasName
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"has",{"name":"ReductiveBias has BiasName","readings":["{0} has {1}","{1} identifies {0}"],"players":["ReductiveBias","BiasName"]}]],"fact_type":{"name":"ReductiveBias has BiasName","readings":["{0} has {1}","{1} identifies {0}"],"players":["ReductiveBias","BiasName"]}}'
         - type: internal_uniqueness
           roles:
-            - e4cfadba-d9f1-51db-9da7-005d31aa7ce5
+            - ReductiveBias_has_BiasName.identifies
+          id: Each_BiasName_identifies_at_most_one_ReductiveBias
+          minted_from: '{"type":"internal_uniqueness","roles":[[1,"identifies",{"name":"ReductiveBias has BiasName","readings":["{0} has {1}","{1} identifies {0}"],"players":["ReductiveBias","BiasName"]}]],"fact_type":{"name":"ReductiveBias has BiasName","readings":["{0} has {1}","{1} identifies {0}"],"players":["ReductiveBias","BiasName"]}}'
         - type: mandatory
-          role: 37d10e16-208b-5fdf-955b-6c04c131869f
-    - id: 34e3f755-1b4b-5040-8c8e-bc26ffa86a64
+          role: ReductiveBias_has_BiasName.has
+          id: Each_ReductiveBias_has_at_least_one_BiasName
+          minted_from: '{"type":"mandatory","role":[0,"has",{"name":"ReductiveBias has BiasName","readings":["{0} has {1}","{1} identifies {0}"],"players":["ReductiveBias","BiasName"]}],"fact_type":{"name":"ReductiveBias has BiasName","readings":["{0} has {1}","{1} identifies {0}"],"players":["ReductiveBias","BiasName"]}}'
+    - id: CheckKind_has_CheckKindName
       name: CheckKind has CheckKindName
       roles:
-        - id: 8d399a3a-54c3-529e-b0bd-a1a6d70874aa
-          player: ccba718f-496a-51c7-b06e-7c1f9adf2c92
+        - id: CheckKind_has_CheckKindName.has
+          player: CheckKind
           role_name: has
-        - id: fe86533d-2b32-5f66-854b-60e3c83ee795
-          player: eaa7467f-0e2f-5a25-84fd-f55adbd7aef5
+        - id: CheckKind_has_CheckKindName.identifies
+          player: CheckKindName
           role_name: identifies
       readings:
         - "{0} has {1}"
@@ -223,21 +245,26 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - 8d399a3a-54c3-529e-b0bd-a1a6d70874aa
-          is_preferred: true
+            - CheckKind_has_CheckKindName.has
+          id: Each_CheckKind_has_at_most_one_CheckKindName
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"has",{"name":"CheckKind has CheckKindName","readings":["{0} has {1}","{1} identifies {0}"],"players":["CheckKind","CheckKindName"]}]],"fact_type":{"name":"CheckKind has CheckKindName","readings":["{0} has {1}","{1} identifies {0}"],"players":["CheckKind","CheckKindName"]}}'
         - type: internal_uniqueness
           roles:
-            - fe86533d-2b32-5f66-854b-60e3c83ee795
+            - CheckKind_has_CheckKindName.identifies
+          id: Each_CheckKindName_identifies_at_most_one_CheckKind
+          minted_from: '{"type":"internal_uniqueness","roles":[[1,"identifies",{"name":"CheckKind has CheckKindName","readings":["{0} has {1}","{1} identifies {0}"],"players":["CheckKind","CheckKindName"]}]],"fact_type":{"name":"CheckKind has CheckKindName","readings":["{0} has {1}","{1} identifies {0}"],"players":["CheckKind","CheckKindName"]}}'
         - type: mandatory
-          role: 8d399a3a-54c3-529e-b0bd-a1a6d70874aa
-    - id: 175d1536-9f9d-54de-a552-0106367ae0c8
+          role: CheckKind_has_CheckKindName.has
+          id: Each_CheckKind_has_at_least_one_CheckKindName
+          minted_from: '{"type":"mandatory","role":[0,"has",{"name":"CheckKind has CheckKindName","readings":["{0} has {1}","{1} identifies {0}"],"players":["CheckKind","CheckKindName"]}],"fact_type":{"name":"CheckKind has CheckKindName","readings":["{0} has {1}","{1} identifies {0}"],"players":["CheckKind","CheckKindName"]}}'
+    - id: GymCheck_has_CheckRef
       name: GymCheck has CheckRef
       roles:
-        - id: 1be8680b-85de-51f4-8db6-a382fb55915a
-          player: 043071ce-9ba1-5e42-94f0-fa55206bb4a5
+        - id: GymCheck_has_CheckRef.has
+          player: GymCheck
           role_name: has
-        - id: fc4d02d5-b258-5f28-9b8d-f43b1a601eb4
-          player: 6f440eb9-66ef-5661-b28a-107f8a0dc9b7
+        - id: GymCheck_has_CheckRef.identifies
+          player: CheckRef
           role_name: identifies
       readings:
         - "{0} has {1}"
@@ -245,21 +272,26 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - 1be8680b-85de-51f4-8db6-a382fb55915a
-          is_preferred: true
+            - GymCheck_has_CheckRef.has
+          id: Each_GymCheck_has_at_most_one_CheckRef
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"has",{"name":"GymCheck has CheckRef","readings":["{0} has {1}","{1} identifies {0}"],"players":["GymCheck","CheckRef"]}]],"fact_type":{"name":"GymCheck has CheckRef","readings":["{0} has {1}","{1} identifies {0}"],"players":["GymCheck","CheckRef"]}}'
         - type: internal_uniqueness
           roles:
-            - fc4d02d5-b258-5f28-9b8d-f43b1a601eb4
+            - GymCheck_has_CheckRef.identifies
+          id: Each_CheckRef_identifies_at_most_one_GymCheck
+          minted_from: '{"type":"internal_uniqueness","roles":[[1,"identifies",{"name":"GymCheck has CheckRef","readings":["{0} has {1}","{1} identifies {0}"],"players":["GymCheck","CheckRef"]}]],"fact_type":{"name":"GymCheck has CheckRef","readings":["{0} has {1}","{1} identifies {0}"],"players":["GymCheck","CheckRef"]}}'
         - type: mandatory
-          role: 1be8680b-85de-51f4-8db6-a382fb55915a
-    - id: d572e5b7-97b7-5afd-a3b4-8f95aae907b9
+          role: GymCheck_has_CheckRef.has
+          id: Each_GymCheck_has_at_least_one_CheckRef
+          minted_from: '{"type":"mandatory","role":[0,"has",{"name":"GymCheck has CheckRef","readings":["{0} has {1}","{1} identifies {0}"],"players":["GymCheck","CheckRef"]}],"fact_type":{"name":"GymCheck has CheckRef","readings":["{0} has {1}","{1} identifies {0}"],"players":["GymCheck","CheckRef"]}}'
+    - id: MissCard_has_MissCardRef
       name: MissCard has MissCardRef
       roles:
-        - id: e82cd518-2c36-5d80-a625-872a4b06fd33
-          player: 99d87a20-cb9e-5546-9444-ac062884ffcc
+        - id: MissCard_has_MissCardRef.has
+          player: MissCard
           role_name: has
-        - id: 2e98abb6-0bf8-5108-9c03-7e09b5d1c930
-          player: e12ddde9-e5c1-5bec-a985-4a0bc614cb46
+        - id: MissCard_has_MissCardRef.identifies
+          player: MissCardRef
           role_name: identifies
       readings:
         - "{0} has {1}"
@@ -267,21 +299,26 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - e82cd518-2c36-5d80-a625-872a4b06fd33
-          is_preferred: true
+            - MissCard_has_MissCardRef.has
+          id: Each_MissCard_has_at_most_one_MissCardRef
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"has",{"name":"MissCard has MissCardRef","readings":["{0} has {1}","{1} identifies {0}"],"players":["MissCard","MissCardRef"]}]],"fact_type":{"name":"MissCard has MissCardRef","readings":["{0} has {1}","{1} identifies {0}"],"players":["MissCard","MissCardRef"]}}'
         - type: internal_uniqueness
           roles:
-            - 2e98abb6-0bf8-5108-9c03-7e09b5d1c930
+            - MissCard_has_MissCardRef.identifies
+          id: Each_MissCardRef_identifies_at_most_one_MissCard
+          minted_from: '{"type":"internal_uniqueness","roles":[[1,"identifies",{"name":"MissCard has MissCardRef","readings":["{0} has {1}","{1} identifies {0}"],"players":["MissCard","MissCardRef"]}]],"fact_type":{"name":"MissCard has MissCardRef","readings":["{0} has {1}","{1} identifies {0}"],"players":["MissCard","MissCardRef"]}}'
         - type: mandatory
-          role: e82cd518-2c36-5d80-a625-872a4b06fd33
-    - id: 4a60e5b7-38b3-59d8-b62d-8ab6a9210508
+          role: MissCard_has_MissCardRef.has
+          id: Each_MissCard_has_at_least_one_MissCardRef
+          minted_from: '{"type":"mandatory","role":[0,"has",{"name":"MissCard has MissCardRef","readings":["{0} has {1}","{1} identifies {0}"],"players":["MissCard","MissCardRef"]}],"fact_type":{"name":"MissCard has MissCardRef","readings":["{0} has {1}","{1} identifies {0}"],"players":["MissCard","MissCardRef"]}}'
+    - id: DeckCard_has_DeckCardRef
       name: DeckCard has DeckCardRef
       roles:
-        - id: 530d24f6-4289-539d-b95b-de059169231e
-          player: 9c57a9fa-a60b-5a59-ab34-e23fb12545b7
+        - id: DeckCard_has_DeckCardRef.has
+          player: DeckCard
           role_name: has
-        - id: 7beb71ba-deda-555b-bc47-6dc1b61cf698
-          player: c6a3d8d5-207d-503f-ad3b-6b6bfdacc5a4
+        - id: DeckCard_has_DeckCardRef.identifies
+          player: DeckCardRef
           role_name: identifies
       readings:
         - "{0} has {1}"
@@ -289,41 +326,50 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - 530d24f6-4289-539d-b95b-de059169231e
-          is_preferred: true
+            - DeckCard_has_DeckCardRef.has
+          id: Each_DeckCard_has_at_most_one_DeckCardRef
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"has",{"name":"DeckCard has DeckCardRef","readings":["{0} has {1}","{1} identifies {0}"],"players":["DeckCard","DeckCardRef"]}]],"fact_type":{"name":"DeckCard has DeckCardRef","readings":["{0} has {1}","{1} identifies {0}"],"players":["DeckCard","DeckCardRef"]}}'
         - type: internal_uniqueness
           roles:
-            - 7beb71ba-deda-555b-bc47-6dc1b61cf698
+            - DeckCard_has_DeckCardRef.identifies
+          id: Each_DeckCardRef_identifies_at_most_one_DeckCard
+          minted_from: '{"type":"internal_uniqueness","roles":[[1,"identifies",{"name":"DeckCard has DeckCardRef","readings":["{0} has {1}","{1} identifies {0}"],"players":["DeckCard","DeckCardRef"]}]],"fact_type":{"name":"DeckCard has DeckCardRef","readings":["{0} has {1}","{1} identifies {0}"],"players":["DeckCard","DeckCardRef"]}}'
         - type: mandatory
-          role: 530d24f6-4289-539d-b95b-de059169231e
-    - id: 374efeab-b918-5812-a5f8-38c33a1053b5
+          role: DeckCard_has_DeckCardRef.has
+          id: Each_DeckCard_has_at_least_one_DeckCardRef
+          minted_from: '{"type":"mandatory","role":[0,"has",{"name":"DeckCard has DeckCardRef","readings":["{0} has {1}","{1} identifies {0}"],"players":["DeckCard","DeckCardRef"]}],"fact_type":{"name":"DeckCard has DeckCardRef","readings":["{0} has {1}","{1} identifies {0}"],"players":["DeckCard","DeckCardRef"]}}'
+    - id: LearningModule_advances_ProficiencyLevel_to_ProficiencyLevel
       name: LearningModule advances ProficiencyLevel to ProficiencyLevel
       roles:
-        - id: 59fed0cb-df59-5914-b61f-7cd79a4232d0
-          player: 61d1151e-0188-50af-9ab9-8c4216a3bed1
+        - id: LearningModule_advances_ProficiencyLevel_to_ProficiencyLevel.role1
+          player: LearningModule
           role_name: role1
-        - id: 430b9a88-c029-513b-b209-bc1c0ae7545b
-          player: 3f78b57e-ce69-5557-8cfc-8555e4607dde
+        - id: LearningModule_advances_ProficiencyLevel_to_ProficiencyLevel.role2
+          player: ProficiencyLevel
           role_name: role2
-        - id: ffe6e1f4-ef8f-5c1a-8fb9-bbccad096dfd
-          player: 3f78b57e-ce69-5557-8cfc-8555e4607dde
+        - id: LearningModule_advances_ProficiencyLevel_to_ProficiencyLevel.role3
+          player: ProficiencyLevel
           role_name: role3
       readings:
         - "{0} advances {1} to {2}"
       constraints:
         - type: internal_uniqueness
           roles:
-            - 59fed0cb-df59-5914-b61f-7cd79a4232d0
+            - LearningModule_advances_ProficiencyLevel_to_ProficiencyLevel.role1
+          id: For_each_LearningModule_combination,_at_most_one_ProficiencyLevel_and_ProficiencyLevel_applies
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"role1",{"name":"LearningModule advances ProficiencyLevel to ProficiencyLevel","readings":["{0} advances {1} to {2}"],"players":["LearningModule","ProficiencyLevel","ProficiencyLevel"]}]],"fact_type":{"name":"LearningModule advances ProficiencyLevel to ProficiencyLevel","readings":["{0} advances {1} to {2}"],"players":["LearningModule","ProficiencyLevel","ProficiencyLevel"]}}'
         - type: mandatory
-          role: 59fed0cb-df59-5914-b61f-7cd79a4232d0
-    - id: 258f2ff6-22d7-5f4c-a2aa-17626f1f73c8
+          role: LearningModule_advances_ProficiencyLevel_to_ProficiencyLevel.role1
+          id: Each_LearningModule_advances_some_ProficiencyLevel_to_some_ProficiencyLevel
+          minted_from: '{"type":"mandatory","role":[0,"role1",{"name":"LearningModule advances ProficiencyLevel to ProficiencyLevel","readings":["{0} advances {1} to {2}"],"players":["LearningModule","ProficiencyLevel","ProficiencyLevel"]}],"fact_type":{"name":"LearningModule advances ProficiencyLevel to ProficiencyLevel","readings":["{0} advances {1} to {2}"],"players":["LearningModule","ProficiencyLevel","ProficiencyLevel"]}}'
+    - id: LearningModule_promises_ExitPerformance
       name: LearningModule promises ExitPerformance
       roles:
-        - id: 65d630bc-0952-55cc-bcb1-ea6578e6bd1b
-          player: 61d1151e-0188-50af-9ab9-8c4216a3bed1
+        - id: LearningModule_promises_ExitPerformance.role1
+          player: LearningModule
           role_name: role1
-        - id: 2d3a6b03-9706-55f3-a875-6a8d1fc7aef3
-          player: 78678e9d-85df-5a22-a334-a6d202c35656
+        - id: LearningModule_promises_ExitPerformance.role2
+          player: ExitPerformance
           role_name: role2
       readings:
         - "{0} promises {1}"
@@ -331,17 +377,21 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - 65d630bc-0952-55cc-bcb1-ea6578e6bd1b
+            - LearningModule_promises_ExitPerformance.role1
+          id: Each_LearningModule_promises_at_most_one_ExitPerformance
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"role1",{"name":"LearningModule promises ExitPerformance","readings":["{0} promises {1}","{1} is promised by {0}"],"players":["LearningModule","ExitPerformance"]}]],"fact_type":{"name":"LearningModule promises ExitPerformance","readings":["{0} promises {1}","{1} is promised by {0}"],"players":["LearningModule","ExitPerformance"]}}'
         - type: mandatory
-          role: 65d630bc-0952-55cc-bcb1-ea6578e6bd1b
-    - id: af3f2008-9528-5c4f-946b-bd370cb97380
+          role: LearningModule_promises_ExitPerformance.role1
+          id: Each_LearningModule_promises_at_least_one_ExitPerformance
+          minted_from: '{"type":"mandatory","role":[0,"role1",{"name":"LearningModule promises ExitPerformance","readings":["{0} promises {1}","{1} is promised by {0}"],"players":["LearningModule","ExitPerformance"]}],"fact_type":{"name":"LearningModule promises ExitPerformance","readings":["{0} promises {1}","{1} is promised by {0}"],"players":["LearningModule","ExitPerformance"]}}'
+    - id: LearningModule_attacks_ReductiveBias
       name: LearningModule attacks ReductiveBias
       roles:
-        - id: e542ca24-241c-5ae6-9545-d54e6f57a30a
-          player: 61d1151e-0188-50af-9ab9-8c4216a3bed1
+        - id: LearningModule_attacks_ReductiveBias.role1
+          player: LearningModule
           role_name: role1
-        - id: 593d6cb6-1c54-577d-a95d-20e664d28fd1
-          player: 06daba0b-9a47-523b-b775-7a600b25d97c
+        - id: LearningModule_attacks_ReductiveBias.role2
+          player: ReductiveBias
           role_name: role2
       readings:
         - "{0} attacks {1}"
@@ -349,16 +399,18 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - e542ca24-241c-5ae6-9545-d54e6f57a30a
-            - 593d6cb6-1c54-577d-a95d-20e664d28fd1
-    - id: 611c001d-8d26-5fe3-a212-7aa3b2c17461
+            - LearningModule_attacks_ReductiveBias.role1
+            - LearningModule_attacks_ReductiveBias.role2
+          id: Each_combination_of_LearningModule_and_ReductiveBias_is_unique_in_LearningModule_attacks_ReductiveBias
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"role1",{"name":"LearningModule attacks ReductiveBias","readings":["{0} attacks {1}","{1} is attacked by {0}"],"players":["LearningModule","ReductiveBias"]}],[1,"role2",{"name":"LearningModule attacks ReductiveBias","readings":["{0} attacks {1}","{1} is attacked by {0}"],"players":["LearningModule","ReductiveBias"]}]],"fact_type":{"name":"LearningModule attacks ReductiveBias","readings":["{0} attacks {1}","{1} is attacked by {0}"],"players":["LearningModule","ReductiveBias"]}}'
+    - id: ReductiveBias_is_caught_by_CheckKind
       name: ReductiveBias is caught by CheckKind
       roles:
-        - id: 94841a9d-eeda-56b1-8416-ebedc0c49701
-          player: 06daba0b-9a47-523b-b775-7a600b25d97c
+        - id: ReductiveBias_is_caught_by_CheckKind.role1
+          player: ReductiveBias
           role_name: role1
-        - id: 556e5417-5ee1-511c-9a7b-5b5cef94a2d4
-          player: ccba718f-496a-51c7-b06e-7c1f9adf2c92
+        - id: ReductiveBias_is_caught_by_CheckKind.role2
+          player: CheckKind
           role_name: role2
       readings:
         - "{0} is caught by {1}"
@@ -366,17 +418,21 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - 94841a9d-eeda-56b1-8416-ebedc0c49701
+            - ReductiveBias_is_caught_by_CheckKind.role1
+          id: Each_ReductiveBias_is_caught_by_at_most_one_CheckKind
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"role1",{"name":"ReductiveBias is caught by CheckKind","readings":["{0} is caught by {1}","{1} catches {0}"],"players":["ReductiveBias","CheckKind"]}]],"fact_type":{"name":"ReductiveBias is caught by CheckKind","readings":["{0} is caught by {1}","{1} catches {0}"],"players":["ReductiveBias","CheckKind"]}}'
         - type: mandatory
-          role: 94841a9d-eeda-56b1-8416-ebedc0c49701
-    - id: e52e1e5c-e347-574f-9808-2f3146f744f2
+          role: ReductiveBias_is_caught_by_CheckKind.role1
+          id: Each_ReductiveBias_is_caught_by_at_least_one_CheckKind
+          minted_from: '{"type":"mandatory","role":[0,"role1",{"name":"ReductiveBias is caught by CheckKind","readings":["{0} is caught by {1}","{1} catches {0}"],"players":["ReductiveBias","CheckKind"]}],"fact_type":{"name":"ReductiveBias is caught by CheckKind","readings":["{0} is caught by {1}","{1} catches {0}"],"players":["ReductiveBias","CheckKind"]}}'
+    - id: GymCheck_belongs_to_LearningModule
       name: GymCheck belongs to LearningModule
       roles:
-        - id: 24f57cb5-08c9-5ae9-b36b-794fb12d27cc
-          player: 043071ce-9ba1-5e42-94f0-fa55206bb4a5
+        - id: GymCheck_belongs_to_LearningModule.role1
+          player: GymCheck
           role_name: role1
-        - id: 5a86ed5c-0e86-580a-9647-d223926839f9
-          player: 61d1151e-0188-50af-9ab9-8c4216a3bed1
+        - id: GymCheck_belongs_to_LearningModule.role2
+          player: LearningModule
           role_name: role2
       readings:
         - "{0} belongs to {1}"
@@ -384,17 +440,21 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - 24f57cb5-08c9-5ae9-b36b-794fb12d27cc
+            - GymCheck_belongs_to_LearningModule.role1
+          id: Each_GymCheck_belongs_to_at_most_one_LearningModule
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"role1",{"name":"GymCheck belongs to LearningModule","readings":["{0} belongs to {1}","{1} contains {0}"],"players":["GymCheck","LearningModule"]}]],"fact_type":{"name":"GymCheck belongs to LearningModule","readings":["{0} belongs to {1}","{1} contains {0}"],"players":["GymCheck","LearningModule"]}}'
         - type: mandatory
-          role: 24f57cb5-08c9-5ae9-b36b-794fb12d27cc
-    - id: f0ac9c1e-8042-5991-b0ad-9e94cc789c86
+          role: GymCheck_belongs_to_LearningModule.role1
+          id: Each_GymCheck_belongs_to_at_least_one_LearningModule
+          minted_from: '{"type":"mandatory","role":[0,"role1",{"name":"GymCheck belongs to LearningModule","readings":["{0} belongs to {1}","{1} contains {0}"],"players":["GymCheck","LearningModule"]}],"fact_type":{"name":"GymCheck belongs to LearningModule","readings":["{0} belongs to {1}","{1} contains {0}"],"players":["GymCheck","LearningModule"]}}'
+    - id: GymCheck_is_of_CheckKind
       name: GymCheck is of CheckKind
       roles:
-        - id: 9e2ac0cf-a64a-54d7-bf19-68e3824ccb89
-          player: 043071ce-9ba1-5e42-94f0-fa55206bb4a5
+        - id: GymCheck_is_of_CheckKind.role1
+          player: GymCheck
           role_name: role1
-        - id: bb560bc5-c94b-55b8-abf6-e8151bd48eef
-          player: ccba718f-496a-51c7-b06e-7c1f9adf2c92
+        - id: GymCheck_is_of_CheckKind.role2
+          player: CheckKind
           role_name: role2
       readings:
         - "{0} is of {1}"
@@ -402,17 +462,21 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - 9e2ac0cf-a64a-54d7-bf19-68e3824ccb89
+            - GymCheck_is_of_CheckKind.role1
+          id: Each_GymCheck_is_of_at_most_one_CheckKind
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"role1",{"name":"GymCheck is of CheckKind","readings":["{0} is of {1}","{1} classifies {0}"],"players":["GymCheck","CheckKind"]}]],"fact_type":{"name":"GymCheck is of CheckKind","readings":["{0} is of {1}","{1} classifies {0}"],"players":["GymCheck","CheckKind"]}}'
         - type: mandatory
-          role: 9e2ac0cf-a64a-54d7-bf19-68e3824ccb89
-    - id: dd698e9c-0c94-54ca-a0a1-16b0c25fc04c
+          role: GymCheck_is_of_CheckKind.role1
+          id: Each_GymCheck_is_of_at_least_one_CheckKind
+          minted_from: '{"type":"mandatory","role":[0,"role1",{"name":"GymCheck is of CheckKind","readings":["{0} is of {1}","{1} classifies {0}"],"players":["GymCheck","CheckKind"]}],"fact_type":{"name":"GymCheck is of CheckKind","readings":["{0} is of {1}","{1} classifies {0}"],"players":["GymCheck","CheckKind"]}}'
+    - id: GymCheck_offers_Hint
       name: GymCheck offers Hint
       roles:
-        - id: 7bca0423-ca8d-5995-966d-60124afcd93f
-          player: 043071ce-9ba1-5e42-94f0-fa55206bb4a5
+        - id: GymCheck_offers_Hint.role1
+          player: GymCheck
           role_name: role1
-        - id: 36834bfa-2d08-529d-8ec7-e4c5b5c2e8a3
-          player: fe3700b1-50b6-5674-8483-223d3477361f
+        - id: GymCheck_offers_Hint.role2
+          player: Hint
           role_name: role2
       readings:
         - "{0} offers {1}"
@@ -420,15 +484,17 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - 7bca0423-ca8d-5995-966d-60124afcd93f
-    - id: ba50d7ed-5b5b-5bad-9972-48c43ab43b38
+            - GymCheck_offers_Hint.role1
+          id: Each_GymCheck_offers_at_most_one_Hint
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"role1",{"name":"GymCheck offers Hint","readings":["{0} offers {1}","{1} is offered by {0}"],"players":["GymCheck","Hint"]}]],"fact_type":{"name":"GymCheck offers Hint","readings":["{0} offers {1}","{1} is offered by {0}"],"players":["GymCheck","Hint"]}}'
+    - id: GymCheck_explains_failure_with_Diagnosis
       name: GymCheck explains failure with Diagnosis
       roles:
-        - id: 16d8377b-321d-5511-91ad-137ba93b30c3
-          player: 043071ce-9ba1-5e42-94f0-fa55206bb4a5
+        - id: GymCheck_explains_failure_with_Diagnosis.role1
+          player: GymCheck
           role_name: role1
-        - id: d01f80e1-a829-53f3-9400-60fd45d8fc42
-          player: d4eeb69f-1d88-56ff-b6b8-bf3afc0c9642
+        - id: GymCheck_explains_failure_with_Diagnosis.role2
+          player: Diagnosis
           role_name: role2
       readings:
         - "{0} explains failure with {1}"
@@ -436,17 +502,21 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - 16d8377b-321d-5511-91ad-137ba93b30c3
+            - GymCheck_explains_failure_with_Diagnosis.role1
+          id: Each_GymCheck_explains_failure_with_at_most_one_Diagnosis
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"role1",{"name":"GymCheck explains failure with Diagnosis","readings":["{0} explains failure with {1}","{1} is the failure explanation of {0}"],"players":["GymCheck","Diagnosis"]}]],"fact_type":{"name":"GymCheck explains failure with Diagnosis","readings":["{0} explains failure with {1}","{1} is the failure explanation of {0}"],"players":["GymCheck","Diagnosis"]}}'
         - type: mandatory
-          role: 16d8377b-321d-5511-91ad-137ba93b30c3
-    - id: 4e36b667-d548-5d8f-be47-dd1a094f5774
+          role: GymCheck_explains_failure_with_Diagnosis.role1
+          id: Each_GymCheck_explains_failure_with_at_least_one_Diagnosis
+          minted_from: '{"type":"mandatory","role":[0,"role1",{"name":"GymCheck explains failure with Diagnosis","readings":["{0} explains failure with {1}","{1} is the failure explanation of {0}"],"players":["GymCheck","Diagnosis"]}],"fact_type":{"name":"GymCheck explains failure with Diagnosis","readings":["{0} explains failure with {1}","{1} is the failure explanation of {0}"],"players":["GymCheck","Diagnosis"]}}'
+    - id: GymCheck_cites_ReadingReference
       name: GymCheck cites ReadingReference
       roles:
-        - id: c982e11d-1348-53d4-b1dd-88024e0b6fd8
-          player: 043071ce-9ba1-5e42-94f0-fa55206bb4a5
+        - id: GymCheck_cites_ReadingReference.role1
+          player: GymCheck
           role_name: role1
-        - id: c37b7f87-3ec4-53b0-b330-a965a540f782
-          player: 135a722b-47a2-5e89-860c-860734f96917
+        - id: GymCheck_cites_ReadingReference.role2
+          player: ReadingReference
           role_name: role2
       readings:
         - "{0} cites {1}"
@@ -454,17 +524,21 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - c982e11d-1348-53d4-b1dd-88024e0b6fd8
+            - GymCheck_cites_ReadingReference.role1
+          id: Each_GymCheck_cites_at_most_one_ReadingReference
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"role1",{"name":"GymCheck cites ReadingReference","readings":["{0} cites {1}","{1} is cited by {0}"],"players":["GymCheck","ReadingReference"]}]],"fact_type":{"name":"GymCheck cites ReadingReference","readings":["{0} cites {1}","{1} is cited by {0}"],"players":["GymCheck","ReadingReference"]}}'
         - type: mandatory
-          role: c982e11d-1348-53d4-b1dd-88024e0b6fd8
-    - id: d31651ab-23bb-5949-a385-5733806eb21e
+          role: GymCheck_cites_ReadingReference.role1
+          id: Each_GymCheck_cites_at_least_one_ReadingReference
+          minted_from: '{"type":"mandatory","role":[0,"role1",{"name":"GymCheck cites ReadingReference","readings":["{0} cites {1}","{1} is cited by {0}"],"players":["GymCheck","ReadingReference"]}],"fact_type":{"name":"GymCheck cites ReadingReference","readings":["{0} cites {1}","{1} is cited by {0}"],"players":["GymCheck","ReadingReference"]}}'
+    - id: MissCard_derives_from_GymCheck
       name: MissCard derives from GymCheck
       roles:
-        - id: cdd9e188-4772-5172-90c9-cf2f75e13517
-          player: 99d87a20-cb9e-5546-9444-ac062884ffcc
+        - id: MissCard_derives_from_GymCheck.role1
+          player: MissCard
           role_name: role1
-        - id: b05f7bf4-aad4-5e3f-bd5d-8069e8292b91
-          player: 043071ce-9ba1-5e42-94f0-fa55206bb4a5
+        - id: MissCard_derives_from_GymCheck.role2
+          player: GymCheck
           role_name: role2
       readings:
         - "{0} derives from {1}"
@@ -472,17 +546,21 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - cdd9e188-4772-5172-90c9-cf2f75e13517
+            - MissCard_derives_from_GymCheck.role1
+          id: Each_MissCard_derives_from_at_most_one_GymCheck
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"role1",{"name":"MissCard derives from GymCheck","readings":["{0} derives from {1}","{1} spawned {0}"],"players":["MissCard","GymCheck"]}]],"fact_type":{"name":"MissCard derives from GymCheck","readings":["{0} derives from {1}","{1} spawned {0}"],"players":["MissCard","GymCheck"]}}'
         - type: mandatory
-          role: cdd9e188-4772-5172-90c9-cf2f75e13517
-    - id: 6debc83b-5a21-50af-b754-4723f539fd96
+          role: MissCard_derives_from_GymCheck.role1
+          id: Each_MissCard_derives_from_at_least_one_GymCheck
+          minted_from: '{"type":"mandatory","role":[0,"role1",{"name":"MissCard derives from GymCheck","readings":["{0} derives from {1}","{1} spawned {0}"],"players":["MissCard","GymCheck"]}],"fact_type":{"name":"MissCard derives from GymCheck","readings":["{0} derives from {1}","{1} spawned {0}"],"players":["MissCard","GymCheck"]}}'
+    - id: DeckCard_demands_Tier
       name: DeckCard demands Tier
       roles:
-        - id: 76c966db-4106-5b47-ab7f-0b83bd9fd435
-          player: 9c57a9fa-a60b-5a59-ab34-e23fb12545b7
+        - id: DeckCard_demands_Tier.role1
+          player: DeckCard
           role_name: role1
-        - id: 1c81e9d6-18ad-5fe5-a93d-e3a6fb27eb2d
-          player: 9fbe8f6f-8ee7-5741-98db-924a0ad85e87
+        - id: DeckCard_demands_Tier.role2
+          player: Tier
           role_name: role2
       readings:
         - "{0} demands {1}"
@@ -490,17 +568,21 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - 76c966db-4106-5b47-ab7f-0b83bd9fd435
+            - DeckCard_demands_Tier.role1
+          id: Each_DeckCard_demands_at_most_one_Tier
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"role1",{"name":"DeckCard demands Tier","readings":["{0} demands {1}","{1} is demanded by {0}"],"players":["DeckCard","Tier"]}]],"fact_type":{"name":"DeckCard demands Tier","readings":["{0} demands {1}","{1} is demanded by {0}"],"players":["DeckCard","Tier"]}}'
         - type: mandatory
-          role: 76c966db-4106-5b47-ab7f-0b83bd9fd435
-    - id: de035d93-78bd-5939-8baa-e653544be559
+          role: DeckCard_demands_Tier.role1
+          id: Each_DeckCard_demands_at_least_one_Tier
+          minted_from: '{"type":"mandatory","role":[0,"role1",{"name":"DeckCard demands Tier","readings":["{0} demands {1}","{1} is demanded by {0}"],"players":["DeckCard","Tier"]}],"fact_type":{"name":"DeckCard demands Tier","readings":["{0} demands {1}","{1} is demanded by {0}"],"players":["DeckCard","Tier"]}}'
+    - id: DeckCard_is_leveled_at_ProficiencyLevel
       name: DeckCard is leveled at ProficiencyLevel
       roles:
-        - id: c1b67dbb-33af-5fa0-b4be-b1d71b1ff704
-          player: 9c57a9fa-a60b-5a59-ab34-e23fb12545b7
+        - id: DeckCard_is_leveled_at_ProficiencyLevel.role1
+          player: DeckCard
           role_name: role1
-        - id: e6d154c1-5311-5dc2-a772-807967a31ccc
-          player: 3f78b57e-ce69-5557-8cfc-8555e4607dde
+        - id: DeckCard_is_leveled_at_ProficiencyLevel.role2
+          player: ProficiencyLevel
           role_name: role2
       readings:
         - "{0} is leveled at {1}"
@@ -508,17 +590,21 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - c1b67dbb-33af-5fa0-b4be-b1d71b1ff704
+            - DeckCard_is_leveled_at_ProficiencyLevel.role1
+          id: Each_DeckCard_is_leveled_at_at_most_one_ProficiencyLevel
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"role1",{"name":"DeckCard is leveled at ProficiencyLevel","readings":["{0} is leveled at {1}","{1} is the level of {0}"],"players":["DeckCard","ProficiencyLevel"]}]],"fact_type":{"name":"DeckCard is leveled at ProficiencyLevel","readings":["{0} is leveled at {1}","{1} is the level of {0}"],"players":["DeckCard","ProficiencyLevel"]}}'
         - type: mandatory
-          role: c1b67dbb-33af-5fa0-b4be-b1d71b1ff704
-    - id: 15ccd93f-2980-52e2-ae8d-cf58f230a425
+          role: DeckCard_is_leveled_at_ProficiencyLevel.role1
+          id: Each_DeckCard_is_leveled_at_at_least_one_ProficiencyLevel
+          minted_from: '{"type":"mandatory","role":[0,"role1",{"name":"DeckCard is leveled at ProficiencyLevel","readings":["{0} is leveled at {1}","{1} is the level of {0}"],"players":["DeckCard","ProficiencyLevel"]}],"fact_type":{"name":"DeckCard is leveled at ProficiencyLevel","readings":["{0} is leveled at {1}","{1} is the level of {0}"],"players":["DeckCard","ProficiencyLevel"]}}'
+    - id: DeckCard_belongs_to_LearningModule
       name: DeckCard belongs to LearningModule
       roles:
-        - id: 4445e4a8-8445-5db1-818f-78e1ea8f2eca
-          player: 9c57a9fa-a60b-5a59-ab34-e23fb12545b7
+        - id: DeckCard_belongs_to_LearningModule.role1
+          player: DeckCard
           role_name: role1
-        - id: 7a36ac9c-b680-585a-a0c5-4d0232b73861
-          player: 61d1151e-0188-50af-9ab9-8c4216a3bed1
+        - id: DeckCard_belongs_to_LearningModule.role2
+          player: LearningModule
           role_name: role2
       readings:
         - "{0} belongs to {1}"
@@ -526,6 +612,10 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - 4445e4a8-8445-5db1-818f-78e1ea8f2eca
+            - DeckCard_belongs_to_LearningModule.role1
+          id: Each_DeckCard_belongs_to_at_most_one_LearningModule
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"role1",{"name":"DeckCard belongs to LearningModule","readings":["{0} belongs to {1}","{1} contains {0}"],"players":["DeckCard","LearningModule"]}]],"fact_type":{"name":"DeckCard belongs to LearningModule","readings":["{0} belongs to {1}","{1} contains {0}"],"players":["DeckCard","LearningModule"]}}'
         - type: mandatory
-          role: 4445e4a8-8445-5db1-818f-78e1ea8f2eca
+          role: DeckCard_belongs_to_LearningModule.role1
+          id: Each_DeckCard_belongs_to_at_least_one_LearningModule
+          minted_from: '{"type":"mandatory","role":[0,"role1",{"name":"DeckCard belongs to LearningModule","readings":["{0} belongs to {1}","{1} contains {0}"],"players":["DeckCard","LearningModule"]}],"fact_type":{"name":"DeckCard belongs to LearningModule","readings":["{0} belongs to {1}","{1} contains {0}"],"players":["DeckCard","LearningModule"]}}'

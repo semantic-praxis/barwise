@@ -723,9 +723,8 @@ describe("RelationalMapper", () => {
     });
 
     it("lets the preferred identifier win a disagreement, name and all", () => {
-      // examples/output/order-management.orm.yaml is the shipped case:
-      // Customer's reference mode says customer_id while the preferred
-      // identifier is on "Customer has Name". One rule, no special case
+      // Customer's reference mode says one name while the preferred
+      // identifier is on another fact type. One rule, no special case
       // -- and a key named `medical_record_number` on a table whose
       // reference mode said `chart_no` is the visible consequence.
       const schema = mapper.map(clinic("chart_no"));
