@@ -60,7 +60,7 @@ for (const [name, adrs] of Object.entries(cases)) {
   );
   const t2 = performance.now();
   const c = compare(code, model);
-  const ok = c.diff.length === 0 && c.refusalDiff.length === 0 && model.other.length === 0;
+  const ok = c.diff.length === 0 && c.refusalDiff.length === 0 && c.refused.length === 0;
   console.log(
     `${name}: ${
       ok ? "AGREE" : "DISAGREE"
@@ -68,5 +68,5 @@ for (const [name, adrs] of Object.entries(cases)) {
       Math.round(t2 - t1)
     }ms)`,
   );
-  for (const x of [...c.diff, ...c.refusalDiff, ...model.other]) console.log("   " + x);
+  for (const x of [...c.diff, ...c.refusalDiff, ...c.refused]) console.log("   " + x);
 }

@@ -180,28 +180,28 @@ model:
         - Decision_belongs_to_ADR.belongs_to
       superset_roles:
         - Entry_lists_Decision.is_listed_by
-      id: rule-coverage
+      id: coverage
     - type: subset
       subset_roles:
         - Entry_lists_Decision.is_listed_by
       superset_roles:
         - Decision_belongs_to_ADR.belongs_to
-      id: rule-ids-exist
+      id: ids-exist
     - type: subset
       subset_roles:
         - Entry_names_Script.is_named_by
       superset_roles:
         - Package_defines_Script.is_defined_by
-      id: rule-script-exists
+      id: script-exists
     - type: subset
       subset_roles:
         - Entry_cites_Issue.is_cited_by
       superset_roles:
         - Issue_is_tracked_in_Tracker.is_tracked_in
-      id: rule-issue-tracked
+      id: issue-tracked
     - type: subset
       subset_roles:
         - Entry_cites_Issue.is_cited_by
       superset_roles:
         - Issue_is_open_in_Tracker.is_open_in
-      id: rule-issue-open
+      id: issue-open

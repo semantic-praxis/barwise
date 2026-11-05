@@ -48,7 +48,11 @@ export const scriptIsLookedUp = (entry, adr) =>
   gateName(entry.script)
   && !(Object.hasOwn(META_GATES, entry.script) && !META_GATES[entry.script].includes(adr));
 
-export function build(adrs, reader, { tags = [], entries = new Map() } = {}) {
+export function build(
+  adrs,
+  reader,
+  { tags = [], entries = new Map(), breakFactType = false } = {},
+) {
   const pops = {};
   const fact = (k, a, b) => {
     const [ft, ra, rb] = ROLES[k];
@@ -90,5 +94,10 @@ export function build(adrs, reader, { tags = [], entries = new Map() } = {}) {
     }
   }
   for (const [t, d] of tags) fact("tagged", t, d);
+  // A test hook: a builder slip that names a fact type the schema lacks.
+  if (breakFactType) {
+    pops.Entry_names_Scrpt = pops.Entry_names_Script ?? [];
+    delete pops.Entry_names_Script;
+  }
   return pops;
 }

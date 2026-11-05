@@ -35,10 +35,9 @@ differ from the code judge's; the owner chose to prototype (2026-11-05).
 The prototype is committed beside this spec, in
 `docs/specs/adr-conformance-model.prototype/`: five rules in a format-4.0
 schema (`governance.orm.yaml`), a fact builder over the real reader
-(`build.mjs`), both judges and their comparison (`judge.mjs`), twenty
-stub cases (`run.mjs`), the real tree clean and with four violations
+(`build.mjs`), both judges and their comparison (`judge.mjs`), twenty-two stub cases (`run.mjs`), the real tree clean and with four violations
 planted into a real ADR, each plant checked to change the ADR's text
-(`real.mjs`), and the classifier's edge cases (`typo.mjs`). Each runs
+(`real.mjs`), and the classifier's edge cases, core's one-violation-per-value count, the mandatory-coverage leak and the exit when the model cannot load (`typo.mjs`). Each runs
 with `node <file>` from that directory after `npm run build`. Every claim
 below marked _(prototype)_ rests on it. It was measured against today's
 `judgeDeclarations`; WS3 re-runs it against the judge enforceable-adr-
@@ -78,13 +77,17 @@ Core reports a subset violation once per distinct tuple
 missing script are one core violation _(prototype)_. The key is the single
 value in the table above. `check-adr-model.mjs` expands each violation to
 the entries that carry its key, from its own facts (coverage has no
-entry, only its ADR), and the two judges are compared as **sets of (rule,
-ADR, entry, key)**, so a disagreement on a second entry with the same key
-is not hidden behind the first. The code judge's side comes from the
-(rule, key) WS2 attaches to each finding, with the entry and ADR it
-already names.
+entry, only its ADR), and the two judges are compared as **multisets of
+(rule, ADR, entry, key)**, where the entry is its position in the header,
+so a disagreement on a second entry with the same key is not hidden
+behind the first, and two identical entries are two findings on both
+sides. The code judge's side comes from the (rule, key, entry position)
+WS2 attaches to each finding. The prototype identifies an entry by its
+text, which with multiset counting gives the same answer on its cases,
+including two identical entries _(prototype)_; the position removes the
+reliance on counting.
 
-On that grain the two judges agreed on all twenty stub cases and all five
+On that grain the two judges agreed on all twenty-two stub cases and all five
 real-tree runs _(prototype)_. One case needs a rule beyond set equality:
 an issue not in the tracker is also not open, and the code judge reports
 only `issue-tracked` while the model reports both. `issue-tracked` and
@@ -114,7 +117,18 @@ model does not judge and are left out of the comparison. The prototype's
 stubs push refusals as the real reader does, and the cases include an
 unreadable `package.json` and tracker both when an entry asks for them
 and when none does, an unreadable `ci.yml`, and an unreadable step
-guard _(prototype)_.
+guard, the last with two entries asking so that the refusal is pushed
+once _(prototype)_. A difference between the two refusal sets is a
+disagreement: the builder asked the reader differently.
+
+The model's **own** refusals are another matter: a population that does
+not load, a deontic `RULES` constraint, an error diagnostic that is not a
+`RULES` violation, or a violation message that does not have the pinned
+shape. With any of them the model has no answer, so the comparison does
+not run and the check exits 2. Comparing anyway would turn every code
+finding into "missed by the model" and report a refusal with the finding
+code, which the gate-refusal contract forbids _(prototype: exit 2 with a
+code finding beside a load failure)_.
 
 ## How do diagnostics map back to rules? (resolved: stated ids, format 4.0)
 
@@ -150,8 +164,8 @@ model shows _(prototype)_. An error that is a subset violation of a
 population could not be judged"), exit 2, never dropped. A misspelled
 role key is such an error (`population/incomplete-instance`)
 _(prototype)_. A misspelled fact type is not a diagnostic: the load
-throws, and `check-adr-model.mjs` catches it as a refusal, so it never
-exits 1 _(prototype)_. The role-id test, which also checks the fact-type
+throws, and `check-adr-model.mjs` catches it as one of the model's own
+refusals, so it exits 2 even beside a code finding _(prototype)_. The role-id test, which also checks the fact-type
 ids, catches both earlier.
 
 ## Scope
@@ -161,18 +175,18 @@ In scope:
 - When WS2 lands, `check:architecture`'s stdout, stderr and exit code
   shall be what they were, on every tree the existing tests build and on
   the real tree; every finding `judgeDeclarations` makes for a rule in
-  the table shall carry its rule id and key.
+  the table shall carry its rule id, its key and its entry's position.
 - When `check:adr-model` runs, it shall read the tree through
   `createGovernanceReader`, build the population through
   `adr-population.mjs`, validate it against
   `barwise/docs/adr/governance.orm.yaml` (format 4.0), run `judgeDeclarations` on a
-  second reader, and compare the two as sets of (rule, ADR, entry, key)
-  with shadowing, and their refusals for the inputs the model reads.
-  During WS3 it shall exit 1 on any disagreement (naming it), else 2 on a
-  refusal of its own, an unbuilt core, a schema that does not load, a
-  deontic `RULES` constraint, or an unclassified diagnostic or message,
-  else 0. A disagreement wins over a refusal, as a finding does in every
-  gate.
+  second reader, and compare the two as multisets of (rule, ADR, entry
+  position, key) with shadowing, and their refusals for the inputs the
+  model reads as sets. During WS3 it shall exit 2 when the model refuses
+  on its own account (an unbuilt core, a population that does not load, a
+  deontic `RULES` constraint, an unclassified diagnostic or message),
+  without comparing; else 1 on any disagreement, naming it; else 2 on a
+  reader refusal on either side; else 0.
 - When the schema's rule ids and `RULES` differ, a fact-type or role id
   the builder writes is not in the schema, or a rule has no planted case,
   a test shall fail naming it.
@@ -195,12 +209,12 @@ Out of scope:
 
 ## Inventory
 
-| Code today (main, after #910)                                                                                                                       | Verdict                                                                                      |
-| --------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
-| `adr-facts.mjs` `createGovernanceReader`: `scripts()`, `steps(command)`, `issues()`, each `null` when unreadable                                    | used as is                                                                                   |
-| `adr-judge.mjs` `judgeDeclarations`: well-formedness, the fact rules, the verdict rules, the step classification                                    | WS2: `RULES` (id, chain, rank) and a (rule, key) on each fact-rule finding; no output change |
-| core population validation: subset violations once per distinct tuple, `elementId` the stated constraint id in a 4.0 file, the tuple in the message | used as is; the message shape pinned by a test                                               |
-| the prototype (`docs/specs/adr-conformance-model.prototype/`, ignored by knip)                                                                      | WS3 starts from it; its cases become the tests                                               |
+| Code today (main, after #910)                                                                                                                       | Verdict                                                                                                      |
+| --------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `adr-facts.mjs` `createGovernanceReader`: `scripts()`, `steps(command)`, `issues()`, each `null` when unreadable                                    | used as is                                                                                                   |
+| `adr-judge.mjs` `judgeDeclarations`: well-formedness, the fact rules, the verdict rules, the step classification                                    | WS2: `RULES` (id, chain, rank) and a (rule, key, entry position) on each fact-rule finding; no output change |
+| core population validation: subset violations once per distinct tuple, `elementId` the stated constraint id in a 4.0 file, the tuple in the message | used as is; the message shape pinned by a test                                                               |
+| the prototype (`docs/specs/adr-conformance-model.prototype/`, ignored by knip)                                                                      | WS3 starts from it; its cases become the tests                                                               |
 
 ## Target architecture
 
@@ -208,14 +222,15 @@ Out of scope:
 adr-facts.mjs        reader (#910)
 adr-judge.mjs        RULES: { id, chain, rank }; scriptVerdict(entry, adr),
                      shared; judgeDeclarations tags each fact-rule finding
-                     with (rule, key)
+                     with (rule, key, entry position)
 adr-population.mjs   build(adrs, reader) -> populations; a table of the 4.0
                      role ids it writes; verdicts decide which facts are
                      written; asks the reader only what the code judge asks
 governance.orm.yaml  format 4.0; one subset constraint per RULES id, by id
-check-adr-model.mjs  two readers -> code judge and model -> sets of
-                     (rule, ADR, entry, key), shadowed by chain, and the
-                     model's inputs' refusals -> 0 / 1 / 2
+check-adr-model.mjs  two readers -> code judge and model; the model's own
+                     refusal -> 2; else multisets of (rule, ADR, entry,
+                     key), shadowed by chain, and the model's inputs'
+                     refusals -> 1 / 2 / 0
 ```
 
 ## Alternatives considered
@@ -248,8 +263,8 @@ check-adr-model.mjs  two readers -> code judge and model -> sets of
 ### 2. Rule ids in the code judge
 
 `RULES` in `adr-judge.mjs` gives each fact rule an id, a chain and a rank;
-`judgeDeclarations` returns each fact-rule finding's (rule, key) beside its
-unchanged message, and `check:architecture` prints only the message.
+`judgeDeclarations` returns each fact-rule finding's (rule, key, entry
+position) beside its unchanged message, and `check:architecture` prints only the message.
 `scriptVerdict` is extracted from `judgeDeclarations`' gate-name and
 meta-gate checks and exported. No
 output change, held as #910 held it: the existing tests and a
@@ -265,15 +280,18 @@ diff is cleaner against a judge that is not also moving.
 vouches for no ADR). `adr-model.test.mjs` drives both judges through stub
 readers, from the prototype's cases: the clean input, one planted
 violation per rule enumerated from `RULES`, two entries naming one
-missing value, one value on two entries the verdict splits, the
+missing value, two identical entries, one value on two entries the
+verdict splits, the
 untracked-issue chain, an unreadable `package.json` and tracker (asked
-and not), an unreadable `ci.yml` and step guard (code-only refusals), a
+and not), an unreadable `ci.yml` (asked by two entries) and step guard (code-only
+refusals), a
 headerless ADR, a value containing `]`, a deontic rule, a population
-that does not load, an unclassified diagnostic, and the pinned message
-shape. It carries no `[adr:...]` tag. The role-id and id-set tests need
+that does not load beside a code finding (exit 2), an unclassified
+diagnostic, and the pinned message shape. It carries no `[adr:...]` tag. The role-id and id-set tests need
 no core and live in `adr-facts.test.mjs`. `adr-model.test.mjs` skips
-without `@barwise/core` built, as it is when `test:scripts` runs, so the
-CI steps below run it directly with `node --test` after building core.
+without `@barwise/core` built, as it is when `test:scripts` runs, so a
+`test:adr-model` npm script runs it after building core, in the CI steps
+below; an npm script, so `ci:local` runs it too.
 Every disagreement CI reports is resolved in a commit that adds its input
 as a case here; that test file's history and the job's run count are the
 record WS4 starts from.
@@ -291,7 +309,9 @@ the owner reviews WS3's record: how many runs, and every disagreement.
 ## API and migration impact
 
 - No package API changes.
-- WS2 changes no output. WS3 adds two CI steps and an npm script. The knip ignore for spec
+- WS2 changes no output. WS3 adds three CI steps and three npm scripts
+  (`build:core`, `check:adr-model`, `test:adr-model`), each with its root
+  forwarder. The knip ignore for spec
   prototypes lands with the prototype, in the plan PR. WS4 moves
   the fact rules' findings from `check:architecture` to `check:adr-model`;
   the owner approves it first.
@@ -299,20 +319,25 @@ the owner reviews WS3's record: how many runs, and every disagreement.
 ## Open decisions (for review)
 
 - **Where `check:adr-model` runs in CI.** It needs core built, it must
-  run when `check:architecture` fails (a disagreement hides exactly
-  then) and on tracker-only changes, which are docs-only and skip the
-  build, and it must be required, or WS3's judge is advisory, which the
-  owner rejected. Recommended (the owner's choice of the two offered,
-  2026-11-05): two steps at the end of the required `ci` job, guarded
-  `if: ${{ !cancelled() }}` and not by `docs_only` (`npm ci` already
-  runs unguarded): `npm run build --workspace=@barwise/core`, then
-  `npm run check:adr-model` and `node --test
-  scripts/tests/adr-model.test.mjs`. This changes how a step is guarded,
-  which the owner asked to approve; this decision is that approval's
-  record. Rejected: a separate job, which branch protection does not
-  require without an admin change; and a step after `check:adr-tests`
-  guarded like its neighbours, which never runs after a failed gate or on
-  a docs-only change.
+  run when `check:architecture` fails (a disagreement hides exactly then)
+  and on tracker-only changes, which are docs-only and skip the build, and
+  it must be required, or WS3's judge is advisory, which the owner
+  rejected. Recommended: three unguarded steps in the required `ci` job
+  directly after `npm ci`, before any gate: `npm run build:core`
+  (`turbo run build --filter=@barwise/core`, so the later full build
+  reuses it from turbo's cache), `npm run check:adr-model`, and `npm run
+  test:adr-model`. Running first, they run whenever `check:architecture`
+  could, and need no new `if:` form: an `if: ${{ !cancelled() }}` after
+  the gates, the owner's choice of the two first offered (2026-11-05), is
+  a form `shouldRun` does not read, so `ci-conditions.test.mjs` would
+  fail and `ci:local` would report it as not understood. This keeps that
+  choice's intent (required, runs when a gate fails, runs on docs-only
+  changes) without the new form, and the owner confirms it in this plan's
+  review. The cost is core's build on a docs-only run. Rejected: a
+  separate job, which branch protection does not require without an
+  admin change; and steps after `check:adr-tests` guarded like their
+  neighbours, which never run after a failed gate or on a docs-only
+  change.
 - **How long WS3 runs before WS4.** Recommended: one release cycle, and a
   look at every disagreement it records.
 - **Names.** `check:adr-model` and `barwise/docs/adr/governance.orm.yaml`;

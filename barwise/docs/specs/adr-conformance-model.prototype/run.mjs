@@ -1,5 +1,5 @@
 // Stub cases: both judges, each with its own reader over the same answers.
-import { codeJudge, compare, modelJudge } from "./judge.mjs";
+import { codeJudge, compare, exitOf, modelJudge } from "./judge.mjs";
 const stub = (
   {
     scripts = { "check:x": "x", "check:a]b": "y" },
@@ -16,9 +16,15 @@ const stub = (
       return value;
     };
   };
+  // The workflow's refusal, like the real reader's, is pushed at most once.
+  let stepsAsked = false;
   return {
     scripts: once("barwise/package.json", scripts),
-    steps: (cmd) => steps(cmd, refusals),
+    steps: (cmd) => {
+      const into = stepsAsked ? [] : refusals;
+      stepsAsked = true;
+      return steps(cmd, into);
+    },
     issues: once(
       ".beads/issues.jsonl",
       issues === null ? null : new Map(issues.map(([id, status]) => [id, { status }])),
@@ -43,14 +49,14 @@ const showR = (name, adrs, mk = stub(), opts = {}) => {
   const [mr, ml] = pair(mk);
   const model = modelJudge(adrs, mr, ml, opts);
   const c = compare(code, model);
-  const ok = c.diff.length === 0 && c.refusalDiff.length === 0 && model.other.length === 0;
+  const ok = c.diff.length === 0 && c.refusalDiff.length === 0 && c.refused.length === 0;
   if (ok) agree++;
   console.log(
-    `== ${name}: ${
-      ok ? "AGREE" : "DISAGREE"
-    } code=[${code.findings}] model=[${model.findings}] refusals code ${cl.length} model ${ml.length}`,
+    `== ${name}: ${ok ? "AGREE" : "DISAGREE"} (exit ${exitOf(code, model, c)})`
+      + ` code=[${code.findings}] model=[${model.findings}]`
+      + ` refusals code ${cl.length} model ${ml.length}`,
   );
-  for (const x of [...c.diff, ...c.refusalDiff, ...model.other.map((o) => `other: ${o}`)]) {
+  for (const x of [...c.diff, ...c.refusalDiff, ...c.refused.map((o) => `model refused: ${o}`)]) {
     console.log("   " + x);
   }
 };
@@ -123,4 +129,17 @@ showR("one missing meta gate, two ADRs, one the verdict skips", [
   adr("a", "npm run check:architecture (one)", ["one"]),
   adr("package-graph-authority", "npm run check:architecture (one)", ["one"]),
 ]);
+showR("two identical entries name one missing script", [
+  adr("a", "npm run check:gone (one), npm run check:gone (one)", ["one"]),
+]);
+showR(
+  "ci.yml unreadable, two npm entries ask (one refusal)",
+  [adr("a", "npm run check:x (one), npm run check:x -- --y (one)", ["one"])],
+  stub({
+    steps: (c, rf) => {
+      rf.push(".github/workflows/ci.yml: unreadable");
+      return null;
+    },
+  }),
+);
 console.log(`\n${agree} of ${total} stub cases agree`);
