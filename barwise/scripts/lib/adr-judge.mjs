@@ -32,11 +32,16 @@ const guard = (condition) => {
 /**
  * Each ADR's `Enforced-by:` declarations, judged (check:architecture).
  * `reader` is createGovernanceReader()'s; `refusals` is the gate's list.
- * Returns the findings and how many ADRs declare the header.
+ * Returns the findings and `held`: how
+ * the decisions are held, over every decision with an id
+ * (docs/specs/enforceable-adr-practice.spec.md, WS2). A decision with an
+ * `npm` entry has a gate; with `tests` and no `npm`, tests and no gate;
+ * with only `none`, none only; `gap` counts any `none` entry, so it
+ * overlaps the other three.
  */
 export function judgeDeclarations(adrs, reader, refusals) {
   const problems = [];
-  let declaring = 0;
+  const held = { decisions: 0, gate: 0, testsOnly: 0, noneOnly: 0, gap: 0 };
   // Each gap issue is one decision's own: the first entry to name an issue,
   // across every ADR, by file and entry text.
   const gapNamedBy = new Map();
@@ -49,7 +54,6 @@ export function judgeDeclarations(adrs, reader, refusals) {
       );
       continue;
     }
-    declaring++;
     const name = f.slice(ADR_DIR.length, -".md".length);
     for (const p of parsed.problems) fail(p);
     const { decisions, problems: decisionProblems } = decisionIds(text);
@@ -66,11 +70,13 @@ export function judgeDeclarations(adrs, reader, refusals) {
         fail(`decisions ${ids.get(d.id).n} and ${d.n} share the id ${d.id}`);
       } else ids.set(d.id, d);
     }
-    const covered = new Set();
+    // Each id an entry lists, with the kinds of entry that list it.
+    const covered = new Map();
     for (const entry of parsed.entries) {
       for (const id of entry.ids) {
         if (!ids.has(id)) fail(`"${entry.text}" lists ${id}, which no decision here has`);
-        covered.add(id);
+        if (!covered.has(id)) covered.set(id, new Set());
+        covered.get(id).add(entry.kind);
       }
       if (entry.kind === "npm") {
         const { script } = entry;
@@ -182,8 +188,19 @@ export function judgeDeclarations(adrs, reader, refusals) {
     for (const [id, d] of ids) {
       if (!covered.has(id)) fail(`decision ${d.n} {#${id}} has no Enforced-by: entry`);
     }
+    // Over the decisions with an entry, so the three buckets sum to it; one
+    // with none is a finding above, and the OK line never prints beside one.
+    for (const id of ids.keys()) {
+      const kinds = covered.get(id);
+      if (kinds === undefined) continue;
+      held.decisions++;
+      if (kinds.has("npm")) held.gate++;
+      else if (kinds.has("tests")) held.testsOnly++;
+      else if (kinds.has("none")) held.noneOnly++;
+      if (kinds.has("none")) held.gap++;
+    }
   }
-  return { problems, declaring };
+  return { problems, held };
 }
 
 /**

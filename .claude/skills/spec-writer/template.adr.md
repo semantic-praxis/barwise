@@ -23,7 +23,9 @@ decisions whose tests carry [adr:<this-file>#<id>] in their titles, and
 gate or test holds: one decision per entry, an issue labelled `adr-gap`
 and titled `Gap: <this-file> decision <id> ...`, named by no other
 entry. Declare a gate only if a violation of that decision makes it fail
-(docs/specs/executable-adrs.spec.md).
+(docs/specs/executable-adrs.spec.md): plant one and watch it go red, as
+adr-writing.md beside this template describes, and record the plant in
+the PR body.
 Delete this comment.
 -->
 

@@ -34,8 +34,19 @@
  *
  * Usage:
  *   node scripts/mutate.mjs --file <path> --old <text> --new <text>
- *                           [--count N] [--backup-dir <path>]
+ *                           [--count N] [--expect-exit N] [--backup-dir <path>]
  *                           -- <command> [args...]
+ *
+ * --expect-exit N makes CAUGHT mean the command exited exactly N with the
+ * mutation applied. Without it any non-zero exit is a catch, which is
+ * wrong for a gate under the refusal contract: exit 2 means the gate
+ * could not answer, so it did not see the violation, and a probe that
+ * reads 2 as caught would vouch for a gate that never went red
+ * (docs/specs/enforceable-adr-practice.spec.md, WS5). Under it, an exit 2
+ * the caller did not ask for is a refusal (2): the command could not
+ * answer, so there is no reading either way. Another non-zero exit is
+ * UNCAUGHT (1), naming both codes: the command failed, but not the way
+ * asked for.
  *
  * --file resolves against the REPO ROOT, because a gate's coverage must
  * not depend on the cwd it was invoked from. The COMMAND runs in the
@@ -43,15 +54,19 @@
  * what the caller typed.
  *
  * Exit codes:
- *   0  caught   -- the command failed with the mutation applied
- *   1  uncaught -- the command passed with the mutation applied
+ *   0  caught   -- the command failed with the mutation applied (with
+ *                  --expect-exit N: exited exactly N)
+ *   1  uncaught -- the command passed with the mutation applied (with
+ *                  --expect-exit N: or failed with a code other than N
+ *                  and 2)
  *   2  refused  -- anchor absent or ambiguous, mutation is a no-op, the
  *                  restore did not verify, the command was KILLED by a
  *                  signal rather than exiting (a killed run reports on
  *                  nothing, so it is neither of the other two), or the
  *                  command ALREADY FAILS unmutated (CAUGHT is read from
  *                  the exit status, so a red command reports CAUGHT for
- *                  every mutation -- barwise-1019)
+ *                  every mutation -- barwise-1019), or, with
+ *                  --expect-exit N other than 2, the command exited 2
  */
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -105,6 +120,12 @@ if (!command || command.length === 0) {
 const expected = flags.count === undefined ? 1 : Number(flags.count);
 if (!Number.isInteger(expected) || expected < 1) {
   refuse(`--count must be a positive integer, got "${flags.count}"`);
+}
+
+const expectRaw = flags["expect-exit"];
+const expectExit = expectRaw === undefined || !/^\d+$/.test(expectRaw) ? null : Number(expectRaw);
+if (expectRaw !== undefined && (expectExit === null || expectExit < 1 || expectExit > 255)) {
+  refuse(`--expect-exit must be an exit code from 1 to 255, got "${flags["expect-exit"]}"`);
 }
 
 const target = isAbsolute(flags.file) ? flags.file : resolve(REPO_ROOT, flags.file);
@@ -325,6 +346,26 @@ try {
 if (refusal !== undefined) {
   process.stderr.write(`mutate: ${refusal}\n`);
   process.exit(REFUSED);
+}
+
+if (status === 2 && expectExit !== null && expectExit !== 2) {
+  // Under the refusal contract exit 2 is "could not answer": the command
+  // did not see the mutation, so this is no reading, not a miss.
+  process.stderr.write(
+    `mutate: the command exited 2 (could not answer) with the mutation applied,\n`
+      + `  not the expected ${expectExit}. That is no reading: it neither caught nor\n`
+      + `  missed the mutation. Fix whatever it could not read, then run again.\n`,
+  );
+  process.exit(REFUSED);
+}
+
+if (status !== 0 && expectExit !== null && status !== expectExit) {
+  process.stdout.write(
+    `mutate: UNCAUGHT -- the command failed with exit ${status}, not the expected ${expectExit}.\n`
+      + `  ${flags.file}: "${flags.old}" -> "${flags.new}"\n`
+      + `  It failed, but not the way asked for, so this is not the catch.\n`,
+  );
+  process.exit(1);
 }
 
 if (status !== 0) {

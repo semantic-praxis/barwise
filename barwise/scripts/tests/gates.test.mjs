@@ -1147,6 +1147,67 @@ test("mutate exits 1 when the command does not notice the mutation", () => {
   }
 });
 
+test("mutate --expect-exit counts only that exit code as caught", () => {
+  // The checker exits 2 (could not answer) on the mutation, as a gate does
+  // when it refuses: without --expect-exit that reads CAUGHT; with
+  // --expect-exit 1 it is a refusal, and with --expect-exit 2 it is CAUGHT.
+  const dir = mutateRepo({ subject: "value = GOOD\n" });
+  try {
+    writeFileSync(
+      join(dir, "check.mjs"),
+      `import { readFileSync } from "node:fs";\n`
+        + `process.exit(readFileSync("subject.txt", "utf8").includes("GOOD") ? 0 : 2);\n`,
+    );
+    const run = (...extra) =>
+      mutate(dir, [
+        "--file",
+        "subject.txt",
+        "--old",
+        "GOOD",
+        "--new",
+        "BAD",
+        ...extra,
+        "--",
+        process.execPath,
+        "check.mjs",
+      ]);
+    const any = run();
+    assert.equal(
+      any.status,
+      0,
+      `no --expect-exit: any failure is CAUGHT\n${any.stdout}${any.stderr}`,
+    );
+    // An exit 2 the caller did not ask for is no reading: a refusal.
+    const one = run("--expect-exit", "1");
+    assert.equal(
+      one.status,
+      2,
+      `exit 2 under --expect-exit 1 is a refusal\n${one.stdout}${one.stderr}`,
+    );
+    assert.match(one.stderr, /exited 2 \(could not answer\)/);
+    const two = run("--expect-exit", "2");
+    assert.equal(two.status, 0, two.stdout + two.stderr);
+    assert.match(two.stdout, /^mutate: CAUGHT/m);
+    for (const bad of ["0", "0x2", "1e0", "256"]) {
+      const r = run("--expect-exit", bad);
+      assert.equal(r.status, 2, `--expect-exit ${bad} is refused`);
+      assert.match(r.stderr, /--expect-exit must be an exit code from 1 to 255/);
+    }
+    // Another failing code is a failure, but not the one asked for.
+    writeFileSync(
+      join(dir, "check.mjs"),
+      `import { readFileSync } from "node:fs";\n`
+        + `process.exit(readFileSync("subject.txt", "utf8").includes("GOOD") ? 0 : 3);\n`,
+    );
+    const three = run("--expect-exit", "1");
+    assert.equal(three.status, 1, three.stdout + three.stderr);
+    assert.match(three.stdout, /UNCAUGHT -- the command failed with exit 3, not the expected 1/);
+    assert.equal(readFileSync(join(dir, "subject.txt"), "utf8"), "value = GOOD\n");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test("mutate refuses an anchor that is absent or ambiguous, writing nothing", () => {
   // The failure this whole script exists for: a `sed` whose anchor no
   // longer matches leaves the file alone and the suite green, which
@@ -6494,18 +6555,19 @@ function architectureRepo() {
   // (executable-adrs.spec.md, WS3). One fixture gap issue for every
   // decision would break the one-decision-per-gap-issue rule
   // (enforceable-adr-practice.spec.md, WS3).
-  let declaring = 0;
+  let decisions = 0;
   for (const rel of adrList.split("\0").filter(Boolean)) {
     const text = readFileSync(join(REPO, rel), "utf8");
     assert.ok(parseEnforcedBy(text).present, `${rel}: has no Enforced-by: header to rewrite`);
     const ids = decisionIds(text).decisions.map((d) => d.id);
+    // Counted as the judge counts: unique ids, a malformed one left out.
+    decisions += new Set(ids.filter(Boolean)).size;
     // Enforced-by: is the last header field (check:architecture holds it to
     // that, and requires it), so it runs to the blank line.
     const value = `Enforced-by: tests (${ids.join(", ")})\n`;
     const rewritten = text.replace(/^Enforced-by:[^]*?\n(?=\n)/m, value);
     assert.notEqual(rewritten, text, `${rel}: its Enforced-by: header was not rewritten`);
     stage(dir, rel, rewritten);
-    declaring += 1;
   }
   let manifests = 0;
   for (const pkg of readdirSync(join(REPO, "barwise", "packages"))) {
@@ -6533,7 +6595,7 @@ function architectureRepo() {
     );
   }
   execFileSync("git", ["commit", "-qm", "inputs"], { cwd: dir });
-  return { dir, manifests, declaring };
+  return { dir, manifests, decisions };
 }
 
 const ARCH_CMD = [process.execPath, join(SCRIPTS, "check-architecture.mjs"), "--root", "."];
@@ -7338,7 +7400,7 @@ test("check:architecture cannot answer with no ADR to check", () => {
  */
 const ENFORCED_ADR = "# A concern\n\nScope: process\nDate: 2026-10-24\nTracking: barwise-ubc\n"
   + "Enforced-by: npm run check:x (one), npm run audit:y -- --check (two),\n"
-  + "tests (three), none (barwise-gap: four)\n\n"
+  + "tests (three), none (barwise-gap2: two), none (barwise-gap: four)\n\n"
   + "## Context\n\nWhy.\n\n## Decision\n\n"
   + "1. **One.** {#one} The first rule.\n"
   + "2. **Two, whose title\n   wraps.** {#two} The second.\n"
@@ -7361,6 +7423,7 @@ const ENFORCED_ROOT_PKG = JSON.stringify({
 });
 const ENFORCED_TRACKER =
   '{"id":"barwise-gap","status":"open","title":"Gap: a-concern decision four has no enforcer","labels":["adr-gap"]}\n'
+  + '{"id":"barwise-gap2","status":"open","title":"Gap: a-concern decision two is partly held","labels":["adr-gap"]}\n'
   + '{"id":"barwise-shut","status":"closed","title":"s"}\n';
 const TRACKER_PATH = ".beads/issues.jsonl";
 
@@ -7378,12 +7441,21 @@ const ENFORCED_PATH = "barwise/docs/adr/a-concern.md";
 const CI_PATH = ".github/workflows/ci.yml";
 
 test("check:architecture accepts every entry kind when each decision is accounted for", () => {
-  const { dir, declaring } = enforcementRepo();
+  const { dir, decisions } = enforcementRepo();
   try {
     const ok = runArch(dir);
     assert.equal(ok.status, 0, ok.stdout + ok.stderr);
-    // The copied real ADRs that declare, and this fixture's own.
-    assert.match(ok.stdout, new RegExp(`; ${declaring + 1} declare Enforced-by:`));
+    // The copied real ADRs declare every decision tested; this fixture's
+    // own four are two gates, one tested, one none only, and two carry a
+    // gap issue: four, and two beside its gate, since the gap count
+    // overlaps the others (enforceable-adr-practice WS2's breakdown).
+    assert.match(
+      ok.stdout,
+      new RegExp(
+        `; ${decisions + 4} decisions: 2 with a gate, ${decisions + 1} tests and no gate,`
+          + " 1 none only; 2 carry a gap issue\\. OK",
+      ),
+    );
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -7643,14 +7715,20 @@ test("check:architecture requires Enforced-by:, and reads no ci.yml, scripts or 
   // The fixture has no ci.yml, root package.json or tracker, and every ADR
   // in it declares `tests` only, which needs none of them, so none is a
   // refusal.
-  const { dir, declaring } = architectureRepo();
+  const { dir, decisions } = architectureRepo();
   try {
     assert.ok(!existsSync(join(dir, ".beads/issues.jsonl")), "the fixture must carry no tracker");
     stageAdr(dir, "a-concern", ADR_OK);
     execFileSync("git", ["commit", "-qm", "adr"], { cwd: dir });
     const ok = runArch(dir);
     assert.equal(ok.status, 0, ok.stdout + ok.stderr);
-    assert.match(ok.stdout, new RegExp(`; ${declaring + 1} declare Enforced-by:`));
+    assert.match(
+      ok.stdout,
+      new RegExp(
+        `; ${decisions + 1} decisions: 0 with a gate, ${decisions + 1} tests and no gate,`
+          + " 0 none only; 0 carry a gap issue\\. OK",
+      ),
+    );
     // An ADR without the header is a finding naming it, not a skip.
     const bare = archPlanted(
       dir,
