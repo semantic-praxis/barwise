@@ -31,24 +31,6 @@ const adr = (name, header, decisions) => ({
     + decisions.map((d, i) => `${i + 1}. **D${i}** {#${d}}. Text.\n`).join(""),
 });
 let agree = 0, total = 0;
-const show = (name, adrs, mk = stub(), opts = {}) => {
-  total++;
-  const code = codeJudge(adrs, mk([]), []);
-  const r = [];
-  const model = modelJudge(adrs, mk(r), r, opts);
-  code.refusals = code.refusals; // filled by the stub
-  const c = compare(code, model);
-  const ok = c.diff.length === 0 && c.refusalDiff.length === 0 && model.other.length === 0;
-  if (ok) agree++;
-  console.log(
-    `== ${name}: ${
-      ok ? "AGREE" : "DISAGREE"
-    } code=[${code.findings}] model=[${model.findings}] refusals code ${code.refusals.length} model ${model.refusals.length}`,
-  );
-  for (const x of [...c.diff, ...c.refusalDiff, ...model.other.map((o) => `other: ${o}`)]) {
-    console.log("   " + x);
-  }
-};
 // codeJudge pushes into the list its reader was built with:
 const pair = (mk) => {
   const list = [];
