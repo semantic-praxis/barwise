@@ -1,0 +1,30 @@
+orm_version: "4.0"
+model:
+  name: Customer
+  object_types:
+    - id: Customer
+      name: Customer
+      kind: entity
+      reference_mode: customer_id
+    - id: CustomerName
+      name: CustomerName
+      kind: value
+      data_type:
+        name: text
+  fact_types:
+    - id: Customer_has_CustomerName
+      name: Customer has CustomerName
+      roles:
+        - id: Customer_has_CustomerName.has
+          player: Customer
+          role_name: has
+        - id: Customer_has_CustomerName.is_of
+          player: CustomerName
+          role_name: is of
+      readings:
+        - "{0} has {1}"
+        - "{1} is of {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - Customer_has_CustomerName.has

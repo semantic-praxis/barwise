@@ -42,13 +42,6 @@
       "note": "The default OpenAPI export writes a /* comment */ header when the model has diagnostics (which it always has after barwise-lh9), so the .json is not JSON and the importer returns an empty model with exit 0 (barwise-sxh).",
       "detail": "145 delta(s) outside the declared loss set: removed object_type Patient; removed object_type Provider; removed object_type Payer; removed object_type Facility; removed object_type Department; removed object_type Encounter; removed object_type InpatientEncounter; removed object_type OutpatientEncount"
     },
-    "C01/small/4.5/late:impact-name": {
-      "severity": "S1",
-      "class": "lineage-impact-by-name",
-      "issue": "barwise-5m9",
-      "note": "docs/CLI.md shows lineage impact --element with a name; the option takes an id and a name silently matches nothing, exit 0 (barwise-5m9). Cannot close before barwise-ofb, since with no sources recorded the id gives the same empty answer.",
-      "detail": "lineage impact reports no affected artifacts for DischargeDisposition, which the DDL exported before the change renders"
-    },
     "C01/small/4/read-back-diff-ddl:ansi": {
       "severity": "S1",
       "class": "sql-read-back-own-export",
@@ -69,6 +62,13 @@
       "issue": "barwise-nul",
       "note": "Edit distance to acceptance on an OpenAPI artifact. Checks OpenAPI cannot state (rings, deontic rules, composite and value-side uniqueness, n-ary uniqueness) are declared not_expressible on the personas (barwise-1079). What remains is the importer ignoring discriminator subtypes (barwise-nul).",
       "detail": "1 of 9 persona checks fail: Your model still allows what it should forbid: Rules out: a EmergencyEncounter that exists but never plays \"EmergencyEncounter has TriageAcuity\" -- e.g. EmergencyEncounter#1 appears in TraumaEncounter has TraumaActivationLevel but not in EmergencyEncounter has TriageAcuit"
+    },
+    "C01/small/6/parity:verbalize": {
+      "severity": "S1",
+      "detail": "verbalize: CLI and MCP differ at character 51: cli \" identifies Patient\n  Each Patient has at most one PatientId\" vs mcp \" identifies Patient\nEach Patient has at most one PatientId.\n\"",
+      "note": "The CLI indents a fact type's constraint readings by two spaces under its readings and MCP verbalize_model joins every reading flat (barwise-j82). The lane saw it only once parity stopped skipping spilled results; the capability matrix still says verbalize has no divergence.",
+      "issue": "barwise-j82",
+      "class": "verbalize-parity"
     },
     "C01/small/6/release-bundle:gym-list": {
       "severity": "S3",
@@ -98,20 +98,6 @@
       "note": "OpenAPI export then import drops data-type lengths, definitions and value constraints on every value type and loses subtypes beyond the declared loss set (barwise-a0h).",
       "detail": "151 delta(s) outside the declared loss set: modified object_type PartyId; modified object_type LegalName; modified object_type TaxIdentifier; modified object_type KycStatus; modified object_type KycScreeningDate; modified object_type DateOfBirth; modified object_type GivenName; modified object_type "
     },
-    "C02/small/1/roundtrip-diff:regmart-ddl": {
-      "severity": "S1",
-      "class": "sql-import-roundtrip",
-      "issue": "barwise-dnm",
-      "note": "Consequence of barwise-dnm: import sql reads DDL through the DDL importer (barwise-jjd), so the model it produces loses value types and fact types on the export-and-reimport round trip as the DDL importer's does. Closes with the parent.",
-      "detail": "18 delta(s) outside the declared loss set: removed object_type Party; removed object_type Product; removed object_type Branch; removed object_type Currency; removed object_type LoanAccount; removed object_type GeneralLedgerAccount; removed object_type DepositAccount; removed object_type LegalEntity"
-    },
-    "C02/small/4.5/late:impact-name": {
-      "severity": "S1",
-      "class": "lineage-impact-by-name",
-      "issue": "barwise-5m9",
-      "note": "docs/CLI.md shows lineage impact --element with a name; the option takes an id and a name silently matches nothing, exit 0 (barwise-5m9). Cannot close before barwise-ofb, since with no sources recorded the id gives the same empty answer.",
-      "detail": "lineage impact reports no affected artifacts for TransactionType, which the DDL exported before the change renders"
-    },
     "C02/small/4/read-back-diff-ddl:ansi": {
       "severity": "S1",
       "class": "sql-read-back-own-export",
@@ -132,6 +118,13 @@
       "issue": "barwise-s4x",
       "note": "A blind spot, not a finding: barwise registers no Avro importer, so the lane cannot read its own Avro export back, and no other step checks it. Avro export correctness is unverified until barwise-s4x gives it a check that can fail.",
       "detail": "barwise registers no avro importer, so its own export cannot be read back"
+    },
+    "C02/small/6/parity:verbalize": {
+      "severity": "S1",
+      "detail": "verbalize: CLI and MCP differ at character 43: cli \"Id identifies Party\n  Each Party has at most one PartyId.\n  \" vs mcp \"Id identifies Party\nEach Party has at most one PartyId.\nEach\"",
+      "note": "The CLI indents a fact type's constraint readings by two spaces under its readings and MCP verbalize_model joins every reading flat (barwise-j82). The lane saw it only once parity stopped skipping spilled results; the capability matrix still says verbalize has no divergence.",
+      "issue": "barwise-j82",
+      "class": "verbalize-parity"
     },
     "C02/small/6/release-bundle:gym-list": {
       "severity": "S3",
@@ -175,20 +168,6 @@
       "note": "dbt export then import loses value types, definitions, subtypes and objectification beyond the declared loss set (barwise-vsp).",
       "detail": "52 delta(s) outside the declared loss set: modified object_type Account; modified object_type Producer; modified object_type Adjuster; modified object_type Policy; modified object_type Term; modified object_type PolicyPeriod; modified object_type Coverage; modified object_type Risk"
     },
-    "C03/small/1/roundtrip-diff:pc-ddl": {
-      "severity": "S1",
-      "class": "sql-import-roundtrip",
-      "issue": "barwise-dnm",
-      "note": "Consequence of barwise-dnm: import sql reads DDL through the DDL importer (barwise-jjd), so the model it produces loses value types and fact types on the export-and-reimport round trip as the DDL importer's does. Closes with the parent.",
-      "detail": "13 delta(s) outside the declared loss set: removed object_type PcContact; removed object_type PcAccount; removed object_type PcProducer; removed object_type PcPolicyPeriod; removed object_type PcRisk; removed object_type PcVehicleRisk; removed object_type PcAdjuster; removed object_type PcClaim"
-    },
-    "C03/small/4.5/late:impact-name": {
-      "severity": "S1",
-      "class": "lineage-impact-by-name",
-      "issue": "barwise-5m9",
-      "note": "docs/CLI.md shows lineage impact --element with a name; the option takes an id and a name silently matches nothing, exit 0 (barwise-5m9). Cannot close before barwise-ofb, since with no sources recorded the id gives the same empty answer.",
-      "detail": "lineage impact reports no affected artifacts for Claim, which the DDL exported before the change renders"
-    },
     "C03/small/4/read-back-diff-ddl:ansi": {
       "severity": "S1",
       "class": "sql-read-back-own-export",
@@ -223,6 +202,13 @@
       "issue": "barwise-nkn",
       "note": "Edit distance to acceptance on a dbt project. Nothing is declared not_expressible for dbt: a singular test is SQL, so even a ring constraint can be stated (PR #575 review). What remains are checks the round trip does not carry: rings, multi-column uniqueness, warn-severity rules, subtypes, relationship roles, composite-key ternaries (barwise-nkn).",
       "detail": "2 of 10 persona checks fail: The model does not verbalize as \"It is obligatory that each Reserve is approved by at least one Adjuster.\". Check the fact type, its reading, and its constraints.; The model has no fact type connecting \"Subrogation\" and \"Contact\"."
+    },
+    "C03/small/6/parity:verbalize": {
+      "severity": "S1",
+      "detail": "verbalize: CLI and MCP differ at character 51: cli \" identifies Contact\n  Each Contact has at most one ContactId\" vs mcp \" identifies Contact\nEach Contact has at most one ContactId.\n\"",
+      "note": "The CLI indents a fact type's constraint readings by two spaces under its readings and MCP verbalize_model joins every reading flat (barwise-j82). The lane saw it only once parity stopped skipping spilled results; the capability matrix still says verbalize has no divergence.",
+      "issue": "barwise-j82",
+      "class": "verbalize-parity"
     },
     "C03/small/6/release-bundle:gym-list": {
       "severity": "S3",
@@ -280,13 +266,6 @@
       "note": "dbt export then import loses value types, definitions, subtypes and objectification beyond the declared loss set (barwise-vsp).",
       "detail": "68 delta(s) outside the declared loss set: modified object_type Category; modified object_type Product; modified object_type PhysicalProduct; modified object_type HazmatProduct; modified object_type ProductVariant; modified object_type Listing; modified object_type Order; modified object_type OrderL"
     },
-    "C04/small/4.5/late:impact-name": {
-      "severity": "S1",
-      "class": "lineage-impact-by-name",
-      "issue": "barwise-5m9",
-      "note": "docs/CLI.md shows lineage impact --element with a name; the option takes an id and a name silently matches nothing, exit 0 (barwise-5m9). Cannot close before barwise-ofb, since with no sources recorded the id gives the same empty answer.",
-      "detail": "lineage impact reports no affected artifacts for CurrencyCode, which the DDL exported before the change renders"
-    },
     "C04/small/4/read-back-diff-ddl:ansi": {
       "severity": "S1",
       "class": "sql-read-back-own-export",
@@ -321,6 +300,13 @@
       "issue": "barwise-nkn",
       "note": "Edit distance to acceptance on a dbt project. Nothing is declared not_expressible for dbt: a singular test is SQL, so even a ring constraint can be stated (PR #575 review). What remains are checks the round trip does not carry: rings, multi-column uniqueness, warn-severity rules, subtypes, relationship roles, composite-key ternaries (barwise-nkn).",
       "detail": "3 of 6 persona checks fail: The model has no object type named \"Seller\".; The model has no fact type connecting \"Order\" and \"Buyer\".; Your model does not yet carry the relationship this rule guards (no fact type matching \"Order includes ProductVariant in Quantity\"), so it cannot rule out: Rules out:"
+    },
+    "C04/small/6/parity:verbalize": {
+      "severity": "S1",
+      "detail": "verbalize: CLI and MCP differ at character 43: cli \"Id identifies Party\n  Each Party has at most one PartyId.\n  \" vs mcp \"Id identifies Party\nEach Party has at most one PartyId.\nEach\"",
+      "note": "The CLI indents a fact type's constraint readings by two spaces under its readings and MCP verbalize_model joins every reading flat (barwise-j82). The lane saw it only once parity stopped skipping spilled results; the capability matrix still says verbalize has no divergence.",
+      "issue": "barwise-j82",
+      "class": "verbalize-parity"
     },
     "C04/small/6/release-bundle:gym-list": {
       "severity": "S3",
@@ -364,13 +350,6 @@
       "note": "Consequence of barwise-dnm: import sql reads DDL through the DDL importer (barwise-jjd), so the model it produces loses value types and fact types on the export-and-reimport round trip as the DDL importer's does. Closes with the parent.",
       "detail": "15 delta(s) outside the declared loss set: removed object_type UnitOfMeasure; removed object_type Mat; removed object_type WorkCenter; removed object_type FinishedGood; removed object_type Werk; removed object_type Plko; removed object_type Charg; removed object_type Lifnr"
     },
-    "C05/small/4.5/late:impact-name": {
-      "severity": "S1",
-      "class": "lineage-impact-by-name",
-      "issue": "barwise-5m9",
-      "note": "docs/CLI.md shows lineage impact --element with a name; the option takes an id and a name silently matches nothing, exit 0 (barwise-5m9). Cannot close before barwise-ofb, since with no sources recorded the id gives the same empty answer.",
-      "detail": "lineage impact reports no affected artifacts for UomCode, which the DDL exported before the change renders"
-    },
     "C05/small/4/read-back-diff-ddl:ansi": {
       "severity": "S1",
       "class": "sql-read-back-own-export",
@@ -405,6 +384,13 @@
       "issue": "barwise-3pc",
       "note": "Edit distance to acceptance on C05's SAP DDL. MAT_IS_PRODUCED_AT_WERK_IN_CHA is WorkOrder's table, keyed on CHARG_ID alone (the kernel's uniqueness over the batch role), which is a key that is also a foreign key: an entity identified through another entity, which core cannot express (barwise-3pc). The import keeps the key and drops the reference, so no fact type connects Material and Plant. Was barwise-2z1 until composite-key-tables.spec.md, which covers keys of two or more roles.",
       "detail": "1 of 6 persona checks fail: The model has no fact type connecting \"Material\" and \"Plant\". (26 names mapped through the skin)"
+    },
+    "C05/small/6/parity:verbalize": {
+      "severity": "S1",
+      "detail": "verbalize: CLI and MCP differ at character 63: cli \"identifies Material\n  Each Material has at most one Material\" vs mcp \"identifies Material\nEach Material has at most one MaterialNu\"",
+      "note": "The CLI indents a fact type's constraint readings by two spaces under its readings and MCP verbalize_model joins every reading flat (barwise-j82). The lane saw it only once parity stopped skipping spilled results; the capability matrix still says verbalize has no divergence.",
+      "issue": "barwise-j82",
+      "class": "verbalize-parity"
     },
     "C05/small/6/release-bundle:gym-list": {
       "severity": "S3",
@@ -455,13 +441,6 @@
       "note": "Consequence of barwise-dnm: import sql reads DDL through the DDL importer (barwise-jjd), so the model it produces loses value types and fact types on the export-and-reimport round trip as the DDL importer's does. Closes with the parent.",
       "detail": "20 delta(s) outside the declared loss set: removed object_type Consignee; removed object_type Port; removed object_type Carrier; removed object_type Vehicle; removed object_type Container; removed object_type Voyage; removed object_type Leg; removed object_type Shipment"
     },
-    "C06/small/4.5/late:impact-name": {
-      "severity": "S1",
-      "class": "lineage-impact-by-name",
-      "issue": "barwise-5m9",
-      "note": "docs/CLI.md shows lineage impact --element with a name; the option takes an id and a name silently matches nothing, exit 0 (barwise-5m9). Cannot close before barwise-ofb, since with no sources recorded the id gives the same empty answer.",
-      "detail": "lineage impact reports no affected artifacts for ImdgClass, which the DDL exported before the change renders"
-    },
     "C06/small/4/read-back-diff-ddl:ansi": {
       "severity": "S1",
       "class": "sql-read-back-own-export",
@@ -482,6 +461,13 @@
       "issue": "barwise-s4x",
       "note": "A blind spot, not a finding: barwise registers no Avro importer, so the lane cannot read its own Avro export back, and no other step checks it. Avro export correctness is unverified until barwise-s4x gives it a check that can fail.",
       "detail": "barwise registers no avro importer, so its own export cannot be read back"
+    },
+    "C06/small/6/parity:verbalize": {
+      "severity": "S1",
+      "detail": "verbalize: CLI and MCP differ at character 51: cli \" identifies Shipper\n  Each Shipper has at most one ShipperId\" vs mcp \" identifies Shipper\nEach Shipper has at most one ShipperId.\n\"",
+      "note": "The CLI indents a fact type's constraint readings by two spaces under its readings and MCP verbalize_model joins every reading flat (barwise-j82). The lane saw it only once parity stopped skipping spilled results; the capability matrix still says verbalize has no divergence.",
+      "issue": "barwise-j82",
+      "class": "verbalize-parity"
     },
     "C06/small/6/release-bundle:gym-list": {
       "severity": "S3",
@@ -532,13 +518,6 @@
       "note": "The default OpenAPI export writes a /* comment */ header when the model has diagnostics (which it always has after barwise-lh9), so the .json is not JSON and the importer returns an empty model with exit 0 (barwise-sxh).",
       "detail": "140 delta(s) outside the declared loss set: removed object_type Party; removed object_type Individual; removed object_type Organization; removed object_type Customer; removed object_type Subscriber; removed object_type Country; removed object_type Operator; removed object_type ProductSpecification"
     },
-    "C07/small/4.5/late:impact-name": {
-      "severity": "S1",
-      "class": "lineage-impact-by-name",
-      "issue": "barwise-5m9",
-      "note": "docs/CLI.md shows lineage impact --element with a name; the option takes an id and a name silently matches nothing, exit 0 (barwise-5m9). Cannot close before barwise-ofb, since with no sources recorded the id gives the same empty answer.",
-      "detail": "lineage impact reports no affected artifacts for RatePlanCode, which the DDL exported before the change renders"
-    },
     "C07/small/4/read-back-diff-ddl:ansi": {
       "severity": "S1",
       "class": "sql-read-back-own-export",
@@ -559,6 +538,13 @@
       "issue": "barwise-s4x",
       "note": "A blind spot, not a finding: barwise registers no Avro importer, so the lane cannot read its own Avro export back, and no other step checks it. Avro export correctness is unverified until barwise-s4x gives it a check that can fail.",
       "detail": "barwise registers no avro importer, so its own export cannot be read back"
+    },
+    "C07/small/6/parity:verbalize": {
+      "severity": "S1",
+      "detail": "verbalize: CLI and MCP differ at character 43: cli \"Id identifies Party\n  Each Party has at most one PartyId.\n  \" vs mcp \"Id identifies Party\nEach Party has at most one PartyId.\nEach\"",
+      "note": "The CLI indents a fact type's constraint readings by two spaces under its readings and MCP verbalize_model joins every reading flat (barwise-j82). The lane saw it only once parity stopped skipping spilled results; the capability matrix still says verbalize has no divergence.",
+      "issue": "barwise-j82",
+      "class": "verbalize-parity"
     },
     "C07/small/6/release-bundle:gym-list": {
       "severity": "S3",
@@ -602,13 +588,6 @@
       "note": "Consequence of barwise-dnm: import sql reads DDL through the DDL importer (barwise-jjd), so the model it produces loses value types and fact types on the export-and-reimport round trip as the DDL importer's does. Closes with the parent.",
       "detail": "14 delta(s) outside the declared loss set: removed object_type Premise; removed object_type Transformer; removed object_type Manufacturer; removed object_type ServicePoint; removed object_type Meter; removed object_type SmartMeter; removed object_type Customer; removed object_type Tariff"
     },
-    "C08/small/4.5/late:impact-name": {
-      "severity": "S1",
-      "class": "lineage-impact-by-name",
-      "issue": "barwise-5m9",
-      "note": "docs/CLI.md shows lineage impact --element with a name; the option takes an id and a name silently matches nothing, exit 0 (barwise-5m9). Cannot close before barwise-ofb, since with no sources recorded the id gives the same empty answer.",
-      "detail": "lineage impact reports no affected artifacts for RateCode, which the DDL exported before the change renders"
-    },
     "C08/small/4/read-back-diff-ddl:ansi": {
       "severity": "S1",
       "class": "sql-read-back-own-export",
@@ -629,6 +608,13 @@
       "issue": "barwise-s4x",
       "note": "A blind spot, not a finding: barwise registers no Avro importer, so the lane cannot read its own Avro export back, and no other step checks it. Avro export correctness is unverified until barwise-s4x gives it a check that can fail.",
       "detail": "barwise registers no avro importer, so its own export cannot be read back"
+    },
+    "C08/small/6/parity:verbalize": {
+      "severity": "S1",
+      "detail": "verbalize: CLI and MCP differ at character 71: cli \"tifies ServicePoint\n  Each ServicePoint has at most one Serv\" vs mcp \"tifies ServicePoint\nEach ServicePoint has at most one Servic\"",
+      "note": "The CLI indents a fact type's constraint readings by two spaces under its readings and MCP verbalize_model joins every reading flat (barwise-j82). The lane saw it only once parity stopped skipping spilled results; the capability matrix still says verbalize has no divergence.",
+      "issue": "barwise-j82",
+      "class": "verbalize-parity"
     },
     "C08/small/6/release-bundle:gym-list": {
       "severity": "S3",
@@ -672,13 +658,6 @@
       "note": "Consequence of barwise-dnm: the DDL export of the imported model does not read back to the same model -- value types and fact types are lost beyond the declared loss set. Closes with the parent.",
       "detail": "503 delta(s) outside the declared loss set: removed object_type StudyTitle; removed object_type StudyPhase; removed object_type ProtocolTitle; removed object_type AmendmentApprovalDate; removed object_type CountryCode; removed object_type InvestigatorName; removed object_type SubjectNumber; removed "
     },
-    "C09/small/4.5/late:impact-name": {
-      "severity": "S1",
-      "class": "lineage-impact-by-name",
-      "issue": "barwise-5m9",
-      "note": "docs/CLI.md shows lineage impact --element with a name; the option takes an id and a name silently matches nothing, exit 0 (barwise-5m9). Cannot close before barwise-ofb, since with no sources recorded the id gives the same empty answer.",
-      "detail": "lineage impact reports no affected artifacts for MeddraPreferredTermCode, which the DDL exported before the change renders"
-    },
     "C09/small/4/read-back-diff-ddl:ansi": {
       "severity": "S1",
       "class": "sql-read-back-own-export",
@@ -713,6 +692,13 @@
       "issue": "barwise-nm4",
       "note": "barwise-nm4: the NORMA importer drops every internal uniqueness constraint that no fact references, while keeping the mandatory ones, so the imported model allows what the source forbids. Exit 0, confidence high, no warning. A consequence row; closes with that importer issue.",
       "detail": "3 of 10 persona checks fail: The model does not verbalize as \"It is obligatory that each SeriousAdverseEvent was reported at at least one SaeReportDateTime.\". Check the fact type, its reading, and its constraints.; Your model still allows what it should forbid: Rules out: a acyclic ring violation am"
+    },
+    "C09/small/6/parity:verbalize": {
+      "severity": "S1",
+      "detail": "verbalize: CLI and MCP differ at character 43: cli \"Id identifies Study\n  Each Study has at most one StudyId.\n  \" vs mcp \"Id identifies Study\nEach Study has at most one StudyId.\nEach\"",
+      "note": "The CLI indents a fact type's constraint readings by two spaces under its readings and MCP verbalize_model joins every reading flat (barwise-j82). The lane saw it only once parity stopped skipping spilled results; the capability matrix still says verbalize has no divergence.",
+      "issue": "barwise-j82",
+      "class": "verbalize-parity"
     },
     "C09/small/6/release-bundle:gym-list": {
       "severity": "S3",
@@ -749,20 +735,6 @@
       "note": "OpenAPI export then import drops data-type lengths, definitions and value constraints on every value type and loses subtypes beyond the declared loss set (barwise-a0h).",
       "detail": "167 delta(s) outside the declared loss set: modified object_type Pidm; modified object_type StudentNumber; modified object_type CampusCode; modified object_type CollegeCode; modified object_type DepartmentCode; modified object_type CourseId; modified object_type Crn; modified object_type TermCode"
     },
-    "C10/small/1/roundtrip-diff:sis-ddl": {
-      "severity": "S1",
-      "class": "sql-import-roundtrip",
-      "issue": "barwise-dnm",
-      "note": "Consequence of barwise-dnm: import sql reads DDL through the DDL importer (barwise-jjd), so the model it produces loses value types and fact types on the export-and-reimport round trip as the DDL importer's does. Closes with the parent.",
-      "detail": "16 delta(s) outside the declared loss set: removed object_type Spriden; removed object_type Stvcamp; removed object_type Sgbstdn; removed object_type Sibinst; removed object_type Pebempl; removed object_type Stvcoll; removed object_type Stvdept; removed object_type Scbcrse"
-    },
-    "C10/small/4.5/late:impact-name": {
-      "severity": "S1",
-      "class": "lineage-impact-by-name",
-      "issue": "barwise-5m9",
-      "note": "docs/CLI.md shows lineage impact --element with a name; the option takes an id and a name silently matches nothing, exit 0 (barwise-5m9). Cannot close before barwise-ofb, since with no sources recorded the id gives the same empty answer.",
-      "detail": "lineage impact reports no affected artifacts for GradeCode, which the DDL exported before the change renders"
-    },
     "C10/small/4/read-back-diff-ddl:ansi": {
       "severity": "S1",
       "class": "sql-read-back-own-export",
@@ -783,6 +755,13 @@
       "issue": "barwise-s4x",
       "note": "A blind spot, not a finding: barwise registers no Avro importer, so the lane cannot read its own Avro export back, and no other step checks it. Avro export correctness is unverified until barwise-s4x gives it a check that can fail.",
       "detail": "barwise registers no avro importer, so its own export cannot be read back"
+    },
+    "C10/small/6/parity:verbalize": {
+      "severity": "S1",
+      "detail": "verbalize: CLI and MCP differ at character 39: cli \"m identifies Person\n  Each Person has at most one Pidm.\n  Ea\" vs mcp \"m identifies Person\nEach Person has at most one Pidm.\nEach P\"",
+      "note": "The CLI indents a fact type's constraint readings by two spaces under its readings and MCP verbalize_model joins every reading flat (barwise-j82). The lane saw it only once parity stopped skipping spilled results; the capability matrix still says verbalize has no divergence.",
+      "issue": "barwise-j82",
+      "class": "verbalize-parity"
     },
     "C10/small/6/release-bundle:gym-list": {
       "severity": "S3",
@@ -840,13 +819,6 @@
       "note": "dbt export then import loses value types, definitions, subtypes and objectification beyond the declared loss set (barwise-vsp).",
       "detail": "75 delta(s) outside the declared loss set: modified object_type Workspace; modified object_type Project; modified object_type ApiKey; modified object_type ServiceAccount; modified object_type Plan; modified object_type Subscription; modified object_type EventDefinition; modified object_type Event"
     },
-    "C11/small/4.5/late:impact-name": {
-      "severity": "S1",
-      "class": "lineage-impact-by-name",
-      "issue": "barwise-5m9",
-      "note": "docs/CLI.md shows lineage impact --element with a name; the option takes an id and a name silently matches nothing, exit 0 (barwise-5m9). Cannot close before barwise-ofb, since with no sources recorded the id gives the same empty answer.",
-      "detail": "lineage impact reports no affected artifacts for ReservedEventName, which the DDL exported before the change renders"
-    },
     "C11/small/4/read-back-diff-ddl:ansi": {
       "severity": "S1",
       "class": "sql-read-back-own-export",
@@ -881,6 +853,13 @@
       "issue": "barwise-dyq",
       "note": "Edit distance to acceptance on a Kotlin repo: the persona's checks fail because the Kotlin importer returned an empty model (barwise-dyq). A consequence row; closes with that importer issue.",
       "detail": "5 of 6 persona checks fail: The model has no object type named \"Tenant\".; The model has no object type named \"Event\".; The model has no object type named \"VerifiedUser\".; The model has no fact type connecting \"Event\" and \"Session\"."
+    },
+    "C11/small/6/parity:verbalize": {
+      "severity": "S1",
+      "detail": "verbalize: CLI and MCP differ at character 47: cli \"d identifies Tenant\n  Each Tenant has at most one TenantId.\n\" vs mcp \"d identifies Tenant\nEach Tenant has at most one TenantId.\nEa\"",
+      "note": "The CLI indents a fact type's constraint readings by two spaces under its readings and MCP verbalize_model joins every reading flat (barwise-j82). The lane saw it only once parity stopped skipping spilled results; the capability matrix still says verbalize has no divergence.",
+      "issue": "barwise-j82",
+      "class": "verbalize-parity"
     },
     "C11/small/6/release-bundle:gym-list": {
       "severity": "S3",
@@ -917,20 +896,6 @@
       "note": "OpenAPI export then import drops data-type lengths, definitions and value constraints on every value type and loses subtypes beyond the declared loss set (barwise-a0h).",
       "detail": "183 delta(s) outside the declared loss set: modified object_type ClientNumber; modified object_type HouseholdNumber; modified object_type IncomeSourceId; modified object_type CaseId; modified object_type CaseNumber; modified object_type ProgramCode; modified object_type PeriodNumber; modified object"
     },
-    "C12/small/1/roundtrip-diff:modern-ddl": {
-      "severity": "S1",
-      "class": "sql-import-roundtrip",
-      "issue": "barwise-dnm",
-      "note": "Consequence of barwise-dnm: import sql reads DDL through the DDL importer (barwise-jjd), so the model it produces loses value types and fact types on the export-and-reimport round trip as the DDL importer's does. Closes with the parent.",
-      "detail": "29 delta(s) outside the declared loss set: removed object_type Hhld; removed object_type Clnt; removed object_type Aplct; removed object_type Ofc; removed object_type EligWrk; removed object_type Supv; removed object_type Detr; removed object_type Prgm"
-    },
-    "C12/small/4.5/late:impact-name": {
-      "severity": "S1",
-      "class": "lineage-impact-by-name",
-      "issue": "barwise-5m9",
-      "note": "docs/CLI.md shows lineage impact --element with a name; the option takes an id and a name silently matches nothing, exit 0 (barwise-5m9). Cannot close before barwise-ofb, since with no sources recorded the id gives the same empty answer.",
-      "detail": "lineage impact reports no affected artifacts for ClosureReasonCode, which the DDL exported before the change renders"
-    },
     "C12/small/4/read-back-diff-ddl:ansi": {
       "severity": "S1",
       "class": "sql-read-back-own-export",
@@ -951,6 +916,13 @@
       "issue": "barwise-s4x",
       "note": "A blind spot, not a finding: barwise registers no Avro importer, so the lane cannot read its own Avro export back, and no other step checks it. Avro export correctness is unverified until barwise-s4x gives it a check that can fail.",
       "detail": "barwise registers no avro importer, so its own export cannot be read back"
+    },
+    "C12/small/6/parity:verbalize": {
+      "severity": "S1",
+      "detail": "verbalize: CLI and MCP differ at character 55: cli \"r identifies Client\n  Each Client has at most one ClientNumb\" vs mcp \"r identifies Client\nEach Client has at most one ClientNumber\"",
+      "note": "The CLI indents a fact type's constraint readings by two spaces under its readings and MCP verbalize_model joins every reading flat (barwise-j82). The lane saw it only once parity stopped skipping spilled results; the capability matrix still says verbalize has no divergence.",
+      "issue": "barwise-j82",
+      "class": "verbalize-parity"
     },
     "C12/small/6/release-bundle:gym-list": {
       "severity": "S3",
