@@ -49,6 +49,23 @@ output specification for the PR body (spec:
   model name belongs. Authority: root `CLAUDE.md` conventions; the
   harness rule on model identity.
 - The branch is on current `main` and carries no merge markers.
+- **A change to a shared function names each caller, and why the change
+  is right for that caller.** A function two writers share changes for
+  both of them. Removing `source_context` from the object type writer
+  the 3.0 and 4.0 writers share was right for 4.0 and dropped a field
+  the 3.0 writer still had to write (PR #900's session review).
+  Authority: root `CLAUDE.md`, orthogonality. In this group rather
+  than the function group below, because a body-only change to an
+  existing shared function triggers no heading.
+- **A second review that finds a new case in the same function asks
+  whether the function answers a question it cannot.** Each round's fix
+  for one case, followed by the next round's case, is the sign of a
+  question the inputs do not settle. Four passes on the kind filter for
+  shared 3.x ids ended when the owner chose to list the candidates
+  instead of guessing among them (PR #902). Stop and name the question
+  rather than patch a fifth case. Authority: root `CLAUDE.md`, define
+  errors out of existence; `spec-writer` skill, sensemaking. In this
+  group because its trigger is the review history, not the diff.
 
 ## When a surface changed (CLI, MCP, VS Code)
 
@@ -251,13 +268,6 @@ now holds, guards, or learns that they did not have to.
   (barwise-927: a merge that drops six fields). Authority:
   `docs/specs/core-branching-load.spec.md`, Principle; Ousterhout
   ch. 5, information hiding.
-- **A change to a shared function names each caller, and why the change
-  is right for that caller.** A function two writers share changes for
-  both of them. Removing `source_context` from the object type writer
-  the 3.0 and 4.0 writers share was right for 4.0 and dropped a field
-  the 3.0 writer still had to write (PR #900's session review).
-  Authority: root `CLAUDE.md`, orthogonality; the duplication-audit
-  skill's rule that a shared owner is changed for all its users.
 - **A shared function makes two sides agree only when they give it the
   same inputs.** Sharing the rule is half of the guarantee; the other
   half is that each caller derives the inputs the same way. The Ossie
@@ -268,14 +278,6 @@ now holds, guards, or learns that they did not have to.
   found by its pr-review). Check how each caller computes what it
   passes, not only that the callee is shared. Authority: root
   `CLAUDE.md`, a copy that must agree is shared or derived.
-- **A second review that finds a new case in the same function asks
-  whether the function answers a question it cannot.** Each round's fix
-  for one case, followed by the next round's case, is the sign of a
-  question the inputs do not settle. Four passes on the kind filter for
-  shared 3.x ids ended when the owner chose to list the candidates
-  instead of guessing among them (PR #902). Stop and name the question
-  rather than patch a fifth case. Authority: root `CLAUDE.md`, define
-  errors out of existence; `spec-writer` skill, sensemaking.
 - Two modules that both know one format or convention is the first
   item of the copy group below; run it there.
 
@@ -314,10 +316,10 @@ now holds, guards, or learns that they did not have to.
   claims.** A `sed` across fixtures changes what each one asserts, and
   a fixture that now claims something false can keep passing by
   accident. Moving every lineage fixture to manifest version 2 left two
-  describing a 3.x model with 3.x ids under a 4.0 manifest; they passed
+  describing a 3.x model with 3.x ids under a version 2 manifest; they passed
   only because impact pooled ids across generations, the defect a later
-  review found (PR #902's session review). Authority: `assertion-audit`
-  skill, fixture-asserting tests.
+  review found (PR #902's session review). Authority: root `REVIEW.md`,
+  failure mode 3; `assertion-audit` skill, Pass 2.
 - **A fixture, `ModelBuilder`, or `fc.Arbitrary` hand-avoids a state
   construction should refuse, rather than constructing it and
   asserting refusal.** `tests/arbitraries/model.ts` derives ids and
