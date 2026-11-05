@@ -12,6 +12,7 @@ barwise/scripts/tests/adr-facts.test.mjs, barwise/scripts/lib/adr-enforcement.mj
 barwise/scripts/tests/expected-counts.json, barwise/package.json, package.json,
 .github/workflows/ci.yml, barwise/scripts/lib/ci-gates.mjs,
 barwise/scripts/tests/ci-conditions.test.mjs
+Plan-reviewed: 05383a2a (code-review, pr-review)
 
 ## Principle
 
@@ -304,7 +305,7 @@ Every disagreement CI reports is resolved in a commit that adds its input
 as a case here; that test file's history and the job's run count are the
 record WS4 starts from.
 
-Requirements the build must meet, from the plan's last review rounds:
+Requirements the build must meet, from the plan's last review rounds. The owner closed the plan review on these (2026-11-05): the last round's findings were requirements of this kind, not design problems, so they are recorded here rather than starting another round.
 
 - **Positions come from the loop.** `judgeDeclarations` attaches each
   finding's entry position from its own loop index over
