@@ -3,7 +3,7 @@
 Status: Draft -- no workstream implemented
 
 Created: 2026-10-13
-Last-updated: 2026-11-04
+Last-updated: 2026-11-05
 Tracking: barwise-0wa. Sources: `docs/cli-surface-audit-2026-10-12.md`
 (option by option) and `docs/surface-parity-audit-2026-10-12.md`
 (runtime behaviour, a separate same-day audit whose issues are mapped
@@ -76,7 +76,7 @@ existing model is approved is the next section.
 
 - `rename` and `--matching content` read "none": every surface has them.
 - `--surrogate-keys` reaches MCP through `export_model`'s `options` and not VS Code, whose export tool drops `options`. Workstream 3 closes it.
-- `migrate` keeps the reason its own spec gave ("rewrites files in place"). It post-dates the owner's 2026-10-13 calls, so this spec does not reopen it; the owner rules on it like any other row.
+- `migrate` post-dates the owner's 2026-10-13 calls. The owner kept it CLI-only on 2026-11-05 ("Resolved by the owner", below).
 
 ### Corrections to the audit
 
@@ -356,9 +356,11 @@ so no eval suite enters a bundle.
 
 ## Open decisions (for review)
 
-1. **Does `migrate` stay CLI-only?** Its row reads `deliberate` with the reason its own spec gave ("rewrites files in place", orm-format-3, #709), which the owner has not ruled on under the 2026-10-12 direction.
-   - Recommended: keep it CLI-only. MCP and VS Code already write 4.0 on the next save of a file they edit, and the editor's "Store ids" quick fix writes a file's unstored ids. A migration changes a file's format, not its model, so it produces no deltas for the per-change review to show; a tool that rewrites files in bulk with nothing to review is the write this spec otherwise removes.
-   - Alternative: an MCP and VS Code tool with a preview, as `rename_element` has (`check: true`, then write). It closes the row, at the cost of a bulk write the review flow cannot cover.
+None. Every decision this spec needed is resolved below.
+
+### Resolved by the owner (2026-11-05)
+
+- **`migrate` stays CLI-only.** MCP and VS Code already write 4.0 on the next save of a file they edit, and the editor's "Store ids" quick fix writes a file's unstored ids. A migration changes a file's format, not its model, so it produces no deltas for the per-change review to show, and a tool that rewrites files in bulk with nothing to review is the write this spec removes elsewhere. The alternative, an MCP and VS Code tool with a preview as `rename_element` has, was rejected for that reason.
 
 ### Resolved by the owner (2026-11-04)
 
