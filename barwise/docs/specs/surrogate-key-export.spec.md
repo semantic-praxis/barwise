@@ -22,7 +22,7 @@ barwise/packages/mcp/src/tools/exportModel.ts,
 barwise/packages/mcp/tests/,
 barwise/docs/CLI.md,
 CLAUDE.md,
-barwise/docs/release-notes/unreleased.md
+barwise/docs/release-notes/2.0.0.md
 
 When a user exports DDL or dbt with `--surrogate-keys`, every table
 whose key spans several columns shall get one generated key column, the

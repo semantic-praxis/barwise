@@ -94,8 +94,9 @@ in `keyless-model-access.spec.md`; detecting a key that leaks anyway is
   (`llm/tests/observe/callLog.test.ts`) (barwise-ppb).
 - Left to the owner: the spec marks none of its Open decisions resolved,
   and the code follows each recommendation. Whether retiring `--api-key`
-  needed a major version (it shipped in v1.7.0, a minor); whether MCP
-  sampling should be preferred even when a key is also configured (the
+  needed a major version (it first ships in v2.0.0, a major, which settles
+  it); whether MCP sampling should be preferred even when a key is also
+  configured (the
   root `CLAUDE.md` says only that the MCP path needs no key where the
   client advertises sampling); and whether `detectProvider()` should
   refuse a key outside promptlab ("Recommended: no").

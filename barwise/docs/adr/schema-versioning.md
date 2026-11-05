@@ -91,8 +91,9 @@ was a section of the metamodel ADR before this one.
   CI (barwise-vvg, which waits on barwise-6om for what "released"
   means).
 - Decision 3 is silent on what counts as released and on what happens
-  inside an unreleased major. v1.7.0 wrote 1.1; 2.0 and 3.0 have landed
-  since only in the moving `edge` pre-release. `join_ring` (#746) and
+  inside an unreleased major. v1.7.0 wrote 1.1; 2.0 and 3.0 landed after
+  it only in the moving `edge` pre-release, and v2.0.0 is the first
+  release since, writing 4.0. `join_ring` (#746) and
   the external-uniqueness preferred identifier (#767), both additive,
   joined 3.0 after #708 with no minor bump, so an earlier 3.0 `edge`
   build refuses such a file at the schema rather than with "newer

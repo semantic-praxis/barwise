@@ -11,7 +11,7 @@ barwise/packages/core/src/mapping/RelationalMapper.ts,
 barwise/packages/core/src/mapping/index.ts,
 barwise/packages/formats/tests/,
 barwise/packages/cli/tests/dbtUniquenessRoundTrip.test.ts,
-barwise/docs/release-notes/unreleased.md
+barwise/docs/release-notes/2.0.0.md
 
 When the DDL importer reads an annotated table whose entity objectifies a
 relationship, and the table's one key column is a role of that

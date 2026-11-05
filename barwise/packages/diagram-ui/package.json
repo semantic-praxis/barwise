@@ -1,6 +1,6 @@
 {
   "name": "@barwise/diagram-ui",
-  "version": "1.7.0",
+  "version": "2.0.0",
   "private": true,
   "description": "React renderer for ORM diagrams: interactive canvas and headless SVG",
   "type": "module",
@@ -28,7 +28,7 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@barwise/diagram": "1.7.0",
+    "@barwise/diagram": "2.0.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0"
   },
