@@ -41,8 +41,10 @@ import { gradedCandidate } from "./skinNames.mjs";
 /**
  * How a spilled MCP result opens: the server writes its notice first
  * (mcp/src/workspace/response.ts), and `spill.test.mjs` reads that file
- * so the two cannot drift apart. A length cap stood in for this before: a
- * spill's preview of a long DDL ran past it, and the preview was graded
+ * so the two cannot drift apart. The lane lifts the inline limit
+ * (mcp.mjs), so a spill means the lane could not compare, never an answer.
+ * A length cap stood in for this before, and a spilled export (its preview
+ * plus the constraint report the tool appends) ran past it and was graded
  * against the CLI's whole output as a parity failure.
  */
 export const MCP_SPILL_NOTICE = /^\[barwise\] Output is .* too large to return inline\./;
@@ -1188,10 +1190,12 @@ export async function sprint6Surfaces(customer, tier, record) {
           { source: model },
           (cli, m) => grade.gradeValidationParity(cli, m),
         ],
+        // The artifact is export_model's first block; a second block, when
+        // present, is the constraint report the CLI prints to stderr.
         ["export-ddl", ["export", model, "--format", "ddl"], "export_model", {
           source: model,
           format: "ddl",
-        }, (cli, m) => grade.gradeParity(cli, m, "export ddl")],
+        }, (cli, _m, blocks) => grade.gradeParity(cli, blocks[0] ?? "", "export ddl")],
         [
           "verbalize",
           ["verbalize", model],
@@ -1203,18 +1207,6 @@ export async function sprint6Surfaces(customer, tier, record) {
       for (const [name, args, tool, toolArgs, compare] of pairs) {
         const cli = runCli(args, { timeoutMs: budget });
         const m = await mcp.call(tool, toolArgs);
-        const spilled = MCP_SPILL_NOTICE.test(m.text);
-        if (spilled) {
-          record({
-            sprint: 6,
-            step: `parity:${name}`,
-            status: "refused",
-            detail:
-              `MCP result spilled to a cache file (inline limit); parity not comparable inline`,
-            ms: m.ms,
-          });
-          continue;
-        }
         if (m.isError || cli.exit !== 0) {
           record({
             sprint: 6,
@@ -1230,10 +1222,24 @@ export async function sprint6Surfaces(customer, tier, record) {
           });
           continue;
         }
+        // After the error check, so a failing command is reported as such.
+        // Not "refused": the product declined nothing, the lane saw too
+        // little, and the gate drops a refused step from what it counts.
+        if (MCP_SPILL_NOTICE.test(m.text)) {
+          record({
+            sprint: 6,
+            step: `parity:${name}`,
+            status: "could_not_answer",
+            detail: "the MCP result spilled to a file despite the lifted inline limit, "
+              + "so there is no whole answer to compare",
+            ms: m.ms,
+          });
+          continue;
+        }
         record({
           sprint: 6,
           step: `parity:${name}`,
-          ...compare(cli.stdout, m.text),
+          ...compare(cli.stdout, m.text, m.blocks),
           ms: m.ms,
           exit: cli.exit,
         });

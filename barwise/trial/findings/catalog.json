@@ -170,6 +170,13 @@
       "step": "^acceptance:",
       "importer": "openapi",
       "note": "Edit distance to acceptance on an OpenAPI artifact. Checks OpenAPI cannot state (rings, deontic rules, composite and value-side uniqueness, n-ary uniqueness) are declared not_expressible on the personas (barwise-1079). What remains is the importer ignoring discriminator subtypes (barwise-nul)."
+    },
+    {
+      "id": "verbalize-parity",
+      "issue": "barwise-j82",
+      "severity": "S1",
+      "step": "^parity:verbalize$",
+      "note": "The CLI indents a fact type's constraint readings by two spaces under its readings and MCP verbalize_model joins every reading flat (barwise-j82). The lane saw it only once parity stopped skipping spilled results; the capability matrix still says verbalize has no divergence."
     }
   ]
 }

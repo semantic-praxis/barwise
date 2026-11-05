@@ -1148,7 +1148,7 @@ describe("NORMA export of a file that omits constraint ids", () => {
   it("writes the same document on every export", () => {
     // A 2.0 file, so the load replays it and names every constraint, which
     // this export must do the same way twice. The example is 4.0 now, so
-    // the frozen 2.0 copy core's tests keep.
+    // this reads the frozen 2.0 copy that core's tests keep.
     const shop = readFileSync(
       resolve(here, "../../core/tests/fixtures/shop-2.0.orm.yaml"),
       "utf-8",

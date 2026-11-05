@@ -1959,8 +1959,7 @@ rewrites ids. WS7 also migrates the tests holding UUID literals (`cli/tests/comm
       `test-plan/`, verified by the package suites, `validate:examples`
       and the regenerated goldens;
     - 7b, the 17 in `trial/` (customer kernels and findings);
-    - 7c, the tests holding UUID literals listed above, and the fixtures
-      with hand-written ids they read.
+    - 7c, the tests holding UUID literals listed above.
   - _7b, decided by the owner (2026-11-05): the trial lane's 17 models stay
     at 1.0 and 1.1._ They are deliberate old-format input, so the lane runs
     the old-file load path end to end at scale, as real customers' files

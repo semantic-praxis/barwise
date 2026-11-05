@@ -9,17 +9,29 @@ import { MCP_BUNDLE } from "./paths.mjs";
 
 export async function withMcp(fn) {
   const client = new Client({ name: "barwise-trial", version: "1.0.0" }, { capabilities: {} });
-  const transport = new StdioClientTransport({ command: process.execPath, args: [MCP_BUNDLE] });
+  // Parity compares whole answers, and a customer's DDL (40-50 KB) and
+  // verbalization (about 10 KB) pass the server's 8 KB inline limit, so a
+  // default server spills every one and parity compares nothing. The limit
+  // is lifted for the lane; a spill that still happens is a step the lane
+  // could not answer (steps.mjs, MCP_SPILL_NOTICE).
+  const transport = new StdioClientTransport({
+    command: process.execPath,
+    args: [MCP_BUNDLE],
+    env: { ...process.env, BARWISE_MCP_INLINE_LIMIT: "100000000" },
+  });
   await client.connect(transport);
   try {
     return await fn({
       call: async (name, args) => {
         const started = Date.now();
         const res = await client.callTool({ name, arguments: args });
-        const text = (res?.content ?? []).filter((c) => c.type === "text").map((c) => c.text).join(
-          "\n",
-        );
-        return { text, isError: !!res.isError, ms: Date.now() - started };
+        const blocks = (res?.content ?? []).filter((c) => c.type === "text").map((c) => c.text);
+        return {
+          text: blocks.join("\n"),
+          blocks,
+          isError: !!res.isError,
+          ms: Date.now() - started,
+        };
       },
       listTools: async () => (await client.listTools()).tools.map((t) => t.name),
     });
