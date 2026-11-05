@@ -6,7 +6,7 @@ Created: 2026-11-05
 Last-updated: 2026-11-05
 Tracking: barwise-ym8.gc9 (follows docs/specs/enforceable-adr-practice.spec.md)
 Touches: barwise/docs/adr/, barwise/docs/ARCHITECTURE.md, .beads/issues.jsonl,
-barwise/docs/adr/probes.json, barwise/correction-baseline.json
+barwise/docs/adr/probes.json
 
 ## Principle
 
