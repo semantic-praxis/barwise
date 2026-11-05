@@ -129,6 +129,119 @@ First because it is cheap, needs only the owner's time, and changes what
 the later batches build: a restatement accepted here usually becomes a
 buildable row.
 
+#### WS1 proposals
+
+Each row: the decision, what is proposed, and the replacement text or
+where the prose goes. "Changes" marks a row where the inventory's first
+proposal would have changed the rule; the proposal here does not, or
+says so. The owner answers per row: accept, reject, or edit.
+
+Restatements (the rule stays; `Date:` stays):
+
+1. `connector-packages#descriptor-wraps-core`: "The DDL, OpenAPI, Avro
+   and dbt export descriptors call core's `renderDdl`, `renderOpenApi`,
+   `renderAvro` and `renderDbt`, and the SQL and dbt importers call
+   core's `parseSqlFile`; a format core has no renderer for keeps its
+   writer in its connector, as NORMA and Ossie do."
+2. `credential-handling#rotate-not-revert`: "Every message `check:secrets`
+   and the pre-commit hook print on a finding names rotation in the
+   provider console as the remedy, and none suggests rewriting history."
+3. `determinism-in-core#one-layer-out`: "Outside core, only
+   `@barwise/llm` imports a model SDK, and a format's own file and
+   subprocess I/O lives in its connector package; anything else that
+   cannot be deterministic lives in the tool layer (`cli`, `mcp`,
+   `vscode`)." Note for the owner: `learn` and `promptlab` read files,
+   the clock and the environment today and the decision does not name
+   them; saying where they belong would change the decision, so it is a
+   separate ADR edit if wanted.
+4. `findings-close-by-mechanism#mechanism-closes`: "An issue filed from
+   an audit finding is closed with a reason naming the check or the
+   baseline row that holds it, and that file is in the tree." Low
+   confidence: no label marks a finding issue today, so a check needs
+   one (a convention this restatement would add).
+5. `findings-close-by-mechanism#person-classifies`: "A baseline writer
+   never sets a verdict: a new row gets the placeholder, and a row
+   already classified keeps its verdict."
+6. `keyless-model-access#measurement-key`: keep the first sentence;
+   move "That key must be a workspace-scoped key with a spend limit,
+   never a personal one" to Consequences as operator guidance, since the
+   key's scope lives in the provider console, outside the tree. The
+   decision then states only what the tree can show: the measurement
+   lane is the one place that reads a key.
+7. `merge-delegation#review-before-merge` (owner: restate): "Before the
+   agent driving a pull request merges it, a comment on the pull request
+   names the head being merged and the `pr-review` recommendation of
+   `merge` on that head; 'merge after', 'do not merge' and 'cannot tell'
+   do not license a merge, nor does a review run where `/code-review`
+   was unavailable."
+8. `merge-delegation#no-size-exemption`: "Decision 1's comment is
+   required on every pull request, tracker-only and docs-only included."
+9. `merge-delegation#owner-overrides` (changes, first proposal dropped
+   the owner's override): "When the owner says to merge a pull request,
+   the agent merges it, and its merge comment says the owner directed
+   the merge. A reviewer who is not the driving agent recommends, and
+   never approves or merges."
+10. `metamodel-evolution-policy#recompute-derived`: "The `.orm.yaml`
+    schema defines no property for relational mapping, DDL or any other
+    rendered output, and the serializer writes none; each is recomputed
+    from the conceptual model."
+11. `must-agree-copies#check-on-copy`: "Every `audit:duplication`
+    candidate's verdict names its check (a shared owner, a derivation, a
+    `parity.manifest.json` entry, or a drift test) or a benign reason."
+    Low confidence: this restates through the audit, which sees only
+    the copies its detectors find.
+12. `ossie-interchange#peer-standard` (changes, first proposal dropped a
+    clause): keep the checkable part as the decision ("core names
+    nothing specific to Ossie, and Ossie documents enter and leave only
+    through the `ossie` descriptor in `@barwise/formats`"), and move "an
+    idea from Ossie enters barwise because it serves barwise, never only
+    because Ossie has it" to Context as the reasoning, since it is the
+    judgment the metamodel filters apply.
+13. `ossie-interchange#own-vocabulary`: "Only `formats/src/ossie`
+    imports Ossie's types, `mapOssieToOrm.ts` or `writeOssie.ts`; barwise
+    keeps its ORM 2 terms, and the construct-by-construct translation is
+    the spec's Scope."
+14. `plan-before-code#spec-first`: "A pull request that changes package
+    source names the spec it implements, in its body or a commit
+    message." Owner choice: plan-scope never fails by decision, so this
+    needs that choice reopened; with no exemption line, a small fix
+    needs a spec too, which is the rule as written.
+15. `plan-before-code#open-decisions-reviewer`: "Every spec has an Open
+    decisions section, and each entry gives its options, the trade-off
+    and a recommended default."
+16. `review-policy#review-md-owns-lanes`: "`REVIEW.md`'s lane table
+    lists each review lane and when it runs, and no other file states
+    when a lane runs."
+
+Proposed as retirements instead of restatements (no restatement keeps
+the rule and is checkable):
+
+17. `constraint-coverage-policy#trust-statement` (changes, first
+    proposal added a feature): it says how a reader treats extracted
+    constraints, which is guidance to consumers. Move to Consequences.
+18. `metamodel-evolution-policy#four-filters` (changes, first proposal
+    checked existing constructs instead of candidates): criteria for
+    admitting a construct are judgment. Move to Context as the filters
+    a candidate is weighed against.
+
+Retirements (judgment; the text moves to prose, `Date:` moves, later
+decisions renumber and their numbered references are updated):
+
+19. `constraint-coverage-policy#compares-not-certifies`: to Context.
+20. `merge-delegation#ask-owner`: to Consequences, as when the driving
+    agent asks instead of merging. Low confidence: "after two reviews
+    that did not recommend merge" could be read from the comments
+    decision 1 now requires; if the owner prefers, it stays a decision
+    and moves to batch 10.
+21. `metamodel-evolution-policy#deliberately-lossy`: to Context.
+22. `metamodel-evolution-policy#tiering`: to Context, beside the tiers.
+23. `metamodel-evolution-policy#design-against-book`: to Context.
+24. `must-agree-copies#check-first`: to Context.
+25. `review-policy#prevent-upstream`: to Consequences.
+
+If every row is accepted, `metamodel-evolution-policy` keeps one
+decision (recompute-derived) and `constraint-coverage-policy` three.
+
 ### 2 to 10. Buildable batches
 
 Each batch is designed in its own section of this spec, plan-reviewed,
@@ -172,22 +285,19 @@ goes back to the sort, not into the header.
 
 ## Open decisions (for review)
 
-1. **Order.** WS1 first (recommended: restatements change what gets
-   built, and it costs only review time), or start with batch 2, the
-   largest buildable group.
+1. **Order.** Resolved 2026-11-05 by the owner: WS1 first, since
+   restatements change what gets built and it costs only review time.
 2. **fault-matrix in CI.** Batch 2 holds four decisions only if
    fault-matrix runs in CI; today it is on demand by design
    (`gate-refusal-contract.spec.md`). Recommended: decide in batch 2's
    design, with its runtime measured.
-3. **merge-delegation.** Three of its rows (review-before-merge,
-   no-size-exemption, owner-overrides) need a merge record that does not
-   exist (barwise-zdd); `pinned-merge` is buildable from the merge call
-   alone (batch 10), and `ask-owner` is a retirement. Build the record
-   (a merge hook that posts the review's recommendation and head), or
-   restate the three as what review can see. These rows are the merge
-   rule CLAUDE.md delegates to (steward, section 4b), so retiring them
-   to prose is not on offer. Recommended: restate, unless barwise-zdd is
-   wanted on its own merits.
+3. **merge-delegation.** Resolved 2026-11-05 by the owner: restate.
+   Three of its rows (review-before-merge, no-size-exemption,
+   owner-overrides) need a merge record that does not exist
+   (barwise-zdd), and retiring them is not on offer, since CLAUDE.md
+   delegates the merge rule to them (steward, section 4b). WS1 restates
+   them as what review can see; `pinned-merge` stays buildable (batch
+   10), and `ask-owner` is a retirement.
 4. **The five owner choices** listed under the sort: each is the owner's
    to reopen or leave; leaving one means it is restated or retired, not
    built.
