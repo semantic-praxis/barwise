@@ -30,10 +30,12 @@ spec; the gate is from the archived architecture-analysis spec.
    SDK in `barwise/packages/core/src`. Orderings use a fixed comparison
    (code-unit order, or a collator with an explicit locale), never the
    process locale. An id core needs is derived from content, never
-   drawn from a clock or a random source: an element's from its name
-   (`model/mint.ts`; the readable IRI of
-   `ossie-interchange.md#readable-iri`), a constraint's from what it
-   states (`serialization/derivedId.ts`). A value core would need from a
+   drawn from a clock or a random source: an element's id is its name
+   (the readable IRI of `ossie-interchange.md#readable-iri`), and an
+   element a person does not name, such as a constraint, gets a name
+   minted from the sentence that states it (`model/mint.ts`); a
+   constraint id a 2.0 file leaves out is derived from the constraint's
+   content (`serialization/derivedId.ts`). A value core would need from a
    clock or a random source arrives as an argument from the surface that
    owns it.
 2. **Non-determinism lives one layer out.** {#one-layer-out} A capability that cannot be
