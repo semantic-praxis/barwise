@@ -59,7 +59,7 @@ describe("impact_analysis tool", () => {
 
     writeManifest(tempDir, manifest);
 
-    const elementId = "550e8400-e29b-41d4-a716-446655440000";
+    const elementId = "Customer";
     const result = executeImpactAnalysis(modelPath, elementId);
     const parsed = JSON.parse(result.content[0]!.text);
 
@@ -75,7 +75,7 @@ describe("impact_analysis tool", () => {
     const model = serializer.deserialize(yaml);
     const modelHash = hashModel(model);
 
-    const elementId = "550e8400-e29b-41d4-a716-446655440000";
+    const elementId = "Customer";
 
     const manifest: LineageManifest = {
       version: 2,
@@ -115,7 +115,7 @@ describe("impact_analysis tool", () => {
           modelHash,
           sources: [
             {
-              elementId: "999e8400-e29b-41d4-a716-446655440999",
+              elementId: "Supplier",
               elementType: "EntityType",
               elementName: "Player",
             },
@@ -149,7 +149,7 @@ describe("impact_analysis tool", () => {
     const model = serializer.deserialize(yaml);
     const modelHash = hashModel(model);
 
-    const elementId = "550e8400-e29b-41d4-a716-446655440000";
+    const elementId = "Customer";
 
     const manifest: LineageManifest = {
       version: 2,
@@ -189,7 +189,7 @@ describe("impact_analysis tool", () => {
     const model = serializer.deserialize(yaml);
     const modelHash = hashModel(model);
 
-    const constraintId = "c1111111-e29b-41d4-a716-446655440000";
+    const constraintId = "Each_Customer_has_some_Name";
     const valueTypeId = "v2222222-e29b-41d4-a716-446655440000";
 
     const manifest: LineageManifest = {
@@ -258,7 +258,7 @@ describe("impact_analysis tool", () => {
 
     writeManifest(tempDir, manifest);
 
-    const result = executeImpactAnalysis(modelPath, "550e8400-e29b-41d4-a716-446655440000");
+    const result = executeImpactAnalysis(modelPath, "Customer");
 
     expect(result.content).toHaveLength(1);
     expect(result.content[0]!.type).toBe("text");

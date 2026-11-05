@@ -170,11 +170,11 @@ export type Region = "US" | "EU" | "APAC";
     it("filters types to match guiding model entities", async () => {
       // Create a guiding model with only Order as an entity
       const guidingYaml = `
-orm_version: "1.0"
+orm_version: "4.0"
 model:
   name: Guiding
   object_types:
-    - id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+    - id: Order
       name: Order
       kind: entity
       reference_mode: id

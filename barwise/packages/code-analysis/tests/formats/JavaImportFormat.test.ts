@@ -198,11 +198,11 @@ public class Employee {
   describe("guidingModel support", () => {
     it("filters types to match guiding model entities", async () => {
       const guidingYaml = `
-orm_version: "1.0"
+orm_version: "4.0"
 model:
   name: Guiding
   object_types:
-    - id: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+    - id: Customer
       name: Customer
       kind: entity
       reference_mode: id

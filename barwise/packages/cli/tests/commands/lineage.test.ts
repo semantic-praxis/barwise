@@ -327,7 +327,7 @@ describe("barwise lineage", () => {
         "impact",
         modelPath,
         "--element",
-        "550e8400-e29b-41d4-a716-446655440000",
+        "Customer",
       ]);
 
       expect(result.stdout).toContain("Impact analysis for element");
@@ -342,7 +342,7 @@ describe("barwise lineage", () => {
       const model = loadModel(modelPath);
       const modelHash = hashModel(model);
 
-      const elementId = "550e8400-e29b-41d4-a716-446655440000";
+      const elementId = "Customer";
 
       const manifest: LineageManifest = {
         version: 2,
@@ -417,7 +417,7 @@ describe("barwise lineage", () => {
         "impact",
         modelPath,
         "--element",
-        "550e8400-e29b-41d4-a716-446655440000",
+        "Customer",
         "--format",
         "json",
       ]);
@@ -605,7 +605,7 @@ model:
             modelHash,
             sources: [
               {
-                elementId: "550e8400-e29b-41d4-a716-446655440000",
+                elementId: "Customer",
                 elementType: "EntityType",
                 elementName: "Game",
               },
