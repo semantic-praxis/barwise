@@ -15,7 +15,7 @@ barwise/docs/specs/executable-adrs.spec.md, .beads/issues.jsonl,
 +barwise/docs/adr/probes.json, barwise/package.json, package.json,
 .claude/skills/spec-writer/SKILL.md, +.claude/skills/spec-writer/adr-writing.md,
 .claude/skills/spec-writer/template.adr.md, .claude/skills/pr-review/checklist.md
-Plan-reviewed: 1004b993 (code-review, pr-review)
+Plan-reviewed: f83ebbfb (code-review, pr-review)
 
 ## Principle
 
