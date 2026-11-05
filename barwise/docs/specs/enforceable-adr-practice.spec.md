@@ -1,6 +1,6 @@
 # Enforceable ADR practice
 
-Status: WS1 implemented 2026-11-04 (check:adr-tests refuses a decision whose tagged tests all skipped; credential-handling#gitleaks-detects declared through its probe tests); WS3 implemented 2026-11-05 (the 87 gap issues labelled adr-gap; check:architecture requires the label, the title prefix, one decision per none entry, and one entry per gap issue). WS4 implemented 2026-11-05 (spec-writer/adr-writing.md, the SKILL.md and template pointers, the pr-review checklist item). WS5 in part: mutate.mjs --expect-exit; the probe runner waits on the plants WS4's PR bodies record. WS2 not started.
+Status: WS1 implemented 2026-11-04 (check:adr-tests refuses a decision whose tagged tests all skipped; credential-handling#gitleaks-detects declared through its probe tests); WS3 implemented 2026-11-05 (the 87 gap issues labelled adr-gap; check:architecture requires the label, the title prefix, one decision per none entry, and one entry per gap issue). WS4 implemented 2026-11-05 (spec-writer/adr-writing.md, the SKILL.md and template pointers, the pr-review checklist item). WS5 in part: mutate.mjs --expect-exit; the probe runner waits on the plants WS4's PR bodies record. WS2 implemented 2026-11-05 (#920: the held-by breakdown on check:architecture's OK line; the real tree reads 89 decisions, 14 with a gate, 31 tests and no gate, 44 none only, 87 carrying a gap issue).
 
 Created: 2026-11-04
 Last-updated: 2026-11-05
