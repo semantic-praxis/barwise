@@ -550,8 +550,14 @@ workstream delivers the query and a report.
   drift test is its check. A field added to the format that the encoding
   should read (a new constraint kind) fails the drift test rather than
   being silently uncounted.
-
-## Non-goals
+- While this spec is Draft, its `Touches:` names code paths main changes
+  often (`probes.json` with every ADR edit, `changed-class.mjs`,
+  `model.ts`). `audit:specs` reads a main merge that touched one of them
+  as work since the spec's last edit, at CI's merge ref only, even when
+  the merge's own diff on those paths is empty (barwise-ibf,
+  barwise-dm0; it happened to this spec's own PR on #932's merge). Until
+  that gate is fixed, a Draft spec re-edited after merging main passes;
+  one that merges main and is not re-edited goes red at the merge ref.
 
 - No solver, SMT library or Alloy dependency in any npm package; nothing
   in `packages/` imports `reasoner/`.
