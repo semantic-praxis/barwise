@@ -1147,6 +1147,51 @@ test("mutate exits 1 when the command does not notice the mutation", () => {
   }
 });
 
+test("mutate --expect-exit counts only that exit code as caught", () => {
+  // The checker exits 2 (could not answer) on the mutation, as a gate does
+  // when it refuses: without --expect-exit that reads CAUGHT; with
+  // --expect-exit 1 it is UNCAUGHT, and with --expect-exit 2 it is CAUGHT.
+  const dir = mutateRepo({ subject: "value = GOOD\n" });
+  try {
+    writeFileSync(
+      join(dir, "check.mjs"),
+      `import { readFileSync } from "node:fs";\n`
+        + `process.exit(readFileSync("subject.txt", "utf8").includes("GOOD") ? 0 : 2);\n`,
+    );
+    const run = (...extra) =>
+      mutate(dir, [
+        "--file",
+        "subject.txt",
+        "--old",
+        "GOOD",
+        "--new",
+        "BAD",
+        ...extra,
+        "--",
+        process.execPath,
+        "check.mjs",
+      ]);
+    const any = run();
+    assert.equal(
+      any.status,
+      0,
+      `no --expect-exit: any failure is CAUGHT\n${any.stdout}${any.stderr}`,
+    );
+    const one = run("--expect-exit", "1");
+    assert.equal(one.status, 1, `exit 2 is not the expected 1\n${one.stdout}${one.stderr}`);
+    assert.match(one.stdout, /UNCAUGHT -- the command failed with exit 2, not the expected 1/);
+    const two = run("--expect-exit", "2");
+    assert.equal(two.status, 0, two.stdout + two.stderr);
+    assert.match(two.stdout, /CAUGHT/);
+    const bad = run("--expect-exit", "0");
+    assert.equal(bad.status, 2, "exit 0 cannot be a catch");
+    assert.match(bad.stderr, /--expect-exit must be an exit code from 1 to 255/);
+    assert.equal(readFileSync(join(dir, "subject.txt"), "utf8"), "value = GOOD\n");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test("mutate refuses an anchor that is absent or ambiguous, writing nothing", () => {
   // The failure this whole script exists for: a `sed` whose anchor no
   // longer matches leaves the file alone and the suite green, which

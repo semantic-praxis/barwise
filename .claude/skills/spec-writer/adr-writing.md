@@ -24,7 +24,8 @@ that asks that question before review does.
    read its exit status with nothing in between, and revert. For a gate
    that reads the working tree, `barwise/scripts/mutate.mjs` does all
    three: it applies the edit, runs the command, restores the file, and
-   exits 0 when the command failed. A gate that reads staged content
+   with `--expect-exit 1` exits 0 only when the command exited 1, so a
+   gate that refuses (exit 2) is not mistaken for one that caught it. A gate that reads staged content
    needs the edit staged by hand. For tests, run the suite that carries
    the tag and watch the tagged test fail.
 4. **Declare only what went red.** An `npm` entry for a gate that exited

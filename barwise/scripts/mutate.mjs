@@ -34,8 +34,16 @@
  *
  * Usage:
  *   node scripts/mutate.mjs --file <path> --old <text> --new <text>
- *                           [--count N] [--backup-dir <path>]
+ *                           [--count N] [--expect-exit N] [--backup-dir <path>]
  *                           -- <command> [args...]
+ *
+ * --expect-exit N makes CAUGHT mean the command exited exactly N with the
+ * mutation applied. Without it any non-zero exit is a catch, which is
+ * wrong for a gate under the refusal contract: exit 2 means the gate
+ * could not answer, so it did not see the violation, and a probe that
+ * reads 2 as caught would vouch for a gate that never went red
+ * (docs/specs/enforceable-adr-practice.spec.md, WS5). Another non-zero
+ * exit is reported UNCAUGHT, naming both codes.
  *
  * --file resolves against the REPO ROOT, because a gate's coverage must
  * not depend on the cwd it was invoked from. The COMMAND runs in the
@@ -105,6 +113,11 @@ if (!command || command.length === 0) {
 const expected = flags.count === undefined ? 1 : Number(flags.count);
 if (!Number.isInteger(expected) || expected < 1) {
   refuse(`--count must be a positive integer, got "${flags.count}"`);
+}
+
+const expectExit = flags["expect-exit"] === undefined ? null : Number(flags["expect-exit"]);
+if (expectExit !== null && (!Number.isInteger(expectExit) || expectExit < 1 || expectExit > 255)) {
+  refuse(`--expect-exit must be an exit code from 1 to 255, got "${flags["expect-exit"]}"`);
 }
 
 const target = isAbsolute(flags.file) ? flags.file : resolve(REPO_ROOT, flags.file);
@@ -325,6 +338,16 @@ try {
 if (refusal !== undefined) {
   process.stderr.write(`mutate: ${refusal}\n`);
   process.exit(REFUSED);
+}
+
+if (status !== 0 && expectExit !== null && status !== expectExit) {
+  process.stdout.write(
+    `mutate: UNCAUGHT -- the command failed with exit ${status}, not the expected ${expectExit}.\n`
+      + `  ${flags.file}: "${flags.old}" -> "${flags.new}"\n`
+      + `  A different failure is not the catch asked for: under the refusal contract\n`
+      + `  exit 2 means the command could not answer, so it did not see the mutation.\n`,
+  );
+  process.exit(1);
 }
 
 if (status !== 0) {
