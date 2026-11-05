@@ -85,7 +85,7 @@ alongside this file.
    (`docs/specs/architecture-index.spec.md`). Its `Enforced-by:` header
    declares only an enforcer seen to fail on a planted violation of the
    decision: `adr-writing.md` beside this file has the four steps and
-   the record the PR body carries.
+   the record: a `probes.json` row for a gate, a PR-body line for tests.
 7. **Edit, then run an articulation pass.** Run the edit passes in
    `editing.md` (scanning `llm-tics.md` during the voice pass), then
    invoke the `articulation` skill in critique mode over the draft --

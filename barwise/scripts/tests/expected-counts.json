@@ -4,6 +4,7 @@
     "adr-enforcement.test.mjs": 10,
     "adr-facts.test.mjs": 10,
     "adr-model.test.mjs": 8,
+    "adr-probes.test.mjs": 10,
     "at-root.test.mjs": 4,
     "baseline-merge.test.mjs": 14,
     "beads-ids.test.mjs": 3,

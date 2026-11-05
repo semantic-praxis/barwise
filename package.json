@@ -45,6 +45,7 @@
     "measure:comparison": "npm --prefix barwise run measure:comparison --",
     "measure:sample-medoids": "npm --prefix barwise run measure:sample-medoids --",
     "measure:touches-required": "npm --prefix barwise run measure:touches-required --",
+    "adr-probes": "npm --prefix barwise run adr-probes --",
     "fault-matrix": "npm --prefix barwise run fault-matrix --",
     "test:cli-checks": "npm --prefix barwise run test:cli-checks --",
     "test:mcp-checks": "npm --prefix barwise run test:mcp-checks --",

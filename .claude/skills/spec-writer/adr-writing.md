@@ -53,22 +53,36 @@ plant.
 - In the place the enforcer actually reads. A file left untracked, when
   the gate reads `git ls-files`, proves nothing (barwise-906).
 
-## The record, in the PR body
+## The record
 
-For each `npm` or `tests` entry the PR adds or changes, one line:
+For each `npm` entry the PR adds or changes, the plant becomes a row of
+`barwise/docs/adr/probes.json`, so it can be replayed:
+
+```json
+{
+  "decision": "<adr>#<id>",
+  "file": "<path from the repo root>",
+  "old": "<text the edit replaces>",
+  "new": "<the violation>"
+}
+```
+
+The row names no command: `npm run adr-probes` takes the script and its
+`-- <args>` from the decision's `npm` entry, and fails unless that gate
+exits 1 with the edit applied. Run it with `--only <adr>#<id>` before
+pushing. A gate that reads committed state (`check:plan-review`) never
+sees a working-tree edit; give it `{ "decision", "unprobed": "<why>" }`
+instead, and plant it by hand in a scratch commit.
+
+For each `tests` entry, one line in the PR body, since probes do not run
+tests yet:
 
 ```
-<adr>#<decision-id>: <the edit, in one phrase> -> <enforcer> exit 1
+<adr>#<decision-id>: <the edit, in one phrase> -> <the tagged test> failed
 ```
 
-For example:
-`python-from-the-lockfile#uv-bootstrap: an unpinned uv bootstrap line in ci.yml -> npm run check:python-uv exit 1`
-(PR #885).
-
-Entries the PR leaves unchanged need no line. Backfilling records for
-the existing declarations is the ADR refactor session's work
-(barwise-ym8.gc9). The `pr-review` checklist asks for these lines
-("When an ADR changed").
+Entries the PR leaves unchanged need neither. The `pr-review` checklist
+asks for both ("When an ADR changed").
 
 ## When no plant is possible
 
