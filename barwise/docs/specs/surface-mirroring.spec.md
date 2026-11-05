@@ -45,7 +45,7 @@ package.json,
 +barwise/surface-correspondence.json,
 +barwise/scripts/regen-gym-exercises.mjs,
 +barwise/surface-parity-baseline.json
-Plan-reviewed: ada49d4a (code-review, pr-review; four passes on 2026-11-04, ada49d4a applies the last pass's two wording fixes)
+Plan-reviewed: 0230ddb5 (code-review, pr-review; re-pointed from ada49d4a after the final review and the owner's 2026-11-05 migrate decision edited the body, 0230ddb5 applies the last pass's findings)
 
 ## Principle
 
