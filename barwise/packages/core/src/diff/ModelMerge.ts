@@ -1148,20 +1148,25 @@ function refuseOwnerChanges(deltas: readonly ModelDelta[], accepted: ReadonlySet
 }
 
 /**
- * Refuse an accepted modification that pairs, through the ids two 3.x
- * files stated, two object types or fact types whose names moved
- * (barwise-xv1): each side's name is held on another element of the other
- * side, as when two files number Dog and Cat `ot0` and `ot1` in opposite
- * orders. Two replayed models pair by the ids their files had, so before
- * this the merge exited 0 having turned Dog into Cat.
+ * Refuse accepted renames paired through the ids two 3.x files stated
+ * when the files look unrelated (barwise-xv1). Two replayed models pair
+ * by the ids their files had, so two unrelated files numbered from `ot0`
+ * would otherwise merge with exit 0, each element renamed to whatever the
+ * other file held under its number. Two signs say the ids coincide rather
+ * than name one element:
  *
- * Only a moved name is evidence. A name and reference mode changed
- * together under a kept id is what an edited revision of one file looks
- * like (`simple-modified.orm.yaml` renames Customer to Client, customer_id
- * to client_id), so a difference in structure tells nothing. And models
- * that carry no prior ids pair by their own: a shared id there is one
- * element (model-invariants decision 1), so a rotation of names under kept
- * ids is a set of renames (`renamedPair.law.test.ts`).
+ * - no object type or fact type keeps its name between the files, so
+ *   nothing shows they are revisions of one model (Customer and Order
+ *   against Employee and Department);
+ * - a rename's names moved, the incoming file holding the old name on
+ *   another element or the merged model keeping the new one on another
+ *   element (Dog and Cat under ids swapped between two files).
+ *
+ * A changed structure is not one: an edited revision renames Customer to
+ * Client and `customer_id` to `client_id` together (`simple-modified`).
+ * And models with no prior ids pair by their own, where a shared id is one
+ * element (model-invariants decision 1), so a rotation of names under
+ * kept ids is a set of renames (`renamedPair.law.test.ts`).
  */
 function refuseCoincidentIds(
   existing: OrmModel,
@@ -1169,27 +1174,60 @@ function refuseCoincidentIds(
   deltas: readonly ModelDelta[],
   accepted: ReadonlySet<number>,
 ): void {
-  const prior = existing.priorIds;
-  if (prior === undefined || incoming.priorIds === undefined) return;
-  // The pair's own elements need no excluding: their local names differ.
-  const holds = (model: OrmModel, kind: string, name: string): boolean =>
-    (kind === "object_type" ? model.objectTypes : model.factTypes)
-      .some((e) => localName(e.name) === localName(name));
-  const clashes = deltas.flatMap((d, i) => {
-    if (d.kind !== "modified" || !accepted.has(i)) return [];
-    if (d.elementType !== "object_type" && d.elementType !== "fact_type") return [];
-    const [a, b] = [d.existing, d.incoming];
-    if (!a || !b || localName(a.name) === localName(b.name)) return [];
-    const moved = holds(incoming, d.elementType, a.name) || holds(existing, d.elementType, b.name);
-    return moved ? [`"${prior.get(a.id) ?? a.id}" ("${a.name}" and "${b.name}")`] : [];
+  const [fromExisting, fromIncoming] = [existing.priorIds, incoming.priorIds];
+  if (fromExisting === undefined || fromIncoming === undefined) return;
+  type Kind = "object_type" | "fact_type";
+  type Named = { readonly id: string; readonly name: string; };
+  const renames: { kind: Kind; a: Named; b: Named; }[] = [];
+  const removed = new Set<string>();
+  deltas.forEach((d, i) => {
+    if (!accepted.has(i) || (d.elementType !== "object_type" && d.elementType !== "fact_type")) {
+      return;
+    }
+    if (d.kind === "removed" && d.existing) removed.add(d.existing.id);
+    if (d.kind !== "modified" || !d.existing || !d.incoming) return;
+    if (localName(d.existing.name) === localName(d.incoming.name)) return;
+    renames.push({ kind: d.elementType, a: d.existing, b: d.incoming });
   });
+  if (renames.length === 0) return;
+
+  const elements = (model: OrmModel, kind: Kind): readonly Named[] =>
+    kind === "object_type" ? model.objectTypes : model.factTypes;
+  const KINDS: readonly Kind[] = ["object_type", "fact_type"];
+  // Each element's local name under the id its file stated.
+  const byFileId = (model: OrmModel, ids: ReadonlyMap<string, string>) =>
+    new Map(
+      KINDS.flatMap((k) =>
+        elements(model, k).map((e) => [`${k} ${ids.get(e.id) ?? e.id}`, localName(e.name)] as const)
+      ),
+    );
+  const incomingByFileId = byFileId(incoming, fromIncoming);
+  const related = [...byFileId(existing, fromExisting)].some(([key, name]) =>
+    incomingByFileId.get(key) === name
+  );
+  // The pair's own elements need no excluding: their local names differ.
+  const names = (model: OrmModel, kind: Kind, skip: ReadonlySet<string>) =>
+    new Set(elements(model, kind).filter((e) => !skip.has(e.id)).map((e) => localName(e.name)));
+  const held = new Map(KINDS.map((k) => [k, {
+    incoming: names(incoming, k, new Set()),
+    kept: names(existing, k, removed),
+  }]));
+  const clashes = renames.filter(({ kind, a, b }) =>
+    !related || held.get(kind)!.incoming.has(localName(a.name))
+    || held.get(kind)!.kept.has(localName(b.name))
+  );
   if (clashes.length === 0) return;
+  const pairs = clashes.map(({ a, b }) =>
+    `"${fromExisting.get(a.id) ?? a.id}" ("${a.name}" and "${b.name}")`
+  );
+  const why = related
+    ? "the names are held on other elements"
+    : "no object type or fact type keeps its name between them";
   throw new Error(
-    `the two 3.x files share the id ${clashes.join(", ")} for elements whose names each file `
-      + "holds on another element, so the ids likely coincide between unrelated files, and "
-      + "merging would turn one element into the other. Diff with --matching content to see "
-      + "how they pair by content, or give one model's elements ids of their own (barwise "
-      + "migrate).",
+    `the two 3.x files share the id ${pairs.join(", ")}, and ${why}, so the ids likely `
+      + "coincide between unrelated files, and merging would turn one element into the other. "
+      + "Diff with --matching content to see how they pair by content, or give one model's "
+      + "elements ids of their own (barwise migrate).",
   );
 }
 

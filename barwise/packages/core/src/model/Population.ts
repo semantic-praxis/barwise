@@ -6,8 +6,8 @@
  * an instance might be { "role-customer": "C001", "role-order": "O123" }.
  */
 import type { Complete } from "../util/complete.js";
+import { DuplicateIdError } from "./idIndex.js";
 import { populationIdBase } from "./idRules.js";
-import { DuplicateIdError } from "./OrmModel.js";
 export interface FactInstance {
   /** Unique identifier for this instance. */
   readonly id: string;
@@ -85,6 +85,8 @@ export class Population {
   /** See `PopulationConfig.sample`. Positive evidence only when true. */
   readonly sample: boolean;
   private readonly _instances: FactInstance[] = [];
+  /** The ids `_instances` holds, so a repeat is refused in constant time. */
+  private readonly _held = new Set<string>();
   /**
    * The number the next unnamed instance takes: one past the highest this
    * population has used, stated or given, so a number is not reused while
@@ -125,7 +127,7 @@ export class Population {
     // Two instances never share an id (barwise-wcg.4kp): six population
     // rules, the editor's source map and the NORMA mapping key on it. The
     // error is the store's, so a reader reports the file as unloadable.
-    if (id !== undefined && this._instances.some((i) => i.id === id)) {
+    if (id !== undefined && this._held.has(id)) {
       const held = `a fact instance of population "${this.id}"`;
       throw new DuplicateIdError(id, "fact instance", held, "a second one");
     }
@@ -137,6 +139,7 @@ export class Population {
     } else {
       this.countPast(id);
     }
+    this._held.add(id);
     return { id, roleValues: { ...config.roleValues } };
   }
 
@@ -186,6 +189,7 @@ export class Population {
       );
     }
     this._instances.splice(idx, 1);
+    this._held.delete(id);
   }
 
   /** Look up a fact instance by id. */

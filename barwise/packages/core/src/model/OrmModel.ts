@@ -11,7 +11,13 @@ import {
 import type { Definition } from "./Definition.js";
 import { type DiagramLayout, withoutDiagramReferences } from "./DiagramLayout.js";
 import { checkInternalConstraint, FactType, type FactTypeConfig } from "./FactType.js";
-import { IdIndex, type IdKeyedKind, IdKeyedStore, type IdKind } from "./idIndex.js";
+import {
+  DuplicateIdError,
+  IdIndex,
+  type IdKeyedKind,
+  IdKeyedStore,
+  type IdKind,
+} from "./idIndex.js";
 import { nameIdBase, populationIdBase, roleIdBase, suffixed } from "./idRules.js";
 import { checkedIri, NAMESPACE_PATTERN } from "./iri.js";
 import { mint, type Mintable } from "./mint.js";
@@ -111,30 +117,8 @@ function holdsAny(ft: FactType, roleIds: readonly string[]): boolean {
 
 export type { IdKeyedKind, IdKind } from "./idIndex.js";
 
-/**
- * An `add*` was given an id its store already holds.
- *
- * Each store is a `Map` keyed by id, and `set` overwrites without a word,
- * so before this check a second element under a held id silently replaced
- * the first: an objectification evicted another in a merge, and a file
- * stating two fact types under one id loaded as one (model invariants,
- * WS3). The model cannot represent two elements under one id, so it
- * refuses rather than reports, whatever `skipPlayerValidation` says: that
- * option skips checks on what an element references, and this is a check
- * on the store itself. Both readers turn it into a `DeserializationError`.
- */
-export class DuplicateIdError extends Error {
-  constructor(
-    readonly id: string,
-    // A fact instance is not in the id index; its population holds it.
-    readonly kind: IdKind | "fact instance",
-    held: string,
-    adding: string,
-  ) {
-    super(`Id ${JSON.stringify(id)} is held by ${held}, so ${adding} cannot be added.`);
-    this.name = "DuplicateIdError";
-  }
-}
+// In the leaf module, so `Population` can throw it with no import cycle.
+export { DuplicateIdError } from "./idIndex.js";
 
 /** How `OrmModel.addFactType` adds a fact type; see its parameters. */
 export interface AddFactTypeOptions {
