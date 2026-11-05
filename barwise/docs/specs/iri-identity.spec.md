@@ -1,6 +1,6 @@
 # IRI identity: readable names replace UUIDs (format 4.0)
 
-Status: In progress -- WS1 and WS2 implemented 2026-10-28 (the loader reads a
+Status: Implemented -- WS1 and WS2 implemented 2026-10-28 (the loader reads a
 minor of the current major, barwise-jj8; `localName()` and the name checks);
 WS3 folded into WS6; WS4 implemented 2026-10-28 with barwise-y1b (versioned
 project and mapping files, `iri_base`, `namespace`, `namespaceOf` and two
@@ -28,10 +28,10 @@ rules, `imports` on the model, rename rewriting ids); 6b-3c implemented
 2026-11-04 (merge keeps the base's ids, split writes alias shadows,
 `source_context` leaves 4.0); 6e implemented 2026-11-04 (lineage manifest
 version 2, renames rewrite lineage); 6f implemented 2026-11-04 (Ossie's
-`iri`, the namespace read back), so WS6 is complete; WS7 in progress:
-7a implemented 2026-11-05 (the examples, docs, learn and test-plan
-models); 7b decided 2026-11-05 (the trial lane's models stay as written,
-its ratchet brought current); 7c (the UUID-literal tests) to come
+`iri`, the namespace read back), so WS6 is complete; WS7 implemented
+2026-11-05: 7a (the examples, docs, learn and test-plan models), 7b (the
+trial lane's models stay as written, its ratchet brought current) and 7c
+(the UUID-literal tests)
 
 Created: 2026-10-28
 Last-updated: 2026-11-05
@@ -1971,7 +1971,14 @@ rewrites ids. WS7 also migrates the tests holding UUID literals (`cli/tests/comm
     because the lane is not in CI (7 new, 16 stale).
   - _7c, decided by the owner (2026-11-05): only the UUID-literal tests._
     Every other test fixture stays at its version, since old-format inputs
-    keep the replay tested.
+    keep the replay tested. 7c gave the cli and mcp lineage tests' hand-built
+    version 2 manifests 4.0 ids (`Customer`, `Supplier`, a constraint id),
+    and stated the three code-analysis tests' inline guiding models at 4.0
+    with ids from names. `NormaJoinPaths.test.ts`, which the list above
+    names, held no UUID literal by then. The UUIDs left in core's tests
+    are deliberate: they test reading old formats and the id rules
+    themselves (`format30`, `derivedConstraintIds`, `localNamePattern`,
+    `id`, the 4.0 schema drift test).
   - `barwise migrate` drops YAML comments (`docs/CLI.md`). 7a put back the
     86 hand-written comment lines in eight of its files, each where it
     stood.
