@@ -45,9 +45,8 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { parseEnforcedBy } from "./lib/adr-enforcement.mjs";
 import { createGovernanceReader } from "./lib/adr-facts.mjs";
-import { judgeDeclarations } from "./lib/adr-judge.mjs";
+import { judgeDeclarations, needsWorkflow } from "./lib/adr-judge.mjs";
 import {
   ADR_DIR,
   currentSection,
@@ -389,10 +388,10 @@ const refusals = [];
 // ci-occurrences.mjs needs the `yaml` package, so it is imported only when
 // some ADR declares a gate: a tree with no such entry runs on builtins, as
 // this check always has.
-const needsWorkflow = adrs.some(({ text }) =>
-  parseEnforcedBy(text).entries.some((e) => e.kind === "npm")
-);
-const reader = await createGovernanceReader(root, { needsWorkflow, refusals });
+const reader = await createGovernanceReader(root, {
+  needsWorkflow: needsWorkflow(adrs),
+  refusals,
+});
 const { problems: enforcementProblems, held } = judgeDeclarations(adrs, reader, refusals);
 
 // The generated section is rendered from these same inputs (the tracked

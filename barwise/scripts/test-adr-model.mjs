@@ -45,8 +45,10 @@ const count = (name) => {
   return m === null ? null : Number(m[1]);
 };
 // TAP from node --test prints `# tests N` and `# skipped N`.
-const [tests, skipped] = [count("tests"), count("skipped")];
-if (tests === null || skipped === null) refuse("the run printed no test counts");
+const [tests, skipped, failed] = [count("tests"), count("skipped"), count("fail")];
+if (tests === null || skipped === null || failed === null) refuse("the run printed no test counts");
 if (tests === 0) refuse("the run registered no tests");
+// A failure is a finding, and wins over a skip beside it.
+if (failed > 0 || run.status !== 0 && skipped === 0) process.exit(1);
 if (skipped > 0) refuse(`${skipped} of ${tests} case(s) skipped, so this run did not judge them`);
 process.exit(run.status === 0 ? 0 : 1);

@@ -97,10 +97,10 @@ export function ciSteps(workflow = WORKFLOW) {
  * Only the forms ci.yml uses are understood: a comparison of
  * `steps.changes.outputs.docs_only` or `.optimizer` with `'true'` or
  * `'false'`, `github.event_name == 'pull_request'`, and `&&` joins of
- * those, and `${{ !cancelled() }}` alone. The event test is true locally: ci-local runs before a push, and
- * every push from a branch is headed for a pull request, so a PR-only step
- * is one the push will meet (check-tracker-closes, barwise-i61). Anything
- * else answers `run: true` with `understood: false`, because skipping a
+ * those, and `${{ !cancelled() }}` alone. The event test is true locally:
+ * ci-local runs before a push, and every push from a branch is headed for
+ * a pull request, so a PR-only step is one the push will meet
+ * (check-tracker-closes, barwise-i61). Anything else answers `run: true` with `understood: false`, because skipping a
  * gate CI will run turns a green local pass into a red push -- the failure
  * the local runner exists to prevent. The caller prints the unknown condition rather than hiding it.
  */

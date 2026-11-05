@@ -108,13 +108,10 @@ export function build(adrs, reader) {
   return { pops, entries };
 }
 
-// The entry's fact type carrying each entry-keyed rule's value.
-const KEY_FACT = {
-  "ids-exist": "lists",
-  "script-exists": "names",
-  "issue-tracked": "cites",
-  "issue-open": "cites",
-};
+// The entry's fact type that carries a value of each kind RULES keys a
+// rule by. A decision is carried by "Entry lists Decision"; coverage, the
+// one rule about a decision with no entry, is expanded by its ADR alone.
+const CARRIED_BY = { decision: "lists", script: "names", issue: "cites" };
 
 /**
  * The model's verdict: the schema text with these facts as its
@@ -130,6 +127,7 @@ export function modelJudge(adrs, reader, { core, YAML, schemaText, rules }) {
   const { pops, entries } = build(adrs, reader);
   const self = [];
   let model;
+  let diagnostics;
   try {
     const doc = YAML.parse(schemaText);
     doc.model.populations = Object.entries(pops).map(([ft, rows]) => ({
@@ -138,6 +136,7 @@ export function modelJudge(adrs, reader, { core, YAML, schemaText, rules }) {
       instances: rows.map((role_values, i) => ({ id: `${ft}.population.${i + 1}`, role_values })),
     }));
     model = new core.OrmYamlSerializer().deserialize(YAML.stringify(doc));
+    diagnostics = new core.ValidationEngine().validate(model);
   } catch (err) {
     return {
       findings: [],
@@ -155,7 +154,7 @@ export function modelJudge(adrs, reader, { core, YAML, schemaText, rules }) {
   const missing = [...ruleIds].filter((id) => !model.constraints.some((c) => c.id === id));
   if (missing.length > 0) self.push(`the schema states no constraint ${missing.join(", ")}`);
   const findings = [];
-  for (const d of new core.ValidationEngine().validate(model)) {
+  for (const d of diagnostics) {
     if (d.severity !== "error") continue;
     if (!(ruleIds.has(d.elementId) && d.ruleId === "population/subset-violation")) {
       self.push(`an error it cannot classify: ${d.ruleId} ${d.elementId}: ${d.message}`);
@@ -175,7 +174,12 @@ export function modelJudge(adrs, reader, { core, YAML, schemaText, rules }) {
       findings.push(`${rule}|${key.slice(0, key.indexOf("#"))}|null|${key}`);
       continue;
     }
-    const [ft, entryRole, valueRole] = ROLES[KEY_FACT[rule]];
+    const carrier = ROLES[CARRIED_BY[rules.find((r) => r.id === rule).key]];
+    if (carrier === undefined) {
+      self.push(`${rule}: no entry fact carries its key`);
+      continue;
+    }
+    const [ft, entryRole, valueRole] = carrier;
     for (const row of (pops[ft] ?? []).filter((r) => r[valueRole] === key)) {
       const { adr, position, ids } = entries.get(row[entryRole]);
       // ids-exist counts once per time the entry lists the id, as the code

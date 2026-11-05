@@ -46,6 +46,17 @@ export const RULES = [
 ];
 
 /**
+ * Whether the code judge's reader needs the workflow reader: some ADR
+ * declares a gate. ci-occurrences.mjs needs the `yaml` package, so a tree
+ * with no such entry runs on builtins. check:architecture and
+ * check:adr-model both build the code judge's reader with this, so the
+ * second judge is compared with the judgment CI enforces.
+ */
+export function needsWorkflow(adrs) {
+  return adrs.some(({ text }) => parseEnforcedBy(text).entries.some((e) => e.kind === "npm"));
+}
+
+/**
  * Whether the judge looks an `npm` entry's script up at all: the gate-name
  * and meta-gate verdicts, as the finding's text, or `null` when the script
  * passes both. Shared, so the conformance model's fact builder writes a

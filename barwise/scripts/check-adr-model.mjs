@@ -68,74 +68,77 @@ try {
       + "  @barwise/core must be built first: npm run build:core.",
   );
 }
-const { RULES, judgeDeclarations } = judge;
+const { RULES, judgeDeclarations, needsWorkflow } = judge;
 const { compareJudges, factStrings, modelJudge } = population;
 const { createGovernanceReader } = facts;
 const { isAdr, readFiles, trackedPaths } = section;
-const { parseEnforcedBy } = await import("./lib/adr-enforcement.mjs");
 
 const SCHEMA = join(root, "barwise", "docs", "adr", "governance.orm.yaml");
 
-let adrs;
-let schemaText;
+async function main() {
+  const adrs = readFiles(root, trackedPaths(root).filter(isAdr));
+  const schemaText = readFileSync(SCHEMA, "utf8");
+  if (adrs.length === 0) refuse(`no ADR under ${join(root, "barwise", "docs", "adr")}`);
+
+  // The code judge, on a reader of its own, built as check:architecture
+  // builds it; the model, on another: each reader records an unreadable
+  // input's refusal once, into the list it was built with.
+  const codeRefusals = [];
+  const code = judgeDeclarations(
+    adrs,
+    await createGovernanceReader(root, {
+      needsWorkflow: needsWorkflow(adrs),
+      refusals: codeRefusals,
+    }),
+    codeRefusals,
+  );
+  const modelRefusals = [];
+  const model = modelJudge(
+    adrs,
+    await createGovernanceReader(root, { needsWorkflow: false, refusals: modelRefusals }),
+    { core, YAML, schemaText, rules: RULES },
+  );
+
+  if (model.self.length > 0) {
+    console.error("check:adr-model: the model could not answer, so nothing was compared:");
+    for (const s of model.self) console.error(`  ${s}`);
+    process.exit(2);
+  }
+  const codeFacts = factStrings(code.facts);
+  const disagreements = compareJudges({
+    codeFacts,
+    codeRefusals,
+    modelFindings: model.findings,
+    modelRefusals,
+    rules: RULES,
+  });
+  if (disagreements.length > 0) {
+    console.error(
+      `check:adr-model: FAIL -- the code judge and the model disagree on ${disagreements.length}`
+        + " finding(s) (rule|ADR|entry position|key):",
+    );
+    for (const d of disagreements) console.error(`  ${d}`);
+    console.error(
+      "Each disagreement is a bug in one of the two judges; fix it, and add its input as a case in"
+        + " scripts/tests/adr-model.test.mjs (docs/specs/adr-conformance-model.spec.md, WS3).",
+    );
+    process.exit(1);
+  }
+  if (codeRefusals.length > 0 || modelRefusals.length > 0) {
+    console.error("check:adr-model: cannot answer for an input a judge could not read:");
+    for (const r of new Set([...codeRefusals, ...modelRefusals])) console.error(`  ${r}`);
+    process.exit(2);
+  }
+  console.log(
+    `check:adr-model: the code judge and the model agree on ${codeFacts.length} fact-rule`
+      + ` finding(s) over ${adrs.length} ADRs (${RULES.map((r) => r.id).join(", ")}). OK`,
+  );
+}
+
+// Anything thrown past the imports is an answer this check could not give:
+// exit 2, never Node's uncaught-error exit 1, which reads as a disagreement.
 try {
-  adrs = readFiles(root, trackedPaths(root).filter(isAdr));
-  schemaText = readFileSync(SCHEMA, "utf8");
+  await main();
 } catch (err) {
-  refuse(`an input could not be read: ${err instanceof Error ? err.message : String(err)}`);
+  refuse(`an unexpected error: ${err instanceof Error ? err.stack ?? err.message : String(err)}`);
 }
-if (adrs.length === 0) refuse(`no ADR under ${join(root, "barwise", "docs", "adr")}`);
-
-// The code judge, on a reader of its own; the model, on another: each
-// reader records an unreadable input's refusal once, into the list it was
-// built with.
-const codeRefusals = [];
-const needsWorkflow = adrs.some(({ text }) =>
-  parseEnforcedBy(text).entries.some((e) => e.kind === "npm")
-);
-const code = judgeDeclarations(
-  adrs,
-  await createGovernanceReader(root, { needsWorkflow, refusals: codeRefusals }),
-  codeRefusals,
-);
-const modelRefusals = [];
-const model = modelJudge(
-  adrs,
-  await createGovernanceReader(root, { needsWorkflow: false, refusals: modelRefusals }),
-  { core, YAML, schemaText, rules: RULES },
-);
-
-if (model.self.length > 0) {
-  console.error("check:adr-model: the model could not answer, so nothing was compared:");
-  for (const s of model.self) console.error(`  ${s}`);
-  process.exit(2);
-}
-const codeFacts = factStrings(code.facts);
-const disagreements = compareJudges({
-  codeFacts,
-  codeRefusals,
-  modelFindings: model.findings,
-  modelRefusals,
-  rules: RULES,
-});
-if (disagreements.length > 0) {
-  console.error(
-    `check:adr-model: FAIL -- the code judge and the model disagree on ${disagreements.length} finding(s)`
-      + " (rule|ADR|entry position|key):",
-  );
-  for (const d of disagreements) console.error(`  ${d}`);
-  console.error(
-    "Each disagreement is a bug in one of the two judges; fix it, and add its input as a case in"
-      + " scripts/tests/adr-model.test.mjs (docs/specs/adr-conformance-model.spec.md, WS3).",
-  );
-  process.exit(1);
-}
-if (codeRefusals.length > 0 || modelRefusals.length > 0) {
-  console.error("check:adr-model: cannot answer for an input a judge could not read:");
-  for (const r of new Set([...codeRefusals, ...modelRefusals])) console.error(`  ${r}`);
-  process.exit(2);
-}
-console.log(
-  `check:adr-model: the code judge and the model agree on ${codeFacts.length} fact-rule`
-    + ` finding(s) over ${adrs.length} ADRs (${RULES.map((r) => r.id).join(", ")}). OK`,
-);
