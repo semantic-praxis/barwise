@@ -148,6 +148,28 @@ model:
     expect(analyzeImpact(m, "ot-1").affectedArtifacts).toEqual([]);
   });
 
+  it("finds by its 4.0 id an export of an element the model no longer holds", () => {
+    // A deleted element: the replayed model holds the id under neither
+    // reading, so it is taken as a 4.0 id and still finds the export that
+    // recorded it (the pr-review of #925: only an mcp test reached this
+    // branch, and by accident).
+    const model = new OrmYamlSerializer().deserialize(`orm_version: "3.0"
+model:
+  name: Shop
+  object_types:
+    - { id: ot-1, name: Customer, kind: entity, reference_mode: nr }
+`);
+    expect(model.getObjectType("Retired")).toBeUndefined();
+    const m: LineageManifest = {
+      version: 2,
+      sourceModel: "shop.orm.yaml",
+      sourceModelHash: "h",
+      exports: [exported("a.sql", "Retired", "h")],
+    };
+    expect(analyzeImpact(m, "Retired", undefined, model).affectedArtifacts.map((a) => a.artifact))
+      .toEqual(["a.sql"]);
+  });
+
   it("finds by a 4.0 id an export that recorded the 3.x id the file states", () => {
     const model = new OrmYamlSerializer().deserialize(`orm_version: "3.0"
 model:

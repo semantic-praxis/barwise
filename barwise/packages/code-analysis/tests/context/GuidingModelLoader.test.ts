@@ -28,19 +28,19 @@ describe("loadGuidingEntityNames", () => {
 
   it("loads entity type names from a valid ORM model", () => {
     const modelYaml = `
-orm_version: "1.0"
+orm_version: "4.0"
 model:
   name: Test Model
   object_types:
-    - id: "11111111-1111-1111-1111-111111111111"
+    - id: Customer
       name: Customer
       kind: entity
       reference_mode: id
-    - id: "22222222-2222-2222-2222-222222222222"
+    - id: Order
       name: Order
       kind: entity
       reference_mode: id
-    - id: "33333333-3333-3333-3333-333333333333"
+    - id: OrderStatus
       name: OrderStatus
       kind: value
       data_type:
@@ -75,11 +75,11 @@ model:
 
   it("returns empty set for model with no entity types", () => {
     const modelYaml = `
-orm_version: "1.0"
+orm_version: "4.0"
 model:
   name: Values Only
   object_types:
-    - id: "44444444-4444-4444-4444-444444444444"
+    - id: Status
       name: Status
       kind: value
       data_type:

@@ -168,13 +168,16 @@ export type Region = "US" | "EU" | "APAC";
 
   describe("guidingModel support", () => {
     it("filters types to match guiding model entities", async () => {
-      // Create a guiding model with only Order as an entity
+      // Create a guiding model with only Order as an entity. A 1.0 file on
+      // purpose: the loader turns any failure into an empty set, which
+      // silently turns filtering off, so one guiding model here stays at a
+      // format before 4.0 (the Java test's is 4.0).
       const guidingYaml = `
 orm_version: "1.0"
 model:
   name: Guiding
   object_types:
-    - id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+    - id: ot-order
       name: Order
       kind: entity
       reference_mode: id

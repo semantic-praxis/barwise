@@ -59,7 +59,7 @@ describe("impact_analysis tool", () => {
 
     writeManifest(tempDir, manifest);
 
-    const elementId = "550e8400-e29b-41d4-a716-446655440000";
+    const elementId = "Customer";
     const result = executeImpactAnalysis(modelPath, elementId);
     const parsed = JSON.parse(result.content[0]!.text);
 
@@ -75,7 +75,7 @@ describe("impact_analysis tool", () => {
     const model = serializer.deserialize(yaml);
     const modelHash = hashModel(model);
 
-    const elementId = "550e8400-e29b-41d4-a716-446655440000";
+    const elementId = "Customer";
 
     const manifest: LineageManifest = {
       version: 2,
@@ -91,7 +91,7 @@ describe("impact_analysis tool", () => {
             {
               elementId,
               elementType: "EntityType",
-              elementName: "Game",
+              elementName: "Customer",
             },
           ],
         },
@@ -104,7 +104,7 @@ describe("impact_analysis tool", () => {
             {
               elementId,
               elementType: "EntityType",
-              elementName: "Game",
+              elementName: "Customer",
             },
           ],
         },
@@ -115,9 +115,9 @@ describe("impact_analysis tool", () => {
           modelHash,
           sources: [
             {
-              elementId: "999e8400-e29b-41d4-a716-446655440999",
+              elementId: "Supplier",
               elementType: "EntityType",
-              elementName: "Player",
+              elementName: "Supplier",
             },
           ],
         },
@@ -141,7 +141,7 @@ describe("impact_analysis tool", () => {
       a.artifact === "schema.sql"
     );
     expect(schemaSql.format).toBe("ddl");
-    expect(schemaSql.relationship).toContain("derived from entity type Game");
+    expect(schemaSql.relationship).toContain("derived from entity type Customer");
   });
 
   it("works with inline YAML content", () => {
@@ -149,7 +149,7 @@ describe("impact_analysis tool", () => {
     const model = serializer.deserialize(yaml);
     const modelHash = hashModel(model);
 
-    const elementId = "550e8400-e29b-41d4-a716-446655440000";
+    const elementId = "Customer";
 
     const manifest: LineageManifest = {
       version: 2,
@@ -165,7 +165,7 @@ describe("impact_analysis tool", () => {
             {
               elementId,
               elementType: "EntityType",
-              elementName: "Game",
+              elementName: "Customer",
             },
           ],
         },
@@ -189,8 +189,11 @@ describe("impact_analysis tool", () => {
     const model = serializer.deserialize(yaml);
     const modelHash = hashModel(model);
 
-    const constraintId = "c1111111-e29b-41d4-a716-446655440000";
-    const valueTypeId = "v2222222-e29b-41d4-a716-446655440000";
+    // Both ids are absent from the fixture on purpose: an id the loaded
+    // model does not hold is read as a 4.0 id, which is the branch this
+    // test reaches (core's lineage40.test.ts pins it directly).
+    const constraintId = "Each_Customer_has_some_Name";
+    const valueTypeId = "Status";
 
     const manifest: LineageManifest = {
       version: 2,
@@ -206,7 +209,7 @@ describe("impact_analysis tool", () => {
             {
               elementId: constraintId,
               elementType: "Constraint",
-              elementName: "UC: Game is identified by GameId",
+              elementName: "Each Customer has some Name",
             },
           ],
         },
@@ -219,7 +222,7 @@ describe("impact_analysis tool", () => {
             {
               elementId: valueTypeId,
               elementType: "ValueType",
-              elementName: "GameStatus",
+              elementName: "Status",
             },
           ],
         },
@@ -258,7 +261,7 @@ describe("impact_analysis tool", () => {
 
     writeManifest(tempDir, manifest);
 
-    const result = executeImpactAnalysis(modelPath, "550e8400-e29b-41d4-a716-446655440000");
+    const result = executeImpactAnalysis(modelPath, "Customer");
 
     expect(result.content).toHaveLength(1);
     expect(result.content[0]!.type).toBe("text");
