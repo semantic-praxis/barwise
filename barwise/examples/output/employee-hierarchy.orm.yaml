@@ -1,40 +1,40 @@
-orm_version: "1.1"
+orm_version: "4.0"
 model:
   name: Employee Hierarchy
   object_types:
-    - id: 1f58a60c-7de3-4130-a889-3371c65b17d7
+    - id: Person
       name: Person
       kind: entity
       reference_mode: person_id
       definition: Any individual tracked by the HR system.
-    - id: fc286747-b995-48ce-bee2-02cc40600687
+    - id: Employee
       name: Employee
       kind: entity
       reference_mode: employee_id
       definition: A person who works for the company.
-    - id: 184aaaf8-2547-4169-bd85-3176783f9058
+    - id: Manager
       name: Manager
       kind: entity
       reference_mode: manager_id
       definition: An employee who manages other employees.
-    - id: 31678bc9-d47b-455d-b99b-58db9e12b4ed
+    - id: Department
       name: Department
       kind: entity
       reference_mode: department_code
       definition: An organizational unit within the company.
-    - id: cb0a3d25-e720-448c-b8cd-09e48ece3605
+    - id: DepartmentName
       name: DepartmentName
       kind: value
       definition: The name of a department.
   fact_types:
-    - id: 5b53532f-0a6c-449a-bf37-4aa14995e493
+    - id: Employee_works_in_Department
       name: Employee works in Department
       roles:
-        - id: 705466f4-e45c-49e4-b36f-42fda699f82e
-          player: fc286747-b995-48ce-bee2-02cc40600687
+        - id: Employee_works_in_Department.works_in
+          player: Employee
           role_name: works in
-        - id: a8cac0b8-f5f6-4ef8-824b-94d33355bbfb
-          player: 31678bc9-d47b-455d-b99b-58db9e12b4ed
+        - id: Employee_works_in_Department.has
+          player: Department
           role_name: has
       readings:
         - "{0} works in {1}"
@@ -42,17 +42,21 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - 705466f4-e45c-49e4-b36f-42fda699f82e
+            - Employee_works_in_Department.works_in
+          id: Each_Employee_works_in_at_most_one_Department
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"works in",{"name":"Employee works in Department","readings":["{0} works in {1}","{1} has {0}"],"players":["Employee","Department"]}]],"fact_type":{"name":"Employee works in Department","readings":["{0} works in {1}","{1} has {0}"],"players":["Employee","Department"]}}'
         - type: mandatory
-          role: 705466f4-e45c-49e4-b36f-42fda699f82e
-    - id: 7be37cf9-1d23-40d0-97ad-87210a902349
+          role: Employee_works_in_Department.works_in
+          id: Each_Employee_works_in_at_least_one_Department
+          minted_from: '{"type":"mandatory","role":[0,"works in",{"name":"Employee works in Department","readings":["{0} works in {1}","{1} has {0}"],"players":["Employee","Department"]}],"fact_type":{"name":"Employee works in Department","readings":["{0} works in {1}","{1} has {0}"],"players":["Employee","Department"]}}'
+    - id: Manager_manages_Department
       name: Manager manages Department
       roles:
-        - id: eac011af-d17b-4ed6-a064-894a6c4332c2
-          player: 184aaaf8-2547-4169-bd85-3176783f9058
+        - id: Manager_manages_Department.manages
+          player: Manager
           role_name: manages
-        - id: c3ddd6df-ecd6-4610-8253-be3fdf80120a
-          player: 31678bc9-d47b-455d-b99b-58db9e12b4ed
+        - id: Manager_manages_Department.is_managed_by
+          player: Department
           role_name: is managed by
       readings:
         - "{0} manages {1}"
@@ -60,15 +64,17 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - c3ddd6df-ecd6-4610-8253-be3fdf80120a
-    - id: 43c34e8e-9473-4f33-8856-a3e2e4b056da
+            - Manager_manages_Department.is_managed_by
+          id: Each_Department_is_managed_by_at_most_one_Manager
+          minted_from: '{"type":"internal_uniqueness","roles":[[1,"is managed by",{"name":"Manager manages Department","readings":["{0} manages {1}","{1} is managed by {0}"],"players":["Manager","Department"]}]],"fact_type":{"name":"Manager manages Department","readings":["{0} manages {1}","{1} is managed by {0}"],"players":["Manager","Department"]}}'
+    - id: Department_has_DepartmentName
       name: Department has DepartmentName
       roles:
-        - id: 87c8727a-42d9-4870-822c-e10925230db2
-          player: 31678bc9-d47b-455d-b99b-58db9e12b4ed
+        - id: Department_has_DepartmentName.has
+          player: Department
           role_name: has
-        - id: 407ce690-fb58-4327-b521-c6e315b3ab0d
-          player: cb0a3d25-e720-448c-b8cd-09e48ece3605
+        - id: Department_has_DepartmentName.is_of
+          player: DepartmentName
           role_name: is of
       readings:
         - "{0} has {1}"
@@ -76,12 +82,16 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - 87c8727a-42d9-4870-822c-e10925230db2
+            - Department_has_DepartmentName.has
+          id: Each_Department_has_at_most_one_DepartmentName
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"has",{"name":"Department has DepartmentName","readings":["{0} has {1}","{1} is of {0}"],"players":["Department","DepartmentName"]}]],"fact_type":{"name":"Department has DepartmentName","readings":["{0} has {1}","{1} is of {0}"],"players":["Department","DepartmentName"]}}'
   subtype_facts:
-    - id: 9bb914ef-c751-469b-80f1-b449d0364495
-      subtype: fc286747-b995-48ce-bee2-02cc40600687
-      supertype: 1f58a60c-7de3-4130-a889-3371c65b17d7
+    - id: Employee_is_a_subtype_of_Person
+      minted_from: '{"subtype":"Employee","supertype":"Person","defining_rule":null}'
+      subtype: Employee
+      supertype: Person
       provides_identification: false
-    - id: 27e40fcd-4213-4f43-a024-e145e339aa25
-      subtype: 184aaaf8-2547-4169-bd85-3176783f9058
-      supertype: fc286747-b995-48ce-bee2-02cc40600687
+    - id: Manager_is_a_subtype_of_Employee
+      minted_from: '{"subtype":"Manager","supertype":"Employee","defining_rule":null}'
+      subtype: Manager
+      supertype: Employee

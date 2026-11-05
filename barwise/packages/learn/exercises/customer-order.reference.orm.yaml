@@ -1,36 +1,37 @@
-orm_version: "1.0"
-
+orm_version: "4.0"
 model:
-  name: "Customer places Order"
-
+  name: Customer places Order
   object_types:
-    - id: "ot-customer"
-      name: "Customer"
-      kind: "entity"
-      reference_mode: "customer_id"
-      definition: "A party that places orders."
-
-    - id: "ot-order"
-      name: "Order"
-      kind: "entity"
-      reference_mode: "order_id"
-      definition: "A request a customer places."
-
+    - id: Customer
+      name: Customer
+      kind: entity
+      reference_mode: customer_id
+      definition: A party that places orders.
+    - id: Order
+      name: Order
+      kind: entity
+      reference_mode: order_id
+      definition: A request a customer places.
   fact_types:
-    - id: "ft-places"
-      name: "Customer places Order"
+    - id: Customer_places_Order
+      name: Customer places Order
       roles:
-        - id: "r-places"
-          player: "ot-customer"
-          role_name: "places"
-        - id: "r-placed-by"
-          player: "ot-order"
-          role_name: "is placed by"
+        - id: Customer_places_Order.places
+          player: Customer
+          role_name: places
+        - id: Customer_places_Order.is_placed_by
+          player: Order
+          role_name: is placed by
       readings:
         - "{0} places {1}"
         - "{1} is placed by {0}"
       constraints:
-        - type: "internal_uniqueness"
-          roles: ["r-placed-by"]
-        - type: "mandatory"
-          role: "r-placed-by"
+        - type: internal_uniqueness
+          roles:
+            - Customer_places_Order.is_placed_by
+          id: Each_Order_is_placed_by_at_most_one_Customer
+          minted_from: '{"type":"internal_uniqueness","roles":[[1,"is placed by",{"name":"Customer places Order","readings":["{0} places {1}","{1} is placed by {0}"],"players":["Customer","Order"]}]],"fact_type":{"name":"Customer places Order","readings":["{0} places {1}","{1} is placed by {0}"],"players":["Customer","Order"]}}'
+        - type: mandatory
+          role: Customer_places_Order.is_placed_by
+          id: Each_Order_is_placed_by_at_least_one_Customer
+          minted_from: '{"type":"mandatory","role":[1,"is placed by",{"name":"Customer places Order","readings":["{0} places {1}","{1} is placed by {0}"],"players":["Customer","Order"]}],"fact_type":{"name":"Customer places Order","readings":["{0} places {1}","{1} is placed by {0}"],"players":["Customer","Order"]}}'

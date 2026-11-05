@@ -1,118 +1,118 @@
-orm_version: "1.0"
+orm_version: "4.0"
 model:
   name: parties
   domain_context: parties
+  imports:
+    payments: payments
+    auctions: auctions
+    catalog: catalog
   object_types:
-    - id: 6720f54b-1a85-485c-ace2-a2d2630c76c6
+    - id: Customer
       name: Customer
       kind: entity
       reference_mode: id
-    - id: e531a38b-e15f-455e-a3f5-ea7a2e0d24eb
+      preferred_identifier: For_each_Customer_id,_at_most_one_Customer_has_that_Customer_id
+    - id: Organization
       name: Organization
       kind: entity
       reference_mode: id
-    - id: d38e013f-2e99-4869-8876-2a5537b86b22
+      preferred_identifier: For_each_Organization_id,_at_most_one_Organization_has_that_Organization_id
+    - id: Location
       name: Location
       kind: entity
       reference_mode: id
-    - id: 12a6b1cf-55d4-4f31-b0c9-b69ff50b9871
+      preferred_identifier: For_each_Location_id,_at_most_one_Location_has_that_Location_id
+    - id: Customer_id
       name: Customer_id
       kind: value
       data_type:
         name: auto_counter
         length: 0
         scale: 0
-    - id: 819f1a5e-444e-4e9f-98fb-1a632ca6000d
+    - id: Organization_id
       name: Organization_id
       kind: value
       data_type:
         name: auto_counter
         length: 0
         scale: 0
-    - id: 152892cc-98a7-43fa-b53a-f2e35d855aae
+    - id: Location_id
       name: Location_id
       kind: value
       data_type:
         name: auto_counter
         length: 0
         scale: 0
-    - id: 40224ee7-d988-4a9a-8076-a0ebf1ba7f9b
+    - id: CustomerOnBehalfOfOrganizationSignsAgreement
       name: CustomerOnBehalfOfOrganizationSignsAgreement
       kind: entity
       reference_mode: customer_on_behalf_of_organization_signs_agreement_id
-    - id: dab8e240-5170-41e7-9803-c72fe31c7bd5
+      preferred_identifier: For_each_Agreement_and_Customer_combination,_at_most_one_Organization_applies
+    - id: CustomerCreatesBidSubmissionOnBehalfOfOrganization
       name: CustomerCreatesBidSubmissionOnBehalfOfOrganization
       kind: entity
       reference_mode: customer_creates_bid_submission_on_behalf_of_organization_id
-    - id: 15ea515c-702b-4516-b862-1fd08fd1d632
+      preferred_identifier: For_each_Customer_and_BidSubmission_combination,_at_most_one_Organization_applies
+    - id: PaymentIsMadeByCustomerOnBehalfOfOrganization
       name: PaymentIsMadeByCustomerOnBehalfOfOrganization
       kind: entity
       reference_mode: payment_is_made_by_customer_on_behalf_of_organization_id
-    - id: 38d2baaf-1c9e-4e93-a34a-e746cf06e8a4
+      preferred_identifier: For_each_Payment_and_Customer_combination,_at_most_one_Organization_applies
+    - id: payments:ARInvoice
       name: ARInvoice
       kind: entity
       reference_mode: id
-      source_context: payments
-    - id: 8c60d6ec-b851-43b3-a19f-ab103b69148b
+    - id: payments:SettlementEstimate
       name: SettlementEstimate
       kind: entity
       reference_mode: id
-      source_context: payments
-    - id: 93d954da-90c8-4ae3-823d-6b790207eb8f
+    - id: auctions:Agreement
       name: Agreement
       kind: entity
       reference_mode: id
-      source_context: auctions
-    - id: 90fee62d-e7fd-4a2d-8584-3de4e9f989c7
+    - id: catalog:Asset
       name: Asset
       kind: entity
       reference_mode: id
-      source_context: catalog
-    - id: 3d43039a-8aac-4e91-91ac-67991f9bc068
+    - id: payments:Amount
       name: Amount
       kind: value
       data_type:
         name: money
         length: 0
         scale: 0
-      source_context: payments
-    - id: 885113e0-ea22-4875-be18-1cb0f1b2b473
+    - id: auctions:BidSubmission
       name: BidSubmission
       kind: entity
       reference_mode: id
-      source_context: auctions
-    - id: b8ee656e-f276-4cdc-ba57-11a8a6fac7c9
+    - id: auctions:Listing
       name: Listing
       kind: entity
       reference_mode: id
-      source_context: auctions
-    - id: beb852d1-5f29-4fb8-8ce0-34fb435608b8
+    - id: payments:Purchase
       name: Purchase
       kind: entity
       reference_mode: id
-      source_context: payments
-    - id: 0da046a1-db66-47e4-9daf-efb10f1c84a2
+    - id: auctions:GTV
       name: GTV
       kind: value
       data_type:
         name: money
         length: 0
         scale: 0
-      source_context: auctions
-    - id: da15d41e-83bb-46fc-ae6d-592c8a9c7eea
+    - id: payments:Payment
       name: Payment
       kind: entity
       reference_mode: id
-      source_context: payments
   fact_types:
-    - id: 6ffddcc3-38a1-4fe3-88d8-ace019c70783
+    - id: CustomerHasCustomerId
       name: CustomerHasCustomerId
       roles:
-        - id: _88C51B6B-EEE4-43D5-A811-D9EA99DBD560
-          player: 6720f54b-1a85-485c-ace2-a2d2630c76c6
+        - id: CustomerHasCustomerId._88C51B6B-EEE4-43D5-A811-D9EA99DBD560
+          player: Customer
           role_name: _88C51B6B-EEE4-43D5-A811-D9EA99DBD560
-        - id: _5EEE5C4F-9F49-473F-B696-7E2220B520F6
-          player: 12a6b1cf-55d4-4f31-b0c9-b69ff50b9871
+        - id: CustomerHasCustomerId._5EEE5C4F-9F49-473F-B696-7E2220B520F6
+          player: Customer_id
           role_name: _5EEE5C4F-9F49-473F-B696-7E2220B520F6
       readings:
         - "{0} has {1}"
@@ -120,24 +120,26 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - _5EEE5C4F-9F49-473F-B696-7E2220B520F6
-          is_preferred: true
-          id: 58b46bbc-5e35-4f23-8ddf-629e699b04f3
+            - CustomerHasCustomerId._5EEE5C4F-9F49-473F-B696-7E2220B520F6
+          id: For_each_Customer_id,_at_most_one_Customer_has_that_Customer_id
+          minted_from: '{"type":"internal_uniqueness","roles":[[1,"_5EEE5C4F-9F49-473F-B696-7E2220B520F6",{"name":"CustomerHasCustomerId","readings":["{0} has {1}","{0} is of {1}"],"players":["Customer","Customer_id"]}]],"fact_type":{"name":"CustomerHasCustomerId","readings":["{0} has {1}","{0} is of {1}"],"players":["Customer","Customer_id"]}}'
         - type: internal_uniqueness
           roles:
-            - _88C51B6B-EEE4-43D5-A811-D9EA99DBD560
-          id: 128eda77-4d91-4767-b747-e59fcee5f1d3
+            - CustomerHasCustomerId._88C51B6B-EEE4-43D5-A811-D9EA99DBD560
+          id: Each_Customer_has_at_most_one_Customer_id
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"_88C51B6B-EEE4-43D5-A811-D9EA99DBD560",{"name":"CustomerHasCustomerId","readings":["{0} has {1}","{0} is of {1}"],"players":["Customer","Customer_id"]}]],"fact_type":{"name":"CustomerHasCustomerId","readings":["{0} has {1}","{0} is of {1}"],"players":["Customer","Customer_id"]}}'
         - type: mandatory
-          role: _88C51B6B-EEE4-43D5-A811-D9EA99DBD560
-          id: 3fc504be-e354-43ce-9de9-1bd8b77da3df
-    - id: cae6e28b-0047-4226-b01a-6f92a1e83d0c
+          role: CustomerHasCustomerId._88C51B6B-EEE4-43D5-A811-D9EA99DBD560
+          id: Each_Customer_has_at_least_one_Customer_id
+          minted_from: '{"type":"mandatory","role":[0,"_88C51B6B-EEE4-43D5-A811-D9EA99DBD560",{"name":"CustomerHasCustomerId","readings":["{0} has {1}","{0} is of {1}"],"players":["Customer","Customer_id"]}],"fact_type":{"name":"CustomerHasCustomerId","readings":["{0} has {1}","{0} is of {1}"],"players":["Customer","Customer_id"]}}'
+    - id: OrganizationRequestsARInvoice
       name: OrganizationRequestsARInvoice
       roles:
-        - id: _22C10549-336E-44A3-8D0A-E4207A4961DE
-          player: e531a38b-e15f-455e-a3f5-ea7a2e0d24eb
+        - id: OrganizationRequestsARInvoice._22C10549-336E-44A3-8D0A-E4207A4961DE
+          player: Organization
           role_name: _22C10549-336E-44A3-8D0A-E4207A4961DE
-        - id: _FC7A2B5D-2FDD-48BD-9AF7-3B699F13732E
-          player: 38d2baaf-1c9e-4e93-a34a-e746cf06e8a4
+        - id: OrganizationRequestsARInvoice._FC7A2B5D-2FDD-48BD-9AF7-3B699F13732E
+          player: payments:ARInvoice
           role_name: _FC7A2B5D-2FDD-48BD-9AF7-3B699F13732E
       readings:
         - "{0} requests {1}"
@@ -145,59 +147,63 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - _FC7A2B5D-2FDD-48BD-9AF7-3B699F13732E
-          id: 8e9feacf-70f2-44c7-a7f8-9470af8879d0
-    - id: 52b13c54-ea99-4850-983f-232d82a3ab86
+            - OrganizationRequestsARInvoice._FC7A2B5D-2FDD-48BD-9AF7-3B699F13732E
+          id: For_each_ARInvoice,_at_most_one_Organization_requests_that_ARInvoice
+          minted_from: '{"type":"internal_uniqueness","roles":[[1,"_FC7A2B5D-2FDD-48BD-9AF7-3B699F13732E",{"name":"OrganizationRequestsARInvoice","readings":["{0} requests {1}","{0} is for {1}"],"players":["Organization","ARInvoice"]}]],"fact_type":{"name":"OrganizationRequestsARInvoice","readings":["{0} requests {1}","{0} is for {1}"],"players":["Organization","ARInvoice"]}}'
+    - id: OrganizationReceivesSettlementEstimate
       name: OrganizationReceivesSettlementEstimate
       roles:
-        - id: _FA2594E1-2DD9-4FCE-B12B-38C720E6B258
-          player: e531a38b-e15f-455e-a3f5-ea7a2e0d24eb
+        - id: OrganizationReceivesSettlementEstimate._FA2594E1-2DD9-4FCE-B12B-38C720E6B258
+          player: Organization
           role_name: _FA2594E1-2DD9-4FCE-B12B-38C720E6B258
-        - id: _BC523C03-5863-49EF-9214-DC52C0EA0639
-          player: 8c60d6ec-b851-43b3-a19f-ab103b69148b
+        - id: OrganizationReceivesSettlementEstimate._BC523C03-5863-49EF-9214-DC52C0EA0639
+          player: payments:SettlementEstimate
           role_name: _BC523C03-5863-49EF-9214-DC52C0EA0639
       readings:
         - "{0} receives {1}"
       constraints:
         - type: internal_uniqueness
           roles:
-            - _BC523C03-5863-49EF-9214-DC52C0EA0639
-          id: d0c0cea4-f39b-47c3-bc99-34b08ad38636
+            - OrganizationReceivesSettlementEstimate._BC523C03-5863-49EF-9214-DC52C0EA0639
+          id: For_each_SettlementEstimate,_at_most_one_Organization_receives_that_SettlementEstimate
+          minted_from: '{"type":"internal_uniqueness","roles":[[1,"_BC523C03-5863-49EF-9214-DC52C0EA0639",{"name":"OrganizationReceivesSettlementEstimate","readings":["{0} receives {1}"],"players":["Organization","SettlementEstimate"]}]],"fact_type":{"name":"OrganizationReceivesSettlementEstimate","readings":["{0} receives {1}"],"players":["Organization","SettlementEstimate"]}}'
         - type: mandatory
-          role: _BC523C03-5863-49EF-9214-DC52C0EA0639
-          id: 1e01bf68-826d-4789-90d6-5b93e3df4e57
-    - id: 7a51157b-2210-4292-8e29-2e25994a1a9f
+          role: OrganizationReceivesSettlementEstimate._BC523C03-5863-49EF-9214-DC52C0EA0639
+          id: For_each_SettlementEstimate,_some_Organization_receives_that_SettlementEstimate
+          minted_from: '{"type":"mandatory","role":[1,"_BC523C03-5863-49EF-9214-DC52C0EA0639",{"name":"OrganizationReceivesSettlementEstimate","readings":["{0} receives {1}"],"players":["Organization","SettlementEstimate"]}],"fact_type":{"name":"OrganizationReceivesSettlementEstimate","readings":["{0} receives {1}"],"players":["Organization","SettlementEstimate"]}}'
+    - id: Customer_on_behalf_of_Organization_signs_Agreement
       name: CustomerOnBehalfOfOrganizationSignsAgreement
       roles:
-        - id: _2EF7570A-80A0-4951-A1B4-C0B299E112FF
-          player: 6720f54b-1a85-485c-ace2-a2d2630c76c6
+        - id: Customer_on_behalf_of_Organization_signs_Agreement._2EF7570A-80A0-4951-A1B4-C0B299E112FF
+          player: Customer
           role_name: _2EF7570A-80A0-4951-A1B4-C0B299E112FF
-        - id: _76943B80-EF38-4834-BA87-A43F4E2794D3
-          player: e531a38b-e15f-455e-a3f5-ea7a2e0d24eb
+        - id: Customer_on_behalf_of_Organization_signs_Agreement._76943B80-EF38-4834-BA87-A43F4E2794D3
+          player: Organization
           role_name: _76943B80-EF38-4834-BA87-A43F4E2794D3
-        - id: _5593C6C5-F1E4-4581-AE4F-BA0B3E9F75B5
-          player: 93d954da-90c8-4ae3-823d-6b790207eb8f
+        - id: Customer_on_behalf_of_Organization_signs_Agreement._5593C6C5-F1E4-4581-AE4F-BA0B3E9F75B5
+          player: auctions:Agreement
           role_name: _5593C6C5-F1E4-4581-AE4F-BA0B3E9F75B5
       readings:
         - "{0} on behalf of {1} signs {2}"
       constraints:
         - type: internal_uniqueness
           roles:
-            - _5593C6C5-F1E4-4581-AE4F-BA0B3E9F75B5
-            - _2EF7570A-80A0-4951-A1B4-C0B299E112FF
-          is_preferred: true
-          id: b04746d8-ad66-4bac-b8c9-955980e22250
+            - Customer_on_behalf_of_Organization_signs_Agreement._5593C6C5-F1E4-4581-AE4F-BA0B3E9F75B5
+            - Customer_on_behalf_of_Organization_signs_Agreement._2EF7570A-80A0-4951-A1B4-C0B299E112FF
+          id: For_each_Agreement_and_Customer_combination,_at_most_one_Organization_applies
+          minted_from: '{"type":"internal_uniqueness","roles":[[2,"_5593C6C5-F1E4-4581-AE4F-BA0B3E9F75B5",{"name":"CustomerOnBehalfOfOrganizationSignsAgreement","readings":["{0} on behalf of {1} signs {2}"],"players":["Customer","Organization","Agreement"]}],[0,"_2EF7570A-80A0-4951-A1B4-C0B299E112FF",{"name":"CustomerOnBehalfOfOrganizationSignsAgreement","readings":["{0} on behalf of {1} signs {2}"],"players":["Customer","Organization","Agreement"]}]],"fact_type":{"name":"CustomerOnBehalfOfOrganizationSignsAgreement","readings":["{0} on behalf of {1} signs {2}"],"players":["Customer","Organization","Agreement"]}}'
         - type: mandatory
-          role: _5593C6C5-F1E4-4581-AE4F-BA0B3E9F75B5
-          id: 28b8ce7b-fc7f-45e5-a002-185674903f89
-    - id: 707e4d3e-cfa8-4192-9e3d-511ca872aafa
+          role: Customer_on_behalf_of_Organization_signs_Agreement._5593C6C5-F1E4-4581-AE4F-BA0B3E9F75B5
+          id: For_each_Agreement,_some_Customer_on_behalf_of_some_Organization_signs_that_Agreement
+          minted_from: '{"type":"mandatory","role":[2,"_5593C6C5-F1E4-4581-AE4F-BA0B3E9F75B5",{"name":"CustomerOnBehalfOfOrganizationSignsAgreement","readings":["{0} on behalf of {1} signs {2}"],"players":["Customer","Organization","Agreement"]}],"fact_type":{"name":"CustomerOnBehalfOfOrganizationSignsAgreement","readings":["{0} on behalf of {1} signs {2}"],"players":["Customer","Organization","Agreement"]}}'
+    - id: OrganizationHasOrganizationId
       name: OrganizationHasOrganizationId
       roles:
-        - id: _A2981AE8-D8D6-4A30-8E19-4FFD083EB73B
-          player: e531a38b-e15f-455e-a3f5-ea7a2e0d24eb
+        - id: OrganizationHasOrganizationId._A2981AE8-D8D6-4A30-8E19-4FFD083EB73B
+          player: Organization
           role_name: _A2981AE8-D8D6-4A30-8E19-4FFD083EB73B
-        - id: _5C9441D1-31DE-48C3-A541-18C6E02B21F7
-          player: 819f1a5e-444e-4e9f-98fb-1a632ca6000d
+        - id: OrganizationHasOrganizationId._5C9441D1-31DE-48C3-A541-18C6E02B21F7
+          player: Organization_id
           role_name: _5C9441D1-31DE-48C3-A541-18C6E02B21F7
       readings:
         - "{0} has {1}"
@@ -205,24 +211,26 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - _5C9441D1-31DE-48C3-A541-18C6E02B21F7
-          is_preferred: true
-          id: 682a0811-5be7-4cdd-b6df-969041ec0c32
+            - OrganizationHasOrganizationId._5C9441D1-31DE-48C3-A541-18C6E02B21F7
+          id: For_each_Organization_id,_at_most_one_Organization_has_that_Organization_id
+          minted_from: '{"type":"internal_uniqueness","roles":[[1,"_5C9441D1-31DE-48C3-A541-18C6E02B21F7",{"name":"OrganizationHasOrganizationId","readings":["{0} has {1}","{0} is of {1}"],"players":["Organization","Organization_id"]}]],"fact_type":{"name":"OrganizationHasOrganizationId","readings":["{0} has {1}","{0} is of {1}"],"players":["Organization","Organization_id"]}}'
         - type: internal_uniqueness
           roles:
-            - _A2981AE8-D8D6-4A30-8E19-4FFD083EB73B
-          id: d2a81ce1-6e97-42b1-95de-49ef3fb82227
+            - OrganizationHasOrganizationId._A2981AE8-D8D6-4A30-8E19-4FFD083EB73B
+          id: Each_Organization_has_at_most_one_Organization_id
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"_A2981AE8-D8D6-4A30-8E19-4FFD083EB73B",{"name":"OrganizationHasOrganizationId","readings":["{0} has {1}","{0} is of {1}"],"players":["Organization","Organization_id"]}]],"fact_type":{"name":"OrganizationHasOrganizationId","readings":["{0} has {1}","{0} is of {1}"],"players":["Organization","Organization_id"]}}'
         - type: mandatory
-          role: _A2981AE8-D8D6-4A30-8E19-4FFD083EB73B
-          id: 79d791bd-0e37-4d67-a412-b402f607730b
-    - id: 92ee911d-2b05-4507-b5ab-95d50631366a
+          role: OrganizationHasOrganizationId._A2981AE8-D8D6-4A30-8E19-4FFD083EB73B
+          id: Each_Organization_has_at_least_one_Organization_id
+          minted_from: '{"type":"mandatory","role":[0,"_A2981AE8-D8D6-4A30-8E19-4FFD083EB73B",{"name":"OrganizationHasOrganizationId","readings":["{0} has {1}","{0} is of {1}"],"players":["Organization","Organization_id"]}],"fact_type":{"name":"OrganizationHasOrganizationId","readings":["{0} has {1}","{0} is of {1}"],"players":["Organization","Organization_id"]}}'
+    - id: LocationHasLocationId
       name: LocationHasLocationId
       roles:
-        - id: _67954176-1078-4B58-8E13-0EDBB1F84BEF
-          player: d38e013f-2e99-4869-8876-2a5537b86b22
+        - id: LocationHasLocationId._67954176-1078-4B58-8E13-0EDBB1F84BEF
+          player: Location
           role_name: _67954176-1078-4B58-8E13-0EDBB1F84BEF
-        - id: _EEA93F53-6053-4BB0-8893-432DF45BDFE3
-          player: 152892cc-98a7-43fa-b53a-f2e35d855aae
+        - id: LocationHasLocationId._EEA93F53-6053-4BB0-8893-432DF45BDFE3
+          player: Location_id
           role_name: _EEA93F53-6053-4BB0-8893-432DF45BDFE3
       readings:
         - "{0} has {1}"
@@ -230,160 +238,175 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - _EEA93F53-6053-4BB0-8893-432DF45BDFE3
-          is_preferred: true
-          id: 1a8e32a4-9991-4b79-977b-c0c321109830
+            - LocationHasLocationId._EEA93F53-6053-4BB0-8893-432DF45BDFE3
+          id: For_each_Location_id,_at_most_one_Location_has_that_Location_id
+          minted_from: '{"type":"internal_uniqueness","roles":[[1,"_EEA93F53-6053-4BB0-8893-432DF45BDFE3",{"name":"LocationHasLocationId","readings":["{0} has {1}","{0} is of {1}"],"players":["Location","Location_id"]}]],"fact_type":{"name":"LocationHasLocationId","readings":["{0} has {1}","{0} is of {1}"],"players":["Location","Location_id"]}}'
         - type: internal_uniqueness
           roles:
-            - _67954176-1078-4B58-8E13-0EDBB1F84BEF
-          id: 782d8875-7ecf-4302-ac76-eee77fd3cf62
+            - LocationHasLocationId._67954176-1078-4B58-8E13-0EDBB1F84BEF
+          id: Each_Location_has_at_most_one_Location_id
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"_67954176-1078-4B58-8E13-0EDBB1F84BEF",{"name":"LocationHasLocationId","readings":["{0} has {1}","{0} is of {1}"],"players":["Location","Location_id"]}]],"fact_type":{"name":"LocationHasLocationId","readings":["{0} has {1}","{0} is of {1}"],"players":["Location","Location_id"]}}'
         - type: mandatory
-          role: _67954176-1078-4B58-8E13-0EDBB1F84BEF
-          id: 440a107b-da45-4888-a47b-fda9db0199de
-    - id: 709e01b7-5e05-46b8-be17-f781d746cf4c
+          role: LocationHasLocationId._67954176-1078-4B58-8E13-0EDBB1F84BEF
+          id: Each_Location_has_at_least_one_Location_id
+          minted_from: '{"type":"mandatory","role":[0,"_67954176-1078-4B58-8E13-0EDBB1F84BEF",{"name":"LocationHasLocationId","readings":["{0} has {1}","{0} is of {1}"],"players":["Location","Location_id"]}],"fact_type":{"name":"LocationHasLocationId","readings":["{0} has {1}","{0} is of {1}"],"players":["Location","Location_id"]}}'
+    - id: OrganizationOwnsAsset
       name: OrganizationOwnsAsset
       roles:
-        - id: _942E1613-6B0A-42D9-9057-7762E3CCEB09
-          player: e531a38b-e15f-455e-a3f5-ea7a2e0d24eb
+        - id: OrganizationOwnsAsset._942E1613-6B0A-42D9-9057-7762E3CCEB09
+          player: Organization
           role_name: _942E1613-6B0A-42D9-9057-7762E3CCEB09
-        - id: _5EA8E6EB-B96A-4002-9E3E-9E81BA8E5AAB
-          player: 90fee62d-e7fd-4a2d-8584-3de4e9f989c7
+        - id: OrganizationOwnsAsset._5EA8E6EB-B96A-4002-9E3E-9E81BA8E5AAB
+          player: catalog:Asset
           role_name: _5EA8E6EB-B96A-4002-9E3E-9E81BA8E5AAB
       readings:
         - "{0} owns {1}"
       constraints:
         - type: internal_uniqueness
           roles:
-            - _5EA8E6EB-B96A-4002-9E3E-9E81BA8E5AAB
-          id: ca7ebe8b-dd8d-4f7a-a8aa-8a21356d9617
+            - OrganizationOwnsAsset._5EA8E6EB-B96A-4002-9E3E-9E81BA8E5AAB
+          id: For_each_Asset,_at_most_one_Organization_owns_that_Asset
+          minted_from: '{"type":"internal_uniqueness","roles":[[1,"_5EA8E6EB-B96A-4002-9E3E-9E81BA8E5AAB",{"name":"OrganizationOwnsAsset","readings":["{0} owns {1}"],"players":["Organization","Asset"]}]],"fact_type":{"name":"OrganizationOwnsAsset","readings":["{0} owns {1}"],"players":["Organization","Asset"]}}'
         - type: mandatory
-          role: _5EA8E6EB-B96A-4002-9E3E-9E81BA8E5AAB
-          id: a780896a-8818-4881-9c5f-300e647dad93
-    - id: f940687d-92f6-4225-b6d3-6afcb0d952fb
+          role: OrganizationOwnsAsset._5EA8E6EB-B96A-4002-9E3E-9E81BA8E5AAB
+          id: For_each_Asset,_some_Organization_owns_that_Asset
+          minted_from: '{"type":"mandatory","role":[1,"_5EA8E6EB-B96A-4002-9E3E-9E81BA8E5AAB",{"name":"OrganizationOwnsAsset","readings":["{0} owns {1}"],"players":["Organization","Asset"]}],"fact_type":{"name":"OrganizationOwnsAsset","readings":["{0} owns {1}"],"players":["Organization","Asset"]}}'
+    - id: OrganizationHasBidLimitOfAmount
       name: OrganizationHasBidLimitOfAmount
       roles:
-        - id: _FFB9DF95-9C54-4292-B7F2-D0A0374A46C4
-          player: e531a38b-e15f-455e-a3f5-ea7a2e0d24eb
+        - id: OrganizationHasBidLimitOfAmount._FFB9DF95-9C54-4292-B7F2-D0A0374A46C4
+          player: Organization
           role_name: _FFB9DF95-9C54-4292-B7F2-D0A0374A46C4
-        - id: _C6E2EBE2-6464-47CA-829F-3B2CD2489B72
-          player: 3d43039a-8aac-4e91-91ac-67991f9bc068
+        - id: OrganizationHasBidLimitOfAmount._C6E2EBE2-6464-47CA-829F-3B2CD2489B72
+          player: payments:Amount
           role_name: _C6E2EBE2-6464-47CA-829F-3B2CD2489B72
       readings:
         - "{0} has bid limit of {1}"
       constraints:
         - type: internal_uniqueness
           roles:
-            - _FFB9DF95-9C54-4292-B7F2-D0A0374A46C4
-          id: fc89b015-9314-49e2-a03c-68459b7afe9e
+            - OrganizationHasBidLimitOfAmount._FFB9DF95-9C54-4292-B7F2-D0A0374A46C4
+          id: Each_Organization_has_bid_limit_of_at_most_one_Amount
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"_FFB9DF95-9C54-4292-B7F2-D0A0374A46C4",{"name":"OrganizationHasBidLimitOfAmount","readings":["{0} has bid limit of {1}"],"players":["Organization","Amount"]}]],"fact_type":{"name":"OrganizationHasBidLimitOfAmount","readings":["{0} has bid limit of {1}"],"players":["Organization","Amount"]}}'
         - type: mandatory
-          role: _FFB9DF95-9C54-4292-B7F2-D0A0374A46C4
-          id: beaf3e0f-fc8d-44e9-a1ef-7c301cf531e9
-    - id: 29751f9e-7787-4ee0-b3a8-01b4db9b28d0
+          role: OrganizationHasBidLimitOfAmount._FFB9DF95-9C54-4292-B7F2-D0A0374A46C4
+          id: Each_Organization_has_bid_limit_of_at_least_one_Amount
+          minted_from: '{"type":"mandatory","role":[0,"_FFB9DF95-9C54-4292-B7F2-D0A0374A46C4",{"name":"OrganizationHasBidLimitOfAmount","readings":["{0} has bid limit of {1}"],"players":["Organization","Amount"]}],"fact_type":{"name":"OrganizationHasBidLimitOfAmount","readings":["{0} has bid limit of {1}"],"players":["Organization","Amount"]}}'
+    - id: Customer_creates_BidSubmission_on_behalf_of_Organization
       name: CustomerCreatesBidSubmissionOnBehalfOfOrganization
       roles:
-        - id: _9924584F-A861-48B6-AB83-F30DE42721D4
-          player: 6720f54b-1a85-485c-ace2-a2d2630c76c6
+        - id: Customer_creates_BidSubmission_on_behalf_of_Organization._9924584F-A861-48B6-AB83-F30DE42721D4
+          player: Customer
           role_name: _9924584F-A861-48B6-AB83-F30DE42721D4
-        - id: _8B979C16-5E46-4F15-8657-0BD6777C6AB3
-          player: 885113e0-ea22-4875-be18-1cb0f1b2b473
+        - id: Customer_creates_BidSubmission_on_behalf_of_Organization._8B979C16-5E46-4F15-8657-0BD6777C6AB3
+          player: auctions:BidSubmission
           role_name: _8B979C16-5E46-4F15-8657-0BD6777C6AB3
-        - id: _2CD6ABDF-574D-4B91-B606-725606C57823
-          player: e531a38b-e15f-455e-a3f5-ea7a2e0d24eb
+        - id: Customer_creates_BidSubmission_on_behalf_of_Organization._2CD6ABDF-574D-4B91-B606-725606C57823
+          player: Organization
           role_name: _2CD6ABDF-574D-4B91-B606-725606C57823
       readings:
         - "{0} creates {1} on behalf of {2}"
       constraints:
         - type: internal_uniqueness
           roles:
-            - _9924584F-A861-48B6-AB83-F30DE42721D4
-            - _8B979C16-5E46-4F15-8657-0BD6777C6AB3
-          is_preferred: true
-          id: e4c5cc29-3d0d-4889-a800-1c40678b9176
+            - Customer_creates_BidSubmission_on_behalf_of_Organization._9924584F-A861-48B6-AB83-F30DE42721D4
+            - Customer_creates_BidSubmission_on_behalf_of_Organization._8B979C16-5E46-4F15-8657-0BD6777C6AB3
+          id: For_each_Customer_and_BidSubmission_combination,_at_most_one_Organization_applies
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"_9924584F-A861-48B6-AB83-F30DE42721D4",{"name":"CustomerCreatesBidSubmissionOnBehalfOfOrganization","readings":["{0} creates {1} on behalf of {2}"],"players":["Customer","BidSubmission","Organization"]}],[1,"_8B979C16-5E46-4F15-8657-0BD6777C6AB3",{"name":"CustomerCreatesBidSubmissionOnBehalfOfOrganization","readings":["{0} creates {1} on behalf of {2}"],"players":["Customer","BidSubmission","Organization"]}]],"fact_type":{"name":"CustomerCreatesBidSubmissionOnBehalfOfOrganization","readings":["{0} creates {1} on behalf of {2}"],"players":["Customer","BidSubmission","Organization"]}}'
         - type: mandatory
-          role: _8B979C16-5E46-4F15-8657-0BD6777C6AB3
-          id: 81002b82-7985-43b6-8213-753aaac127fa
-    - id: 016ef996-324d-4564-82f8-197d812df12a
+          role: Customer_creates_BidSubmission_on_behalf_of_Organization._8B979C16-5E46-4F15-8657-0BD6777C6AB3
+          id: For_each_BidSubmission,_some_Customer_creates_that_BidSubmission_on_behalf_of_some_Organization
+          minted_from: '{"type":"mandatory","role":[1,"_8B979C16-5E46-4F15-8657-0BD6777C6AB3",{"name":"CustomerCreatesBidSubmissionOnBehalfOfOrganization","readings":["{0} creates {1} on behalf of {2}"],"players":["Customer","BidSubmission","Organization"]}],"fact_type":{"name":"CustomerCreatesBidSubmissionOnBehalfOfOrganization","readings":["{0} creates {1} on behalf of {2}"],"players":["Customer","BidSubmission","Organization"]}}'
+    - id: OrganizationWinsListing
       name: OrganizationWinsListing
       roles:
-        - id: _3AABBC4A-B236-4843-BF35-1E2B798EDE1A
-          player: e531a38b-e15f-455e-a3f5-ea7a2e0d24eb
+        - id: OrganizationWinsListing._3AABBC4A-B236-4843-BF35-1E2B798EDE1A
+          player: Organization
           role_name: _3AABBC4A-B236-4843-BF35-1E2B798EDE1A
-        - id: _ADB433E1-87D5-4013-A872-3235EA2E86D4
-          player: b8ee656e-f276-4cdc-ba57-11a8a6fac7c9
+        - id: OrganizationWinsListing._ADB433E1-87D5-4013-A872-3235EA2E86D4
+          player: auctions:Listing
           role_name: _ADB433E1-87D5-4013-A872-3235EA2E86D4
       readings:
         - "{0} wins {1}"
       constraints:
         - type: internal_uniqueness
           roles:
-            - _ADB433E1-87D5-4013-A872-3235EA2E86D4
-          id: 49722614-4629-4336-8ce0-41db1fab86c6
-    - id: 07e74afe-8bc7-4d0f-91d7-684d26060e1d
+            - OrganizationWinsListing._ADB433E1-87D5-4013-A872-3235EA2E86D4
+          id: For_each_Listing,_at_most_one_Organization_wins_that_Listing
+          minted_from: '{"type":"internal_uniqueness","roles":[[1,"_ADB433E1-87D5-4013-A872-3235EA2E86D4",{"name":"OrganizationWinsListing","readings":["{0} wins {1}"],"players":["Organization","Listing"]}]],"fact_type":{"name":"OrganizationWinsListing","readings":["{0} wins {1}"],"players":["Organization","Listing"]}}'
+    - id: OrganizationHasPurchase
       name: OrganizationHasPurchase
       roles:
-        - id: _6CEABD83-7051-4D72-9E3B-9E6F8EBDE4F6
-          player: e531a38b-e15f-455e-a3f5-ea7a2e0d24eb
+        - id: OrganizationHasPurchase._6CEABD83-7051-4D72-9E3B-9E6F8EBDE4F6
+          player: Organization
           role_name: _6CEABD83-7051-4D72-9E3B-9E6F8EBDE4F6
-        - id: _CC481EB6-D009-484D-BFB4-912D749376BC
-          player: beb852d1-5f29-4fb8-8ce0-34fb435608b8
+        - id: OrganizationHasPurchase._CC481EB6-D009-484D-BFB4-912D749376BC
+          player: payments:Purchase
           role_name: _CC481EB6-D009-484D-BFB4-912D749376BC
       readings:
         - "{0} has {1}"
       constraints:
         - type: internal_uniqueness
           roles:
-            - _6CEABD83-7051-4D72-9E3B-9E6F8EBDE4F6
-          id: d37fa1d6-76a9-462b-bc57-2a1c9ee53fa0
-    - id: 69d468c8-5055-42f0-9e0a-841f596f3198
+            - OrganizationHasPurchase._6CEABD83-7051-4D72-9E3B-9E6F8EBDE4F6
+          id: Each_Organization_has_at_most_one_Purchase
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"_6CEABD83-7051-4D72-9E3B-9E6F8EBDE4F6",{"name":"OrganizationHasPurchase","readings":["{0} has {1}"],"players":["Organization","Purchase"]}]],"fact_type":{"name":"OrganizationHasPurchase","readings":["{0} has {1}"],"players":["Organization","Purchase"]}}'
+    - id: OrganizationHasTrueGTV
       name: OrganizationHasTrueGTV
       roles:
-        - id: _2558E58A-D020-422C-95D7-3FEE89DCD3D7
-          player: e531a38b-e15f-455e-a3f5-ea7a2e0d24eb
+        - id: OrganizationHasTrueGTV._2558E58A-D020-422C-95D7-3FEE89DCD3D7
+          player: Organization
           role_name: _2558E58A-D020-422C-95D7-3FEE89DCD3D7
-        - id: _EDC0E83C-AA47-4299-AC59-1182CAC32598
-          player: 0da046a1-db66-47e4-9daf-efb10f1c84a2
+        - id: OrganizationHasTrueGTV._EDC0E83C-AA47-4299-AC59-1182CAC32598
+          player: auctions:GTV
           role_name: _EDC0E83C-AA47-4299-AC59-1182CAC32598
       readings:
         - "{0} has true- {1}"
       constraints:
         - type: internal_uniqueness
           roles:
-            - _2558E58A-D020-422C-95D7-3FEE89DCD3D7
-          id: f4f3769d-a6ca-4a2f-9221-b0d706390ccb
+            - OrganizationHasTrueGTV._2558E58A-D020-422C-95D7-3FEE89DCD3D7
+          id: Each_Organization_has_at_most_one_true_GTV
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"_2558E58A-D020-422C-95D7-3FEE89DCD3D7",{"name":"OrganizationHasTrueGTV","readings":["{0} has true- {1}"],"players":["Organization","GTV"]}]],"fact_type":{"name":"OrganizationHasTrueGTV","readings":["{0} has true- {1}"],"players":["Organization","GTV"]}}'
         - type: mandatory
-          role: _2558E58A-D020-422C-95D7-3FEE89DCD3D7
-          id: e726e96b-cb41-4df6-8d6d-6a79329ca0cb
-    - id: 1e16c022-25c2-43b3-b98a-bdf07912ce33
+          role: OrganizationHasTrueGTV._2558E58A-D020-422C-95D7-3FEE89DCD3D7
+          id: Each_Organization_has_at_least_one_true_GTV
+          minted_from: '{"type":"mandatory","role":[0,"_2558E58A-D020-422C-95D7-3FEE89DCD3D7",{"name":"OrganizationHasTrueGTV","readings":["{0} has true- {1}"],"players":["Organization","GTV"]}],"fact_type":{"name":"OrganizationHasTrueGTV","readings":["{0} has true- {1}"],"players":["Organization","GTV"]}}'
+    - id: Payment_is_made_by_Customer_on_behalf_of_Organization
       name: PaymentIsMadeByCustomerOnBehalfOfOrganization
       roles:
-        - id: _AE9D1E43-EDDD-4A19-AAF1-14E27BB4A6AB
-          player: da15d41e-83bb-46fc-ae6d-592c8a9c7eea
+        - id: Payment_is_made_by_Customer_on_behalf_of_Organization._AE9D1E43-EDDD-4A19-AAF1-14E27BB4A6AB
+          player: payments:Payment
           role_name: _AE9D1E43-EDDD-4A19-AAF1-14E27BB4A6AB
-        - id: _B4AFB25C-B3F6-4DAC-AB8A-4C11D41DD942
-          player: 6720f54b-1a85-485c-ace2-a2d2630c76c6
+        - id: Payment_is_made_by_Customer_on_behalf_of_Organization._B4AFB25C-B3F6-4DAC-AB8A-4C11D41DD942
+          player: Customer
           role_name: _B4AFB25C-B3F6-4DAC-AB8A-4C11D41DD942
-        - id: _3711BB83-8A99-444C-ADBF-98537D7E82D1
-          player: e531a38b-e15f-455e-a3f5-ea7a2e0d24eb
+        - id: Payment_is_made_by_Customer_on_behalf_of_Organization._3711BB83-8A99-444C-ADBF-98537D7E82D1
+          player: Organization
           role_name: _3711BB83-8A99-444C-ADBF-98537D7E82D1
       readings:
         - "{0} is made by {1} on behalf of {2}"
       constraints:
         - type: internal_uniqueness
           roles:
-            - _AE9D1E43-EDDD-4A19-AAF1-14E27BB4A6AB
-            - _B4AFB25C-B3F6-4DAC-AB8A-4C11D41DD942
-          is_preferred: true
-          id: fa6389c7-44ef-4784-a257-d6a1322e7bae
+            - Payment_is_made_by_Customer_on_behalf_of_Organization._AE9D1E43-EDDD-4A19-AAF1-14E27BB4A6AB
+            - Payment_is_made_by_Customer_on_behalf_of_Organization._B4AFB25C-B3F6-4DAC-AB8A-4C11D41DD942
+          id: For_each_Payment_and_Customer_combination,_at_most_one_Organization_applies
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"_AE9D1E43-EDDD-4A19-AAF1-14E27BB4A6AB",{"name":"PaymentIsMadeByCustomerOnBehalfOfOrganization","readings":["{0} is made by {1} on behalf of {2}"],"players":["Payment","Customer","Organization"]}],[1,"_B4AFB25C-B3F6-4DAC-AB8A-4C11D41DD942",{"name":"PaymentIsMadeByCustomerOnBehalfOfOrganization","readings":["{0} is made by {1} on behalf of {2}"],"players":["Payment","Customer","Organization"]}]],"fact_type":{"name":"PaymentIsMadeByCustomerOnBehalfOfOrganization","readings":["{0} is made by {1} on behalf of {2}"],"players":["Payment","Customer","Organization"]}}'
         - type: mandatory
-          role: _AE9D1E43-EDDD-4A19-AAF1-14E27BB4A6AB
-          id: 95bcbc9e-2d57-48c5-9d05-167767af1936
+          role: Payment_is_made_by_Customer_on_behalf_of_Organization._AE9D1E43-EDDD-4A19-AAF1-14E27BB4A6AB
+          id: Each_Payment_is_made_by_some_Customer_on_behalf_of_some_Organization
+          minted_from: '{"type":"mandatory","role":[0,"_AE9D1E43-EDDD-4A19-AAF1-14E27BB4A6AB",{"name":"PaymentIsMadeByCustomerOnBehalfOfOrganization","readings":["{0} is made by {1} on behalf of {2}"],"players":["Payment","Customer","Organization"]}],"fact_type":{"name":"PaymentIsMadeByCustomerOnBehalfOfOrganization","readings":["{0} is made by {1} on behalf of {2}"],"players":["Payment","Customer","Organization"]}}'
   objectified_fact_types:
-    - id: 7f4dbfc0-f85b-4b3c-83aa-fd30a814dd3e
-      fact_type: 7a51157b-2210-4292-8e29-2e25994a1a9f
-      object_type: 40224ee7-d988-4a9a-8076-a0ebf1ba7f9b
-    - id: 1cbbcf8b-1492-44b8-98d4-adca3a99fb97
-      fact_type: 29751f9e-7787-4ee0-b3a8-01b4db9b28d0
-      object_type: dab8e240-5170-41e7-9803-c72fe31c7bd5
-    - id: fad87495-b489-4482-a5d8-b0d0016c72b2
-      fact_type: 1e16c022-25c2-43b3-b98a-bdf07912ce33
-      object_type: 15ea515c-702b-4516-b862-1fd08fd1d632
+    - id: CustomerOnBehalfOfOrganizationSignsAgreement_is_where_Customer_on_behalf_of_Organization_signs_Agreement
+      minted_from: '{"fact_type":{"name":"CustomerOnBehalfOfOrganizationSignsAgreement","readings":["{0} on behalf of {1} signs {2}"],"players":["Customer","Organization","Agreement"]},"object_type":"CustomerOnBehalfOfOrganizationSignsAgreement"}'
+      fact_type: Customer_on_behalf_of_Organization_signs_Agreement
+      object_type: CustomerOnBehalfOfOrganizationSignsAgreement
+    - id: CustomerCreatesBidSubmissionOnBehalfOfOrganization_is_where_Customer_creates_BidSubmission_on_behalf_of_Organization
+      minted_from: '{"fact_type":{"name":"CustomerCreatesBidSubmissionOnBehalfOfOrganization","readings":["{0} creates {1} on behalf of {2}"],"players":["Customer","BidSubmission","Organization"]},"object_type":"CustomerCreatesBidSubmissionOnBehalfOfOrganization"}'
+      fact_type: Customer_creates_BidSubmission_on_behalf_of_Organization
+      object_type: CustomerCreatesBidSubmissionOnBehalfOfOrganization
+    - id: PaymentIsMadeByCustomerOnBehalfOfOrganization_is_where_Payment_is_made_by_Customer_on_behalf_of_Organization
+      minted_from: '{"fact_type":{"name":"PaymentIsMadeByCustomerOnBehalfOfOrganization","readings":["{0} is made by {1} on behalf of {2}"],"players":["Payment","Customer","Organization"]},"object_type":"PaymentIsMadeByCustomerOnBehalfOfOrganization"}'
+      fact_type: Payment_is_made_by_Customer_on_behalf_of_Organization
+      object_type: PaymentIsMadeByCustomerOnBehalfOfOrganization

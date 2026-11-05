@@ -88,7 +88,8 @@ describe("export, then lineage impact", () => {
         "impact",
         hierarchy,
         "--element",
-        loadedId(hierarchy, "9bb914ef-c751-469b-80f1-b449d0364495"),
+        // The example is 4.0, so the subtype fact is named by its own id.
+        "Employee_is_a_subtype_of_Person",
         "--format",
         "json",
       ]);

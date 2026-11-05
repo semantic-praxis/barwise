@@ -3,37 +3,37 @@
 # collected from a store, never both and never neither -- stated as an ORM
 # exclusive-or constraint. cli/tests/docs/whyOrmExample.test.ts checks
 # that the README quotes what barwise actually says about this file.
-orm_version: "3.0"
+orm_version: "4.0"
 model:
   name: Order Handover
   domain_context: shop
   object_types:
-    - id: sales-order
+    - id: SalesOrder
       name: SalesOrder
       kind: entity
       reference_mode: order_number
-      preferred_identifier: 098b6905-f336-8aad-a254-4d640731b186
+      preferred_identifier: Each_OrderNumber_is_of_at_most_one_SalesOrder
       definition: A request by one customer for goods, from checkout to handover.
-    - id: order-number
+    - id: OrderNumber
       name: OrderNumber
       kind: value
       definition: The number printed on the order confirmation.
       data_type:
         name: integer
-    - id: address
+    - id: Address
       name: Address
       kind: value
       definition: A postal address the shop delivers to.
       data_type:
         name: text
         length: 200
-    - id: store
+    - id: Store
       name: Store
       kind: entity
       reference_mode: store_code
-      preferred_identifier: 7818cc64-88e7-8ce7-a610-bbf644087613
+      preferred_identifier: Each_StoreCode_is_of_at_most_one_Store
       definition: A shop location where customers can collect orders.
-    - id: store-code
+    - id: StoreCode
       name: StoreCode
       kind: value
       definition: The short code the shop uses for each of its locations.
@@ -41,14 +41,14 @@ model:
         name: text
         length: 10
   fact_types:
-    - id: order-has-number
+    - id: SalesOrder_has_OrderNumber
       name: SalesOrder has OrderNumber
       roles:
-        - id: order-has-number.order
-          player: sales-order
+        - id: SalesOrder_has_OrderNumber.has
+          player: SalesOrder
           role_name: has
-        - id: order-has-number.number
-          player: order-number
+        - id: SalesOrder_has_OrderNumber.is_of
+          player: OrderNumber
           role_name: is of
       readings:
         - "{0} has {1}"
@@ -56,23 +56,26 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - order-has-number.number
-          id: 098b6905-f336-8aad-a254-4d640731b186
+            - SalesOrder_has_OrderNumber.is_of
+          id: Each_OrderNumber_is_of_at_most_one_SalesOrder
+          minted_from: '{"type":"internal_uniqueness","roles":[[1,"is of",{"name":"SalesOrder has OrderNumber","readings":["{0} has {1}","{1} is of {0}"],"players":["SalesOrder","OrderNumber"]}]],"fact_type":{"name":"SalesOrder has OrderNumber","readings":["{0} has {1}","{1} is of {0}"],"players":["SalesOrder","OrderNumber"]}}'
         - type: internal_uniqueness
           roles:
-            - order-has-number.order
-          id: 44c39cc8-87ec-8d7a-9594-57f7c049c8ba
+            - SalesOrder_has_OrderNumber.has
+          id: Each_SalesOrder_has_at_most_one_OrderNumber
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"has",{"name":"SalesOrder has OrderNumber","readings":["{0} has {1}","{1} is of {0}"],"players":["SalesOrder","OrderNumber"]}]],"fact_type":{"name":"SalesOrder has OrderNumber","readings":["{0} has {1}","{1} is of {0}"],"players":["SalesOrder","OrderNumber"]}}'
         - type: mandatory
-          role: order-has-number.order
-          id: 94aaaa04-2fd8-87bb-80e4-5022a18084ec
-    - id: store-has-code
+          role: SalesOrder_has_OrderNumber.has
+          id: Each_SalesOrder_has_at_least_one_OrderNumber
+          minted_from: '{"type":"mandatory","role":[0,"has",{"name":"SalesOrder has OrderNumber","readings":["{0} has {1}","{1} is of {0}"],"players":["SalesOrder","OrderNumber"]}],"fact_type":{"name":"SalesOrder has OrderNumber","readings":["{0} has {1}","{1} is of {0}"],"players":["SalesOrder","OrderNumber"]}}'
+    - id: Store_has_StoreCode
       name: Store has StoreCode
       roles:
-        - id: store-has-code.store
-          player: store
+        - id: Store_has_StoreCode.has
+          player: Store
           role_name: has
-        - id: store-has-code.code
-          player: store-code
+        - id: Store_has_StoreCode.is_of
+          player: StoreCode
           role_name: is of
       readings:
         - "{0} has {1}"
@@ -80,23 +83,26 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - store-has-code.code
-          id: 7818cc64-88e7-8ce7-a610-bbf644087613
+            - Store_has_StoreCode.is_of
+          id: Each_StoreCode_is_of_at_most_one_Store
+          minted_from: '{"type":"internal_uniqueness","roles":[[1,"is of",{"name":"Store has StoreCode","readings":["{0} has {1}","{1} is of {0}"],"players":["Store","StoreCode"]}]],"fact_type":{"name":"Store has StoreCode","readings":["{0} has {1}","{1} is of {0}"],"players":["Store","StoreCode"]}}'
         - type: internal_uniqueness
           roles:
-            - store-has-code.store
-          id: 844359b9-cb6c-894f-a658-59557788dc7d
+            - Store_has_StoreCode.has
+          id: Each_Store_has_at_most_one_StoreCode
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"has",{"name":"Store has StoreCode","readings":["{0} has {1}","{1} is of {0}"],"players":["Store","StoreCode"]}]],"fact_type":{"name":"Store has StoreCode","readings":["{0} has {1}","{1} is of {0}"],"players":["Store","StoreCode"]}}'
         - type: mandatory
-          role: store-has-code.store
-          id: acce5ee0-fa21-8e9f-80c4-70b4fae8d408
-    - id: order-shipped-to-address
+          role: Store_has_StoreCode.has
+          id: Each_Store_has_at_least_one_StoreCode
+          minted_from: '{"type":"mandatory","role":[0,"has",{"name":"Store has StoreCode","readings":["{0} has {1}","{1} is of {0}"],"players":["Store","StoreCode"]}],"fact_type":{"name":"Store has StoreCode","readings":["{0} has {1}","{1} is of {0}"],"players":["Store","StoreCode"]}}'
+    - id: SalesOrder_is_shipped_to_Address
       name: SalesOrder is shipped to Address
       roles:
-        - id: order-shipped-to-address.order
-          player: sales-order
+        - id: SalesOrder_is_shipped_to_Address.is_shipped_to
+          player: SalesOrder
           role_name: is shipped to
-        - id: order-shipped-to-address.address
-          player: address
+        - id: SalesOrder_is_shipped_to_Address.receives
+          player: Address
           role_name: receives
       readings:
         - "{0} is shipped to {1}"
@@ -104,16 +110,17 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - order-shipped-to-address.order
-          id: 16954706-2c8c-8c37-be3e-49a4cb91a9de
-    - id: order-collected-from-store
+            - SalesOrder_is_shipped_to_Address.is_shipped_to
+          id: Each_SalesOrder_is_shipped_to_at_most_one_Address
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"is shipped to",{"name":"SalesOrder is shipped to Address","readings":["{0} is shipped to {1}","{1} receives {0}"],"players":["SalesOrder","Address"]}]],"fact_type":{"name":"SalesOrder is shipped to Address","readings":["{0} is shipped to {1}","{1} receives {0}"],"players":["SalesOrder","Address"]}}'
+    - id: SalesOrder_is_collected_from_Store
       name: SalesOrder is collected from Store
       roles:
-        - id: order-collected-from-store.order
-          player: sales-order
+        - id: SalesOrder_is_collected_from_Store.is_collected_from
+          player: SalesOrder
           role_name: is collected from
-        - id: order-collected-from-store.store
-          player: store
+        - id: SalesOrder_is_collected_from_Store.hands_over
+          player: Store
           role_name: hands over
       readings:
         - "{0} is collected from {1}"
@@ -121,11 +128,13 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - order-collected-from-store.order
-          id: 9efab1b4-f3cc-8e72-9f44-5e4ef3e83254
+            - SalesOrder_is_collected_from_Store.is_collected_from
+          id: Each_SalesOrder_is_collected_from_at_most_one_Store
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"is collected from",{"name":"SalesOrder is collected from Store","readings":["{0} is collected from {1}","{1} hands over {0}"],"players":["SalesOrder","Store"]}]],"fact_type":{"name":"SalesOrder is collected from Store","readings":["{0} is collected from {1}","{1} hands over {0}"],"players":["SalesOrder","Store"]}}'
   constraints:
     - type: exclusive_or
       roles:
-        - order-shipped-to-address.order
-        - order-collected-from-store.order
-      id: 40aa7a3b-5f4a-891b-a835-4a3507baaa4d
+        - SalesOrder_is_shipped_to_Address.is_shipped_to
+        - SalesOrder_is_collected_from_Store.is_collected_from
+      id: Each_SalesOrder_either_is_shipped_to_some_Address_or_is_collected_from_some_Store_but_not_both
+      minted_from: '{"type":"exclusive_or","roles":[[0,"is shipped to",{"name":"SalesOrder is shipped to Address","readings":["{0} is shipped to {1}","{1} receives {0}"],"players":["SalesOrder","Address"]}],[0,"is collected from",{"name":"SalesOrder is collected from Store","readings":["{0} is collected from {1}","{1} hands over {0}"],"players":["SalesOrder","Store"]}]]}'

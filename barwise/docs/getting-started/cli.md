@@ -222,7 +222,7 @@ or not that is true.
 
 ```sh
 barwise lineage status shop.orm.yaml
-barwise lineage impact shop.orm.yaml --element sales-order
+barwise lineage impact shop.orm.yaml --element SalesOrder
 ```
 
 `review` asks the configured LLM for modeling advice: naming, missing

@@ -1,69 +1,61 @@
-orm_version: "1.1"
-
+orm_version: "4.0"
 model:
-  name: "Order Fulfillment"
-  domain_context: "order-fulfillment"
-
+  name: Order Fulfillment
+  domain_context: order-fulfillment
   object_types:
-    - id: "ot-customer"
-      name: "Customer"
-      kind: "entity"
-      reference_mode: "customer_number"
-      definition: "A person or organization that places orders with us."
-
-    - id: "ot-order"
-      name: "Order"
-      kind: "entity"
-      reference_mode: "order_number"
-      definition: "A single request to buy, identified by an order number."
-
-    - id: "ot-product"
-      name: "Product"
-      kind: "entity"
-      reference_mode: "product_code"
-      definition: "An item we sell, identified by a product code."
-
-    - id: "ot-status"
-      name: "OrderStatus"
-      kind: "value"
+    - id: Customer
+      name: Customer
+      kind: entity
+      reference_mode: customer_number
+      definition: A person or organization that places orders with us.
+    - id: Order
+      name: Order
+      kind: entity
+      reference_mode: order_number
+      definition: A single request to buy, identified by an order number.
+    - id: Product
+      name: Product
+      kind: entity
+      reference_mode: product_code
+      definition: An item we sell, identified by a product code.
+    - id: OrderStatus
+      name: OrderStatus
+      kind: value
       data_type:
-        name: "text"
-
+        name: text
   fact_types:
-    - id: "ft-places"
-      name: "Customer places Order"
+    - id: Customer_places_Order
+      name: Customer places Order
       roles:
-        - id: "r-places-customer"
-          player: "ot-customer"
-          role_name: "places"
-        - id: "r-places-order"
-          player: "ot-order"
-          role_name: "is placed by"
+        - id: Customer_places_Order.places
+          player: Customer
+          role_name: places
+        - id: Customer_places_Order.is_placed_by
+          player: Order
+          role_name: is placed by
       readings:
         - "{0} places {1}"
         - "{1} is placed by {0}"
-
-    - id: "ft-includes"
-      name: "Order includes Product"
+    - id: Order_includes_Product
+      name: Order includes Product
       roles:
-        - id: "r-includes-order"
-          player: "ot-order"
-          role_name: "includes"
-        - id: "r-includes-product"
-          player: "ot-product"
-          role_name: "is included in"
+        - id: Order_includes_Product.includes
+          player: Order
+          role_name: includes
+        - id: Order_includes_Product.is_included_in
+          player: Product
+          role_name: is included in
       readings:
         - "{0} includes {1}"
         - "{1} is included in {0}"
-
-    - id: "ft-status"
-      name: "Order has OrderStatus"
+    - id: Order_has_OrderStatus
+      name: Order has OrderStatus
       roles:
-        - id: "r-status-order"
-          player: "ot-order"
-          role_name: "has"
-        - id: "r-status-value"
-          player: "ot-status"
-          role_name: "is of"
+        - id: Order_has_OrderStatus.has
+          player: Order
+          role_name: has
+        - id: Order_has_OrderStatus.is_of
+          player: OrderStatus
+          role_name: is of
       readings:
         - "{0} has {1}"
