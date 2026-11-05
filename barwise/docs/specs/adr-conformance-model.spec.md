@@ -1,6 +1,6 @@
 # ADR conformance as an ORM model
 
-Status: WS1 implemented 2026-11-04 by docs/specs/adr-gate-reader-split.spec.md (#910); WS2 implemented 2026-11-05 (RULES, scriptVerdict, and a { rule, adr, position, key } fact per fact-rule finding, with no output change); WS3-WS4 not started.
+Status: WS1 implemented 2026-11-04 by docs/specs/adr-gate-reader-split.spec.md (#910); WS2 implemented 2026-11-05 (RULES, scriptVerdict, and a { rule, adr, position, key } fact per fact-rule finding, with no output change); WS3 implemented 2026-11-05 (governance.orm.yaml, adr-population.mjs, check:adr-model, test:adr-model and build:core, three ci.yml steps under ${{ !cancelled() }}); WS4 not started, and waits on the owner's review of WS3's record.
 
 Created: 2026-11-04
 Last-updated: 2026-11-05
@@ -332,6 +332,30 @@ Requirements the build must meet, from the plan's last review rounds. The owner 
   reader, so it stays not-understood; and no general `${{ }}` stripping,
   which would make the wrapped docs-only guard understood and break the
   existing test that pins it as not.
+
+WS3 implementation notes (2026-11-05):
+
+- The judging and the comparison live in `adr-population.mjs`
+  (`modelJudge`, `compareJudges`), with core and `yaml` passed in, so the
+  tests drive both judges through stub readers;
+  `check-adr-model.mjs` loads every dependency in one `try` and wires
+  them to the real tree.
+- `STRUCTURAL` is a test rather than a list: `adr-facts.test.mjs` holds the
+  schema's model-level constraints to exactly `RULES`, each a subset, and
+  every other constraint to a fact type's internal uniqueness.
+- `test:adr-model` is `scripts/test-adr-model.mjs`, a file this spec's
+  Touches did not name: it refuses when core will not load and when the
+  run's TAP `# skipped` count is not zero.
+- The schema leaves out the prototype's tag fact type, which existed only
+  to show the mandatory-coverage leak.
+- `architectureRepo()` in `gates.test.mjs` listed every tracked file under
+  `docs/adr/` as an ADR; it now filters with `isAdr`, as the gate does, so
+  the schema beside the ADRs is not read as one.
+- Seen red: each of the repeat count, the chain shadow, the deontic
+  refusal and the refusal scoping disabled in turn fails
+  `adr-model.test.mjs`; and `check:adr-model` exits 1, naming 87
+  disagreements, on the real tree with the builder marking open issues not
+  open.
 
 ### 4. The model becomes the judge of the fact rules (provisional)
 

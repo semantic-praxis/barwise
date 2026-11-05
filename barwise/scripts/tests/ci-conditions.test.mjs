@@ -81,6 +81,9 @@ test("shouldRun reads every condition form ci.yml uses", () => {
   const prOnly = "github.event_name == 'pull_request'";
   assert.deepEqual(shouldRun(prOnly, DOCS), { run: true, understood: true });
   assert.deepEqual(shouldRun(`${prOnly} && ${docsGuard}`, DOCS), { run: false, understood: true });
+  // A step that runs after an earlier one failed, docs-only or not.
+  assert.deepEqual(shouldRun("${{ !cancelled() }}", DOCS), { run: true, understood: true });
+  assert.deepEqual(shouldRun("${{ !cancelled() }}", CODE), { run: true, understood: true });
 });
 
 test("shouldRun runs a gate whose condition it cannot read, and says so", () => {
@@ -90,6 +93,8 @@ test("shouldRun runs a gate whose condition it cannot read, and says so", () => 
       "steps.changes.outputs.docs_only != 'true' || failure()",
       "steps.changes.outputs.something_new == 'true'",
       "${{ steps.changes.outputs.docs_only != 'true' }}",
+      // The bare form is a YAML tag the two readers read differently.
+      "!cancelled()",
     ]
   ) {
     assert.deepEqual(shouldRun(cond, DOCS), { run: true, understood: false }, cond);

@@ -47,6 +47,7 @@ import { dirname, join, resolve } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { decisionIds, parseEnforcedBy } from "../lib/adr-enforcement.mjs";
+import { isAdr } from "../lib/architecture-section.mjs";
 import { ciLocalLibs } from "./ci-local-files.mjs";
 
 const SCRIPTS = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -6556,7 +6557,9 @@ function architectureRepo() {
   // decision would break the one-decision-per-gap-issue rule
   // (enforceable-adr-practice.spec.md, WS3).
   let decisions = 0;
-  for (const rel of adrList.split("\0").filter(Boolean)) {
+  // ADRs as the gate lists them (isAdr): the governance schema beside them
+  // is a gate input, not an ADR (adr-conformance-model.spec.md, WS3).
+  for (const rel of adrList.split("\0").filter(Boolean).filter(isAdr)) {
     const text = readFileSync(join(REPO, rel), "utf8");
     assert.ok(parseEnforcedBy(text).present, `${rel}: has no Enforced-by: header to rewrite`);
     const ids = decisionIds(text).decisions.map((d) => d.id);

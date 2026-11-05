@@ -48,6 +48,7 @@ export const GAP_LABEL = "adr-gap";
  * none, `check:architecture` by `package-graph-authority`.
  */
 export const META_GATES = {
+  "check:adr-model": [],
   "check:adr-tests": [],
   "check:architecture": ["package-graph-authority"],
 };

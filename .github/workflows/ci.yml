@@ -529,3 +529,17 @@ jobs:
       # scripts/audit-gate.mjs with a reason and an expiry date.
       - run: npm run audit
         if: steps.changes.outputs.docs_only != 'true'
+
+      # The ADR governance schema as a second judge beside check:architecture
+      # (docs/specs/adr-conformance-model.spec.md, WS3): core is built alone
+      # (a turbo cache hit after the full build), then both judges run on
+      # this tree and must agree. !cancelled() runs these after an earlier
+      # step failed, when a disagreement would otherwise hide, and on
+      # docs-only changes, which tracker-only changes are; npm ci above is
+      # unguarded, so their inputs are installed.
+      - run: npm run build:core
+        if: ${{ !cancelled() }}
+      - run: npm run check:adr-model
+        if: ${{ !cancelled() }}
+      - run: npm run test:adr-model
+        if: ${{ !cancelled() }}

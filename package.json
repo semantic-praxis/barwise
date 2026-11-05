@@ -9,6 +9,7 @@
   ],
   "scripts": {
     "build": "npm --prefix barwise run build --",
+    "build:core": "npm --prefix barwise run build:core --",
     "test": "npm --prefix barwise run test --",
     "test:coverage": "npm --prefix barwise run test:coverage --",
     "test:watch": "npm --prefix barwise run test:watch --",
@@ -35,7 +36,9 @@
     "check:instruction-refs": "npm --prefix barwise run check:instruction-refs --",
     "check:architecture": "npm --prefix barwise run check:architecture --",
     "check:adr-tests": "npm --prefix barwise run check:adr-tests --",
+    "check:adr-model": "npm --prefix barwise run check:adr-model --",
     "test:scripts": "npm --prefix barwise run test:scripts --",
+    "test:adr-model": "npm --prefix barwise run test:adr-model --",
     "test:optimizer": "npm --prefix barwise run test:optimizer --",
     "audit:duplication": "npm --prefix barwise run audit:duplication --",
     "mutate": "npm --prefix barwise run mutate --",
