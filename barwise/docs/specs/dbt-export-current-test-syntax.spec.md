@@ -11,7 +11,7 @@ barwise/packages/core/tests/mapping/dbt.test.ts,
 barwise/packages/dbt/src/DbtSchemaParser.ts,
 barwise/packages/dbt/tests/DbtSchemaParser.test.ts,
 barwise/docs/IMPORT_EXPORT.md,
-barwise/docs/release-notes/unreleased.md,
+barwise/docs/release-notes/2.0.0.md,
 barwise/trial/lib/generators/dbt.mjs
 
 When barwise exports a dbt project, each generic test that takes

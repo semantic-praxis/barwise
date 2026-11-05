@@ -32,7 +32,10 @@ the one path that skips CI on the commit being released (barwise-8e4).
 All commands run from `barwise/`. The `--no-workspaces-update` flag
 prevents npm from resolving workspace dependencies against the public
 registry (these packages are not published). Use `patch` for bug fixes
-and small improvements, `minor` for new features or format support:
+and small improvements, `minor` for new features or additive format
+support, and `major` when a release breaks something a user has: a
+format older builds cannot read, a removed CLI flag, or a changed
+library API (2.0.0 was all three):
 
 ```bash
 git fetch origin main   # a stale origin/main would bump from a version already shipped
@@ -87,12 +90,20 @@ gh release create v1.3.0 --title "v1.3.0" --generate-notes
 `--generate-notes` builds the changelog from merged PRs since the last
 tag. A PR list does not tell a user what to do about a breaking change,
 so changes that need explanation are written ahead of time in
-`barwise/docs/release-notes/unreleased.md`. If that file exists, rename
-it to `<version>.md` in the bump commit and add
+unreleased.md in `barwise/docs/release-notes/`. If that file exists,
+rename it to `<version>.md` in the bump commit and add
 `--notes-file barwise/docs/release-notes/<version>.md`; gh combines it
-with the generated changelog. Check that `gh` is on PATH first; the GitHub MCP tools can read
-releases but not create one. The `release.yml` workflow then builds and attaches
-the artifacts: the VS Code extension (`.vsix`), the standalone CLI
+with the generated changelog. The rename strands every spec whose
+`Touches:` names unreleased.md, and `check:spec-touches` fails the push
+until they name `<version>.md` instead (the 2.0.0 bump repointed
+twelve). The file name is plain text here, not a backticked path,
+because it exists only between releases: `check:instruction-refs`
+would fail on it after a bump, and an allowlist row for it would go
+stale, and fail, once the next release's notes start.
+
+Check that `gh` is on PATH first; the GitHub MCP tools can read
+releases but not create one. The `release.yml` workflow then builds and
+attaches the artifacts: the VS Code extension (`.vsix`), the standalone CLI
 bundle (`barwise-cli-<ver>.cjs`), the MCP server bundle
 (`barwise-mcp-<ver>.cjs`), and a `SHA256SUMS` file. The same workflow
 refreshes a rolling `edge` pre-release on every push to `main`, so a

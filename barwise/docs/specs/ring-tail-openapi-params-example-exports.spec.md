@@ -18,7 +18,7 @@ barwise/docs/specs/dbt-composite-key-tests.spec.md,
 barwise/packages/core/tests/,
 barwise/packages/cli/tests/characterization/,
 barwise/examples/transcripts/,
-barwise/docs/release-notes/unreleased.md
+barwise/docs/release-notes/2.0.0.md
 
 This PR fixes three small defects in the verbalizer and exporter output.
 They ship together because the third one records output the first two

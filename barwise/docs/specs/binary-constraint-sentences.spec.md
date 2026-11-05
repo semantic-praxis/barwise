@@ -18,7 +18,7 @@ barwise/docs/anki/README.md,
 barwise/trial/customers/C08-utility/personas/billing-analyst.gym.yaml,
 barwise/trial/customers/C08-utility/customer.yaml,
 barwise/docs/specs/binary-reverse-reading-verbalization.spec.md,
-barwise/docs/release-notes/unreleased.md
+barwise/docs/release-notes/2.0.0.md
 
 When barwise verbalizes a binary mandatory, uniqueness or single-role
 frequency constraint, the sentence shall state the whole reading. That

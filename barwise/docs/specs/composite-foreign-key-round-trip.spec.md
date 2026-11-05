@@ -18,7 +18,7 @@ barwise/packages/dbt/tests/,
 barwise/packages/cli/tests/compositeKeyParity.test.ts,
 +barwise/packages/cli/tests/compositeForeignKeyRoundTrip.test.ts,
 barwise/docs/IMPORT_EXPORT.md,
-barwise/docs/release-notes/unreleased.md
+barwise/docs/release-notes/2.0.0.md
 
 When a table references another table through a foreign key over several
 columns, exporting the model to DDL or dbt and importing it back shall
