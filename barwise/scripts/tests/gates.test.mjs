@@ -1150,7 +1150,7 @@ test("mutate exits 1 when the command does not notice the mutation", () => {
 test("mutate --expect-exit counts only that exit code as caught", () => {
   // The checker exits 2 (could not answer) on the mutation, as a gate does
   // when it refuses: without --expect-exit that reads CAUGHT; with
-  // --expect-exit 1 it is UNCAUGHT, and with --expect-exit 2 it is CAUGHT.
+  // --expect-exit 1 it is a refusal, and with --expect-exit 2 it is CAUGHT.
   const dir = mutateRepo({ subject: "value = GOOD\n" });
   try {
     writeFileSync(
@@ -1177,15 +1177,31 @@ test("mutate --expect-exit counts only that exit code as caught", () => {
       0,
       `no --expect-exit: any failure is CAUGHT\n${any.stdout}${any.stderr}`,
     );
+    // An exit 2 the caller did not ask for is no reading: a refusal.
     const one = run("--expect-exit", "1");
-    assert.equal(one.status, 1, `exit 2 is not the expected 1\n${one.stdout}${one.stderr}`);
-    assert.match(one.stdout, /UNCAUGHT -- the command failed with exit 2, not the expected 1/);
+    assert.equal(
+      one.status,
+      2,
+      `exit 2 under --expect-exit 1 is a refusal\n${one.stdout}${one.stderr}`,
+    );
+    assert.match(one.stderr, /exited 2 \(could not answer\)/);
     const two = run("--expect-exit", "2");
     assert.equal(two.status, 0, two.stdout + two.stderr);
-    assert.match(two.stdout, /CAUGHT/);
-    const bad = run("--expect-exit", "0");
-    assert.equal(bad.status, 2, "exit 0 cannot be a catch");
-    assert.match(bad.stderr, /--expect-exit must be an exit code from 1 to 255/);
+    assert.match(two.stdout, /^mutate: CAUGHT/m);
+    for (const bad of ["0", "0x2", "1e0", "256"]) {
+      const r = run("--expect-exit", bad);
+      assert.equal(r.status, 2, `--expect-exit ${bad} is refused`);
+      assert.match(r.stderr, /--expect-exit must be an exit code from 1 to 255/);
+    }
+    // Another failing code is a failure, but not the one asked for.
+    writeFileSync(
+      join(dir, "check.mjs"),
+      `import { readFileSync } from "node:fs";\n`
+        + `process.exit(readFileSync("subject.txt", "utf8").includes("GOOD") ? 0 : 3);\n`,
+    );
+    const three = run("--expect-exit", "1");
+    assert.equal(three.status, 1, three.stdout + three.stderr);
+    assert.match(three.stdout, /UNCAUGHT -- the command failed with exit 3, not the expected 1/);
     assert.equal(readFileSync(join(dir, "subject.txt"), "utf8"), "value = GOOD\n");
   } finally {
     rmSync(dir, { recursive: true, force: true });

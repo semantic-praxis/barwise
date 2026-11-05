@@ -250,9 +250,10 @@ plant record, and backfilling one is the refactor session's work
 This replaces WS5 of `executable-adrs.spec.md`, whose section becomes a pointer here after this spec's `Plan-reviewed:` line. WS3 grounded two of its open questions. Process ADRs do
 admit plants: an unpinned bootstrap line made `check:python-uv` exit 1,
 and a `TODO: classify` note made `audit:specs -- --check` exit 1, both
-recorded in #885 and #886. And `mutate.mjs` still counts any non-zero
-exit as caught, so it needs an expected-exit option before a probe can
-tell a refusal from a catch. Still ungrounded: where probes live (a file
+recorded in #885 and #886. And `mutate.mjs` counted any non-zero exit
+as caught, so it needed an expected-exit option before a probe could
+tell a refusal from a catch; `--expect-exit` landed with WS4
+(2026-11-05), and an exit 2 the caller did not ask for is a refusal. Still ungrounded: where probes live (a file
 per ADR beside it, or one manifest), how a probe stays valid when the
 code it edits moves (`mutate.mjs` already refuses an absent anchor, exit
 2, which would flag a stale probe), and whether probes run in CI or on

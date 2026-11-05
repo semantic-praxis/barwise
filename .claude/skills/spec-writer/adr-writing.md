@@ -25,9 +25,11 @@ that asks that question before review does.
    that reads the working tree, `barwise/scripts/mutate.mjs` does all
    three: it applies the edit, runs the command, restores the file, and
    with `--expect-exit 1` exits 0 only when the command exited 1, so a
-   gate that refuses (exit 2) is not mistaken for one that caught it. A gate that reads staged content
-   needs the edit staged by hand. For tests, run the suite that carries
-   the tag and watch the tagged test fail.
+   gate that refuses (exit 2) is not mistaken for one that caught it;
+   mutate refuses then. A gate that reads staged content needs the edit
+   staged by hand. For tests, run only the tagged test (`vitest run -t`,
+   `node --test --test-name-pattern`), so the exit code is that test's
+   and not an unrelated one the plant also broke, and watch it fail.
 4. **Declare only what went red.** An `npm` entry for a gate that exited
    1, a `tests` entry for tests that failed. Everything else is
    `none (<issue>: <id>)` on the decision's own gap issue: one decision
@@ -54,7 +56,7 @@ plant.
 For each `npm` or `tests` entry the PR adds or changes, one line:
 
 ```
-<adr>#<decision-id>: <the edit, in one phrase> -> <enforcer> exit <code>
+<adr>#<decision-id>: <the edit, in one phrase> -> <enforcer> exit 1
 ```
 
 For example:
