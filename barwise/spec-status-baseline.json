@@ -118,12 +118,15 @@
     "surface-mirroring.spec.md": {
       "status": "Draft -- no workstream implemented",
       "commits": [
+        "ac3a6aae",
+        "94c02e78",
+        "0c567c7a",
         "285ef258",
         "86d5f71a",
         "0ed47d51",
         "c9d83477"
       ],
-      "note": "The header is right. These four commits are PR #914 (barwise-wcg.4kp, barwise-xv1), which touched packages/core/src/diff/ModelMerge.ts to refuse a 3.x merge whose prior-id pairing looks coincidental. That is a merge correctness fix the spec does not plan; none of its workstreams (mirroring CLI options on MCP and VS Code, and the parity gate) has started."
+      "note": "The header is right. These four commits are PR #914 (barwise-wcg.4kp, barwise-xv1), which touched packages/core/src/diff/ModelMerge.ts to refuse a 3.x merge whose prior-id pairing looks coincidental. That is a merge correctness fix the spec does not plan; none of its workstreams (mirroring CLI options on MCP and VS Code, and the parity gate) has started. ac3a6aae, 94c02e78 and 0c567c7a are iri-identity WS7 (PRs #916 and #925): test files under mcp/tests/tools/ given 4.0 ids, not a mirroring workstream."
     }
   }
 }
