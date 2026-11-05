@@ -70,8 +70,8 @@ Consequences below).
   2026-10-12 direction that MCP and VS Code mirror the CLI (barwise-0wa,
   `docs/specs/surface-mirroring.spec.md`): each now reads `deliberate`
   with the reason the owner approved, or `not yet` with its workstream.
-  Whether `migrate`, added since, stays CLI-only is that spec's open
-  decision 1. What the matrix still cannot show: `lineage show` sits
+  `migrate`, added since, is to be mirrored (owner, 2026-11-05; that
+  spec's workstream 5). What the matrix still cannot show: `lineage show` sits
   under a `none` row although MCP and VS Code lack it, the `gym` row
   reads `yes` for MCP although `gym show` and `--catalog` have no MCP
   counterpart (that spec's workstream 5) and `--emit-misses` has no MCP output path (its workstream 7), and option-level

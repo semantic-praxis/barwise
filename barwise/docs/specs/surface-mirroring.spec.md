@@ -26,6 +26,8 @@ barwise/packages/vscode/tests/unit/toolRegistration.test.ts,
 +barwise/packages/learn/tests/generatedCatalog.test.ts,
 barwise/packages/cli/src/commands/merge.ts,
 barwise/packages/cli/src/commands/analyze.ts,
+barwise/packages/cli/src/commands/migrate.ts,
+barwise/packages/core/src/serialization/,
 barwise/packages/cli/src/commands/import/,
 barwise/packages/learn/src/exercise/,
 barwise/docs/CLI.md,
@@ -53,6 +55,19 @@ twice, first claiming parity and then claiming deliberate divergence
 options. This spec closes the gaps and lands a check that fails when
 a CLI option has no counterpart and no recorded reason.
 
+A mirrored capability's logic lives in one place (owner, 2026-11-05).
+What a surface adds is reading its inputs, writing its outputs, and
+wording its result. Where the logic is pure it lives in `@barwise/core`,
+as `rename`'s does in `@barwise/core/rename`, and the CLI command and
+the MCP tool both call it; VS Code calls MCP's `execute*` functions
+(workstream 3 brings the last two onto them). A copy remains only where
+no package can hold the logic for both the CLI and MCP, which is file
+and subprocess I/O, and it carries a check: the helpers paired in
+`parity.manifest.json` today (`stagedWrite.ts`, `lineageIo.ts`, the
+import helpers), and `history`'s git walk with its drift test
+(workstream 6, owner, 2026-11-04). Whether one package should hold
+that I/O for both is barwise-00e.
+
 ## What stays CLI-only? (resolved by the owner, 2026-10-13 and 2026-11-04)
 
 A gap stays only if mirroring would produce a wrong or unattributable
@@ -78,7 +93,7 @@ existing model is approved is the next section.
 
 - `rename` and `--matching content` read "none": every surface has them.
 - `--surrogate-keys` reaches MCP through `export_model`'s `options` and not VS Code, whose export tool drops `options`. Workstream 3 closes it.
-- `migrate` post-dates the owner's 2026-10-13 calls. Its row is open decision 1.
+- `migrate` post-dates the owner's 2026-10-13 calls. The owner chose on 2026-11-05 to mirror it (workstream 5).
 
 ### Corrections to the audit
 
@@ -190,6 +205,7 @@ In scope, as requirements:
   - `history`
   - gym in VS Code
   - an analyze tool in VS Code
+- When `migrate_model` is called on MCP or VS Code with `check: true`, the system shall write nothing and return the migration notes the CLI reports; without `check`, it shall rewrite the files the staged way `rename_element` does.
 - When `prompt schema` or `prompt artifact` is called on MCP or VS Code, the system shall return what the CLI prints, without `--artifacts`.
 
 Out of scope:
@@ -220,7 +236,8 @@ Out of scope:
 | `vscode/src/mcp/ToolRegistration.ts`                     | Separate transcript and review bodies; export forwards three options and drops the rest                            | Transcript and review call `executeImport` and `executeReview` with the editor's client; export forwards `options`                                |
 | `mcp/src/tools/validate.ts`                              | Per-domain validation only                                                                                         | Also `projectRules`                                                                                                                               |
 | `learn/src/exercise/catalog.ts`                          | Resolves the catalog from `import.meta.url`, empty in the CJS bundle                                               | Exercises generated into a module (owner, 2026-11-04)                                                                                             |
-| `mcp/src/tools/`                                         | 19 tools                                                                                                           | Adds `init_project`, `lineage_show`, `gym_show`, `model_history`, `prompt_schema`, `prompt_artifact`                                              |
+| `mcp/src/tools/`                                         | 19 tools                                                                                                           | Adds `init_project`, `lineage_show`, `gym_show`, `model_history`, `migrate_model`, `prompt_schema`, `prompt_artifact`                             |
+| `cli/src/commands/migrate.ts`                            | Plans the rewrite in the command: which files change, what they become, the notes, and a project's owner ids       | The planning moves into core as one pure function over file contents; the command keeps reading, writing and wording (owner, 2026-11-05)          |
 | `cli/src/commands/history.ts`                            | Git walk (about 60 lines of subprocess) plus rendering                                                             | Walk paralleled in MCP, with a drift test (owner, 2026-11-04)                                                                                     |
 | `docs/adr/surface-capability-parity.md`                  | Decision 1 names `not yet`; Context and Consequences record the owner's calls (the PR that added this spec)        | Done; each workstream edits Consequences as its gaps close                                                                                        |
 | `CLAUDE.md` capability matrix                            | Hand-maintained                                                                                                    | Kept and still hand-maintained: `audit:surfaces` checks the surfaces against each other and the baseline, not this table (barwise-xpt stays open) |
@@ -314,6 +331,16 @@ forwards `options`, which closes the `--surrogate-keys` row.
 tools, on both surfaces. VS Code also gains the gym tools (after
 workstream 4) and `analyze_repository`.
 
+`migrate_model` on both surfaces (owner, 2026-11-05). The planning in
+`cli/src/commands/migrate.ts` (`planRead`, `planCurrent`,
+`planRewrite`, and `migrateProject`'s owner ids) is pure once the files
+are read, so it moves into core first, beside `storeIds`, with its note
+wording; `barwise migrate` then calls it unchanged in behaviour, and the
+tool is the same call with MCP's reading and staged writer. The tool's
+`check: true` returns the notes and writes nothing, as `--check` does.
+It also answers barwise-pwn's question from the other side: a surface
+that migrates on save can call the same function and report its notes.
+
 ### 6. `history` (provisional)
 
 `model_history` on both surfaces. This is `model-history.spec.md`'s
@@ -344,7 +371,7 @@ so no eval suite enters a bundle.
 
 ## API and migration impact
 
-- **`@barwise/core`:** a change-set API beside `diffModels` and `mergeAndValidate`; additive.
+- **`@barwise/core`:** a change-set API beside `diffModels` and `mergeAndValidate`, and the migration planner moved from the CLI command; both additive.
 - **`@barwise/mcp`:** new tools and parameters. Two changes are not additive. `merge_models` stops writing in a single call: the first call writes a plan file beside the target, and the second applies the decisions. An import onto an existing file goes through the same review. Both are behaviour changes for an agent that relied on the immediate write.
 - **`barwise-vscode`:** new tools; new parameters on the transcript, review and export tools; a confirmation step before a reviewed write. The palette transcript import stops pre-selecting deltas (owner, 2026-11-04), a behaviour change for a user used to pressing Enter. The `@barwise` participant's merge instruction changes with `merge_models`. The pinned tool lists and the capability matrix change in the same commit as each surface change.
 - **`@barwise/learn`:** exercises generated into a module the bundle can reach.
@@ -354,14 +381,18 @@ so no eval suite enters a bundle.
   - `barwise merge --output` naming an existing file other than its base is refused.
   - `import transcript` stops overwriting an existing file it cannot read or merge.
   - Each is a behaviour change for a script that relied on the overwrite.
+  - `barwise migrate` calls core's planner; its behaviour does not change.
 - **Dependency graph:** unchanged. Only the CLI depends on promptlab (owner, 2026-11-04).
 - **CI:** one new step, `audit:surfaces -- --check`, plus its root forwarder (`check:root-scripts`).
 
 ## Open decisions (for review)
 
-1. **Does `migrate` stay CLI-only?** Reopened on 2026-11-05. The owner kept it CLI-only that day on a reason that proved wrong: that a migration changes only a file's format, so it has nothing to review. In fact `barwise migrate` reports what the reading changed beyond the format (2.0 `is_preferred` flags it drops or cannot place), writes the ids the load minted, and already has `--check`, which writes nothing (`cli/src/commands/migrate.ts`). MCP and VS Code write 4.0 on the next save of a file they edit, and neither reads core's migration notes, so such a save reports none of those changes.
-   - Recommended: mirror it, as `rename_element` mirrors `rename`: a tool that previews with `check: true` and returns the migration notes, then writes the staged way (workstream 5). No reason in this spec's test for keeping a gap holds for it, and the tool would report what a save changes silently today.
-   - Alternative: keep it CLI-only because MCP and VS Code already migrate on save. That leaves their saves reporting nothing of what changed.
+None. Every decision this spec needed is resolved below.
+
+### Resolved by the owner (2026-11-05)
+
+- **`migrate` is mirrored**, as `rename_element` mirrors `rename` (workstream 5). The owner first kept it CLI-only that day, on a reason the agent gave that proved wrong: that a migration changes only a file's format and has nothing to review. `barwise migrate` reports what the reading changed beyond the format (2.0 `is_preferred` flags it drops or cannot place), writes the ids the load minted, and already has `--check` (`cli/src/commands/migrate.ts`); MCP and VS Code migrate on save and report none of it (barwise-pwn). No reason in this spec's test for keeping a gap held, so the owner reversed the call.
+- **A mirrored capability's logic lives in one place** (Principle, above). For `migrate`, the planner moves into core before the tool is written.
 
 ### Resolved by the owner (2026-11-04)
 
