@@ -14,6 +14,10 @@ Touches: barwise/packages/core/src/diff/,
 barwise/packages/mcp/src/tools/,
 barwise/packages/mcp/src/server.ts,
 barwise/packages/mcp/tests/serverSpawn.test.ts,
+barwise/packages/mcp/tests/tools/,
+barwise/packages/core/tests/diff/,
+barwise/packages/core/tests/serialization/,
+barwise/packages/cli/tests/commands/,
 barwise/packages/mcp/src/workspace/,
 barwise/packages/vscode/src/mcp/ToolRegistration.ts,
 barwise/packages/vscode/src/chat/chatPrompts.ts,
@@ -21,8 +25,7 @@ barwise/packages/vscode/src/commands/ImportTranscriptCommand.ts,
 barwise/packages/vscode/src/commands/ImportDbtCommand.ts,
 barwise/packages/vscode/src/commands/ImportCodeCommand.ts,
 barwise/packages/vscode/package.json,
-barwise/packages/vscode/tests/unit/toolRegistration.test.ts,
-+barwise/packages/vscode/tests/unit/bundledServer.test.ts,
+barwise/packages/vscode/tests/unit/,
 +barwise/packages/learn/tests/generatedCatalog.test.ts,
 barwise/packages/cli/src/commands/merge.ts,
 barwise/packages/cli/src/commands/analyze.ts,
@@ -32,11 +35,14 @@ barwise/packages/cli/src/commands/import/,
 barwise/packages/learn/src/exercise/,
 barwise/docs/CLI.md,
 barwise/docs/MCP.md,
+barwise/docs/getting-started/cli.md,
 barwise/package.json,
 package.json,
 .github/workflows/ci.yml,
 +barwise/scripts/tests/history-walk-drift.test.mjs,
 +barwise/scripts/audit-surfaces.mjs,
++barwise/scripts/tests/audit-surfaces.test.mjs,
++barwise/surface-correspondence.json,
 +barwise/scripts/regen-gym-exercises.mjs,
 +barwise/surface-parity-baseline.json
 Plan-reviewed: ada49d4a (code-review, pr-review; four passes on 2026-11-04, ada49d4a applies the last pass's two wording fixes)
@@ -57,16 +63,22 @@ a CLI option has no counterpart and no recorded reason.
 
 A mirrored capability's logic lives in one place (owner, 2026-11-05).
 What a surface adds is reading its inputs, writing its outputs, and
-wording its result. Where the logic is pure it lives in `@barwise/core`,
+presenting its result (text, JSON, a quick pick); wording that must read
+the same on every surface, such as a migration note, belongs with the
+logic. Where the logic is pure it lives in `@barwise/core`,
 as `rename`'s does in `@barwise/core/rename`, and the CLI command and
 the MCP tool both call it; VS Code calls MCP's `execute*` functions
-(workstream 3 brings the last two onto them). A copy remains only where
-no package can hold the logic for both the CLI and MCP, which is file
-and subprocess I/O, and it carries a check: the helpers paired in
-`parity.manifest.json` today (`stagedWrite.ts`, `lineageIo.ts`, the
-import helpers), and `history`'s git walk with its drift test
-(workstream 6, owner, 2026-11-04). Whether one package should hold
-that I/O for both is barwise-00e.
+(workstream 3 brings the last two onto them). The copies that remain
+are mostly file and subprocess I/O, which core cannot hold and the CLI
+and MCP cannot share. Most carry a check: `stagedWrite.ts`,
+`lineageIo.ts` and the import summary are paired in
+`parity.manifest.json`, and `history`'s git walk will have a drift test
+(workstream 6, owner, 2026-11-04). Two do not fit the rule: the import
+summary is pure and predates it, and the two `projectLoader.ts` copies
+have no check at all. Whether one package should hold the I/O for both
+surfaces, and retire those copies, is barwise-00e. This spec adds no
+new copy: workstream 5's tool reads a project through MCP's existing
+loader.
 
 ## What stays CLI-only? (resolved by the owner, 2026-10-13 and 2026-11-04)
 
@@ -205,7 +217,9 @@ In scope, as requirements:
   - `history`
   - gym in VS Code
   - an analyze tool in VS Code
-- When `migrate_model` is called on MCP or VS Code with `check: true`, the system shall write nothing and return the migration notes the CLI reports; without `check`, it shall rewrite the files the staged way `rename_element` does.
+- When `migrate_model` is called on MCP or VS Code with `check: true`, the system shall write nothing and return what `barwise migrate --check` reports: each file's status, the migration notes, the ids it would store, and any refusal. Without `check`, it shall rewrite the files the staged way `rename_element` does.
+- When `migrate_model` receives a `.orm-project.yaml`, the system shall migrate every domain in one staged write, giving shadows their owners' ids, and refuse the whole project when any domain fails, as `barwise migrate` does.
+- When `migrate_model` runs in VS Code and a file it would write has unsaved changes in an editor, the system shall refuse and write nothing, as `barwise_rename_element` does.
 - When `prompt schema` or `prompt artifact` is called on MCP or VS Code, the system shall return what the CLI prints, without `--artifacts`.
 
 Out of scope:
@@ -222,25 +236,25 @@ Out of scope:
 
 ## Inventory
 
-| Area                                                     | Current state                                                                                                      | Verdict                                                                                                                                           |
-| -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `barwise/scripts/audit-surfaces.mjs`                     | Does not exist                                                                                                     | New: reads the built CLI program, MCP server and VS Code manifest; ratchets command and parameter gaps against a baseline                         |
-| `barwise/surface-parity-baseline.json`                   | Does not exist                                                                                                     | New: one row per gap, `gap` (names its workstream or tracking issue) or `kept` (owner-approved reason)                                            |
-| `vscode/tests/unit/toolRegistration.test.ts`             | Pins tool names                                                                                                    | Also pins each wrapped tool's parameters against the MCP tool's schema                                                                            |
-| `@barwise/core/diff`                                     | `diffModels` and `mergeAndValidate` with an accepted set                                                           | Plus a change set: delta ids and a fingerprint (provisional)                                                                                      |
-| `mcp/src/tools/importModel.ts`, `import.ts`, `merge.ts`  | No output path; `executeImport`'s `base` is extraction context only; `merge_models` writes the base at once        | Output path; an existing target changes through the reviewed change set                                                                           |
-| `cli/src/commands/merge.ts`, `import/*.ts`, `analyze.ts` | `--output` overwrites (`writeOutput`); `import transcript` falls back to the extraction when a merge or read fails | Interactive review on a terminal; a plan to review and apply without one; never overwrite on a failed read or merge                               |
-| `vscode/src/commands/ImportTranscriptCommand.ts`         | Picker pre-selects every addition and modification                                                                 | Nothing pre-selected (owner, 2026-11-04)                                                                                                          |
-| `vscode/src/chat/chatPrompts.ts`, `docs/MCP.md`          | Describe `merge_models` as one call                                                                                | Describe the two calls and tell the agent to show the deltas and ask                                                                              |
-| `mcp/src/tools/exportModel.ts`                           | One domain per call; returns the combined `result.text`; records no lineage                                        | Project-wide export, multi-file write through `mcp/src/workspace/stagedWrite.ts`, and lineage on write                                            |
-| `vscode/src/mcp/ToolRegistration.ts`                     | Separate transcript and review bodies; export forwards three options and drops the rest                            | Transcript and review call `executeImport` and `executeReview` with the editor's client; export forwards `options`                                |
-| `mcp/src/tools/validate.ts`                              | Per-domain validation only                                                                                         | Also `projectRules`                                                                                                                               |
-| `learn/src/exercise/catalog.ts`                          | Resolves the catalog from `import.meta.url`, empty in the CJS bundle                                               | Exercises generated into a module (owner, 2026-11-04)                                                                                             |
-| `mcp/src/tools/`                                         | 19 tools                                                                                                           | Adds `init_project`, `lineage_show`, `gym_show`, `model_history`, `migrate_model`, `prompt_schema`, `prompt_artifact`                             |
-| `cli/src/commands/migrate.ts`                            | Plans the rewrite in the command: which files change, what they become, the notes, and a project's owner ids       | The planning moves into core as one pure function over file contents; the command keeps reading, writing and wording (owner, 2026-11-05)          |
-| `cli/src/commands/history.ts`                            | Git walk (about 60 lines of subprocess) plus rendering                                                             | Walk paralleled in MCP, with a drift test (owner, 2026-11-04)                                                                                     |
-| `docs/adr/surface-capability-parity.md`                  | Decision 1 names `not yet`; Context and Consequences record the owner's calls (the PR that added this spec)        | Done; each workstream edits Consequences as its gaps close                                                                                        |
-| `CLAUDE.md` capability matrix                            | Hand-maintained                                                                                                    | Kept and still hand-maintained: `audit:surfaces` checks the surfaces against each other and the baseline, not this table (barwise-xpt stays open) |
+| Area                                                     | Current state                                                                                                      | Verdict                                                                                                                                                         |
+| -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `barwise/scripts/audit-surfaces.mjs`                     | Does not exist                                                                                                     | New: reads the built CLI program, MCP server and VS Code manifest; ratchets command and parameter gaps against a baseline                                       |
+| `barwise/surface-parity-baseline.json`                   | Does not exist                                                                                                     | New: one row per gap, `gap` (names its workstream or tracking issue) or `kept` (owner-approved reason)                                                          |
+| `vscode/tests/unit/toolRegistration.test.ts`             | Pins tool names                                                                                                    | Also pins each wrapped tool's parameters against the MCP tool's schema                                                                                          |
+| `@barwise/core/diff`                                     | `diffModels` and `mergeAndValidate` with an accepted set                                                           | Plus a change set: delta ids and a fingerprint (provisional)                                                                                                    |
+| `mcp/src/tools/importModel.ts`, `import.ts`, `merge.ts`  | No output path; `executeImport`'s `base` is extraction context only; `merge_models` writes the base at once        | Output path; an existing target changes through the reviewed change set                                                                                         |
+| `cli/src/commands/merge.ts`, `import/*.ts`, `analyze.ts` | `--output` overwrites (`writeOutput`); `import transcript` falls back to the extraction when a merge or read fails | Interactive review on a terminal; a plan to review and apply without one; never overwrite on a failed read or merge                                             |
+| `vscode/src/commands/ImportTranscriptCommand.ts`         | Picker pre-selects every addition and modification                                                                 | Nothing pre-selected (owner, 2026-11-04)                                                                                                                        |
+| `vscode/src/chat/chatPrompts.ts`, `docs/MCP.md`          | Describe `merge_models` as one call                                                                                | Describe the two calls and tell the agent to show the deltas and ask                                                                                            |
+| `mcp/src/tools/exportModel.ts`                           | One domain per call; returns the combined `result.text`; records no lineage                                        | Project-wide export, multi-file write through `mcp/src/workspace/stagedWrite.ts`, and lineage on write                                                          |
+| `vscode/src/mcp/ToolRegistration.ts`                     | Separate transcript and review bodies; export forwards three options and drops the rest                            | Transcript and review call `executeImport` and `executeReview` with the editor's client; export forwards `options`                                              |
+| `mcp/src/tools/validate.ts`                              | Per-domain validation only                                                                                         | Also `projectRules`                                                                                                                                             |
+| `learn/src/exercise/catalog.ts`                          | Resolves the catalog from `import.meta.url`, empty in the CJS bundle                                               | Exercises generated into a module (owner, 2026-11-04)                                                                                                           |
+| `mcp/src/tools/`                                         | 19 tools                                                                                                           | Adds `init_project`, `lineage_show`, `gym_show`, `model_history`, `migrate_model`, `prompt_schema`, `prompt_artifact`                                           |
+| `cli/src/commands/migrate.ts`                            | Plans the rewrite in the command: which files change, what they become, the notes, and a project's owner ids       | The planning and its note wording move into core as one pure function over file contents; the command keeps reading, writing and presenting (owner, 2026-11-05) |
+| `cli/src/commands/history.ts`                            | Git walk (about 60 lines of subprocess) plus rendering                                                             | Walk paralleled in MCP, with a drift test (owner, 2026-11-04)                                                                                                   |
+| `docs/adr/surface-capability-parity.md`                  | Decision 1 names `not yet`; Context and Consequences record the owner's calls (the PR that added this spec)        | Done; each workstream edits Consequences as its gaps close                                                                                                      |
+| `CLAUDE.md` capability matrix                            | Hand-maintained                                                                                                    | Kept and still hand-maintained: `audit:surfaces` checks the surfaces against each other and the baseline, not this table (barwise-xpt stays open)               |
 
 ## Target architecture
 
@@ -249,7 +263,7 @@ audit:surfaces (root script, reads built output only)
   CLI      createProgram() from packages/cli/dist -> commands, options
   MCP      createServer() over the SDK's in-memory transport -> tools, schemas
   VS Code  package.json contributes.languageModelTools -> tools, schemas
-  correspondence.json  every CLI command -> MCP tool -> VS Code tool, or a baseline row;
+  surface-correspondence.json  every CLI command -> MCP tool -> VS Code tool, or a baseline row;
                        CLI option -> parameter only where camelCase is not enough
   surface-parity-baseline.json  every command or parameter gap: gap (WS n or issue) | kept (reason)
   --check: unclassified gap -> fail; stale row -> fail; missing dist -> exit 2
@@ -295,7 +309,7 @@ VS Code parameter pin in `toolRegistration.test.ts` lands with it.
 - `import_model`, `import_transcript` and `merge_models` gain an output path on MCP and VS Code. `executeImport` writes nothing today, so the transcript path is new in the shared function and its MCP registration, not only forwarded.
 - A new file is written directly. An existing file changes only through the reviewed change set (above), on every surface, and a target that cannot be read or merged is refused. That covers `barwise analyze --output`, which overwrites today (`analyze.ts`, `writeOutput`), and the `analyze_repository` output path workstream 7 adds.
 - The VS Code palette's transcript, dbt and code imports onto an existing model get the per-delta pick, with nothing pre-selected (owner, 2026-11-04), and write nothing when the user accepts none. An import into a new file shows no pick.
-- The capability matrix's `merge` row changes with it: `barwise merge --output <base>`, an unreviewed overwrite today, becomes a reviewed write onto the base.
+- The capability matrix's `merge` row changes with it: `barwise merge --output <base>`, an unreviewed overwrite today, becomes a reviewed write onto the base. `docs/CLI.md`, `docs/MCP.md` and `docs/getting-started/cli.md` say `barwise merge` never modifies its inputs, and are corrected in the same commit.
 - The agent guidance moves with the behaviour: `chatPrompts.ts`'s merge instruction and `docs/MCP.md`'s `merge_models` section describe the two calls, in the commit that changes them.
 - `merge_models` keeps the base as its target and already discloses that (#637, barwise-xjf).
 - `export_model` writes the way `barwise export` does:
@@ -391,7 +405,7 @@ None. Every decision this spec needed is resolved below.
 
 ### Resolved by the owner (2026-11-05)
 
-- **`migrate` is mirrored**, as `rename_element` mirrors `rename` (workstream 5). The owner first kept it CLI-only that day, on a reason the agent gave that proved wrong: that a migration changes only a file's format and has nothing to review. `barwise migrate` reports what the reading changed beyond the format (2.0 `is_preferred` flags it drops or cannot place), writes the ids the load minted, and already has `--check` (`cli/src/commands/migrate.ts`); MCP and VS Code migrate on save and report none of it (barwise-pwn). No reason in this spec's test for keeping a gap held, so the owner reversed the call.
+- **`migrate` is mirrored**, as `rename_element` mirrors `rename` (workstream 5). The owner first kept it CLI-only that day, on a reason the agent gave that proved wrong: that a migration changes only a file's format and has nothing to review. `barwise migrate` reports what the reading changed beyond the format (2.0 `is_preferred` flags it drops or cannot place), writes the ids the load minted, and already has `--check` (`cli/src/commands/migrate.ts`). MCP and VS Code migrate on save; VS Code's editor flags a 4.0 file's unstored ids and offers "Store ids", but neither surface reports the flags a 2.0 read drops (barwise-pwn, not yet reproduced). No reason in this spec's test for keeping a gap held, so the owner reversed the call.
 - **A mirrored capability's logic lives in one place** (Principle, above). For `migrate`, the planner moves into core before the tool is written.
 
 ### Resolved by the owner (2026-11-04)
