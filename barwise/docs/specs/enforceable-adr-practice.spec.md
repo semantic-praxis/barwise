@@ -278,13 +278,15 @@ left open are answered from that, and each answer says what would move
 it.
 
 1. **Where probes live: one manifest, `barwise/docs/adr/probes.json`.**
-   A probe cannot live in its ADR: a probe of a header rule (five of the
-   seven plants) edits the ADR's own text, and its `old` string written
-   into the same file would occur twice, which `mutate.mjs` refuses as
-   an ambiguous anchor. A manifest beside the ADRs also keeps the ADR
-   prose free of literal code. Each row is
-   `{ decision: "<adr>#<id>", file, old, new, script, args? }`, `file`
-   from the repository root.
+   Both real probes edit a file other than their ADR (`ci.yml`, a
+   spec), and their `old` and `new` strings are literal code and YAML
+   that would sit badly in an ADR's prose. One file is also one input
+   for the runner to read and check. Neither reason is strong; a file
+   per ADR would work as well, and the manifest is the cheaper start.
+   Each row is `{ decision: "<adr>#<id>", file, old, new }`, `file`
+   from the repository root. A row names no command: the runner takes
+   the script and its `-- <args>` from the decision's `npm` entry, so a
+   probe runs exactly what the header declares and CI runs.
 2. **A probe whose code moved: refused, never passed.** `mutate.mjs`
    already refuses (exit 2) an absent or ambiguous anchor, a no-op edit,
    a command that fails unmutated, and a restore that does not verify.
@@ -297,16 +299,22 @@ it.
    discrimination on demand, in the shape of `npm run fault-matrix`, and
    ruled out proving it on every PR. Running it costs a full gate run
    per probe, unmutated and mutated, in sequence (each edits the working
-   tree); `purity` and `depcruise` need a build first. A CI step is an
+   tree). A CI step is an
    open decision below, not part of this workstream.
 
 **The runner, `barwise/scripts/adr-probes.mjs`.** It reads the
 manifest and the ADRs' `Enforced-by:` headers, and for each probe:
 
-- a manifest error is a finding (exit 1), checked before anything runs:
-  a decision no ADR has, or a `script` its decision's header does not
-  declare in an `npm` entry (a probe of an undeclared gate says nothing
-  about the header);
+- a manifest it cannot read (absent, not JSON, not an array, a row
+  missing a field) is a refusal (exit 2), before anything runs;
+- a row naming a decision no ADR has, or a decision no `npm` entry of
+  its ADR lists, is a finding (exit 1), before anything runs: there is
+  no declared gate to probe. A decision listed by two `npm` entries is
+  probed once per entry;
+- a probe whose `file` has uncommitted changes is refused (exit 2):
+  `mutate.mjs` restores the bytes it found but does not check that they
+  are committed, so a dirty file would be judged as a tree nobody
+  committed;
 - otherwise it spawns `mutate.mjs --file <file> --old <old> --new <new>
   --expect-exit 1 -- npm run <script> [-- <args>]` from the repository
   root, with no shell, and reads mutate's own status: 0 CAUGHT, 1
@@ -315,17 +323,28 @@ manifest and the ADRs' `Enforced-by:` headers, and for each probe:
   REFUSED (stale anchor, gate red unmutated, gate refused).
 
 It prints one line per probe and then the declared pairs (`npm` entry,
-decision id) with no probe, as information. Exit 1 if any manifest error
-or MISSED; else 2 if any REFUSED or if the manifest has no probe; else
-0. It runs only on a clean tree for the files its probes touch, which
-`mutate.mjs` already guarantees by restoring bytes it hashed; it adds
-no lock, because it runs one probe at a time.
+decision id) with no probe, as information. Exit 1 if any row finding
+or MISSED, printing any refusals beside them; else 2 if the manifest
+could not be read, any probe was REFUSED, or the manifest has no probe;
+else 0. It adds no lock, because it runs one probe at a time.
+
+**Gates a working-tree edit cannot reach.** `mutate.mjs` edits the
+working tree. A gate that reads committed state does not see that edit:
+`check:plan-review` reads only commits on the branch, so a probe of
+`plan-before-code#plan-reviewed` would read MISSED for a gate that does
+catch. Such a gate is not probed in WS5. Seeding names each one, with the
+line of the gate that shows it reads committed state, in the runner's
+unprobed list with that reason, and files no gap issue for it; a
+committed-state probe (a temporary commit in a scratch worktree) is a
+later step if the owner wants one.
 
 **Seeding.** The same PR writes a probe for each of the 14 decisions that
-declare a gate, planted by hand first. A gate that will not go red on any
-honest violation of its decision is a proxy declaration: it gets a gap
-issue (the header change is the ADR refactor's, barwise-ym8.gc9), and no
-probe, so the runner's unprobed list names it.
+declare a gate, planted by hand first. A gate that reads the working tree
+and will not go red on any honest violation of its decision is a proxy
+declaration: it gets a gap issue (the header change is the ADR
+refactor's, barwise-ym8.gc9), and no probe, so the runner's unprobed
+list names it. A MISSED reading counts as a proxy only after the gate's
+input is confirmed to be the working tree, per the paragraph above.
 
 **The skill.** `spec-writer/adr-writing.md` step 4 changes from
 recording each plant in the PR body to adding it to `probes.json`, and
@@ -334,8 +353,9 @@ the `pr-review` checklist item asks for the row instead of the record.
 **Tests**, in `scripts/tests/adr-probes.test.mjs` on a git fixture with a
 one-gate repository: a caught probe exits 0; a gate that ignores the
 edit exits 1, MISSED; a moved anchor exits 2; a probe naming an
-undeclared script or an unknown decision exits 1 before any run; an
-empty manifest exits 2. Each is watched red by removing the branch it
+unknown decision, or one no `npm` entry lists, exits 1 before any
+run; the entry's `-- <args>` reach the gate; a dirty probed file, an
+unreadable manifest and an empty one each exit 2. Each is watched red by removing the branch it
 pins.
 
 **What it still cannot see.** A probe proves the gate catches one
