@@ -384,9 +384,9 @@ now holds, guards, or learns that they did not have to.
   decision from a reflow, so this is the reviewer's call. Authority:
   the same spec, "The format".
 - Each `npm` or `tests` entry the PR adds or changes in an
-  `Enforced-by:` header has a plant line in the body (`<adr>#<id>: <the
-  edit> -> <enforcer> exit 1`): the enforcer was seen red on a violation
-  of that decision. A gate picked because its name sounds related reads
+  `Enforced-by:` header has a plant line in the body, in the form
+  `spec-writer/adr-writing.md` gives under "The record": the enforcer
+  was seen red on a violation of that decision. A gate picked because its name sounds related reads
   green on the violation it was declared for; four batches of
   executable-adrs WS3 shipped such proxies. Entries the PR leaves alone
   need none. Authority: `docs/specs/enforceable-adr-practice.spec.md`,
