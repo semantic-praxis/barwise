@@ -22,8 +22,9 @@ because nothing checked them. The cli-surface-parity spec holds the
 reasoning for recording divergence; the getting-started-guides spec
 holds why user docs map names rather than copy the matrix. On
 2026-10-12 the owner directed that MCP and VS Code mirror the CLI's
-toolset; which gaps survive that direction is being decided row by row
-(barwise-0wa, `docs/cli-surface-audit-2026-10-12.md`).
+toolset, and on 2026-10-13 re-decided the matrix's rows under that
+direction (barwise-0wa, `docs/cli-surface-audit-2026-10-12.md`;
+Consequences below).
 
 ## Decision
 
@@ -71,7 +72,9 @@ toolset; which gaps survive that direction is being decided row by row
   with the reason the owner approved, or `not yet` with its workstream.
   `migrate`, added since, keeps its own spec's reason until the owner
   rules on it. What the matrix still cannot show: `lineage show` sits
-  under a `none` row although MCP and VS Code lack it, and option-level
+  under a `none` row although MCP and VS Code lack it, the `gym` row
+  reads `yes` for MCP although `gym show` and `--catalog` have no MCP
+  counterpart (that spec's workstream 5), and option-level
   gaps (MCP has no `--output` equivalent on import and no project-wide
   export; transcript-import options, barwise-6n8; project awareness,
   barwise-rb4) sit under rows that read `none`. That spec's workstream 1

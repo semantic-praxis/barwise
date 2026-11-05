@@ -31,7 +31,9 @@ barwise/docs/MCP.md,
 barwise/package.json,
 package.json,
 .github/workflows/ci.yml,
+barwise/scripts/tests/,
 +barwise/scripts/audit-surfaces.mjs,
++barwise/scripts/regen-gym-exercises.mjs,
 +barwise/surface-parity-baseline.json
 Plan-reviewed: ada49d4a (code-review, pr-review; four passes on 2026-11-04, ada49d4a applies the last pass's two wording fixes)
 
@@ -56,15 +58,15 @@ result, break a documented safety rule, or cross a package boundary the
 owner has kept closed (promptlab, below). "Nobody has asked for it"
 does not qualify.
 
-| Stays CLI-only                                      | Reason                                                                                                                                                                              |
-| --------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `prompt eval`, `prompt run`                         | The only `prompt` commands that call a model. A recorded score needs an attributable model, and MCP sampling reports none (`keyless-model-access.spec.md`)                          |
-| `prompt score`, `rescore`, `history`, `compare`     | Owner decision (2026-11-04). promptlab is an application built on barwise, not a library other packages reuse, and these are its commands (see the `prompt` boundary section below) |
-| `--thinking-budget`                                 | Declared only on `prompt eval` and `prompt run`                                                                                                                                     |
-| `--artifacts`                                       | Unshipped prompt candidates must not reach production commands (`artifact-resolution-parity.spec.md`)                                                                               |
-| `import batch`                                      | An evaluation sweep across models, the same family as `prompt eval`                                                                                                                 |
-| `llm-usage`                                         | Only the CLI writes the call log (`withCallLog` is used in `cli/src` alone), so a report from another surface would leave out that surface's own calls                              |
-| MCP gym session log (`--emit-misses`, `--no-state`) | Owner decision. The log is the learner's history, which the `gym-coach` skill reads, and an agent's checks through MCP would be counted as the learner's                            |
+| Stays CLI-only                                  | Reason                                                                                                                                                                              |
+| ----------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `prompt eval`, `prompt run`                     | The only `prompt` commands that call a model. A recorded score needs an attributable model, and MCP sampling reports none (`keyless-model-access.spec.md`)                          |
+| `prompt score`, `rescore`, `history`, `compare` | Owner decision (2026-11-04). promptlab is an application built on barwise, not a library other packages reuse, and these are its commands (see the `prompt` boundary section below) |
+| `--thinking-budget`                             | Declared only on `prompt eval` and `prompt run`                                                                                                                                     |
+| `--artifacts`                                   | Unshipped prompt candidates must not reach production commands (`artifact-resolution-parity.spec.md`)                                                                               |
+| `import batch`                                  | An evaluation sweep across models, the same family as `prompt eval`                                                                                                                 |
+| `llm-usage`                                     | Only the CLI writes the call log (`withCallLog` is used in `cli/src` alone), so a report from another surface would leave out that surface's own calls                              |
+| MCP gym session log (`--no-state`)              | Owner decision. The log is the learner's history, which the `gym-coach` skill reads, and an agent's checks through MCP would be counted as the learner's                            |
 
 The owner also decided that `merge_models` keeps the base file as its
 write target; #637 made its tool description say so. How a write to an
@@ -106,7 +108,7 @@ missing is the same review on every surface and for every import.
 
 What the review covers: a write onto an existing model file by `barwise merge --output`, `barwise import ... --output` and `barwise analyze --output`, and by their MCP and VS Code counterparts. `barwise merge` without `--output` prints to stdout, modifies nothing, and is unchanged.
 
-- **The deltas are computed against the model at the write target.** That is the existing file the write would change, whatever `base` names. A merge whose output path names an existing file other than its base is refused, because the deltas it would show describe a different model from the one it would change. For `import_transcript`, `base` stays extraction context, and the plan diffs the extraction against the target file.
+- **The deltas are computed against the model at the write target**, the existing file the write would change. For a merge that is its base: a merge applies the base's changes toward the incoming model, so its target must be its base, and a merge whose output path names a different existing file is refused, since that file and the base are two models and the review could show the changes to only one. For `import_transcript`, `base` stays extraction context, and the plan diffs the extraction against the target file.
 - **CLI on a terminal.** When stdin is a terminal, the CLI walks the deltas one at a time, as `git add -p` walks hunks: accept, reject, accept the rest, reject the rest, or quit without writing. Prompts go to stderr. `--plan` and `--apply` take precedence: with either, the CLI does not walk the deltas, on a terminal or not.
 - **CLI without a terminal.** A script or CI run still has a person in the loop (owner, 2026-11-04). There is a feedback loop instead of a flag that accepts changes by kind, in the shape of `terraform plan -out` and `terraform apply`:
   - `--plan <file>` writes a plan instead of the model: the numbered deltas, each verbalized and marked `pending`, plus the fingerprint and the incoming model itself. Every delta starts `pending`, never pre-filled with its suggestion (owner, 2026-11-04), so a plan nobody opened cannot be applied. The plan carries the incoming model because an import's incoming side is an extraction a second run would not reproduce.
@@ -151,7 +153,7 @@ reuse, so the four stay on its front end, the CLI. That reverses the
 
 - `INTENDED` lists promptlab under `cli` alone, so the graph check enforces it.
 - The optimizer reaches promptlab only through the CLI, as a subprocess.
-- When another package needed promptlab code, the code moved down. `promptHash` moved into `llm` (`artifact-resolution-parity.spec.md`, WS2), and the scorer's rubric check is `evaluateCandidate` in `learn`.
+- When another package needed promptlab code, the code moved down. `hashPrompt` (`promptHash.ts`) moved into `llm` (`artifact-resolution-parity.spec.md`, WS2), and the scorer's rubric check is `evaluateCandidate` in `learn`.
 
 If the four are ever wanted on MCP, that is the route: the logic moves
 down into a library first, under its own spec. It is not recommended,
@@ -274,6 +276,7 @@ VS Code parameter pin in `toolRegistration.test.ts` lands with it.
 - `import_model`, `import_transcript` and `merge_models` gain an output path on MCP and VS Code. `executeImport` writes nothing today, so the transcript path is new in the shared function and its MCP registration, not only forwarded.
 - A new file is written directly. An existing file changes only through the reviewed change set (above), on every surface, and a target that cannot be read or merged is refused. That covers `barwise analyze --output`, which overwrites today (`analyze.ts`, `writeOutput`), and the `analyze_repository` output path workstream 7 adds.
 - The VS Code palette's transcript, dbt and code imports onto an existing model get the per-delta pick, with nothing pre-selected (owner, 2026-11-04), and write nothing when the user accepts none. An import into a new file shows no pick.
+- The capability matrix's `merge` row changes with it: once `barwise merge --output <base>` is a reviewed write onto the base, "never modifies its inputs" no longer holds.
 - The agent guidance moves with the behaviour: `chatPrompts.ts`'s merge instruction and `docs/MCP.md`'s `merge_models` section describe the two calls, in the commit that changes them.
 - `merge_models` keeps the base as its target and already discloses that (#637, barwise-xjf).
 - `export_model` writes the way `barwise export` does:
@@ -318,16 +321,17 @@ against one fixture repository (owner, 2026-11-04).
 
 ### 7. Remaining option mirrors (provisional)
 
-| CLI option                 | Tool                                                                            |
-| -------------------------- | ------------------------------------------------------------------------------- |
-| `--infer-references`       | `import_model`                                                                  |
-| `--lsp-command`            | `import_model`, for the code importers                                          |
-| `--base-url`               | `import_transcript`, `review_model`                                             |
-| `--no-annotate`, `--trail` | `import_transcript`                                                             |
-| `--depth`, `--output`      | `analyze_repository`; an existing output goes through the review (workstream 2) |
-| `--no-synonyms`            | `diff_models`                                                                   |
-| `--no-warnings`            | `validate_model`                                                                |
-| `--verbose`                | `describe_domain`, if it changes content rather than rendering                  |
+| CLI option                 | Tool                                                                                                                     |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `--infer-references`       | `import_model`                                                                                                           |
+| `--lsp-command`            | `import_model`, for the code importers                                                                                   |
+| `--base-url`               | `import_transcript`, `review_model`                                                                                      |
+| `--no-annotate`, `--trail` | `import_transcript`                                                                                                      |
+| `--depth`, `--output`      | `analyze_repository`; an existing output goes through the review (workstream 2)                                          |
+| `--no-synonyms`            | `diff_models`                                                                                                            |
+| `--emit-misses`            | `gym_check`: an output path for the miss-card deck it already returns as `missCardFile`; the deck is not the session log |
+| `--no-warnings`            | `validate_model`                                                                                                         |
+| `--verbose`                | `describe_domain`, if it changes content rather than rendering                                                           |
 
 ### 8. Deterministic `prompt` commands (provisional)
 
@@ -352,7 +356,9 @@ so no eval suite enters a bundle.
 
 ## Open decisions (for review)
 
-None. Every decision this spec needed is resolved below.
+1. **Does `migrate` stay CLI-only?** Its row reads `deliberate` with the reason its own spec gave ("rewrites files in place", orm-format-3, #709), which the owner has not ruled on under the 2026-10-12 direction.
+   - Recommended: keep it CLI-only. MCP and VS Code already write 4.0 on the next save of a file they edit, and the editor's "Store ids" quick fix writes a file's unstored ids. A migration changes a file's format, not its model, so it produces no deltas for the per-change review to show; a tool that rewrites files in bulk with nothing to review is the write this spec otherwise removes.
+   - Alternative: an MCP and VS Code tool with a preview, as `rename_element` has (`check: true`, then write). It closes the row, at the cost of a bulk write the review flow cannot cover.
 
 ### Resolved by the owner (2026-11-04)
 
@@ -376,6 +382,7 @@ None. Every decision this spec needed is resolved below.
   - The VS Code version the extension supports does not show `confirmationMessages` for a language-model tool. The quick pick is then the only gate in VS Code, and the spec says so.
   - A realistic transcript import yields more deltas than a person will read one at a time. The review then needs grouping (by element, or by breaking level) before it ships.
 - **Unit tests run on source; users run bundles.** barwise-fbi shipped because no test spawned a bundle. Workstream 4's spawn test is the guard, and workstream 1 should read the bundled server too, not only `packages/mcp/dist`.
+- **`Touches:` omits the root `CLAUDE.md` and the ADR on purpose.** The PR that added this spec recorded the owner's decisions there, and `check:plan-review` counts any change to a listed path as implementation, so listing them would have made that PR fail its own gate. Every workstream still updates the matrix in the commit that changes a surface's reach (ADR decision 2). The history drift test (workstream 6) lives under `barwise/scripts/tests/`, since neither `cli` nor `mcp` may import the other.
 - **Every new guard is seen failing on its defect** through `scripts/mutate.mjs` before its workstream merges.
 - **Premortem: the check passes while a gap exists.** This happens if the option-to-parameter mapping maps a CLI option onto an unrelated parameter. Mapping rows name both sides explicitly, and a test plants an unmapped option and expects a failure.
 - **Premortem: a review that nobody reviewed.**
