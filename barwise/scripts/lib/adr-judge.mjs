@@ -70,11 +70,13 @@ export function judgeDeclarations(adrs, reader, refusals) {
         fail(`decisions ${ids.get(d.id).n} and ${d.n} share the id ${d.id}`);
       } else ids.set(d.id, d);
     }
-    const covered = new Set();
+    // Each id an entry lists, with the kinds of entry that list it.
+    const covered = new Map();
     for (const entry of parsed.entries) {
       for (const id of entry.ids) {
         if (!ids.has(id)) fail(`"${entry.text}" lists ${id}, which no decision here has`);
-        covered.add(id);
+        if (!covered.has(id)) covered.set(id, new Set());
+        covered.get(id).add(entry.kind);
       }
       if (entry.kind === "npm") {
         const { script } = entry;
@@ -186,8 +188,11 @@ export function judgeDeclarations(adrs, reader, refusals) {
     for (const [id, d] of ids) {
       if (!covered.has(id)) fail(`decision ${d.n} {#${id}} has no Enforced-by: entry`);
     }
+    // Over the decisions with an entry, so the three buckets sum to it; one
+    // with none is a finding above, and the OK line never prints beside one.
     for (const id of ids.keys()) {
-      const kinds = new Set(parsed.entries.filter((e) => e.ids.includes(id)).map((e) => e.kind));
+      const kinds = covered.get(id);
+      if (kinds === undefined) continue;
       held.decisions++;
       if (kinds.has("npm")) held.gate++;
       else if (kinds.has("tests")) held.testsOnly++;

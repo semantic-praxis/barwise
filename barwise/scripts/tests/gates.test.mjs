@@ -6499,7 +6499,8 @@ function architectureRepo() {
     const text = readFileSync(join(REPO, rel), "utf8");
     assert.ok(parseEnforcedBy(text).present, `${rel}: has no Enforced-by: header to rewrite`);
     const ids = decisionIds(text).decisions.map((d) => d.id);
-    decisions += ids.length;
+    // Counted as the judge counts: unique ids, a malformed one left out.
+    decisions += new Set(ids.filter(Boolean)).size;
     // Enforced-by: is the last header field (check:architecture holds it to
     // that, and requires it), so it runs to the blank line.
     const value = `Enforced-by: tests (${ids.join(", ")})\n`;
@@ -7338,7 +7339,7 @@ test("check:architecture cannot answer with no ADR to check", () => {
  */
 const ENFORCED_ADR = "# A concern\n\nScope: process\nDate: 2026-10-24\nTracking: barwise-ubc\n"
   + "Enforced-by: npm run check:x (one), npm run audit:y -- --check (two),\n"
-  + "tests (three), none (barwise-gap: four)\n\n"
+  + "tests (three), none (barwise-gap2: two), none (barwise-gap: four)\n\n"
   + "## Context\n\nWhy.\n\n## Decision\n\n"
   + "1. **One.** {#one} The first rule.\n"
   + "2. **Two, whose title\n   wraps.** {#two} The second.\n"
@@ -7361,6 +7362,7 @@ const ENFORCED_ROOT_PKG = JSON.stringify({
 });
 const ENFORCED_TRACKER =
   '{"id":"barwise-gap","status":"open","title":"Gap: a-concern decision four has no enforcer","labels":["adr-gap"]}\n'
+  + '{"id":"barwise-gap2","status":"open","title":"Gap: a-concern decision two is partly held","labels":["adr-gap"]}\n'
   + '{"id":"barwise-shut","status":"closed","title":"s"}\n';
 const TRACKER_PATH = ".beads/issues.jsonl";
 
@@ -7383,13 +7385,14 @@ test("check:architecture accepts every entry kind when each decision is accounte
     const ok = runArch(dir);
     assert.equal(ok.status, 0, ok.stdout + ok.stderr);
     // The copied real ADRs declare every decision tested; this fixture's
-    // own four are two gates, one tested, one none (enforceable-adr-
-    // practice WS2's breakdown).
+    // own four are two gates, one tested, one none only, and two carry a
+    // gap issue: four, and two beside its gate, since the gap count
+    // overlaps the others (enforceable-adr-practice WS2's breakdown).
     assert.match(
       ok.stdout,
       new RegExp(
         `; ${decisions + 4} decisions: 2 with a gate, ${decisions + 1} tests and no gate,`
-          + " 1 none only; 1 carry a gap issue\\. OK",
+          + " 1 none only; 2 carry a gap issue\\. OK",
       ),
     );
   } finally {
