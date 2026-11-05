@@ -176,48 +176,50 @@ const CASES: [string, (d: Record<string, any>) => void, boolean][] = [
 /**
  * Where the decoder refuses what the schema accepts, on purpose: a pattern
  * cannot test Unicode NFC (barwise-wcg.6tv), so a stated id that is not in
- * NFC passes the schema and is refused when the file is read.
+ * NFC passes the schema and is refused when the file is read. Each case
+ * gives the id written in NFC too, which both accept.
  */
-// The fourth field: whether the decoder names NFC. A map key it refuses
-// is reported in the decoder's words for any refused key.
-const DIVERGENCES: [string, (d: Record<string, any>) => void, boolean][] = [
-  ["an object type id with a combining accent", (d) => {
-    d.model.object_types[0].id = "Cafe\u0301";
-  }, true],
-  ["an Angstrom sign in a fact type id", (d) => (d.model.fact_types[0].id = "\u212Bngstrom"), true],
-  ["a role id not in NFC", (d) => {
-    d.model.fact_types[0].roles[0].id = "Person_smokes.sme\u0301kes";
-  }, true],
-  ["a reference not in NFC", (d) => (d.model.subtype_facts[0].supertype = "Pe\u0301rson"), true],
-  ["a role value key not in NFC", (d) => {
-    d.model.populations[0].instances[0].role_values = { "Person_smokes.sme\u0301kes": "p1" };
-  }, false],
-  ["an alias not in NFC", (d) => (d.model.imports = { "cr\u0301m": "Crm" }), false],
+const DIVERGENCES: [string, (d: Record<string, any>, id: (s: string) => string) => void][] = [
+  ["an object type id", (d, id) => (d.model.object_types[0].id = id("Cafe\u0301"))],
+  ["a fact type id", (d, id) => (d.model.fact_types[0].id = id("\u212Bngstrom"))],
+  ["a role id", (d, id) => (d.model.fact_types[0].roles[0].id = id("Person_smokes.sme\u0301kes"))],
+  ["a reference", (d, id) => (d.model.subtype_facts[0].supertype = id("Pe\u0301rson"))],
+  ["a role value key", (d, id) => {
+    d.model.populations[0].instances[0].role_values = { [id("Person_smokes.sme\u0301kes")]: "p1" };
+  }],
+  ["an alias", (d, id) => (d.model.imports = { [id("cr\u0301m")]: "Crm" })],
+  ["a diagram position key", (d, id) => {
+    d.model.diagrams[0].positions = { [id("Pe\u0301rson")]: { x: 1, y: 2 } };
+  }],
 ];
 
 describe("the deliberate divergence: the decoder refuses an id not in NFC", () => {
   const ajv = new Ajv({ allErrors: true, strict: false });
   const validate = ajv.compile(schema);
-
-  it.each(DIVERGENCES)("%s", (_, change, namesNfc) => {
-    const doc = base();
-    change(doc);
-    let message = "";
+  const decodes = (doc: Record<string, any>) => {
     try {
       runDocument40Decode(doc);
+      return "";
     } catch (err) {
       if (!(err instanceof DecodeError)) throw err;
-      message = err.message;
+      return err.message;
     }
+  };
+
+  it.each(DIVERGENCES)("%s: refused, naming NFC, though the schema accepts it", (_, change) => {
+    const doc = base();
+    change(doc, (s) => s);
     expect(validate(doc)).toBe(true);
-    expect(message).not.toBe("");
-    if (namesNfc) expect(message).toMatch(/Unicode NFC/);
+    expect(decodes(doc)).toMatch(/Unicode NFC/);
   });
 
-  it("accepts the same ids written in NFC", () => {
+  it.each(DIVERGENCES)("%s: accepted by both when written in NFC", (_, change) => {
     const doc = base();
-    doc.model.object_types[0].id = "Caf\u00E9";
-    expect(() => runDocument40Decode(doc)).not.toThrow();
+    change(doc, (s) => s.normalize("NFC"));
+    // A changed id leaves what referred to the old one dangling, which the
+    // reader does not check; only whether it reads the id is in question.
+    expect(validate(doc)).toBe(true);
+    expect(decodes(doc)).toBe("");
   });
 });
 

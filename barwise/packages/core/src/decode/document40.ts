@@ -38,7 +38,7 @@ import {
   smallElementConfigs,
 } from "./document.js";
 import { type DecodedFactType, factTypeFileOf } from "./factType.js";
-import { IDS_40, inNfc } from "./ids.js";
+import { IDS_40, keysInNfc } from "./ids.js";
 import { Flag, Integer, Name, nonEmpty, notBlank, Text } from "./leaves.js";
 import { objectTypeFileOf } from "./objectType.js";
 import { type ElementLabel, elementOf } from "./problems.js";
@@ -97,7 +97,7 @@ const ObjectifiedFactTypeFile = ruled(
 
 const FactInstanceFile = Schema.Struct({
   id: ids.instance,
-  role_values: Schema.Record(ids.roleKey, Text),
+  role_values: Schema.Record(ids.roleKey, Text).check(keysInNfc(" (a role id)")),
 }).annotate(element("Fact instance", "id"));
 
 const PopulationFile = Schema.Struct({
@@ -119,11 +119,15 @@ const DiagramFile = Schema.Struct({
   // Not blank, as `addDiagramLayout` refuses a blank name.
   name: notBlank(""),
   elements: Schema.optionalKey(Schema.Array(ids.elementInList)),
+  // Keyed by element id, so in NFC like every id: a key that is not would
+  // silently match no element.
   positions: Schema.optionalKey(
-    Schema.Record(Schema.String, Schema.Struct({ x: Integer, y: Integer })),
+    Schema.Record(Schema.String, Schema.Struct({ x: Integer, y: Integer })).check(
+      keysInNfc(" (an element id)"),
+    ),
   ),
   orientations: Schema.optionalKey(
-    Schema.Record(Schema.String, OrientationFile),
+    Schema.Record(Schema.String, OrientationFile).check(keysInNfc(" (an element id)")),
   ),
 }).annotate(element("Diagram", "name"));
 
@@ -132,13 +136,15 @@ const Alias = Schema.String.check(
   Schema.makeFilter((alias: string) => LOCAL_NAME_PATTERN.test(alias), {
     message: "must be a local name (an alias).",
   }),
-).check(inNfc(" (an alias)"));
+);
 
 const ModelFile = Schema.Struct({
   name: Name,
   domain_context: Schema.optionalKey(nonEmpty("")),
   namespace: Schema.optionalKey(Namespace),
-  imports: Schema.optionalKey(Schema.Record(Alias, nonEmpty(""))),
+  imports: Schema.optionalKey(
+    Schema.Record(Alias, nonEmpty("")).check(keysInNfc(" (an alias)")),
+  ),
   note: Schema.optionalKey(Text),
   object_types: Schema.optionalKey(Schema.Array(objectTypeFileOf(ids))),
   fact_types: Schema.optionalKey(

@@ -75,11 +75,36 @@ export const INSTANCE_ID_PATTERN = new RegExp(
  *
  * `localName("Customer places Order")` is `Customer_places_Order`;
  * `localName("v1.2 Order")` is `v1%2E2_Order`.
+ *
+ * A combining mark right after an encoded character is encoded too: kept,
+ * it would compose with the escape's last hex digit (`%2E` and U+0301
+ * make `%2É`), and the id would not be in NFC, which a 4.0 file requires
+ * (barwise-wcg.6tv). The id stays NFC for every name.
  */
 export function localName(name: string): string {
   return words(name)
-    .map((word) => [...word].map((ch) => keeps(ch) ? ch : encode(ch)).join(""))
+    .map((word) => {
+      let out = "";
+      let afterEscape = false;
+      for (const ch of word) {
+        const encoded: boolean = !keeps(ch) || (afterEscape && COMBINING_MARK.test(ch));
+        out += encoded ? encode(ch) : ch;
+        afterEscape = encoded;
+      }
+      return out;
+    })
     .join("_");
+}
+
+const COMBINING_MARK = /^\p{M}$/u;
+
+/**
+ * Whether a string is in Unicode NFC, as every 4.0 id must be (iri-identity
+ * decision 3, barwise-wcg.6tv). The one test, for the reader, the replay
+ * and the model alike.
+ */
+export function isNfc(text: string): boolean {
+  return text === text.normalize("NFC");
 }
 
 /**

@@ -12,6 +12,7 @@ import * as Schema from "effect/Schema";
 import type * as SchemaAST from "effect/SchemaAST";
 import {
   INSTANCE_ID_PATTERN,
+  isNfc,
   LOCAL_NAME_PATTERN,
   REFERENCE_PATTERN,
   ROLE_ID_PATTERN,
@@ -88,9 +89,20 @@ export const IDS_30 = {
  * drift test.
  */
 export const inNfc = (what = "") =>
-  Schema.makeFilter((id: string) => id === id.normalize("NFC"), {
-    message: `must be in Unicode NFC form${what}: write each accented letter as one `
-      + "code point, as the id a name gives always is.",
+  Schema.makeFilter((id: string) => isNfc(id), {
+    message: `must be in Unicode NFC form${what}: ${NFC_HOW}`,
+  });
+
+const NFC_HOW = "write each accented letter as one code point, as the id a name gives always is.";
+
+/**
+ * The same for a map whose keys are ids. Checked on the map, not each key,
+ * because a refused key is reported in the decoder's own words, which do
+ * not say why.
+ */
+export const keysInNfc = (what: string) =>
+  Schema.makeFilter((map: Readonly<Record<string, unknown>>) => Object.keys(map).every(isNfc), {
+    message: `must key every entry in Unicode NFC form${what}: ${NFC_HOW}`,
   });
 
 /** A string of one of 4.0's id shapes, refused in the shape's own words. */
@@ -131,7 +143,7 @@ export const IDS_40 = {
     Schema.makeFilter((key: string) => ROLE_ID_PATTERN.test(key), {
       message: `must be a role id: ${ROLE}.`,
     }),
-  ).check(inNfc()),
+  ),
   minted: MINTED_40,
   constraintMinted: MINTED_40,
   mintedRule: crossField(

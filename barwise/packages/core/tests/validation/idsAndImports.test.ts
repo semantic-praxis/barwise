@@ -358,6 +358,9 @@ model:
     const model = new OrmModel({ name: "M" });
     expect(() => model.setImport("a:b", "x")).toThrow(/not a local name/);
     expect(() => model.setImport("a", "")).toThrow(/bound to nothing/);
+    // In NFC, as the 4.0 reader requires (barwise-wcg.6tv).
+    expect(() => model.setImport("cr\u0301m", "x")).toThrow(/not in Unicode NFC/);
+    expect(() => model.setImport("cr\u00EDm", "x")).not.toThrow();
   });
 
   it("is added by the replay for each shadow, bound to its context", () => {

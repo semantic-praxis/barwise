@@ -2,8 +2,9 @@
  * `localName`, the one normalizer from an element's name to its format 4.0
  * id (docs/specs/iri-identity.spec.md, decision 3).
  */
+import fc from "fast-check";
 import { describe, expect, it } from "vitest";
-import { localName, localNameEncodes } from "../../src/model/name.js";
+import { isNfc, localName, localNameEncodes } from "../../src/model/name.js";
 
 describe("localName", () => {
   it("keeps case and turns each run of whitespace into one underscore", () => {
@@ -63,5 +64,38 @@ describe("localNameEncodes", () => {
 
   it("is true when a character is percent-encoded", () => {
     expect(localNameEncodes("v1.2 Order")).toBe(true);
+  });
+});
+
+describe("localName's ids are in NFC (barwise-wcg.6tv)", () => {
+  it("encodes a combining mark that follows an escape, which would compose with its hex digit", () => {
+    // Kept, U+0301 after %2E would read as %2É.
+    expect(localName("Order.\u0301")).toBe("Order%2E%CC%81");
+    expect(localName("x:\u0302\u0301")).toBe("x%3A%CC%82%CC%81");
+    // After a kept letter it stays: the name was NFC, so it did not compose.
+    expect(localName("\u0915\u094D")).toBe("\u0915\u094D");
+  });
+
+  it("is NFC for every name", () => {
+    // Names drawn to reach the case: escapes beside combining marks.
+    const piece = fc.constantFrom(
+      ".",
+      ":",
+      "#",
+      "a",
+      "E",
+      " ",
+      "\u0301",
+      "\u0302",
+      "\u0915",
+      "\u094D",
+    );
+    fc.assert(
+      fc.property(fc.array(piece, { maxLength: 8 }).map((p) => p.join("")), (name) => {
+        expect(isNfc(localName(name))).toBe(true);
+      }),
+      { numRuns: 500 },
+    );
+    fc.assert(fc.property(fc.string({ unit: "grapheme" }), (name) => isNfc(localName(name))));
   });
 });
