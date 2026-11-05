@@ -361,7 +361,7 @@ WS3 implementation notes (2026-11-05):
 
 The owner started WS4 on 2026-11-05, the night WS3 merged, rather than
 after a release cycle: WS3's record at that point was its first CI runs,
-with no disagreement. The design:
+with no disagreement. The design, revised by its review:
 
 - **The judge drops the five rules.** `judgeDeclarations` no longer
   reports `ids-exist`, `coverage`, `script-exists`, `issue-tracked` or
@@ -370,36 +370,51 @@ with no disagreement. The design:
   the schema, moves to `adr-population.mjs`, the model's side.
   `scriptVerdict` and `needsWorkflow` stay in the judge, which still
   decides them.
-- **Silent guards stay.** Where one of the five cut a verdict rule short,
-  the judge still stops there, without a finding: an entry whose script
-  `package.json` lacks is not looked up in `ci.yml`, and a `none` entry
-  whose issue is missing or closed is not checked for its label or
-  title. So each defect is reported by one gate, and the gap-issue rules
-  keep reporting nothing beside a missing or closed issue.
+- **Silent guards stay, and are tested.** Where one of the five cut a
+  verdict rule short, the judge still stops there, without a finding: an
+  entry whose script `package.json` lacks is not looked up in `ci.yml`,
+  and a `none` entry whose issue is missing or closed is not checked for
+  its label or title. So each defect is reported by one gate.
+  `gates.test.mjs` keeps the planted missing script, missing issue and
+  closed issue, now asserting that `check:architecture` reports nothing
+  about them (no step finding, no label or title finding), and adds that
+  a planted unknown id no longer fails it.
+- **`check:architecture` still counts every decision.** Its summary
+  counts decisions without an entry too, and names them as
+  `check:adr-model`'s to report, so its OK line never reads as covering
+  a decision it no longer judges.
 - **`check:adr-model` is the judge.** It no longer runs the code judge
-  or compares. It exits 1 on any model finding, 2 on a refusal (its own,
-  or the reader's for an input the model reads), 0 otherwise; a finding
-  wins over a refusal, as in every gate. Each finding is printed as
-  `check:architecture` printed it (`<file>: "<entry>" lists <id>, which
-  no decision here has`, and so on), so an author sees the same message
-  from a different gate.
+  or compares. It exits 2 on any refusal of the model's own (a schema or
+  population that does not load, a missing or deontic `RULES`
+  constraint, an error or message it cannot classify), whatever else it
+  found, since then some rule may have gone unjudged; else 1 on any
+  finding; else 2 on a reader refusal for an input the model reads; else
+  0. Each finding is printed as `check:architecture` printed it, so an
+  author sees the same message from a different gate: the builder also
+  records each entry's file and text and each decision's number, which
+  the messages quote.
 - **Chains within the model's own output.** A violated rule is not
   reported when a lower-ranked rule of its chain is violated on the same
-  entry and key: an issue not in the tracker reports only that, not also
-  that it is not open.
+  entry and key: an issue not in the tracker reports only that. One
+  function in `adr-population.mjs` decides it, from `RULES`; the
+  comparison's `compareJudges`, `factStrings` and `MODEL_INPUTS` go.
 - **Tests.** `adr-model.test.mjs` tests the model as the judge through
   stub readers: one planted violation per `RULES` rule with its exact
-  message, repeats and positions, the chain, the reader's refusals and
-  the model's own, and `check:adr-model` end to end on a fixture
-  repository. The five rules' cases leave `gates.test.mjs`'s
-  `check:architecture` tests, which gain one case that a planted
-  unknown id no longer fails `check:architecture`. The facts tests in
-  `adr-facts.test.mjs` (WS2) go with the facts; the schema and role-id
-  tests stay.
-- **CI is unchanged.** The three steps at the end of the `ci` job under
-  `${{ !cancelled() }}` now hold the five rules; they run after a
-  failed gate and on docs-only changes, so tracker-only changes are
-  still judged.
+  message; repeats and positions; the chain; the negative cases WS3's
+  comparison guarded (a script `scriptVerdict` rejects, a headerless ADR,
+  a value containing `]`, an unreadable input no entry asks for: none is
+  a finding or a refusal); the reader's refusals and the model's own,
+  including a model refusal beside a finding (exit 2); and
+  `check:adr-model` end to end on a fixture repository. The facts tests
+  in `adr-facts.test.mjs` (WS2) go with the facts; the schema and
+  role-id tests stay. `expected-counts.json` is rewritten for all three
+  files in the same commit.
+- **CI keeps its place; the words around it change.** The three steps at
+  the end of the `ci` job under `${{ !cancelled() }}` now hold the five
+  rules, after a failed gate and on docs-only changes too. Their `ci.yml`
+  comment, `check-adr-model.mjs`'s header and exit table,
+  `needsWorkflow`'s docstring, and `adr-model.test.mjs`'s header stop
+  describing a comparison.
 
 ## API and migration impact
 
