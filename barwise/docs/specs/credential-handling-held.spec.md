@@ -1,6 +1,6 @@
 # Credential handling, held by tests that need no gitleaks
 
-Status: Draft -- no workstream implemented
+Status: WS1 implemented 2026-11-06 (credential-handling.test.mjs, 7 tests, each tagged test seen red on a planted violation with mutate.mjs; the ADR's four gap entries removed)
 Created: 2026-11-06
 Last-updated: 2026-11-06
 Plan-reviewed: 14e4076e (code-review, pr-review)

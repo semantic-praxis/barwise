@@ -4,11 +4,10 @@ Scope: process
 Date: 2026-09-12
 Tracking: barwise-ubc, barwise-1021, barwise-1022, barwise-1028, barwise-3wu, barwise-i23,
 barwise-jha, barwise-8fc, barwise-flw, barwise-sma,
-docs/specs/credential-scanning.spec.md
-Enforced-by: tests (gitleaks-detects, wrapper-contract),
-none (barwise-ym8.7zs: gitleaks-detects),
-none (barwise-ym8.kf3: scan-index-and-history), none (barwise-ym8.gc7: wrapper-contract),
-none (barwise-ym8.nxs: pinned-gitleaks)
+docs/specs/credential-scanning.spec.md,
+docs/specs/credential-handling-held.spec.md
+Enforced-by: tests (gitleaks-detects, scan-index-and-history, wrapper-contract,
+pinned-gitleaks)
 
 ## Context
 
@@ -69,13 +68,18 @@ and the exit contract `credential-handling.md#wrapper-contract` applies is
   under `set -euo pipefail`, so a failed build skips both, and the
   session's `check:secrets` then refuses. If the install fails while
   another gitleaks is on PATH, the gate runs with that one.
-- What holds each decision:
-  - 1: the `gates.test.mjs` probes stage the real `.gitleaks.toml`, so
-    dropping `useDefault` (two default-set probes stop being detected)
-    or the Anthropic rule (its probe) fails a test. Nothing checks that
-    there is exactly one local rule (barwise-3wu). barwise-1028
-    (open) tracks sending the Anthropic rule upstream.
-  - 2: the pre-commit hook and the CI step. The git hooks exist only
+- What holds each decision. `scripts/tests/credential-handling.test.mjs`
+  (`credential-handling-held.spec.md`) holds all four from tracked text
+  and stand-ins, so it never skips for a missing gitleaks:
+  - 1: it reads `.gitleaks.toml` as `[extend] useDefault = true` plus
+    exactly one rule, `anthropic-api-key`. The `gates.test.mjs` probes,
+    where gitleaks is installed, also show `useDefault` and the Anthropic
+    rule detecting. barwise-1028 (open) tracks sending the rule upstream.
+  - 2: it requires the one CI step running `check:secrets` to carry no
+    `if:`, no `continue-on-error` and no `--staged`, after a
+    `fetch-depth: 0` checkout, and the pre-commit hook to run
+    `check-staged-secrets.sh || exit $?`, which scans `--staged` and
+    passes its status through. The git hooks exist only
     after `npm run prepare` (`.npmrc` sets `ignore-scripts`), and not
     in a `git worktree` checkout (barwise-mdp); a clone without them
     commits and pushes with no local scan, and CI scans after the push. The `--staged` scan does not
@@ -89,15 +93,19 @@ and the exit contract `credential-handling.md#wrapper-contract` applies is
     CI under `npm run test:scripts` (`if:
     steps.changes.outputs.docs_only != 'true'`). The
     unresolvable-root refusal is covered by the git-failure cases
-    (`ROOT_DEPENDENT_GATES`); the exec-error refusal (gitleaks present
-    but failing to spawn) has no test (barwise-i23). The pre-commit hook's
+    (`ROOT_DEPENDENT_GATES`). The pre-commit hook's
     secrets step (`scripts/hooks/check-staged-secrets.sh`) tells a refusal
     from a finding: only exit 1 prints "ROTATE it", and a refusal says
     nothing was scanned (barwise-jha, fixed in gate-contract-enforced WS4). `ci:local` names a refusal
-    as "could not answer" separately from failures in every run.
-  - 4: the version is assigned only in the install script today (it also
-    appears in a `.gitleaks.toml` comment and a test stub), but nothing
-    keeps `ci.yml` or the session hook from assigning another (barwise-3wu).
+    as "could not answer" separately from failures in every run. The
+    exec-error refusal (gitleaks present but failing to spawn) and the
+    argv (`--redact`, `--verbose`, `--no-banner`, `--config`) are
+    tested against a stand-in in `credential-handling.test.mjs`.
+  - 4: `credential-handling.test.mjs` fails when `ci.yml` or the session
+    hook mentions gitleaks other than as the installer's name or a step
+    name (so a `uses:` action, `go install` or a package manager fails
+    unnamed), and runs the installer against a download no digest
+    matches to show it stops before `tar`. Other workflows are not read.
 - Left open in the spec, not decided here (its Open decisions carry
   recommendations, none marked resolved; the first, keeping the local
   Anthropic rule, is settled by CLAUDE.md, which `credential-handling.md#gitleaks-detects` follows):

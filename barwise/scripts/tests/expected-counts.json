@@ -13,6 +13,7 @@
     "check-capability-matrix.test.mjs": 15,
     "check-findings.test.mjs": 9,
     "ci-conditions.test.mjs": 19,
+    "credential-handling.test.mjs": 7,
     "gates.test.mjs": 336,
     "generated-marks.test.mjs": 4,
     "masked-exit.test.mjs": 28,
