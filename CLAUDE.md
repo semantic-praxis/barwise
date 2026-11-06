@@ -440,10 +440,11 @@ skill (`.claude/skills/release/`).
   pass, 1 a finding, 2 could not answer; a refusal never uses the
   finding code (`docs/adr/gate-refusal-contract.md`).
   `npm run fault-matrix` measures it, on demand.
-- **A leaked credential is rotated, never reverted.** Detection is
-  gitleaks' -- `npm run check:secrets -- --staged` at pre-commit, the
-  full history in CI -- and `.gitleaks.toml` takes no rule beyond the
-  one for Anthropic keys (`docs/adr/credential-handling.md`).
+- **Credential detection is gitleaks'.** `npm run check:secrets --
+  --staged` at pre-commit, the full history in CI, and `.gitleaks.toml`
+  takes no rule beyond the one for Anthropic keys; a real finding is
+  remedied by rotating the key, since a revert does not undo a leak
+  (`docs/adr/credential-handling.md`).
 - **A key has nowhere to be written down.** `--api-key` is refused on
   every command and the VS Code key lives in secret storage; VS Code's
   default path needs no key, nor does the MCP server's where the client

@@ -8,8 +8,7 @@ docs/specs/tiered-pr-review.spec.md, docs/specs/review-md.spec.md,
 docs/specs/review-routing.spec.md
 Enforced-by: tests (copilot-requested, tier-informs),
 none (barwise-ym8.7y6: copilot-requested), none (barwise-ym8.8ya: copilot-never-blocks),
-none (barwise-ym8.f9u: review-md-owns-lanes), none (barwise-ym8.ehz: tier-informs),
-none (barwise-ym8.gwj: prevent-upstream)
+none (barwise-ym8.f9u: review-md-owns-lanes), none (barwise-ym8.ehz: tier-informs)
 
 ## Context
 
@@ -51,11 +50,6 @@ condition, is a separate decision (`steward` section 4b).
    reviewer run every group it lists, every group no path can detect,
    and every failure mode, and the reviewer says which ran. Nothing
    fails on the tier or the routing.
-5. **What reviews keep finding is prevented upstream.**{#prevent-upstream} Copilot's
-   findings are classified by failure mode and the most common one gets
-   a mechanism in front of review; REVIEW.md's "Always check" list,
-   drawn from a month of all reviews' findings, ranks the modes every
-   review runs.
 
 ## Consequences
 
@@ -94,9 +88,13 @@ condition, is a separate decision (`steward` section 4b).
   that its groups were run (barwise-953). Printing the routing in CI was
   deferred by the owner on 2026-10-24 until reviewers are shown to use
   it (`review-routing.spec.md`, WS3; barwise-6mf).
-- `review-policy.md#prevent-upstream` has no gate. The classification
-  has had its seed pass and
-  first mechanism; the pass that measures that mechanism is open
+- What reviews keep finding is prevented upstream: Copilot's findings
+  are classified by failure mode and the most common one gets a mechanism
+  in front of review; REVIEW.md's "Always check" list, drawn from a month
+  of all reviews' findings, ranks the modes every review runs. This is a
+  practice, not a rule a check can hold; it was decision 5 until
+  2026-11-06 (`adr-refactor.spec.md`, row 25). The classification has had
+  its seed pass and first mechanism; the pass that measures that mechanism is open
   (barwise-1050) and has no new Copilot findings to read while the
   request is paused (barwise-ilb). No reviewer is scored against real
   defects (barwise-nm8).
