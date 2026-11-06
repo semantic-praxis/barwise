@@ -1,6 +1,6 @@
 # Core purity widened, and the model SDK boundary held
 
-Status: WS1 and WS3 implemented 2026-11-06 (purity reads TypeScript's import list and scanner, with the new rules, a refusal on no source, and arch-triage taking its rules; the four sorts use compareCodeUnits with a two-locale test; modelSdkBoundary.test.ts holds one-layer-out); WS2 provisional
+Status: WS1 and WS3 implemented 2026-11-06 (purity parses with TypeScript and walks the syntax tree -- code review showed a token scanner misreads a regex after `)` and hides the rest of the file, and cannot tell type from value position -- with the new rules, a refusal on no source, and arch-triage taking its rules; the four sorts use compareCodeUnits with a two-locale test; modelSdkBoundary.test.ts holds one-layer-out); WS2 provisional
 Created: 2026-11-06
 Last-updated: 2026-11-06
 Plan-reviewed: fc79ebb8 (code-review, pr-review)
@@ -53,7 +53,7 @@ imports a model SDK; nothing checks that.
 1. **`check-core-purity.mjs` reads TypeScript's view of the source**, not
    lines. Module references come from `ts.preProcessFile` (static and
    dynamic imports, `export ... from`, `require`, type imports), and
-   names from `ts.createScanner` tokens, so comments and strings can
+   names from `ts.createScanner` tokens (implemented as a full parse after code review; see Status), so comments and strings can
    neither hide a violation nor raise one, with no hand-written comment
    stripper (plan review: the one in `llm` goes out of phase on three core
    files with a quote in a regex literal). Files come from `git ls-files`;

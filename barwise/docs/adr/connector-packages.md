@@ -71,8 +71,8 @@ format lives and how it reaches the surfaces.
   and environment access in core, so the I/O half of `connector-packages.md#connector-owns-io` and the
   "no discovery" half of `connector-packages.md#explicit-registration`
   have a backstop
-  (`architecture-scenarios.md` S-EXPL-5). It reads TypeScript's import
-  list and scanner, so dynamic imports, `require`, `createRequire`,
+  (`architecture-scenarios.md` S-EXPL-5). It parses each file with
+  TypeScript, so dynamic imports, `require`, `createRequire`,
   `node:process`, `process.cwd()`, global `fetch` and a comment-led
   import line are caught (`purity-and-model-boundary.spec.md`). Format
   I/O placed in a package other than its connector (a surface, `llm`,

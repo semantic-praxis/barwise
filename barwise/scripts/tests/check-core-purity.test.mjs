@@ -129,19 +129,19 @@ const RED = [
   {
     what: "new Date()",
     text: "export const d = new Date();\n",
-    rule: /new Date\(\)/,
+    rule: /S-DET-3 clock/,
     line: 1,
   },
   {
     what: "Date.now()",
     text: "export const n = Date.now();\n",
-    rule: /Date\.now\(\)/,
+    rule: /S-DET-3 clock/,
     line: 1,
   },
   {
     what: "Math.random()",
     text: "export const r = Math.random();\n",
-    rule: /Math\.random\(\)/,
+    rule: /S-DET-2 randomness/,
     line: 1,
   },
   {
@@ -162,14 +162,79 @@ const RED = [
     rule: /node:child_process/,
     line: 1,
   },
+  // The holes a token scanner left (code review of bb3cd348). Each one is a
+  // place where reading tokens without grammar guessed wrong.
+  {
+    what: "process after a regex holding a backtick, following if (a)",
+    text: "export function f(a: boolean, x: string) {\n  if (a) /`/.test(x);\n  return 1;\n}\n"
+      + "export const e = process.env.HOME;\n",
+    rule: /S-DET-3 process/,
+    line: 5,
+  },
+  {
+    what: "process after a division by a variable named of",
+    text: "let of = 4;\nexport const h = of / 2; process;\n",
+    rule: /S-DET-3 process/,
+    line: 2,
+  },
+  {
+    what: "process after a division following a type argument",
+    text: "declare const x: number[];\nexport const n = x as Array<number>\n/ 2; process;\n",
+    rule: /S-DET-3 process/,
+    line: 3,
+  },
+  {
+    what: "import(...).foo in value position",
+    text: 'export const m = import("./p.js").foo;\n',
+    rule: /runtime import\(\)/,
+    line: 1,
+  },
+  {
+    what: "typeof import(...) in value position",
+    text: 'export const k = typeof import("./x.js");\n',
+    rule: /runtime import\(\)/,
+    line: 1,
+  },
+  {
+    what: "Date() called without new",
+    text: "export const now = Date();\n",
+    rule: /S-DET-3 clock/,
+    line: 1,
+  },
+  {
+    what: "new globalThis.Date()",
+    text: "export const now = new globalThis.Date();\n",
+    rule: /S-DET-3 clock/,
+    line: 1,
+  },
+  {
+    what: "globalThis.fetch(u)",
+    text: "export const get = (u: string) => globalThis.fetch(u);\n",
+    rule: /network call/,
+    line: 1,
+  },
+  {
+    what: 'globalThis["process"]',
+    text: 'export const p = globalThis["process"];\n',
+    rule: /S-DET-3 process/,
+    line: 1,
+  },
+  {
+    what: "a .mjs file under core/src importing fs",
+    file: "barwise/packages/core/src/x.mjs",
+    text: 'import { readFileSync } from "node:fs";\nexport const r = readFileSync;\n',
+    rule: /S-DET-1 node:fs/,
+    line: 1,
+  },
 ];
 
 for (const c of RED) {
   test(`core purity refuses ${c.what} [adr:determinism-in-core#pure-ops]`, () => {
-    const r = purityIn({ [CORE_FILE]: c.text });
+    const file = c.file ?? CORE_FILE;
+    const r = purityIn({ [file]: c.text });
     assert.equal(r.status, 1, `expected a finding (1), got ${r.status}:\n${r.stdout}${r.stderr}`);
     assert.match(r.stderr, c.rule);
-    assert.match(r.stderr, new RegExp(`${CORE_FILE}:${c.line}\\b`));
+    assert.match(r.stderr, new RegExp(`${file}:${c.line}\\b`));
     assert.match(r.stderr, /fix: /);
   });
 }
@@ -190,6 +255,19 @@ const GREEN = [
     text: 'export const re = /process"/;\nexport const n = 1 / 2;\n',
   },
   { what: "a template literal naming process", text: "export const t = `process ${1} fetch`;\n" },
+  // Names that are not the global: a property key, a member, a type.
+  { what: "a property key named process", text: "export const o = { process: 1 };\n" },
+  {
+    what: "members named process and fetch",
+    text:
+      "declare const o: { process: number; fetch(): void; };\nexport const p = o.process;\no.fetch();\n",
+  },
+  { what: "a Date type annotation", text: "declare const x: Date;\nexport const d: Date = x;\n" },
+  {
+    what: "typeof import(...) in a type alias",
+    text: 'export type T = typeof import("./x.js");\n',
+  },
+  { what: "import(...).T in an annotation", text: 'export let t: import("x").T;\n' },
 ];
 
 for (const c of GREEN) {
@@ -208,7 +286,7 @@ test("core purity refuses with exit 2 when there is no tracked core source [adr:
     "barwise/packages/core/src/x.test.ts": "export const d = Date.now();\n",
   });
   assert.equal(r.status, 2, `expected refusal (2), got ${r.status}:\n${r.stdout}${r.stderr}`);
-  assert.match(r.stderr, /no tracked \.ts\/\.tsx files/);
+  assert.match(r.stderr, /no tracked source files/);
   assert.doesNotMatch(`${r.stdout}${r.stderr}`, /core purity: OK/);
 });
 

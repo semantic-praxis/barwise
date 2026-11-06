@@ -62,8 +62,9 @@ spec; the gate is from the archived architecture-analysis spec.
   package in `node_modules` under the config's `includeOnly`. A plain
   `fetch` to a provider host stays a gap.
 - `npm run purity` (`barwise/scripts/check-core-purity.mjs`, a CI gate)
-  reads core's tracked source through TypeScript's import list and
-  scanner, so a comment or string can neither hide nor raise a finding
+  parses core's tracked source with TypeScript and walks the syntax
+  tree, so a comment, string or regex literal can neither hide nor raise
+  a finding, and a type position is told from a value
   (`purity-and-model-boundary.spec.md`). It fails on an `fs`,
   `child_process`, `os`, network, `dns`, `undici`, `process`,
   `module`, `worker_threads`, `readline`, `vm` or `perf_hooks` import
@@ -73,7 +74,9 @@ spec; the gate is from the archived architecture-analysis spec.
   `Date.now`, `Math.random` and the global `crypto`; it refuses when it
   can list no source. Core's four locale-dependent sorts use
   `compareCodeUnits` (barwise-c3z, fixed; a test shows one order under
-  sv_SE and en_US).
+  sv_SE and en_US for the comparator and query's entity and anchor
+  orderings; diff's and replay's sorts are held by the gate's
+  `localeCompare` rule, not by that test).
 - Two places in core break the decision today, neither visible to the
   gate:
   - `resolveArtifactInManifest` resolves relative paths against the

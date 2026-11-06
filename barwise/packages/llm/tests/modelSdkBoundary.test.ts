@@ -13,12 +13,11 @@
  * A plain `fetch` to a provider's host is not seen, and stays the gap the
  * ADR names.
  */
-import { readdirSync, readFileSync } from "node:fs";
+import { readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import ts from "typescript";
 import { describe, expect, it } from "vitest";
-import { sourceFiles } from "./helpers/sourceText.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const packagesDir = resolve(here, "../..");
@@ -41,6 +40,22 @@ function sdkImports(code: string): string[] {
   return ts.preProcessFile(code, true, true).importedFiles
     .map((ref) => ref.fileName)
     .filter(isSdk);
+}
+
+/**
+ * Every file TypeScript can parse, declaration files included. Wider than
+ * `helpers/sourceText.ts`'s `sourceFiles` (.ts/.tsx, .d.ts excluded) on
+ * purpose: an SDK imported from a .mjs or .js file in a package's src is
+ * the same breach, and a scan of .ts alone would pass it.
+ */
+const SOURCE = /\.[cm]?[jt]sx?$/;
+
+function scriptFiles(dir: string): string[] {
+  return readdirSync(dir).flatMap((name) => {
+    const path = join(dir, name);
+    if (statSync(path).isDirectory()) return scriptFiles(path);
+    return SOURCE.test(name) ? [path] : [];
+  });
 }
 
 const packages = readdirSync(packagesDir).filter((p) => p !== "llm");
@@ -82,7 +97,7 @@ describe("only @barwise/llm imports a model SDK", () => {
       const dir = join(packagesDir, pkg);
       let files: string[];
       try {
-        files = sourceFiles(join(dir, "src"));
+        files = scriptFiles(join(dir, "src"));
       } catch {
         files = []; // a package with no src directory
       }

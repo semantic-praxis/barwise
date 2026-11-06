@@ -122,5 +122,7 @@ describe("compareCodeUnits", () => {
       expect(sv[key], key).toEqual(CODE_UNIT_ORDER);
       expect(en[key], key).toEqual(CODE_UNIT_ORDER);
     }
-  });
+    // Two child processes, each transpiling core's query module on load:
+    // about 0.7s each alone, longer under a loaded parallel suite.
+  }, 30_000);
 });

@@ -9,16 +9,24 @@
 // .dependency-cruiser.cjs because dependency-cruiser sees imports but not
 // `process.env`, `Date.now` or `localeCompare` usage.
 //
-// It reads TypeScript's own view of each file, not its lines: module
-// references from `ts.preProcessFile` (static and dynamic imports,
-// `export ... from`, `require`, type imports) and names from
-// `ts.createScanner` tokens. The line-pattern version it replaces skipped
-// any line that started with a comment, so `/* c8 ignore */ import ...
-// from "node:fs"` passed (barwise-ym8.iyw), and a regex cannot tell a
-// name from the same word in a string or comment. A hand-written comment
-// stripper was rejected too: the one in `llm` goes out of phase on three
-// core files with a quote in a regex literal. With tokens, a comment or a
-// string can neither hide a violation nor raise one.
+// It parses each file with TypeScript and walks the tree. The line-pattern
+// version before it skipped any line that started with a comment, so
+// `/* c8 ignore */ import ... from "node:fs"` passed (barwise-ym8.iyw), and
+// a regex cannot tell a name from the same word in a string or comment. A
+// hand-written comment stripper was rejected: the one in `llm` goes out of
+// phase on three core files with a quote in a regex literal.
+//
+// A token scanner was tried next and was not enough, for two reasons only a
+// parser settles. Whether `/` starts a regex or divides depends on grammar
+// the scanner does not have: after `if (a)` it is a regex, after a variable
+// named `of` or a type argument's `>` it divides, and guessing wrong once
+// desyncs the rest of the file, so `if (a) /\`/.test(x);` hid every
+// violation after it. And a name's meaning depends on its position: a
+// scanner flags `{ process: 1 }` and `o.process`, and cannot tell the type
+// `import("x").T` from the value `import("x").foo`, or a `Date` annotation
+// from a `Date()` call. The parser gives each node its role, so a comment or
+// a string can neither hide a violation nor raise one, and a property name
+// is not a global.
 //
 // The rules are exported (`PURITY_RULES`, `purityFindings`) so that
 // scripts/arch-triage.mjs reads the same ones rather than a copy.
@@ -42,101 +50,79 @@ const SDK_FIX = "only @barwise/llm imports a model SDK (determinism-in-core#one-
 const IO_FIX = "move the I/O to an outer package or a connector, or pass the value in";
 const LOCALE_FIX =
   "use compareCodeUnits (core/src/util), or take the locale as an argument from the surface";
+const RANDOM_NAMES = ["randomUUID", "randomBytes", "randomInt", "getRandomValues"];
 
 /**
- * Every rule, by id. `kind` says which reading finds it: `module` matches a
- * module specifier from preProcessFile, `name` an Identifier token, and
- * `sequence`/`import` the token shapes below.
+ * Every rule. A rule matches by any of:
+ * - `modules`: a module reference (import, export-from, `import x =
+ *   require`, `import("x")` in a type or a call, `require("x")`), compared
+ *   without `node:` and subpath;
+ * - `dynamicImport`: an `import(...)` call, i.e. in value position;
+ * - `globals`: a free name used as a value, or `globalThis.<name>`;
+ * - `members`: a property access (or `["name"]`) of that name, on anything;
+ * - `qualified`: `Object.member` on that free object name;
+ * - `importedNames`: a named import of that name from `node:crypto`.
  */
 export const PURITY_RULES = [
-  { id: "S-DET-1", name: "node:fs", kind: "module", modules: ["fs"], fix: IO_FIX },
-  {
-    id: "S-DET-1",
-    name: "node:child_process",
-    kind: "module",
-    modules: ["child_process"],
-    fix: IO_FIX,
-  },
-  { id: "S-DET-1", name: "node:os", kind: "module", modules: ["os"], fix: IO_FIX },
+  { id: "S-DET-1", name: "node:fs", modules: ["fs"], fix: IO_FIX },
+  { id: "S-DET-1", name: "node:child_process", modules: ["child_process"], fix: IO_FIX },
+  { id: "S-DET-1", name: "node:os", modules: ["os"], fix: IO_FIX },
   {
     id: "S-DET-1",
     name: "network module",
-    kind: "module",
     modules: ["net", "http", "https", "tls", "dgram", "http2", "dns", "undici"],
     fix: IO_FIX,
   },
   {
     id: "S-DET-1",
     name: "ambient runtime module",
-    kind: "module",
     modules: ["process", "module", "worker_threads", "readline", "vm", "perf_hooks"],
     fix: IO_FIX,
   },
-  {
-    id: "S-DET-1",
-    name: "model SDK",
-    kind: "module",
-    modules: ["@anthropic-ai/sdk", "openai"],
-    fix: SDK_FIX,
-  },
+  { id: "S-DET-1", name: "model SDK", modules: ["@anthropic-ai/sdk", "openai"], fix: SDK_FIX },
   {
     id: "S-DET-1",
     name: "runtime import()",
-    kind: "import",
-    fix: 'use a static import; only type forms import("x").T and typeof import("x") are allowed',
+    dynamicImport: true,
+    fix:
+      'use a static import; only the type forms import("x").T and typeof import("x") are allowed',
   },
-  { id: "S-DET-3", name: "process", kind: "name", names: ["process"], fix: IO_FIX },
-  { id: "S-DET-1", name: "network call", kind: "name", names: ["fetch"], fix: IO_FIX },
-  { id: "S-DET-3", name: "clock", kind: "name", names: ["performance"], fix: "pass the time in" },
+  { id: "S-DET-3", name: "process", globals: ["process"], fix: IO_FIX },
+  { id: "S-DET-1", name: "network call", globals: ["fetch"], fix: IO_FIX },
+  { id: "S-DET-3", name: "clock", globals: ["performance", "Date"], fix: "pass the time in" },
   {
     id: "S-DET-3",
     name: "process locale",
-    kind: "name",
-    names: [
-      "localeCompare",
-      "toLocaleString",
-      "toLocaleUpperCase",
-      "toLocaleLowerCase",
-      "Intl",
-    ],
+    globals: ["Intl"],
+    members: ["localeCompare", "toLocaleString", "toLocaleUpperCase", "toLocaleLowerCase"],
     fix: LOCALE_FIX,
   },
   {
     id: "S-DET-2",
     name: "randomness",
-    kind: "name",
-    names: ["randomUUID", "randomBytes", "randomInt", "getRandomValues"],
+    members: RANDOM_NAMES,
+    qualified: ["Math.random"],
+    importedNames: RANDOM_NAMES,
     fix: "pass the id or seed in",
   },
-  {
-    id: "S-DET-3",
-    name: "new Date()",
-    kind: "sequence",
-    tokens: ["new", "Date"],
-    fix: "pass the time in",
-  },
-  {
-    id: "S-DET-3",
-    name: "Date.now()",
-    kind: "sequence",
-    tokens: ["Date", ".", "now"],
-    fix: "pass the time in",
-  },
-  {
-    id: "S-DET-2",
-    name: "Math.random()",
-    kind: "sequence",
-    tokens: ["Math", ".", "random"],
-    fix: "pass the seed in",
-  },
-  {
-    id: "S-DET-2",
-    name: "global crypto.*",
-    kind: "sequence",
-    tokens: ["crypto", "."],
-    fix: "pass the id or seed in",
-  },
+  { id: "S-DET-2", name: "global crypto.*", globals: ["crypto"], fix: "pass the id or seed in" },
 ];
+
+/** name -> rule, for each way a rule matches. Built once, at load. */
+function indexBy(field) {
+  const map = new Map();
+  for (const rule of PURITY_RULES) for (const key of rule[field] ?? []) map.set(key, rule);
+  return map;
+}
+const BY_MODULE = indexBy("modules");
+const BY_GLOBAL = indexBy("globals");
+const BY_MEMBER = indexBy("members");
+const BY_QUALIFIED = indexBy("qualified");
+const BY_IMPORTED_NAME = indexBy("importedNames");
+const DYNAMIC_IMPORT = PURITY_RULES.find((r) => r.dynamicImport);
+const CRYPTO_MODULES = new Set(["crypto"]);
+const SOURCE = /\.[cm]?[jt]sx?$/;
+const TEST = /\.(test|spec)\.[cm]?[jt]sx?$/;
 
 /** `node:fs/promises` -> `fs`, `openai/resources` -> `openai`, `@a/b/c` -> `@a/b`. */
 function moduleBase(specifier) {
@@ -145,179 +131,146 @@ function moduleBase(specifier) {
   return bare.startsWith("@") ? parts.slice(0, 2).join("/") : parts[0];
 }
 
-/**
- * Tokens after which a `/` starts a regular expression rather than a
- * division. The scanner does not know expression context, so without this
- * a regex literal's body would be read as names (`/process/` would raise
- * `process`), and a quote inside one would misread the rest of the file.
- * Every other token -- an Identifier, a literal, `)`, `]`, `}`, `++`, `--`,
- * and keywords such as `this` -- ends an expression, so `/` there divides.
- */
-function regexMayFollow(kind) {
-  const K = ts.SyntaxKind;
-  if (kind === undefined) return true;
-  if (
-    kind === K.Identifier
-    || kind === K.CloseParenToken
-    || kind === K.CloseBracketToken
-    || kind === K.CloseBraceToken
-    || kind === K.PlusPlusToken
-    || kind === K.MinusMinusToken
-    || kind === K.NumericLiteral
-    || kind === K.BigIntLiteral
-    || kind === K.StringLiteral
-    || kind === K.RegularExpressionLiteral
-    || kind === K.NoSubstitutionTemplateLiteral
-    || kind === K.TemplateTail
-  ) {
-    return false;
-  }
-  if (kind >= K.FirstKeyword && kind <= K.LastKeyword) {
-    return [
-      K.ReturnKeyword,
-      K.TypeOfKeyword,
-      K.CaseKeyword,
-      K.DoKeyword,
-      K.ElseKeyword,
-      K.InKeyword,
-      K.InstanceOfKeyword,
-      K.NewKeyword,
-      K.OfKeyword,
-      K.ThrowKeyword,
-      K.VoidKeyword,
-      K.DeleteKeyword,
-      K.YieldKeyword,
-      K.AwaitKeyword,
-    ].includes(kind);
-  }
-  return true;
+function scriptKindOf(fileName) {
+  if (fileName.endsWith(".tsx")) return ts.ScriptKind.TSX;
+  if (fileName.endsWith(".jsx")) return ts.ScriptKind.JSX;
+  if (/\.[cm]?js$/.test(fileName)) return ts.ScriptKind.JS;
+  return ts.ScriptKind.TS;
 }
 
-/** The file's tokens, comments and whitespace skipped: `{ kind, text, pos }`. */
-function tokens(text, fileName) {
-  const K = ts.SyntaxKind;
-  const scanner = ts.createScanner(
-    ts.ScriptTarget.Latest,
-    /* skipTrivia */ true,
-    fileName.endsWith(".tsx") ? ts.LanguageVariant.JSX : ts.LanguageVariant.Standard,
-    text,
-  );
-  const out = [];
-  // Brace depth at each open `${`, so the `}` that closes a substitution is
-  // rescanned as the template's continuation instead of a block's end.
-  const templates = [];
-  let braces = 0;
-  for (let kind = scanner.scan(); kind !== K.EndOfFileToken; kind = scanner.scan()) {
-    const prev = out.at(-1)?.kind;
-    if ((kind === K.SlashToken || kind === K.SlashEqualsToken) && regexMayFollow(prev)) {
-      kind = scanner.reScanSlashToken();
-    } else if (kind === K.OpenBraceToken) {
-      braces++;
-    } else if (kind === K.CloseBraceToken) {
-      if (templates.at(-1) === braces) {
-        templates.pop();
-        kind = scanner.reScanTemplateToken(false);
-      } else {
-        braces--;
-      }
+/** A string literal's text, or undefined. */
+function literalText(node) {
+  return node && (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node))
+    ? node.text
+    : undefined;
+}
+
+/** The member a property or literal element access names, or undefined. */
+function memberName(node) {
+  if (ts.isPropertyAccessExpression(node)) {
+    return ts.isIdentifier(node.name) ? node.name.text : undefined;
+  }
+  if (ts.isElementAccessExpression(node)) return literalText(node.argumentExpression);
+  return undefined;
+}
+
+/**
+ * Whether a node sits inside a type. `ExpressionWithTypeArguments` counts as
+ * a type node to TypeScript, but its expression is a value in `extends Base`
+ * and in an instantiation expression (`fetch<T>`); only `implements` and an
+ * interface's `extends` name a type there.
+ */
+function inTypePosition(node) {
+  for (let n = node.parent; n; n = n.parent) {
+    if (ts.isExpressionWithTypeArguments(n)) {
+      const clause = n.parent;
+      const typeOnly = clause && ts.isHeritageClause(clause)
+        && (clause.token === ts.SyntaxKind.ImplementsKeyword
+          || ts.isInterfaceDeclaration(clause.parent));
+      if (typeOnly) return true;
+      continue;
     }
-    if (kind === K.TemplateHead || kind === K.TemplateMiddle) templates.push(braces);
-    out.push({ kind, text: scanner.getTokenText(), pos: scanner.getTokenStart() });
+    if (ts.isTypeNode(n)) return true;
+    if (ts.isStatement(n) || ts.isSourceFile(n)) return false;
   }
-  return out;
-}
-
-function lineStarts(text) {
-  const starts = [0];
-  for (let i = 0; i < text.length; i++) if (text[i] === "\n") starts.push(i + 1);
-  return starts;
-}
-
-/** Index of the `)` that closes the `(` at `open`, or -1. */
-function closingParen(toks, open) {
-  const K = ts.SyntaxKind;
-  let depth = 0;
-  for (let i = open; i < toks.length; i++) {
-    if (toks[i].kind === K.OpenParenToken) depth++;
-    else if (toks[i].kind === K.CloseParenToken && --depth === 0) return i;
-  }
-  return -1;
+  return false;
 }
 
 /**
- * `import(` is allowed only in its two type forms: `import("x").Ident`
- * where Ident is not a promise method, and `typeof import("x")`. The rule
- * is stated as the allowed shapes, not the bad ones, because listing bad
- * shapes missed `return import(...)` and `Promise.all([import(...)])`
- * (plan review).
+ * Whether an Identifier reads a binding, as opposed to naming a property,
+ * a declaration, a label, an import or export specifier, or a type.
  */
-function isTypeImport(toks, i) {
-  const K = ts.SyntaxKind;
-  if (toks[i - 1]?.kind === K.TypeOfKeyword) return true;
-  const close = closingParen(toks, i + 1);
-  if (close < 0) return false;
-  const dot = toks[close + 1];
-  const name = toks[close + 2];
-  return dot?.kind === K.DotToken
-    && name?.kind === K.Identifier
-    && !["then", "catch", "finally"].includes(name.text);
+function isValueReference(id) {
+  const p = id.parent;
+  if (!p) return false;
+  if (ts.isShorthandPropertyAssignment(p)) return p.name === id; // `{ process }` reads it
+  if (p.name === id || p.propertyName === id || p.label === id) return false;
+  if (ts.isQualifiedName(p) || ts.isImportClause(p) || ts.isNamespaceImport(p)) return false;
+  return !inTypePosition(id);
 }
 
 /**
  * Every purity finding in one file's text: `[{ rule, line, text, fix }]`,
- * where `rule` is `"<id> <name>"` and `line` is 1-based.
+ * where `rule` is `"<id> <name>"` and `line` is 1-based. One finding per
+ * rule and line.
  */
 export function purityFindings(fileText, fileName) {
-  const K = ts.SyntaxKind;
-  const starts = lineStarts(fileText);
+  const sf = ts.createSourceFile(
+    fileName,
+    fileText,
+    ts.ScriptTarget.Latest,
+    true,
+    scriptKindOf(fileName),
+  );
   const lines = fileText.split("\n");
-  const lineOf = (pos) => {
-    let lo = 0;
-    let hi = starts.length - 1;
-    while (lo < hi) {
-      const mid = (lo + hi + 1) >> 1;
-      if (starts[mid] <= pos) lo = mid;
-      else hi = mid - 1;
-    }
-    return lo + 1;
-  };
+  const seen = new Set();
   const findings = [];
-  const add = (rule, pos) => {
-    const line = lineOf(pos);
+  const add = (rule, node) => {
+    const index = sf.getLineAndCharacterOfPosition(node.getStart(sf)).line;
+    const key = `${rule.name}\0${index}`;
+    if (seen.has(key)) return;
+    seen.add(key);
     findings.push({
       rule: `${rule.id} ${rule.name}`,
-      line,
-      text: lines[line - 1].trim().slice(0, 90),
+      line: index + 1,
+      text: lines[index].trim().slice(0, 90),
       fix: rule.fix,
     });
   };
+  const moduleRef = (specifierNode) => {
+    const text = literalText(specifierNode);
+    if (text === undefined) return;
+    const rule = BY_MODULE.get(moduleBase(text));
+    if (rule) add(rule, specifierNode);
+  };
 
-  const moduleRules = PURITY_RULES.filter((r) => r.kind === "module");
-  const { importedFiles } = ts.preProcessFile(fileText, true, true);
-  for (const ref of importedFiles) {
-    const base = moduleBase(ref.fileName);
-    for (const rule of moduleRules) if (rule.modules.includes(base)) add(rule, ref.pos);
-  }
-
-  const toks = tokens(fileText, fileName);
-  const importRule = PURITY_RULES.find((r) => r.kind === "import");
-  const nameRules = PURITY_RULES.filter((r) => r.kind === "name");
-  const sequenceRules = PURITY_RULES.filter((r) => r.kind === "sequence");
-  toks.forEach((tok, i) => {
-    if (
-      tok.kind === K.ImportKeyword
-      && toks[i + 1]?.kind === K.OpenParenToken
-      && !isTypeImport(toks, i)
+  const visit = (node) => {
+    if (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) {
+      moduleRef(node.moduleSpecifier);
+      const from = literalText(node.moduleSpecifier);
+      const named = node.importClause?.namedBindings;
+      if (from && CRYPTO_MODULES.has(moduleBase(from)) && named && ts.isNamedImports(named)) {
+        for (const spec of named.elements) {
+          const rule = BY_IMPORTED_NAME.get((spec.propertyName ?? spec.name).text);
+          if (rule) add(rule, spec);
+        }
+      }
+    } else if (
+      ts.isImportEqualsDeclaration(node)
+      && ts.isExternalModuleReference(node.moduleReference)
     ) {
-      add(importRule, tok.pos);
+      moduleRef(node.moduleReference.expression);
+    } else if (ts.isImportTypeNode(node)) {
+      if (ts.isLiteralTypeNode(node.argument)) moduleRef(node.argument.literal);
+    } else if (ts.isCallExpression(node)) {
+      if (node.expression.kind === ts.SyntaxKind.ImportKeyword) {
+        add(DYNAMIC_IMPORT, node);
+        moduleRef(node.arguments[0]);
+      } else if (ts.isIdentifier(node.expression) && node.expression.text === "require") {
+        moduleRef(node.arguments[0]);
+      }
     }
-    if (tok.kind === K.Identifier) {
-      for (const rule of nameRules) if (rule.names.includes(tok.text)) add(rule, tok.pos);
+
+    const member = memberName(node);
+    if (member !== undefined && !inTypePosition(node)) {
+      const object = node.expression;
+      const memberRule = BY_MEMBER.get(member);
+      if (memberRule) add(memberRule, node);
+      if (ts.isIdentifier(object) && isValueReference(object)) {
+        const qualifiedRule = BY_QUALIFIED.get(`${object.text}.${member}`);
+        if (qualifiedRule) add(qualifiedRule, node);
+        const viaGlobalThis = object.text === "globalThis" && BY_GLOBAL.get(member);
+        if (viaGlobalThis) add(viaGlobalThis, node);
+      }
     }
-    for (const rule of sequenceRules) {
-      if (rule.tokens.every((t, k) => toks[i + k]?.text === t)) add(rule, tok.pos);
+
+    if (ts.isIdentifier(node) && isValueReference(node)) {
+      const rule = BY_GLOBAL.get(node.text);
+      if (rule) add(rule, node);
     }
-  });
+    ts.forEachChild(node, visit);
+  };
+  visit(sf);
   return findings.sort((a, b) => a.line - b.line);
 }
 
@@ -340,10 +293,13 @@ function main() {
   } catch (error) {
     refuse(`\`git ls-files\` failed: ${String(error.message ?? error).split("\n")[0]}`);
   }
-  const isSource = (f) => /\.tsx?$/.test(f) && !/\.(test|spec)\.tsx?$/.test(f);
+  // Every extension TypeScript can parse, .d.ts included: a .mjs or .js file
+  // in core/src is as much core as a .ts one, and a gate that read only .ts
+  // would print OK over it.
+  const isSource = (f) => SOURCE.test(f) && !TEST.test(f);
   const files = listing.split("\0").filter(Boolean).filter(isSource);
   if (files.length === 0) {
-    refuse(`no tracked .ts/.tsx files under ${pathspec}.`);
+    refuse(`no tracked source files (.ts .tsx .mts .cts .js .jsx .mjs .cjs) under ${pathspec}.`);
   }
   noteUntrackedInput({ pathspec, suffix: "", include: isSource, gate: "core purity" });
 
