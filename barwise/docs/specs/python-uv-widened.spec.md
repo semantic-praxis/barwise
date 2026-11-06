@@ -5,6 +5,7 @@ Created: 2026-11-06
 Last-updated: 2026-11-06
 Tracking: barwise-ym8.gc9 (adr-refactor batch 3), barwise-ym8.fq7,
 barwise-ym8.l69, barwise-ym8.q07, barwise-ym8.usv, barwise-ym8.suc
+Plan-reviewed: 0bd887bb (code-review, pr-review)
 Touches: barwise/scripts/check-python-uv.mjs, barwise/scripts/lib/python-uv-rules.mjs,
 barwise/scripts/hooks/python-uv-guard.mjs, barwise/scripts/tests/,
 +barwise/scripts/install-uv.sh, .github/workflows/ci.yml,
