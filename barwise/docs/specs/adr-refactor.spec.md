@@ -149,9 +149,13 @@ Restatements (the rule stays; `Date:` stays):
    `parseSqlFile` leaves core with it is settled in that spec. The
    `pascal-case-avro`, `pascal-case-openapi` and `sqlglot-bridge`
    parity sets go with the copies.
-2. `credential-handling#rotate-not-revert`: "Every message `check:secrets`
-   and the pre-commit hook print on a finding names rotation in the
-   provider console as the remedy, and none suggests rewriting history."
+2. `credential-handling#rotate-not-revert`: **owner, 2026-11-06:
+   retire.** Obvious to anyone who handles a leak, and the project does
+   not prescribe what a person does in their provider console. The
+   guidance moves to Consequences (rotation is the remedy; reverting or
+   rewriting history does not undo a leak, though a revert may still be
+   wanted), and the root CLAUDE.md convention that restates it is cut
+   to match in the same PR.
 3. `determinism-in-core#one-layer-out`: "Outside core, only
    `@barwise/llm` imports a model SDK, and a format's own file and
    subprocess I/O lives in its connector package; anything else that
