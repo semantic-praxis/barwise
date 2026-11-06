@@ -205,7 +205,8 @@ CLAUDE.md makes that vocabulary descriptive, not a gate.
 Five parts, in this order, and nothing else:
 
 ```
-Recommendation: merge / merge after <items> / do not merge -- <one sentence>.
+Recommendation: merge / merge after <items> / do not merge / cannot tell /
+  code-review unavailable -- <one sentence>.
 Read: <spine, in order, minutes it costs and the basis>. Risk peak: <file>.
 Cleared: <regions>, because <the test that clears each one>.
 Findings: <ranked, per section 4>.
@@ -230,12 +231,17 @@ claim makes the verdict "cannot tell", not "merge".
   then submit as COMMENT, or REQUEST_CHANGES when a finding blocks)
   through the GitHub MCP tools or `gh`, with the attribution footer.
   As the reviewer, never APPROVE and never merge.
-- The agent driving its own PR, before merging it: deliver the review
-  in the session and post nothing; the `steward` skill, section 4b,
-  owns what happens next. The review recommends; the merge decision
-  and its accountability stay with the owner, who has delegated it to
-  that agent only after this review recommends `merge` on the head
-  being merged.
+- The agent driving its own PR, before merging it: post the review as
+  one PR comment (not a GitHub review), whose first line is `Review
+  verdict on head <sha>: **<verdict>**.` with the verdict one of
+  `merge`, `merge after`, `do not merge`, `cannot tell` or
+  `code-review unavailable`; the `steward` skill, section 4b, owns what
+  happens next. The comment is the record a merge is checked against
+  (`docs/adr/merge-delegation.md#review-before-merge`): without it, a
+  review delivered only in the session cannot be told from none. The
+  review recommends; the merge decision and its accountability stay
+  with the owner, who has delegated it to that agent only after this
+  review recommends `merge` on the head being merged.
 - REQUEST_CHANGES is only available when the review posts as someone
   other than the PR's author: GitHub rejects it on one's own PR, and a
   remote session posts as the user, so on the user's PRs it fails
