@@ -7,7 +7,8 @@ barwise-tko, barwise-rh3, barwise-80d,
 docs/specs/baseline-write-preserves-verdicts.spec.md,
 docs/specs/audit-finding-reader.spec.md
 Enforced-by: tests (merge-not-regenerate, one-merge-owner, specs-write-on-ask, findings-order,
-duplication-no-writer), none (barwise-ym8.fi5: merge-not-regenerate)
+duplication-no-writer), none (barwise-ym8.fi5: merge-not-regenerate),
+none (barwise-ym8.nhy: findings-order)
 
 ## Context
 
@@ -62,20 +63,23 @@ note, was decided when barwise-qs8 closed.
     unchanged, apart from the reopen, and a second run changes
     nothing;
   - the reopen, and that `--check` then fails;
-  - that a bare `audit-spec-status` writes nothing, over a reversed,
-    stale baseline as well as the committed one, and that `--write`
-    then does write;
+  - that a bare `audit-spec-status` writes nothing, over a baseline
+    with its rows reversed as well as the committed one, and that
+    `--write` then does write;
   - each writer's output after it is given reversed rows: sorted by id,
     with the merge summary printed;
   - that `audit-duplication.mjs` contains no `writeFileSync`, and that
-    running `--check` leaves its baseline's bytes and git status alone;
+    running `--check` leaves its baseline's bytes and modification
+    time, and the tree's git status, alone;
   - a registry of the five baselines, keyed to the ones
     `scripts/lib/findings.mjs` reads: each writer imports and calls
-    `mergeBaselineRows` (the trial gate is the declared exception), and
-    no other script under `scripts/` or `trial/lib/` names a baseline
-    in code that writes a file.
-- CI runs `test:scripts` before `npm run build`. The `audit-rubric`
-  writer test needs `packages/promptlab/dist`, so it skips in CI and
+    `readExistingRows` and `mergeBaselineRows` (the trial gate is the
+    declared exception) and is one the round-trip tests run, and no
+    other script anywhere under `scripts/` or `trial/lib/` names a
+    baseline in code that writes or moves a file.
+- CI runs `test:scripts` before `npm run build`. The two `audit-rubric`
+  writer tests (round trip, and order and summary) need
+  `packages/promptlab/dist`, so they skip in CI and
   in the pre-push `ci:local --commit`, which uses a fresh worktree. It
   runs only where a build already exists (barwise-eu6).
 - The summary misreports a reopen: `audit-spec-status` counts a
@@ -88,8 +92,10 @@ note, was decided when barwise-qs8 closed.
   nothing checks it (barwise-5ij).
 - The trial writer, decision 2's exception, keeps rows no longer
   detected and never refreshes derived fields (decision 1), and prints
-  no summary (decision 4). Its rows are sorted and existing verdicts
-  survive (barwise-tko).
+  no summary (decision 4), so `findings-order` keeps its gap
+  (barwise-ym8.nhy). It sorts its rows and keeps existing verdicts, but
+  no test runs it: its paths are fixed in `trial/lib/paths.mjs`, and a
+  run needs `trial:offline` results (barwise-tko).
 - Apart from the reopen, a writer refreshes derived fields under a
   kept verdict and reports nothing about it. The spec left this as an
   unresolved Open decision ("Recommend silent refresh for now and a

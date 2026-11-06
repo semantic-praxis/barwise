@@ -1,6 +1,6 @@
 # Audit findings: one reader over the five baselines, and the gates it makes possible
 
-Status: WS1 implemented 2026-11-06 (`scripts/lib/findings.mjs` and `check:findings`, a CI step; findings-close-by-mechanism decisions 1 and 3 restated; the dead catalog class removed); WS2 implemented 2026-11-06 (the writer registry keyed to the findings reader, writer order and summary, write-on-ask and no-writer run-and-compare tests; the trial writer is decision 2's declared exception); WS3 and WS4 not started
+Status: WS1 implemented 2026-11-06 (`scripts/lib/findings.mjs` and `check:findings`, a CI step; findings-close-by-mechanism decisions 1 and 3 restated; the dead catalog class removed); WS2 implemented 2026-11-06 (the writer registry keyed to the findings reader, writer order and summary, write-on-ask and no-writer run-and-compare tests; the trial writer is decision 2's declared exception; its own fixture case is not built, since its paths are fixed in trial/lib/paths.mjs); WS3 and WS4 not started
 
 Created: 2026-11-06
 Last-updated: 2026-11-06
