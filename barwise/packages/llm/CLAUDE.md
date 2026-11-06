@@ -6,11 +6,11 @@ ORM models using structured LLM output.
 
 ## Dependency Rule
 
-This package depends on `@barwise/core` (model types, serializers) and
-the provider SDKs `@anthropic-ai/sdk` and `openai`. The Ollama provider
+Its externals are the provider SDKs `@anthropic-ai/sdk` and `openai`. The Ollama provider
 uses neither: it talks to Ollama's native `/api/chat` over `fetch` from
-Node core, so it adds no dependency at all. It has ZERO
-dependencies on VS Code. The LLM integration is intentionally kept at
+Node core, so it adds no dependency at all. Internal dependencies are the Upstream
+rows of `## Dependencies` below, checked against `INTENDED` by
+`npm run check:architecture`. It has ZERO dependencies on VS Code. The LLM integration is intentionally kept at
 the boundary of the system -- the core model and validation logic know
 nothing about LLMs.
 

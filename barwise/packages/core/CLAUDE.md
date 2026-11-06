@@ -235,6 +235,17 @@ it, so knip sees an unused file where there is a live edge.
 - Coverage targets: model 95%+, validation 95%+, serialization 95%+,
   verbalization 90%+, mapping 90%+.
 
+## Dependencies
+
+| Direction | Package | What is used                                                                   |
+| --------- | ------- | ------------------------------------------------------------------------------ |
+| Upstream  | none    | Core has no internal dependencies; its external runtime dependencies are above |
+
+Upstream rows that name an internal package are checked against `INTENDED`
+(`npm run check:architecture`); for core there are none, and the check
+also fails a bare import in `src/` that core's runtime dependency fields do
+not declare (`docs/adr/package-graph-authority.md#core-external-deps`).
+
 ## Downstream Dependents
 
 Every other package in the monorepo depends on this one; `INTENDED`

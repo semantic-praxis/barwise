@@ -9,8 +9,9 @@ registry, the format interfaces, and the native `.orm.yaml`.
 
 ## Dependency Rule
 
-This package depends on `@barwise/core` for model types, the
-`ImportFormat` / `ExportFormatAdapter` interfaces, the format registry,
+Internal dependencies are the Upstream rows of `## Dependencies`
+below, checked against `INTENDED` by `npm run check:architecture`.
+From core it uses model types, the `ImportFormat` / `ExportFormatAdapter` interfaces, the format registry,
 and the relational capabilities its renderers build on: `RelationalMapper`,
 the constraint router and dialect profiles
 (`routeConstraints`, `resolveDialectProfile`), the ConstraintSpec builder
@@ -19,7 +20,7 @@ and the SQL dialect types. It owns the SQL parser cascade (`sql/`), which
 `@barwise/dbt` composes through `parseSqlPatterns`. It does NOT depend on
 any editor or tool package.
 
-Allowed runtime dependencies: `@barwise/core`, `yaml`, `fast-xml-parser`,
+Allowed external runtime dependencies: `yaml`, `fast-xml-parser`,
 `ajv`. No others without discussion. `ajv` is there for one reason: the
 Ossie importer validates against the pinned schema at run time, to name
 fields it does not define (`docs/specs/ossie-unknown-fields.spec.md`).

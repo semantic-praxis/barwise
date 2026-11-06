@@ -12,12 +12,12 @@ Specs: `docs/specs/modeling-gym.spec.md`, `docs/specs/modeling-tutorial.spec.md`
 
 ## Dependency Rule
 
-Depends only on `@barwise/core` (via its published root and subpath
-exports) and `yaml`. ZERO dependency on VS Code or any editor/platform
-API. `@barwise/diagram` may be added later for the tutorial's per-step
-SVGs. `@barwise/cli` (`barwise gym`) and `@barwise/mcp`
-(`gym_list`/`gym_check`) consume this package; it must never depend on
-either.
+Reaches core through its published root and subpath exports, and
+`yaml` as the one external. ZERO dependency on VS Code or any
+editor/platform API. The CLI (`barwise gym`) and the MCP server
+(`gym_list`/`gym_check`) consume this package, so it must never depend
+on a surface. Its internal dependencies are the Upstream rows of `## Dependencies` below; `INTENDED` in
+`barwise/scripts/lib/intended.cjs` is the authority and `npm run check:architecture` compares the two.
 
 ## Package Layout
 
@@ -90,6 +90,12 @@ tests/            Vitest; tests/helpers/ModelBuilder.ts (copied from @barwise/co
   `renderMissCardFile` are deterministic (no clocks, no randomness);
   the file write and the session log live in the `barwise gym` CLI, at
   the edge, homed at `$XDG_STATE_HOME/barwise/`.
+
+## Dependencies
+
+| Direction | Package         | What is used                                                  |
+| --------- | --------------- | ------------------------------------------------------------- |
+| Upstream  | `@barwise/core` | Model types, validation, serialization, for exercise checking |
 
 ## Commands
 

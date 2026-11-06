@@ -7452,8 +7452,30 @@ function architectureRepo() {
     if (existsSync(join(REPO, rel))) {
       copy(rel);
       manifests += 1;
+      copy(`barwise/packages/${pkg}/CLAUDE.md`);
     }
   }
+  // What the graph-copy and core-import scans read: the scripts that could
+  // keep a copy of the graph (the tests excepted, as the gate excepts
+  // them) and core's source. Written in bulk and added once: it is some
+  // two hundred files.
+  const tracked = execFileSync("git", [
+    "ls-files",
+    "-z",
+    "barwise/scripts/",
+    "barwise/packages/core/src/",
+  ], {
+    cwd: REPO,
+    encoding: "utf8",
+  }).split("\0").filter((f) =>
+    f !== "" && !f.startsWith("barwise/scripts/tests/")
+    && (f.startsWith("barwise/packages/core/src/") || /\.(mjs|cjs|js)$/.test(f))
+  );
+  for (const rel of tracked) {
+    mkdirSync(dirname(join(dir, rel)), { recursive: true });
+    writeFileSync(join(dir, rel), readFileSync(join(REPO, rel)));
+  }
+  execFileSync("git", ["add", "--", ...tracked], { cwd: dir });
   // The rewritten headers render differently in the index, so the copied
   // section is regenerated from them, as stageAdr() does for one ADR.
   {
@@ -7651,6 +7673,55 @@ const ARCH_DISAGREEMENTS = [
     `"yaml": "npm:z3-solver@^`,
     /packages\/core: dependencies has yaml as "npm:z3-solver@\^/,
   ],
+  // The graph copied into a script as an adjacency entry
+  // (package-graph-authority#intended-is-graph); the same entry written
+  // with manifest names, or under a quoted key, is found as well.
+  [
+    "barwise/scripts/arch-triage.mjs",
+    "const PACKAGES = Object.keys(INTENDED);",
+    'const COPY = { "promptlab": ["core"] };\nconst PACKAGES = Object.keys(INTENDED);',
+    /arch-triage\.mjs:\d+: "promptlab": \["core"\] is a copy of an INTENDED entry/,
+  ],
+  [
+    "barwise/scripts/arch-triage.mjs",
+    "const PACKAGES = Object.keys(INTENDED);",
+    'const COPY = { cli: ["@barwise/core", "@barwise/llm"] };\nconst PACKAGES = Object.keys(INTENDED);',
+    /arch-triage\.mjs:\d+: "cli": \["@barwise\/core", "@barwise\/llm"\] is a copy/,
+  ],
+  // A package CLAUDE.md Upstream row INTENDED does not allow, one it lacks,
+  // and one that names no package.
+  [
+    "barwise/packages/diagram/CLAUDE.md",
+    "| Upstream   | `@barwise/core`       |",
+    "| Upstream   | `@barwise/llm`        | x |\n| Upstream   | `@barwise/core`       |",
+    /packages\/diagram\/CLAUDE\.md: Upstream llm, INTENDED does not allow diagram -> llm/,
+  ],
+  [
+    "barwise/packages/diagram/CLAUDE.md",
+    "| Upstream   | `@barwise/core`       |",
+    "| Downstream | `@barwise/core`       |",
+    /INTENDED has diagram -> core, packages\/diagram\/CLAUDE\.md has no Upstream row/,
+  ],
+  [
+    "barwise/packages/diagram/CLAUDE.md",
+    "| Upstream   | `@barwise/core`       |",
+    "| Upstream   | `@barwise/core`       | x |\n| Upstream   | `@barwise/ghost`      |",
+    /packages\/diagram\/CLAUDE\.md: Upstream @barwise\/ghost is not a package in INTENDED/,
+  ],
+  // Core imports a package its runtime fields do not declare, bare or
+  // type-only; a node: or relative import is purity's.
+  [
+    "barwise/packages/core/src/index.ts",
+    "// Model\nexport {",
+    'import "fast-check";\n// Model\nexport {',
+    /packages\/core\/src\/index\.ts: imports fast-check, which is not in packages\/core's/,
+  ],
+  [
+    "barwise/packages/core/src/index.ts",
+    "// Model\nexport {",
+    'import type { Arbitrary } from "fast-check/lib/types";\n// Model\nexport {',
+    /imports fast-check, which is not in/,
+  ],
 ];
 
 test("check:architecture passes the real graph and catches each planted disagreement", () => {
@@ -7745,6 +7816,46 @@ test("check:architecture passes the real graph and catches each planted disagree
     const gone = runArch(dir);
     assert.equal(gone.status, 1, gone.stderr);
     assert.match(gone.stderr, /INTENDED has learn, which is not a package under packages\//);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("check:architecture reads package CLAUDE.md tables and script literals only where they state the graph", () => {
+  const { dir } = architectureRepo();
+  const LLM = "barwise/packages/llm/CLAUDE.md";
+  try {
+    // Not an entry: an array that also holds a non-package, an empty one,
+    // and the same shape in a test, whose fixtures state graphs on purpose.
+    for (
+      const edit of [
+        (x) =>
+          x.replace(
+            "const PACKAGES",
+            'const A = { core: ["ajv", "core"], cli: [] };\nconst PACKAGES',
+          ),
+      ]
+    ) {
+      const ok = archPlanted(dir, "barwise/scripts/arch-triage.mjs", edit);
+      assert.equal(ok.status, 0, ok.stdout + ok.stderr);
+    }
+    stage(dir, "barwise/scripts/tests/fixture-graph.test.mjs", 'const G = { "cli": ["core"] };\n');
+    // An external Upstream row (diagram-ui's react) is ignored; a heading
+    // with no table, and an Upstream cell that is no name, are findings.
+    const noTable = archPlanted(dir, LLM, (x) => x.replace(/^\| Direction/m, "| Heading"));
+    assert.equal(noTable.status, 1, noTable.stderr);
+    assert.match(noTable.stderr, /packages\/llm\/CLAUDE\.md: has no "## Dependencies" table/);
+    const bad = archPlanted(
+      dir,
+      LLM,
+      (x) => x.replace(/^(\| Upstream\s*\| )`@barwise\/core`/m, "$1core"),
+    );
+    assert.equal(bad.status, 1, bad.stderr);
+    assert.match(bad.stderr, /Upstream row "core" is not a backticked name/);
+    // A package CLAUDE.md that cannot be read is a refusal, not "no rows".
+    rmSync(join(dir, LLM));
+    const gone = runArch(dir);
+    assert.equal(gone.status, 2, gone.stdout + gone.stderr);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -8052,12 +8163,17 @@ test("check:architecture checks each ADR's shape", () => {
   }
 });
 
+// A package CLAUDE.md that states no internal dependency, as core's does:
+// a stub in these tests must keep it, or the table check reports the stub.
+const CORE_DEPS =
+  "\n## Dependencies\n\n| Direction | Package | What is used |\n| --- | --- | --- |\n| Upstream | none | x |\n";
+
 test("check:architecture resolves each ADR reference in the files that act on it", () => {
   const { dir } = architectureRepo();
   try {
     stageAdr(dir, "a-concern", ADR_OK);
     // Live references in both forms, from each kind of citing file.
-    stage(dir, "barwise/packages/core/CLAUDE.md", "See ADR `a-concern`.\n");
+    stage(dir, "barwise/packages/core/CLAUDE.md", `See ADR \`a-concern\`.\n${CORE_DEPS}`);
     stage(dir, "barwise/packages/core/src/x.ts", "// docs/adr/a-concern.md\n");
     // A spec may cite an ADR it plans as a `+` Touches: entry.
     stage(
@@ -8077,7 +8193,11 @@ test("check:architecture resolves each ADR reference in the files that act on it
     );
     stage(dir, "barwise/docs/specs/archive/old.spec.md", "# O\n\nADR `gone`\n");
     stage(dir, "barwise/docs/review-2026-08-27.md", "docs/adr/gone.md\n");
-    stage(dir, "barwise/packages/core/CLAUDE.md", "See ADR `a-concern`. ADR 0001 too.\n");
+    stage(
+      dir,
+      "barwise/packages/core/CLAUDE.md",
+      `See ADR \`a-concern\`. ADR 0001 too.\n${CORE_DEPS}`,
+    );
     execFileSync("git", ["commit", "-qm", "refs"], { cwd: dir });
     const ok = runArch(dir);
     assert.equal(ok.status, 0, ok.stdout + ok.stderr);

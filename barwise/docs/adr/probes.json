@@ -13,9 +13,24 @@
   },
   {
     "decision": "package-graph-authority#intended-is-graph",
+    "gate": "depcruise",
     "file": "barwise/packages/diagram/src/index.ts",
     "old": "// Graph types and conversion.",
     "new": "import \"@barwise/llm\";\n// Graph types and conversion."
+  },
+  {
+    "decision": "package-graph-authority#intended-is-graph",
+    "gate": "check:architecture",
+    "file": "barwise/scripts/arch-triage.mjs",
+    "old": "const PACKAGES = Object.keys(INTENDED);",
+    "new": "const COPY = { \"promptlab\": [\"core\"] };\nconst PACKAGES = Object.keys(INTENDED);"
+  },
+  {
+    "decision": "package-graph-authority#intended-is-graph",
+    "gate": "check:architecture",
+    "file": "barwise/packages/diagram/CLAUDE.md",
+    "old": "| Upstream   | `@barwise/core`       |",
+    "new": "| Upstream   | `@barwise/llm`        | not allowed |\n| Upstream   | `@barwise/core`       |"
   },
   {
     "decision": "package-graph-authority#claude-md-rendering",
@@ -28,6 +43,12 @@
     "file": "barwise/packages/core/package.json",
     "old": "\"dependencies\": {\n    \"ajv\"",
     "new": "\"dependencies\": {\n    \"z3-solver\": \"^4.13.0\",\n    \"ajv\""
+  },
+  {
+    "decision": "package-graph-authority#core-external-deps",
+    "file": "barwise/packages/core/src/index.ts",
+    "old": "// Model\nexport {",
+    "new": "import \"fast-check\";\n// Model\nexport {"
   },
   {
     "decision": "package-graph-authority#runtime-deps-within",
