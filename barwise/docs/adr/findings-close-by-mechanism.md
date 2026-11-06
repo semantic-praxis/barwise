@@ -9,7 +9,7 @@ docs/specs/correction-record-ratchet.spec.md,
 docs/specs/audit-finding-reader.spec.md
 Enforced-by: npm run audit:specs -- --check (person-classifies),
 npm run check:findings (mechanism-closes, person-classifies),
-tests (ratchet-both-ways),
+tests (ratchet-both-ways, ratchet-in-ci),
 none (barwise-ym8.k4d: ratchet-both-ways), none (barwise-ym8.h0l: person-classifies),
 none (barwise-ym8.ld2: ratchet-in-ci)
 
@@ -64,10 +64,26 @@ verdict on every row is safe to gate on, when raw detection is not.
     a baseline: `check:instruction-refs` (from the 2026-10-04 prompt
     audit) and `check:python-uv` each fail on a stale allowlist row, so
     a fixed site forces its row out.
-- Decision 2: each of the four audit ratchets implements both
-  directions. A test covers the stale-row direction only for
-  `audit:corrections` (barwise-2af).
-- Decision 4 has no gate.
+- `RATCHETS` in `scripts/lib/findings.mjs` lists one ratchet per
+  baseline the findings reader reads, with the `ci.yml` line that runs
+  it. A test fails when a baseline has no ratchet, when a ratchet's line
+  is not a step that can fail CI (run in `barwise/`, not
+  continue-on-error, under a guard that runs it on every code change, as
+  `adr-judge.mjs` judges a declared gate), when its npm script runs a
+  different file, or when a ratchet has no stale-row case:
+  - `audit:duplication`, `audit:specs` and `audit:rubric` get a row
+    planted in their real baseline and must fail `--check` naming it;
+    the rubric case needs the built promptlab, so it skips in CI, which
+    runs `test:scripts` before the build (barwise-ym8.k4d, with
+    barwise-ym8.fi5);
+  - `audit:corrections` and `trial:gate` are covered by tests that
+    plant a stale row in a sandbox, which the registry names and checks
+    exist;
+  - `trial:gate` alone has no CI step: a run needs `trial:offline`
+    results, which no CI job produces (barwise-ym8.ld2).
+- The other half of decision 2, a new candidate with no row, is tested
+  for `audit:corrections` only (barwise-ym8.k4d).
+- Decision 4 beyond the registry:
   - `trial:gate` ratchets `trial-baseline.json`, but only the trial's
     unit tests run in CI. The enterprise-trial spec plans the small
     tier for CI in its WS6, and defers that wiring "not in this PR"

@@ -221,3 +221,40 @@ export function readFindings(root) {
 
 /** The baseline file each source reads, for messages and tests. */
 export const SOURCE_FILES = Object.fromEntries(SOURCES.map((s) => [s.source, s.file]));
+
+/** The object in each baseline that holds its rows. */
+export const SOURCE_KEYS = Object.fromEntries(SOURCES.map((s) => [s.source, s.key]));
+
+/**
+ * The audit ratchets, one per baseline (findings-close-by-mechanism
+ * decisions 2 and 4): the script that runs it, and the ci.yml `run:` line
+ * that wires it into CI, or why it is not wired (`noCi`). A test in
+ * gates.test.mjs requires this list to cover every baseline above, each
+ * `ci` line to be a step that can fail CI, and each script to be the one
+ * its npm script runs; the stale-row cases that test each ratchet live
+ * with the tests, not here.
+ */
+export const RATCHETS = [
+  {
+    source: "duplication",
+    script: "scripts/audit-duplication.mjs",
+    ci: "npm run audit:duplication -- --check",
+  },
+  { source: "rubric", script: "scripts/audit-rubric.mjs", ci: "npm run audit:rubric -- --check" },
+  {
+    source: "specs",
+    script: "scripts/audit-spec-status.mjs",
+    ci: "npm run audit:specs -- --check",
+  },
+  {
+    source: "corrections",
+    script: "scripts/audit-corrections.mjs",
+    ci: "npm run audit:corrections -- --check",
+  },
+  {
+    source: "trial",
+    script: "trial/lib/gate.mjs",
+    noCi:
+      "needs trial:offline results, which no CI job produces; the trial spec's WS6 wires that lane (barwise-uuy)",
+  },
+];
