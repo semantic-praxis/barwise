@@ -1,6 +1,6 @@
 # The gate refusal contract, enforced: the fault matrix green and in CI
 
-Status: WS1 under way 2026-11-06 (barwise-ydl fixed: check-tracker-closes refuses an empty merge-base and an empty tracker read; check-tracker-closes refuses a close whose diff omits the tracker; test-adr-model refuses when git cannot answer; the shallow-clone cases of test:scripts skip, and the matrix shim answers only for the repository under test); WS2 waits on open decision 1; WS3 and WS4 not started
+Status: WS1 under way 2026-11-06 (barwise-ydl fixed: check-tracker-closes refuses an empty merge-base and an empty tracker read; check-tracker-closes refuses a close whose diff omits the tracker; test-adr-model refuses when git cannot answer; the shallow-clone cases of test:scripts skip, and the matrix shim answers only for the repository under test; audit-rubric and check-depcruise-gate refuse a missing input, barwise-shq; npm run depcruise exits by its violation count, barwise-vt2); WS2 waits on open decision 1; WS3 and WS4 not started
 Created: 2026-11-06
 Last-updated: 2026-11-06
 Tracking: barwise-ym8.gc9 (adr-refactor batch 2), barwise-ym8.j31,
@@ -11,6 +11,7 @@ Touches: barwise/scripts/fault-matrix.mjs, barwise/scripts/check-tracker-closes.
 barwise/scripts/test-adr-model.mjs, barwise/scripts/run-script-tests.mjs,
 barwise/scripts/check-depcruise-gate.mjs, barwise/scripts/audit-rubric.mjs,
 barwise/scripts/ci-local.mjs, barwise/scripts/lib/ci-gates.mjs,
++barwise/scripts/run-depcruise.mjs, barwise/package.json,
 barwise/scripts/tests/,
 barwise/.husky/pre-commit, .github/workflows/ci.yml,
 barwise/docs/adr/gate-refusal-contract.md, barwise/docs/adr/probes.json,

@@ -5595,6 +5595,25 @@ test("check-depcruise-gate refuses when dependency-cruiser cannot run, never a s
   }
 });
 
+test("depcruise exits by its violation count, never by the 8-bit exit code (barwise-vt2) [adr:gate-refusal-contract#three-results]", async () => {
+  // dependency-cruiser exits with its violation count, which the OS keeps
+  // mod 256: two violations read as a refusal, 256 as a pass.
+  const { exitFor } = await import(pathToFileURL(join(SCRIPTS, "run-depcruise.mjs")).href);
+  assert.equal(exitFor({ summary: { error: 0, warn: 3 } }), 0);
+  assert.equal(exitFor({ summary: { error: 1 } }), 1);
+  assert.equal(exitFor({ summary: { error: 2 } }), 1);
+  assert.equal(exitFor({ summary: { error: 256 } }), 1);
+  assert.equal(exitFor({ summary: {} }), 2);
+  assert.equal(exitFor(undefined), 2);
+  // The real tree answers 0 through the npm script CI runs.
+  const r = spawnSync("npm", ["run", "-s", "depcruise"], {
+    cwd: join(REPO, "barwise"),
+    encoding: "utf8",
+  });
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  assert.match(r.stdout, /no dependency violations found/);
+});
+
 test("check-tracker-closes refuses when git answers emptily, with and without BASE_SHA (barwise-ydl) [adr:gate-refusal-contract#refuse-not-find]", () => {
   // The fault matrix's git-empty axis read a FALSE GREEN here: an empty
   // merge-base became base "", and an empty `git show` of the tracker a
