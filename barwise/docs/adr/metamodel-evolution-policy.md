@@ -63,10 +63,16 @@ rows 18, 21, 22 and 23); the decision below is the one a check can.
 
 ## Decision
 
-1. **Keep recomputing derived artifacts; never persist them.**{#recompute-derived} Relational
-   mapping, DDL, and any OIAL-style layer stay _recomputed_ from the
-   conceptual model. Persisting them (as NORMA does) is what keeps core
-   deterministic and the file lean; not adding them is itself a decision.
+1. **The `.orm.yaml` schema defines no property for relational mapping,
+   DDL or other rendered output, and the serializer writes none; each is
+   recomputed from the conceptual model.**{#recompute-derived} Persisting
+   them (as NORMA does) would cost the determinism of core and the
+   leanness of the file; not adding them is itself a decision. Restated
+   on 2026-11-06 (`adr-refactor.spec.md`, row 10) from "keep
+   recomputing derived artifacts; never persist them". Its check, an
+   allowlist of the schema's properties classified as conceptual, is
+   batch 9 of that spec. Whether a format's `x-` value may hold output
+   barwise can recompute is barwise-83g's.
 
 ## Tiering
 
