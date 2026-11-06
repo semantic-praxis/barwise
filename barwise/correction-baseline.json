@@ -1,6 +1,12 @@
 {
   "$comment": "Correction records in docs/specs, from scripts/audit-corrections.mjs (npm run audit:corrections -- --check; CI runs it). A spec that records what its draft got wrong carries a verdict here saying what CAUGHT it -- execution, reasoning, or provenance -- or not-a-correction when the detector over-matched. --check fails on a detected record missing here AND on a row no longer detected, so the file always enumerates exactly the corpus. The detector is deliberately over-inclusive; the markers are in the script, which is their only home. Seed and method: docs/spec-correction-taxonomy-2026-09-11.md. Spec: docs/specs/correction-record-ratchet.spec.md.",
   "records": {
+    "adr-batch9-enforcers::a7ca09d36a00": {
+      "spec": "adr-batch9-enforcers.spec.md",
+      "excerpt": "the first draft's \"two places, plus a type in verifyossie.ts\" was wrong: a key-and-template scan misses the as",
+      "caught_by": "reasoning",
+      "note": "Plan review (code-review on the draft): verifyOssie.ts:169 assigns doc.orm_version in document30(), so the writer census was redone with a full parse."
+    },
     "adr-refactor::9d07bb9afdb8": {
       "spec": "adr-refactor.spec.md",
       "excerpt": "- copilot-requested (barwise-ym8.7y6) -- procedure, buildable (low), batch 10: the copilot request job running only on workflowdispatch; enforcer: workflow test",

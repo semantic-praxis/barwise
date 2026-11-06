@@ -87,6 +87,13 @@ output specification for the PR body (spec:
   downstream packages compile against the new `dist`, not the old.
 - A metamodel or serialization change bumps or handles
   `schemaVersion`.
+- **A new `conceptual` row in `core/schemas/orm-model.property-classes.json`
+  is checked against whether the serializer could recompute it.** If the
+  value follows from the rest of the model (a table, a column, DDL, a
+  rendered diagram), it is derived output and does not belong in the
+  schema at all. The core test fails an unclassified slot but passes a
+  wrongly classified one, so this half is review's. Authority:
+  `docs/adr/metamodel-evolution-policy.md#recompute-derived`.
 - **A new or widened validation rule checks a state construction could
   refuse instead.** `validation/rules/structural.ts` and
   `validation/rules/population/structural.ts`
