@@ -1,9 +1,9 @@
 # The capability matrix, checked against what each surface registers
 
-Status: WS1 implemented 2026-11-06 (check:capability-matrix, full run and --static, with capability-map.json for all 22 rows and their cells; probes for matrix-records-reach, matrix-same-commit and vscode-yes-means CAUGHT; the gate agreed with main on its first run; code review dropped the stale-build refusal and made --static compare cells); WS2 planned (re-grounded 2026-11-06; plan review pending)
+Status: WS1 implemented 2026-11-06 (check:capability-matrix, full run and --static, with capability-map.json for all 22 rows and their cells; probes for matrix-records-reach, matrix-same-commit and vscode-yes-means CAUGHT; the gate agreed with main on its first run; code review dropped the stale-build refusal and made --static compare cells); WS2 planned (re-grounded and plan-reviewed 2026-11-06)
 Created: 2026-11-06
 Last-updated: 2026-11-06
-Plan-reviewed: 8d9588bb (code-review, pr-review)
+Plan-reviewed: 8d9588bb (code-review, pr-review; WS2 re-reviewed at 0dc20f07)
 Tracking: barwise-ym8.gc9 (adr-refactor batch 5), barwise-ym8.wfy,
 barwise-ym8.3nm, barwise-ym8.0hi, barwise-ym8.0pq, barwise-1005, barwise-xpt
 Touches: CLAUDE.md, package.json, +barwise/scripts/check-capability-matrix.mjs,
@@ -219,7 +219,8 @@ Consequences prose.
   `{ decision, files, why }` rows, which the gate turns into a refusal,
   never zero rows. The report readers keep each entry's file as a path
   relative to the **report's own directory** (`packages/<pkg>/` for a
-  vitest report, `scripts/tests/` for a script report), taken from the
+  vitest report, `scripts/tests/` for a script report, `trial/tests/`
+  for the trial report), taken from the
   part of the absolute path after that directory's last occurrence:
   plan review found turbo's shared cache restores a report written in
   another checkout, so its absolute prefix is not this root's. A null
