@@ -51,8 +51,8 @@ Architecture:
 Process:
 
 - [Baseline writers merge verdicts](adr/baselines-merge-on-write.md) -- 2026-11-06 -- declared: tests (merge-not-regenerate, one-merge-owner, specs-write-on-ask, findings-order, duplication-no-writer); gap: barwise-ym8.fi5 (merge-not-regenerate); gap: barwise-ym8.nhy (findings-order)
-- [Constraint-extraction coverage policy](adr/constraint-coverage-policy.md) -- 2026-08-27 -- gap: barwise-ym8.fmt (trust-statement); gap: barwise-ym8.nzv (compares-not-certifies); gap: barwise-ym8.5yl (two-instances); gap: barwise-ym8.vq8 (tiered-types); gap: barwise-ym8.k6g (inventory-outside)
-- [Credential handling](adr/credential-handling.md) -- 2026-09-12 -- declared: tests (gitleaks-detects, wrapper-contract); gap: barwise-ym8.yhs (rotate-not-revert); gap: barwise-ym8.7zs (gitleaks-detects); gap: barwise-ym8.kf3 (scan-index-and-history); gap: barwise-ym8.gc7 (wrapper-contract); gap: barwise-ym8.nxs (pinned-gitleaks)
+- [Constraint-extraction coverage policy](adr/constraint-coverage-policy.md) -- 2026-08-27 -- gap: barwise-ym8.5yl (two-instances); gap: barwise-ym8.vq8 (tiered-types); gap: barwise-ym8.k6g (inventory-outside)
+- [Credential handling](adr/credential-handling.md) -- 2026-09-12 -- declared: tests (gitleaks-detects, wrapper-contract); gap: barwise-ym8.7zs (gitleaks-detects); gap: barwise-ym8.kf3 (scan-index-and-history); gap: barwise-ym8.gc7 (wrapper-contract); gap: barwise-ym8.nxs (pinned-gitleaks)
 - [Findings close by mechanism](adr/findings-close-by-mechanism.md) -- 2026-11-06 -- declared: audit:specs -- --check (person-classifies), check:findings (mechanism-closes, person-classifies), tests (ratchet-both-ways, ratchet-in-ci); gap: barwise-ym8.k4d (ratchet-both-ways); gap: barwise-ym8.h0l (person-classifies); gap: barwise-ym8.ld2 (ratchet-in-ci)
 - [Gate refusal contract](adr/gate-refusal-contract.md) -- 2026-09-17 -- declared: tests (three-results, refuse-not-find, cwd-invariant, readers-keep-third); gap: barwise-ym8.j31 (three-results); gap: barwise-ym8.rl7 (refuse-not-find); gap: barwise-ym8.c42 (cwd-invariant); gap: barwise-ym8.aep (readers-keep-third); gap: barwise-ym8.if3 (no-writes)
 - [Merge delegation](adr/merge-delegation.md) -- 2026-10-18 -- gap: barwise-ym8.2ds (review-before-merge); gap: barwise-ym8.vl9 (pinned-merge); gap: barwise-ym8.2vy (no-size-exemption); gap: barwise-ym8.oof (ask-owner); gap: barwise-ym8.n0m (owner-overrides)
@@ -60,7 +60,7 @@ Process:
 - [Pinned runtimes](adr/pinned-runtimes.md) -- 2026-08-30 -- gap: barwise-ym8.q89 (node-from-nvmrc); gap: barwise-ym8.52y (python-minor); gap: barwise-ym8.eq3 (verify-running)
 - [Plan before code](adr/plan-before-code.md) -- 2026-10-25 -- declared: check:plan-review (plan-reviewed), check:spec-touches (touches-named); gap: barwise-ym8.yg7 (spec-first); gap: barwise-ym8.ogi (plan-reviewed); gap: barwise-ym8.8hq (touches-named); gap: barwise-ym8.l7d (open-decisions-reviewer)
 - [Python from the lockfile](adr/python-from-the-lockfile.md) -- 2026-09-26 -- declared: check:python-uv (lockfile-only, no-outside-forms, uv-bootstrap), tests (project-ancestor); gap: barwise-ym8.fq7 (lockfile-only); gap: barwise-ym8.l69 (no-outside-forms); gap: barwise-ym8.q07 (project-ancestor); gap: barwise-ym8.usv (groups-and-one-offs); gap: barwise-ym8.suc (uv-bootstrap)
-- [Review policy](adr/review-policy.md) -- 2026-10-24 -- declared: tests (copilot-requested, tier-informs); gap: barwise-ym8.7y6 (copilot-requested); gap: barwise-ym8.8ya (copilot-never-blocks); gap: barwise-ym8.f9u (review-md-owns-lanes); gap: barwise-ym8.ehz (tier-informs); gap: barwise-ym8.gwj (prevent-upstream)
+- [Review policy](adr/review-policy.md) -- 2026-10-24 -- declared: tests (copilot-requested, tier-informs); gap: barwise-ym8.7y6 (copilot-requested); gap: barwise-ym8.8ya (copilot-never-blocks); gap: barwise-ym8.f9u (review-md-owns-lanes); gap: barwise-ym8.ehz (tier-informs)
 
 ### Package graph
 

@@ -7,8 +7,7 @@ lives in `docs/specs/constraint-extraction-coverage.spec.md`, the
 living companion to this record), barwise-845, barwise-846. Prompted
 by barwise-863, which restored the Ring/Subset/Equality instruction
 blocks to the default extraction prompt.
-Enforced-by: none (barwise-ym8.fmt: trust-statement),
-none (barwise-ym8.nzv: compares-not-certifies), none (barwise-ym8.5yl: two-instances),
+Enforced-by: none (barwise-ym8.5yl: two-instances),
 none (barwise-ym8.vq8: tiered-types), none (barwise-ym8.k6g: inventory-outside)
 
 ## Context
@@ -30,31 +29,26 @@ kind at all. The capability envelope (what the pipeline accepts) and
 the evidence envelope (what any rubric has tested) diverged silently,
 and a reader of an extracted model or an eval score had no way to
 know. The tempting resolution -- author enough eval cases to certify
-every type -- runs into arithmetic and realism, below.
+every type -- runs into arithmetic and realism.
+
+The suite compares; it never certifies. General-case reliability is
+priced by the rule of three: n distinct passing instances bound the
+true miss rate below roughly 3/n at 95% confidence, where an instance
+is a distinct domain phrasing the rule its own way (repeats of one case
+measure noise on one phrasing). An honest "reliably extracts acyclic
+rules" at a 20% bound needs about fifteen instances per type; across
+eight ring types and three set-comparison kinds that authoring program
+would destroy the transcript-realism discipline
+(`docs/specs/eval-transcript-realism.spec.md`). No coverage level in
+this suite supports a certification claim, and none should be made.
+The decisions below follow from that: the suite's jobs are regression
+detection and variant comparison, and its coverage threshold is set for
+those. (This was decision 2 until 2026-11-06, moved here as reasoning no
+check can hold: `adr-refactor.spec.md`, row 19.)
 
 ## Decision
 
-1. **The trust statement.**{#trust-statement} Until a constraint type has rubric-tested
-   instances in the eval suite, that type in an extracted model is an
-   unreviewed suggestion: plausible, schema-valid, population-checked
-   for internal consistency, and unmeasured against the transcript.
-   Consumers treat it as they would any unreviewed model content --
-   reviewed by a human before it carries weight.
-
-2. **The suite compares; it never certifies.**{#compares-not-certifies} General-case
-   reliability is priced by the rule of three: n distinct passing
-   instances bound the true miss rate below roughly 3/n at 95%
-   confidence, where an instance is a distinct domain phrasing the
-   rule its own way (repeats of one case measure noise on one
-   phrasing). An honest "reliably extracts acyclic rules" at a 20%
-   bound needs about fifteen instances per type; across eight ring
-   types and three set-comparison kinds that authoring program would
-   destroy the transcript-realism discipline
-   (`docs/specs/eval-transcript-realism.spec.md`). No coverage level
-   in this suite supports a certification claim, and none should be
-   made.
-
-3. **Two instances per common type is the coverage threshold**{#two-instances} -- one
+1. **Two instances per common type is the coverage threshold**{#two-instances} -- one
    train, one dev, in different domains with different surface
    phrasing. One instance cannot distinguish "the prompt cannot do X"
    from "the prompt cannot do X in this phrasing"; two domains start
@@ -63,7 +57,7 @@ every type -- runs into arithmetic and realism, below.
    "was the constraint captured" -- enough for the suite's actual
    jobs, regression detection and variant comparison.
 
-4. **Types are tiered by natural occurrence, and the rare tier never
+2. **Types are tiered by natural occurrence, and the rare tier never
    enters an eval transcript.**{#tiered-types} Common tier (each owed two instances):
    `irreflexive`, `acyclic`, `symmetric`, `subset`, set-comparison
    `exclusion` -- rules real facilitated sessions state ("cannot
@@ -74,10 +68,11 @@ every type -- runs into arithmetic and realism, below.
    a transcript, breaking realism. Their home is a didactic gym
    exercise: the gym is allowed to be pedagogically complete where the
    eval suite must stay naturalistic. Until that exercise exists they
-   sit outside the validated envelope and the trust statement applies
+   sit outside the validated envelope and the trust statement (below,
+   under Consequences) applies
    to them indefinitely.
 
-5. **The living inventory stays out of this record.**{#inventory-outside} Which types are
+3. **The living inventory stays out of this record.**{#inventory-outside} Which types are
    covered today, and the workstreams closing the gaps, live in
    `docs/specs/constraint-extraction-coverage.spec.md`, updated in the
    same commit that adds a type's first or second tested instance --
@@ -87,6 +82,14 @@ every type -- runs into arithmetic and realism, below.
 
 ## Consequences
 
+- **The trust statement.** Until a constraint type has rubric-tested
+  instances in the eval suite, that type in an extracted model is an
+  unreviewed suggestion: plausible, schema-valid, population-checked
+  for internal consistency, and unmeasured against the transcript.
+  Consumers treat it as they would any unreviewed model content --
+  reviewed by a human before it carries weight. This is guidance to
+  consumers, which no check here can hold; it was decision 1 until
+  2026-11-06 (`adr-refactor.spec.md`, row 17).
 - Anyone building on ring or set-comparison extraction reads the trust
   statement first; the `llm` and `promptlab` CLAUDE.mds point here
   ("Instructed is not validated"; "A score vouches only for what some
