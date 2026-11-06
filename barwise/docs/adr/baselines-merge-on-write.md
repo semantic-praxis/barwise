@@ -1,14 +1,13 @@
 # Baseline writers merge verdicts
 
 Scope: process
-Date: 2026-10-23
+Date: 2026-11-06
 Tracking: barwise-ubc, barwise-1026, barwise-qs8, barwise-eu6, barwise-5ij,
 barwise-tko, barwise-rh3, barwise-80d,
-docs/specs/baseline-write-preserves-verdicts.spec.md
-Enforced-by: tests (merge-not-regenerate, specs-write-on-ask, findings-order,
-duplication-no-writer), none (barwise-ym8.fi5: merge-not-regenerate),
-none (barwise-ym8.3yv: one-merge-owner), none (barwise-ym8.6jy: specs-write-on-ask), none (barwise-ym8.nhy: findings-order),
-none (barwise-ym8.79m: duplication-no-writer)
+docs/specs/baseline-write-preserves-verdicts.spec.md,
+docs/specs/audit-finding-reader.spec.md
+Enforced-by: tests (merge-not-regenerate, one-merge-owner, specs-write-on-ask, findings-order,
+duplication-no-writer), none (barwise-ym8.fi5: merge-not-regenerate)
 
 ## Context
 
@@ -38,7 +37,10 @@ note, was decided when barwise-qs8 closed.
 2. **The merge has one owner.**{#one-merge-owner} Every writer calls
    `scripts/lib/baseline-merge.mjs` to read the existing rows, merge
    them and print the summary. Each writer declares its own
-   human-owned fields and placeholders in `preserve`.
+   human-owned fields and placeholders in `preserve`. The one exception
+   is `trial/lib/gate.mjs --write`, whose write is additive: a run can
+   cover some scopes or one tier, and the helper writes only the ids it
+   is given, so it would drop the rows of every scope that did not run.
 3. **`audit:specs` writes only when asked.**{#specs-write-on-ask} A bare invocation reports
    and writes nothing; `--write` writes.
 4. **Row order depends only on the findings.**{#findings-order} Rows are sorted by id,
@@ -60,8 +62,18 @@ note, was decided when barwise-qs8 closed.
     unchanged, apart from the reopen, and a second run changes
     nothing;
   - the reopen, and that `--check` then fails;
-  - that a bare `audit-spec-status` writes nothing;
-  - that `audit-duplication.mjs` contains no `writeFileSync`.
+  - that a bare `audit-spec-status` writes nothing, over a reversed,
+    stale baseline as well as the committed one, and that `--write`
+    then does write;
+  - each writer's output after it is given reversed rows: sorted by id,
+    with the merge summary printed;
+  - that `audit-duplication.mjs` contains no `writeFileSync`, and that
+    running `--check` leaves its baseline's bytes and git status alone;
+  - a registry of the five baselines, keyed to the ones
+    `scripts/lib/findings.mjs` reads: each writer imports and calls
+    `mergeBaselineRows` (the trial gate is the declared exception), and
+    no other script under `scripts/` or `trial/lib/` names a baseline
+    in code that writes a file.
 - CI runs `test:scripts` before `npm run build`. The `audit-rubric`
   writer test needs `packages/promptlab/dist`, so it skips in CI and
   in the pre-push `ci:local --commit`, which uses a fresh worktree. It
@@ -74,12 +86,10 @@ note, was decided when barwise-qs8 closed.
 - Decision 4's report of rows no longer detected is tested only for
   `audit-corrections`. For `audit-rubric` and `audit-spec-status`
   nothing checks it (barwise-5ij).
-- Decision 2 has no gate beyond decision 5's test.
-  `trial/lib/gate.mjs --write` is a fourth writer, and it does not use
-  the helper, which breaks decision 2. Existing verdicts survive and
-  its rows are sorted, but it never refreshes derived fields and keeps
-  rows no longer detected (decision 1), and prints no summary
-  (decision 4) (barwise-tko).
+- The trial writer, decision 2's exception, keeps rows no longer
+  detected and never refreshes derived fields (decision 1), and prints
+  no summary (decision 4). Its rows are sorted and existing verdicts
+  survive (barwise-tko).
 - Apart from the reopen, a writer refreshes derived fields under a
   kept verdict and reports nothing about it. The spec left this as an
   unresolved Open decision ("Recommend silent refresh for now and a
