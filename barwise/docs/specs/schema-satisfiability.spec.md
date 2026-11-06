@@ -557,12 +557,13 @@ workstream delivers the query and a report.
   the merge's own diff on those paths is empty (barwise-ibf,
   barwise-dm0; it happened to this spec's own PR on #932's merge). The
   same gate also reads real, unrelated commits on `probes.json` as this
-  spec's work: every ADR enforcement PR adds probe rows, and eight such
+  spec's work: every ADR enforcement PR adds probe rows, and eleven such
   commits landed on 2026-11-06 alone, so the file is shared wiring in
   practice and should join the audit's `WIRING` list (barwise-tpi).
   Until those gates are fixed, a Draft spec re-edited after merging main
   passes; one that merges main and is not re-edited goes red at the
-  merge ref.
+  merge ref. This spec's own PR paid that three times in two days, a
+  merge, an edit and a CI run each.
 
 ## Non-goals
 
