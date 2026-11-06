@@ -1,6 +1,6 @@
 # Audit findings: one reader over the five baselines, and the gates it makes possible
 
-Status: WS1 implemented 2026-11-06 (`scripts/lib/findings.mjs` and `check:findings`, a CI step; findings-close-by-mechanism decisions 1 and 3 restated; the dead catalog class removed); WS2 implemented 2026-11-06 (the writer registry keyed to the findings reader, writer order and summary, write-on-ask and no-writer run-and-compare tests; the trial writer is decision 2's declared exception; its own fixture case is not built, since its paths are fixed in trial/lib/paths.mjs); WS3 implemented 2026-11-06 (RATCHETS in scripts/lib/findings.mjs; a stale-row case per ratchet, planted or a named sandbox test; each ci line held to a step that can fail CI and to its npm script; trial:gate has no CI step, with its reason); WS4 not started
+Status: WS1 implemented 2026-11-06 (`scripts/lib/findings.mjs` and `check:findings`, a CI step; findings-close-by-mechanism decisions 1 and 3 restated; the dead catalog class removed); WS2 implemented 2026-11-06 (the writer registry keyed to the findings reader, writer order and summary, write-on-ask and no-writer run-and-compare tests; the trial writer is decision 2's declared exception; its own fixture case is not built, since its paths are fixed in trial/lib/paths.mjs); WS3 implemented 2026-11-06 (RATCHETS in scripts/lib/findings.mjs; a stale-row case per ratchet, planted or a named sandbox test; each ci line held to a step that can fail CI and to its npm script; trial:gate has no CI step, with its reason); WS4 implemented 2026-11-06 (check:parity finds an ignore it does not apply and a set of fewer than two distinct members, naming the set and still comparing the others; an unreadable manifest is a refusal; the retirement ratchet is left to barwise-ym8.8nq)
 
 Created: 2026-11-06
 Last-updated: 2026-11-06
@@ -94,9 +94,10 @@ In scope:
   the ratchets, read by two tests: each ratchet has a stale-row case
   (barwise-ym8.k4d), and each has a `ci.yml` step or a declared reason
   it has none (barwise-ym8.ld2).
-- **`check:parity`** refuses an unknown `ignore` value, an `ignore` on a
-  symbol or field set, and a set of fewer than two members
-  (barwise-ym8.8nq).
+- **`check:parity`** finds (exit 1, naming the set and still comparing
+  the others) an unknown `ignore` value, an `ignore` on a symbol or
+  field set, and a set of fewer than two distinct members; an
+  unreadable manifest is a refusal (barwise-ym8.8nq).
 - **The ADR edits** these make true: `findings-close-by-mechanism`
   decisions 1 and 3 restated as rows 4 and 5 read; the `Enforced-by:`
   headers of the three ADRs gain `check:findings` and the new tests,
@@ -244,10 +245,13 @@ barwise-ym8.k4d and barwise-ym8.ld2.
 
 ### 4. `check:parity` validates its manifest (provisional: not yet grounded)
 
-Refuse an unknown `ignore`, an `ignore` on a symbol or field set, and a
-set with fewer than two members, with tests and a probe. Narrows
-barwise-ym8.8nq (the manifest-entry ratchet is left to
-barwise-ym8.gc9.e76, which is shrinking the sets).
+Report an unknown `ignore`, an `ignore` on a symbol or field set, and a
+set with fewer than two distinct members as findings that name their
+set, without stopping the comparison of the others, with tests and a
+probe. (Implemented as findings, not refusals: the gate can read the
+manifest, so a defect in it is a finding under the refusal contract.)
+Narrows barwise-ym8.8nq; the retirement ratchet, an entry deleted while
+both copies remain, stays with it.
 
 ## Open decisions (for review)
 

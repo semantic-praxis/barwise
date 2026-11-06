@@ -11,7 +11,8 @@ Enforced-by: npm run audit:duplication -- --check (every-candidate-verdict),
 npm run check:parity (registered-sets-identical),
 none (barwise-ym8.edf: check-on-copy), none (barwise-ym8.3tg: share-by-composition),
 none (barwise-ym8.8nq: registered-sets-identical),
-npm run check:findings (every-candidate-verdict)
+npm run check:findings (every-candidate-verdict),
+tests (registered-sets-identical)
 
 ## Context
 
@@ -68,16 +69,23 @@ members.
   reaches them; a step with no guard is skipped once an earlier step
   fails. `ci:local` runs both before each push, and it keeps going
   after a failure.
-- `check:parity` fails when members differ, or when a member does not
-  resolve. Several parts of decision 3 escape it (barwise-tdu):
-  - it compares raw text, not normalised text or printed syntax trees;
-  - it resolves only top-level function and variable declarations;
-  - it ignores an unknown `ignore` value, and any `ignore` on a symbol
-    or field set, without saying so;
-  - a set with one member, or with none, passes trivially, so dropping
-    members is an unchecked partial retirement.
-- Nothing gates decision 3's retirement clause, or decision 4's verdict
-  content (barwise-ym8.8nq, barwise-ym8.onf; related barwise-u5d). `pr-review` lists both under "Ratchets
+- `check:parity` fails when members differ, when a member does not
+  resolve, when a set has fewer than two distinct members (a set that
+  compares a copy with nothing, or with itself, which is how a
+  half-retired entry used to pass), and when a set names an `ignore` it
+  does not apply or puts one on a symbol or field set, which it used to
+  skip without saying so; each names its set, and the other sets are
+  still compared. An unreadable manifest is a refusal (audit-finding-reader
+  WS4). Three parts of decision 3 still escape it:
+  - it compares raw text, not normalised text or printed syntax trees
+    (barwise-tdu);
+  - it resolves only top-level function and variable declarations
+    (barwise-tdu);
+  - its retirement clause: an entry deleted while both copies remain
+    passes (barwise-ym8.8nq).
+- Nothing gates decision 4's verdict content beyond `check:findings`'s
+  vocabulary and open-issue rules (related barwise-u5d). `pr-review`
+  lists the retirement clause and verdict content under "Ratchets
   silenced". `REVIEW.md`'s "Do not report" tells reviewers to skip
   registered copies and the duplication ratchet because CI enforces
   them, so the review instructions contradict each other (barwise-iil).

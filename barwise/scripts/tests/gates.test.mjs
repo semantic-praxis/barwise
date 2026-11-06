@@ -1694,6 +1694,79 @@ const { parseFieldPath, fieldValue } = await import(
   pathToFileURL(join(SCRIPTS, "check-parity.mjs")).href
 );
 
+test("check-parity finds a set it cannot mean without hiding the others, and refuses a manifest it cannot read [adr:must-agree-copies#registered-sets-identical]", () => {
+  // The escapes barwise-tdu and barwise-ym8.8nq named: an unknown ignore
+  // was silently not applied, an ignore on a symbol or field set was
+  // silently ignored, and a set of one (or of one member twice) compared a
+  // copy with nothing and passed. Each is now a finding naming its set;
+  // the other sets are still compared, so drift elsewhere is not hidden.
+  // Members resolve from the repository; only the manifest is a fixture.
+  const dir = mkdtempSync(join(tmpdir(), "barwise-parity-"));
+  const runWith = (manifest) => {
+    const path = join(dir, "manifest.json");
+    writeFileSync(path, typeof manifest === "string" ? manifest : JSON.stringify(manifest));
+    return gate("check-parity.mjs", REPO, "--manifest", path);
+  };
+  const same = ["scripts/check-parity.mjs", "scripts/check-parity.mjs"];
+  const pair = {
+    name: "pair",
+    why: "x",
+    members: [{ file: "package.json", field: "version" }, {
+      file: "packages/core/package.json",
+      field: "version",
+    }],
+  };
+  try {
+    assert.equal(runWith({ sets: [pair] }).status, 0);
+    const r = runWith({
+      sets: [
+        {
+          name: "typo",
+          why: "x",
+          ignore: "leading-docblok",
+          members: ["package.json", "package-lock.json"],
+        },
+        {
+          name: "on-symbol",
+          why: "x",
+          ignore: "leading-docblock",
+          members: [{ file: "a.ts", symbol: "f" }, "b.ts"],
+        },
+        { name: "thin", why: "x", members: ["package.json"] },
+        { name: "twice", why: "x", members: same },
+        { name: "drift", why: "x", members: ["package.json", "package-lock.json"] },
+      ],
+    });
+    assert.equal(r.status, 1, r.stdout + r.stderr);
+    for (
+      const pattern of [
+        /set "typo": ignore "leading-docblok" is not one this check applies/,
+        /set "on-symbol": ignore applies to whole-file members only/,
+        /set "thin": has 1 distinct member\(s\), so it checks nothing/,
+        /set "twice": has 1 distinct member\(s\)/,
+        /set "drift": package-lock\.json differs from package\.json/,
+      ]
+    ) {
+      assert.match(r.stderr, pattern);
+    }
+    // An empty sets array names nothing to compare; "0 set(s) ... OK"
+    // would be a pass over no input.
+    for (
+      const unreadable of [
+        "{ not json",
+        JSON.stringify({ groups: [] }),
+        JSON.stringify({ sets: [] }),
+      ]
+    ) {
+      const u = runWith(unreadable);
+      assert.equal(u.status, 2, u.stdout + u.stderr);
+      assert.match(u.stderr, /cannot answer -- parity\.manifest\.json: /);
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test("parseFieldPath splits dotted keys and bracketed non-identifiers", () => {
   assert.deepEqual(parseFieldPath("version"), ["version"]);
   assert.deepEqual(parseFieldPath("engines.node"), ["engines", "node"]);
