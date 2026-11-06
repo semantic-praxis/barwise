@@ -103,6 +103,25 @@ function gateWithStubGit(script, mode, ...args) {
   }
 }
 
+/**
+ * Skip a case that runs a history-reading gate (audit-spec-status) against
+ * this repository when the clone is shallow: the gate refuses there, by
+ * design, so the case cannot ask its question. Six such cases failed
+ * instead of skipping under the fault matrix's git-shallow axis, which a
+ * real shallow clone would reproduce (gate-contract-enforced WS1). Read
+ * lazily, so a broken git fails the case that asked, not the module.
+ * Returns true when it skipped.
+ */
+let shallowClone;
+function skipIfShallow(t) {
+  shallowClone ??= execFileSync("git", ["rev-parse", "--is-shallow-repository"], {
+    cwd: REPO,
+    encoding: "utf8",
+  }).trim() === "true";
+  if (shallowClone) t.skip("shallow clone: run `git fetch --unshallow` to exercise this gate");
+  return shallowClone;
+}
+
 // --- barwise-989: a gate that cannot see its input must not print PASS ---
 
 /**
@@ -1588,7 +1607,8 @@ test("check-root-scripts fails on drift in either direction", () => {
  * way passes, which is the barwise-906 shape -- so the red reading has
  * to come from the commit where the defect actually was.
  */
-test("audit-spec-status fires on the header that went stale at 7fbbba7", () => {
+test("audit-spec-status fires on the header that went stale at 7fbbba7", (t) => {
+  if (skipIfShallow(t)) return;
   const r = gate("audit-spec-status.mjs", REPO, "--at", "7fbbba7");
   assert.equal(r.status, 0, `--at failed:\n${r.stdout}${r.stderr}`);
   assert.match(
@@ -1604,14 +1624,7 @@ test("audit-spec-status --check is green on the current tree, from every cwd", (
   // says so instead of printing OK -- which is how it shipped red once:
   // 309 commits locally against CI's full history. Skipping loudly here
   // is not the silent hole; reporting the smaller question's answer was.
-  const shallow = execFileSync("git", ["rev-parse", "--is-shallow-repository"], {
-    cwd: REPO,
-    encoding: "utf8",
-  }).trim() === "true";
-  if (shallow) {
-    t.skip("shallow clone: run `git fetch --unshallow` to exercise this gate");
-    return;
-  }
+  if (skipIfShallow(t)) return;
   for (const cwd of CWDS) {
     const r = gate("audit-spec-status.mjs", cwd, "--check");
     assert.equal(r.status, 0, `--check failed in ${cwd}:\n${r.stdout}${r.stderr}`);
@@ -2690,6 +2703,7 @@ const STALE_CASES = {
   },
   specs: {
     row: { status: "Draft", commits: ["00000000"], note: "a planted stale row" },
+    needsHistory: true,
     output: /STALE baseline row: zz-planted-stale-row\b/,
   },
   corrections: {
@@ -2713,6 +2727,7 @@ for (const [source, c] of Object.entries(STALE_CASES).filter(([, x]) => x.row)) 
       t.skip(`${c.needsDist} not built; run npm run build first`);
       return;
     }
+    if (c.needsHistory && skipIfShallow(t)) return;
     const path = join(REPO, "barwise", FINDING_SOURCE_FILES[source]);
     const before = readFileSync(path, "utf8");
     try {
@@ -3025,6 +3040,8 @@ const BASELINE_WRITERS = [
     args: ["--write"],
     file: "barwise/spec-status-baseline.json",
     key: "specs",
+    // It reads history, and refuses a shallow clone (skipIfShallow).
+    needsHistory: true,
     human: ["note"],
     placeholder: "TODO: classify",
     // The one change a rewrite may make to a verdict: reopening it, with the
@@ -3044,6 +3061,7 @@ for (const w of BASELINE_WRITERS) {
       t.skip(`${w.needsDist} not built; run npm run build first`);
       return;
     }
+    if (w.needsHistory && skipIfShallow(t)) return;
 
     const path = join(REPO, w.file);
     const before = readFileSync(path, "utf8");
@@ -3098,6 +3116,7 @@ for (const w of BASELINE_WRITERS) {
       t.skip(`${w.needsDist} not built; run npm run build first`);
       return;
     }
+    if (w.needsHistory && skipIfShallow(t)) return;
     // The order a writer writes, whatever order its baseline held: the
     // committed rows are reversed first so the input is never already the
     // answer. The sort itself is the helper's (and, for audit-spec-status,
@@ -3262,7 +3281,8 @@ test("audit-corrections --write reports a row it dropped rather than dropping it
   }
 });
 
-test("audit-spec-status writes nothing without --write [adr:baselines-merge-on-write#specs-write-on-ask]", () => {
+test("audit-spec-status writes nothing without --write [adr:baselines-merge-on-write#specs-write-on-ask]", (t) => {
+  if (skipIfShallow(t)) return;
   // The write path used to be the `else` of `--check`, so bare
   // `npm run audit:specs` -- the spelling a reader tries first to see what the
   // gate says -- rewrote the baseline and blanked every note. The operator
@@ -3279,7 +3299,8 @@ test("audit-spec-status writes nothing without --write [adr:baselines-merge-on-w
   }
 });
 
-test("audit-spec-status leaves a stale, unsorted baseline alone unless asked, and rewrites it with --write [adr:baselines-merge-on-write#specs-write-on-ask]", () => {
+test("audit-spec-status leaves a stale, unsorted baseline alone unless asked, and rewrites it with --write [adr:baselines-merge-on-write#specs-write-on-ask]", (t) => {
+  if (skipIfShallow(t)) return;
   // The committed baseline already equals what --write would produce, so a
   // bare run that wrote identical bytes would pass the test above. Reversing
   // the rows makes a write visible: a bare run must leave them reversed, and
