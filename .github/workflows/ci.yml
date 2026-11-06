@@ -595,5 +595,10 @@ jobs:
       # where the build, the test reports and the full history exist, so
       # each gate's unperturbed run can answer. The steps it leaves out,
       # each with why, are MATRIX_EXCEPTIONS in scripts/lib/ci-gates.mjs.
+      # Pull requests only, with the BASE_SHA the PR-only gates above read:
+      # on a push to main those gates do not run, and the matrix would run
+      # them with no base.
       - run: npm run fault-matrix
-        if: steps.changes.outputs.docs_only != 'true'
+        if: github.event_name == 'pull_request' && steps.changes.outputs.docs_only != 'true'
+        env:
+          BASE_SHA: ${{ steps.base.outputs.sha }}

@@ -23,13 +23,13 @@ export const WORKFLOW = resolve(SCRIPTS, "../../.github/workflows/ci.yml");
 
 /**
  * The npm steps ci.yml runs that `fault-matrix` does not, each with why
- * (docs/specs/gate-contract-enforced.spec.md, WS2). The one list: the
- * matrix excludes exactly these, and `gates.test.mjs` fails on a ci.yml
- * step that resolves to a node gate and is neither run by the matrix nor
- * named here, and on a name here that ci.yml does not run.
+ * (docs/specs/gate-contract-enforced.spec.md, WS2). The one list of
+ * exceptions: the matrix also never runs itself, which fault-matrix.mjs
+ * holds by script path. `gates.test.mjs` fails on a name here that is not
+ * a node gate ci.yml runs, and on a step running `node scripts/...` that
+ * the matrix cannot resolve and so would drop unseen.
  */
 export const MATRIX_EXCEPTIONS = Object.freeze({
-  "fault-matrix": "the matrix itself: as one of its own gates it would run itself under every axis",
   "test:scripts":
     "a runner of gate tests, not a gate; the matrix reads the gates its cases spawn directly, and a runner's loud skip on a shallow clone reads as a false green (owner, 2026-11-06)",
   audit:
