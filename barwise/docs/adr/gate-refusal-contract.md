@@ -5,9 +5,10 @@ Date: 2026-09-17
 Tracking: barwise-ubc, barwise-987, barwise-989, barwise-1012,
 barwise-1019, barwise-ydl, barwise-shq, barwise-vt2, barwise-w43,
 docs/specs/gate-refusal-contract.spec.md
-Enforced-by: tests (three-results, refuse-not-find, cwd-invariant, readers-keep-third),
+Enforced-by: npm run fault-matrix (three-results, refuse-not-find, cwd-invariant),
+tests (three-results, refuse-not-find, cwd-invariant, readers-keep-third),
 none (barwise-ym8.j31: three-results), none (barwise-ym8.rl7: refuse-not-find),
-none (barwise-ym8.c42: cwd-invariant), none (barwise-ym8.aep: readers-keep-third),
+none (barwise-ym8.aep: readers-keep-third),
 none (barwise-ym8.if3: no-writes)
 
 ## Context
@@ -57,18 +58,30 @@ corrections made during grounding are in the spec above.
   `if: steps.changes.outputs.docs_only != 'true'`, so it is skipped on
   a docs-only pull request and, like any step, once an earlier step
   fails. Refusal paths are mutation-tested only by hand (barwise-1049).
-- `npm run fault-matrix` runs each `ci.yml` step whose npm script
-  contains a `node scripts/<name>.mjs` segment, also inside an `&&`
-  chain (25 of the 43 npm steps on main), under `git` empty, `git`
-  absent, a shallow answer and three working directories. It refuses
-  when a gate changes `git status --porcelain`, and when a script
-  chains two node gates. It reads exit codes only. It does not check
-  a refusal's message, has no missing-tool, manifest or lockfile axis,
-  and does not see a write undone before the gate exits. It runs on
-  demand, not in CI, as decided in the spec ("Should WS3 run in CI at
-  all? (resolved: no.)"). Its FALSE GREEN verdict is pinned against
-  `classify` in `gates.test.mjs`.
-- The other 18 npm steps are outside the matrix, among them
+- `npm run fault-matrix` is the last step of CI's `ci` job, on pull
+  requests that are not docs-only, with the `BASE_SHA` the PR-only gates
+  read; `ci:local` runs it at pre-push on the same changes (option D of
+  `gate-contract-enforced.spec.md`, owner 2026-11-06). It runs each
+  `ci.yml` step whose npm script contains a `node scripts/<name>.mjs`
+  segment, also inside an `&&` chain, under `git` empty, `git`
+  absent, a shallow answer and three working directories, in about two
+  minutes. A gate that exits 0 having called a broken `git` (FALSE
+  GREEN), exits 1 on it (CRASHED), or answers differently by directory
+  (READING MOVED) is a finding; a gate whose unperturbed run is not 0 is
+  a refusal. It also refuses when a gate changes
+  `git status --porcelain` and when a script chains two node gates. It
+  reads exit codes only: it does not check a refusal's message, has no
+  missing-tool, manifest or lockfile axis, and does not see a write
+  undone before the gate exits (the spec's WS3). Its verdicts are pinned
+  against `classify` in `gates.test.mjs`, and a probe per decision
+  plants a gate that breaks it.
+- The matrix never runs itself, and leaves out the node gates named in
+  `MATRIX_EXCEPTIONS` (`scripts/lib/ci-gates.mjs`), each with its
+  reason; `fault-matrix -- --all` runs them on demand. A test fails on a
+  name there that is not a node gate `ci.yml` runs, and on a step running
+  `node scripts/...` in a form the matrix cannot resolve.
+- The npm steps that are not node gates stay outside the matrix (owner,
+  2026-11-06: the shell scripts stay out), among them
   `test:trial`, `test:mcp-checks`, `test:cli-checks`, `check:beads`,
   `validate:examples`, `test:optimizer` (pytest through uv), turbo's
   `build`, `lint` and `test:coverage`, and the VS Code check and bundle

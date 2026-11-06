@@ -586,3 +586,19 @@ jobs:
         if: ${{ !cancelled() }}
       - run: npm run test:adr-model
         if: ${{ !cancelled() }}
+
+      # Every node gate above under the fault matrix: git empty, absent and
+      # shallow, and three working directories. It fails on a gate that
+      # passes blind or reads differently by cwd, and refuses on one it
+      # cannot read (docs/adr/gate-refusal-contract.md; option D of
+      # docs/specs/gate-contract-enforced.spec.md, owner 2026-11-06). Last,
+      # where the build, the test reports and the full history exist, so
+      # each gate's unperturbed run can answer. The steps it leaves out,
+      # each with why, are MATRIX_EXCEPTIONS in scripts/lib/ci-gates.mjs.
+      # Pull requests only, with the BASE_SHA the PR-only gates above read:
+      # on a push to main those gates do not run, and the matrix would run
+      # them with no base.
+      - run: npm run fault-matrix
+        if: github.event_name == 'pull_request' && steps.changes.outputs.docs_only != 'true'
+        env:
+          BASE_SHA: ${{ steps.base.outputs.sha }}

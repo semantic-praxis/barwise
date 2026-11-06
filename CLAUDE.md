@@ -442,7 +442,7 @@ skill (`.claude/skills/release/`).
 - **A gate that cannot see its input must not print PASS.** Exit 0
   pass, 1 a finding, 2 could not answer; a refusal never uses the
   finding code (`docs/adr/gate-refusal-contract.md`).
-  `npm run fault-matrix` measures it, on demand.
+  `npm run fault-matrix` measures it on every pull request, last in CI.
 - **Credential detection is gitleaks'.** `npm run check:secrets --
   --staged` at pre-commit, the full history in CI, and `.gitleaks.toml`
   takes no rule beyond the one for Anthropic keys; a real finding is

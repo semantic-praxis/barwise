@@ -16,7 +16,7 @@
     "check-pins.test.mjs": 14,
     "ci-conditions.test.mjs": 19,
     "credential-handling.test.mjs": 7,
-    "gates.test.mjs": 336,
+    "gates.test.mjs": 338,
     "generated-marks.test.mjs": 4,
     "install-uv.test.mjs": 6,
     "masked-exit.test.mjs": 28,

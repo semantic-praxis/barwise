@@ -132,5 +132,23 @@
   {
     "decision": "pinned-runtimes#verify-running",
     "unprobed": "check:pins reads back the Node running it and the Python uv resolves; a probe edits one file's content, which cannot change the runtime that runs, and the gate's tests plant both refusals with a stand-in uv"
+  },
+  {
+    "decision": "gate-refusal-contract#three-results",
+    "file": "barwise/scripts/check-no-nul.mjs",
+    "old": "import { REPO_ROOT, trackedFiles } from \"./lib/tracked.mjs\";",
+    "new": "import { spawnSync } from \"node:child_process\";\nconst REPO_ROOT = resolve(import.meta.dirname, \"..\", \"..\");\nconst trackedFiles = () => (spawnSync(\"git\", [\"ls-files\"], { cwd: REPO_ROOT, encoding: \"utf8\" }).stdout ?? \"\").split(\"\\n\").filter(Boolean);"
+  },
+  {
+    "decision": "gate-refusal-contract#refuse-not-find",
+    "file": "barwise/scripts/check-no-nul.mjs",
+    "old": "import { REPO_ROOT, trackedFiles } from \"./lib/tracked.mjs\";",
+    "new": "import { spawnSync } from \"node:child_process\";\nconst REPO_ROOT = resolve(import.meta.dirname, \"..\", \"..\");\nconst trackedFiles = () => {\n  const r = spawnSync(\"git\", [\"ls-files\"], { cwd: REPO_ROOT, encoding: \"utf8\" });\n  if (r.status !== 0 || !r.stdout) process.exit(1);\n  return r.stdout.split(\"\\n\").filter(Boolean);\n};"
+  },
+  {
+    "decision": "gate-refusal-contract#cwd-invariant",
+    "file": "barwise/scripts/check-no-nul.mjs",
+    "old": "const tracked = trackedFiles();",
+    "new": "const tracked = trackedFiles();\nreadFileSync(\"turbo.json\");"
   }
 ]

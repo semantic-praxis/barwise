@@ -32,6 +32,8 @@ export function tagsIn(title) {
 export const GATE_EXCEPTIONS = {
   purity: "scans core's source for clocks, network and randomness (determinism-in-core)",
   depcruise: "its rules file is the package graph it enforces against real imports",
+  "fault-matrix":
+    "runs every node gate CI runs under git faults and three directories, and reads the exit codes (gate-refusal-contract)",
 };
 
 /**
@@ -45,12 +47,14 @@ export const GAP_LABEL = "adr-gap";
 /**
  * Gates that check other gates. Each would vouch for any decision, so it
  * may be declared only by the ADRs it implements: `check:adr-tests` by
- * none, `check:architecture` by `package-graph-authority`.
+ * none, `check:architecture` by `package-graph-authority`, `fault-matrix`
+ * by `gate-refusal-contract`.
  */
 export const META_GATES = {
   "check:adr-model": [],
   "check:adr-tests": [],
   "check:architecture": ["package-graph-authority"],
+  "fault-matrix": ["gate-refusal-contract"],
 };
 
 /** Whether a script's name lets it be declared as a gate at all. */
