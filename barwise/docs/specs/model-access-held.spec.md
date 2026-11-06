@@ -3,6 +3,7 @@
 Status: Draft -- no workstream implemented
 Created: 2026-11-06
 Last-updated: 2026-11-06
+Plan-reviewed: ee781594 (code-review, pr-review)
 Tracking: barwise-ym8.gc9 (adr-refactor batch 7), barwise-ym8.4gl,
 barwise-ym8.nw4, barwise-ym8.52o, barwise-ym8.dxy, barwise-ym8.esi,
 barwise-ym8.mdg, barwise-ym8.w0p, barwise-ym8.x2g, barwise-ym8.29c,
