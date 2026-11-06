@@ -138,11 +138,17 @@ says so. The owner answers per row: accept, reject, or edit.
 
 Restatements (the rule stays; `Date:` stays):
 
-1. `connector-packages#descriptor-wraps-core`: "The DDL, OpenAPI, Avro
-   and dbt export descriptors call core's `renderDdl`, `renderOpenApi`,
-   `renderAvro` and `renderDbt`, and the SQL and dbt importers call
-   core's `parseSqlFile`; a format core has no renderer for keeps its
-   writer in its connector, as NORMA and Ossie do."
+1. `connector-packages#descriptor-wraps-core`: **owner, 2026-11-06:
+   the decision changes**, so it leaves WS1 for a spec of its own.
+   `renderDdl`, `renderOpenApi` and `renderAvro` move to
+   `@barwise/formats` and `renderDbt` to `@barwise/dbt`;
+   `RelationalMapper` stays in core (ORM is relational). `@barwise/dbt`
+   depends on `@barwise/formats`, and one SQL-parsing function there
+   (the sqlglot bridge with the regex fallback) replaces the copy in
+   each importer, by composition, not inheritance; whether
+   `parseSqlFile` leaves core with it is settled in that spec. The
+   `pascal-case-avro`, `pascal-case-openapi` and `sqlglot-bridge`
+   parity sets go with the copies.
 2. `credential-handling#rotate-not-revert`: "Every message `check:secrets`
    and the pre-commit hook print on a finding names rotation in the
    provider console as the remedy, and none suggests rewriting history."
@@ -236,7 +242,12 @@ decisions renumber and their numbered references are updated):
 21. `metamodel-evolution-policy#deliberately-lossy`: to Context.
 22. `metamodel-evolution-policy#tiering`: to Context, beside the tiers.
 23. `metamodel-evolution-policy#design-against-book`: to Context.
-24. `must-agree-copies#check-first`: to Context.
+24. `must-agree-copies#check-first`: **owner, 2026-11-06: the
+    decision changes**, with row 1. The default becomes: share where
+    sharing does not couple packages that should not know each other,
+    by composition (a function both sides call) rather than
+    inheritance, and add a parity check only where sharing would
+    couple them. A separate ADR edit; leaves WS1.
 25. `review-policy#prevent-upstream`: to Consequences.
 
 If every row is accepted, `metamodel-evolution-policy` keeps one
