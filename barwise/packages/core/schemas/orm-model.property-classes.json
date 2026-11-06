@@ -1,5 +1,5 @@
 {
-  "$comment": "Every property slot orm-model.schema.json defines, keyed by its full JSON pointer, with its class (docs/adr/metamodel-evolution-policy.md#recompute-derived). conceptual: the model itself. identity: id, minted_from, imports, namespace, orm_version. presentation: authored diagram layout. A slot for relational mapping, DDL or other rendered output has no class: it is recomputed from the model, never stored. tests/serialization/propertyClasses.test.ts fails on a slot this table lacks and on a row with no slot, so adding a property to the schema means classifying it here, in review.",
+  "$comment": "The class of every property slot orm-model.schema.json defines, keyed by full JSON pointer (docs/adr/metamodel-evolution-policy.md#recompute-derived). A slot for relational mapping, DDL or other rendered output gets no row: it is recomputed, never stored. Which classes exist and where each may be used, and why if/then/else and false slots have no row, are stated and checked in tests/serialization/propertyClasses.test.ts.",
   "slots": {
     "/properties/orm_version": "identity",
     "/properties/model": "conceptual",
@@ -29,11 +29,6 @@
     "/definitions/object_type/properties/note": "conceptual",
     "/definitions/object_type/properties/cardinality": "conceptual",
     "/definitions/object_type/properties/preferred_identifier": "conceptual",
-    "/definitions/object_type/if/properties/kind": "conceptual",
-    "/definitions/object_type/then/properties/data_type": "conceptual",
-    "/definitions/object_type/then/properties/value_constraint": "conceptual",
-    "/definitions/object_type/then/properties/default_value": "conceptual",
-    "/definitions/object_type/else/properties/preferred_identifier": "conceptual",
     "/definitions/role_path_def/properties/root": "conceptual",
     "/definitions/role_path_def/properties/steps": "conceptual",
     "/definitions/role_path_def/properties/steps/items/properties/entry": "conceptual",

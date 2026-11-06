@@ -19,6 +19,7 @@ barwise/docs/adr/tested-in.json, barwise/docs/ARCHITECTURE.md,
 +barwise/packages/core/schemas/orm-model.property-classes.json,
 barwise/packages/core/tests/serialization/,
 barwise/packages/core/tests/validation/idsAndImports.test.ts,
+.claude/skills/pr-review/checklist.md,
 barwise/packages/cli/tests/commands/merge.test.ts,
 barwise/packages/cli/tests/importerIds.test.ts,
 +barwise/packages/cli/tests/loadForward.test.ts,
@@ -222,20 +223,48 @@ beside the schema, `orm-model.property-classes.json`, that classifies
 every property slot as `conceptual`, `identity` (`id`, `minted_from`,
 `imports`, `namespace`, `orm_version`) or `presentation` (diagram
 layout; owner, 2026-11-06, as recommended). Slots are keyed by full
-JSON pointer. A tagged core test walks every `properties` map at any
-depth: root, `/properties/model`, `definitions`, `oneOf`/`anyOf`/`allOf`
-branches, `items`, `additionalProperties` schemas, and `if`/`then`/`else`.
-It fails on any slot the table lacks and on any table row with no slot.
-Keying by slot rather than by name means that reusing a name like
-`expression` in a new place still has to be classified. The test's own
-self-check asserts it found 40 maps and 194 slots, so a walker that
-stops early cannot pass. The writer side is already covered: every map
-an output object passes through is closed, and `writer40.test.ts`
-validates the writer's output. Every input is under core's `schemas/`
-and `tests/`, both turbo inputs, so a vitest test is enough here.
-Wording: unchanged. Plants: add `tables` at
+JSON pointer. A tagged core test walks every subschema at any depth:
+root, `/properties/model`, `definitions` (whose keys are names),
+`oneOf`/`anyOf`/`allOf` branches, `items` and `additionalProperties`
+schemas, skipping the data keywords (`default`, `const`, `enum`,
+`examples`). A slot is a name in a `properties` map whose subschema is
+not `false`. `if`/`then`/`else` (and `not`) define no slots: they
+restate properties the closed schema around them defines, so their five
+rows are not in the table (189 rows). The test fails on any slot the
+table lacks and on any table row with no slot. Keying by slot rather
+than by name means that reusing a name like `expression` in a new place
+still has to be classified. `identity` is allowed only for the five
+names above (one way: an `id` slot may be another class), and
+`presentation` only under `/properties/model/properties/diagrams` and
+`/definitions/diagram_layout`.
+
+The same test holds the schema closed, since an allowlist of slots means
+nothing if an open object accepts a key no row names: every object
+schema has `additionalProperties: false`, none uses `patternProperties`,
+and `additionalProperties` is a schema only at the four data-keyed maps
+(`imports`, `role_values`, `positions`, `orientations`), listed by
+pointer with their reasons. With the schema closed, `writer40.test.ts`
+validating the writer's output is what holds the serializer side.
+
+The first revision also asserted the walk found 40 maps and 194 slots,
+so a walker that stopped early could not pass. Code review dropped it
+(2026-11-06): the orphaned-row check already fails such a walker,
+because the rows for every slot it missed name no slot, and the counts
+made every schema edit a three-place change for no added catch. The
+walker's reach is pinned instead by a synthetic schema with a slot under
+every keyword it must enter and one under every keyword it must not.
+
+What the test cannot hold is a derived slot added with a `conceptual`
+row. That half is review's: `pr-review/checklist.md` names the table,
+and the ADR keeps `none (barwise-ym8.3ai)` beside `tests`. Every
+input is under core's `schemas/` and `tests/`, both turbo inputs, so a
+vitest test is enough here. Wording: unchanged. Plants: add `tables` at
 `/properties/model/properties/tables` -> fails naming that pointer. Add
-it under `/definitions/fact_type/properties` -> fails. Gap: 3ai closes.
+it under `/definitions/fact_type/properties` -> fails. Flip
+`fact_type`'s `additionalProperties` to `true`, or give it
+`patternProperties` -> the closedness test fails. Label a
+`rendered_svg` slot `presentation` outside the layout -> fails. Gap:
+3ai narrows to review of the classification and stays open.
 
 ### schema-versioning
 
@@ -600,8 +629,10 @@ merge.
 
 ### 1. `recompute-derived`
 
-The property-class table (`presentation` for diagram layout) and its
-tagged core test with the 40-map self-check.
+The property-class table (`presentation` for diagram layout), its
+tagged core test with the synthetic-walk self-cases, and the schema
+closedness test. The pr-review checklist line for new `conceptual`
+rows.
 
 ### 2. schema-versioning tests and the minor-and-major restatement
 
@@ -680,8 +711,15 @@ designed. The deontic-mandatory coverage self-check comes first.
 4. **What "released" means for `shared-minor` (barwise-6om).**
    **Resolved (owner, 2026-11-06): a `v*` tag;** the ADR's v2.0.0
    sentence is corrected (WS7).
-5. **Are diagram positions "rendered output"?** **Taken as recommended
-   (owner not asked; 2026-11-06): no,** `presentation`, authored.
+5. **Are diagram positions "rendered output"?** **Resolved (owner,
+   2026-11-06): presentation; saving is a choice.** The question was
+   live: `DiagramSession.collectPositions`
+   (`diagram/src/session/DiagramSession.ts`) saves every entity's
+   laid-out position, ELK output included, and a fact type's only when
+   it was moved. Saving is the user's choice to freeze an arrangement,
+   and the layout engine is not stable enough to recompute the same
+   picture, so the saved positions stay `presentation`. The ADR's
+   Consequences say so.
 6. **The Ossie boundary's residue.** **Resolved (owner, 2026-11-06):
    close zec, yc6 and k74,** the residue review-only in Consequences.
 7. **Package CLAUDE.md dependency prose.** **Taken as recommended (owner
