@@ -8,6 +8,7 @@ Tracking: barwise-ym8.gc9 (adr-refactor batch 4; rows 4, 5 and 11),
 barwise-ym8.1b2, barwise-ym8.h0l, barwise-ym8.k4d, barwise-ym8.ld2,
 barwise-ym8.fi5, barwise-ym8.3yv, barwise-ym8.6jy, barwise-ym8.nhy,
 barwise-ym8.79m, barwise-ym8.8nq, barwise-ym8.onf, barwise-u5d
+Plan-reviewed: 5f165c32 (code-review, pr-review)
 Touches: +barwise/scripts/lib/findings.mjs, +barwise/scripts/check-findings.mjs,
 barwise/scripts/audit-duplication.mjs, barwise/scripts/audit-rubric.mjs,
 barwise/scripts/audit-spec-status.mjs, barwise/scripts/audit-corrections.mjs,
