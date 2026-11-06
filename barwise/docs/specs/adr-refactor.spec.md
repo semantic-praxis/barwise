@@ -156,14 +156,19 @@ Restatements (the rule stays; `Date:` stays):
    rewriting history does not undo a leak, though a revert may still be
    wanted), and the root CLAUDE.md convention that restates it is cut
    to match in the same PR.
-3. `determinism-in-core#one-layer-out`: "Outside core, only
-   `@barwise/llm` imports a model SDK, and a format's own file and
-   subprocess I/O lives in its connector package; anything else that
-   cannot be deterministic lives in the tool layer (`cli`, `mcp`,
-   `vscode`)." Note for the owner: `learn` and `promptlab` read files,
-   the clock and the environment today and the decision does not name
-   them; saying where they belong would change the decision, so it is a
-   separate ADR edit if wanted.
+3. `determinism-in-core#one-layer-out`: **owner, 2026-11-06: restate**
+   to its one checkable rule, by composition: "Outside core, only
+   `@barwise/llm` imports a model SDK; a package that needs a model
+   reaches it through `@barwise/llm`'s `LlmClient`." The rest becomes
+   prose: a host-mediated client (VS Code's language-model API, MCP
+   sampling) lives in the surface that owns the host connection, which
+   is true by construction; "core calls no model" and "non-determinism
+   lives outside core" are decision 1, held by `purity`; a format's own
+   I/O is `connector-packages#connector-owns-io`. With the tool-layer
+   clause gone, `learn` and `promptlab` need no placement. Enforcer
+   (batch 8): a depcruise rule forbidding `@anthropic-ai/sdk` and
+   `openai` outside `@barwise/llm`, with a probe; a plain `fetch` to a
+   provider host stays a gap.
 4. `findings-close-by-mechanism#mechanism-closes`: "An issue filed from
    an audit finding is closed with a reason naming the check or the
    baseline row that holds it, and that file is in the tree." Low
