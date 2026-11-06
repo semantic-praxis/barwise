@@ -38,7 +38,7 @@ gates skip a docs-only change.
 
 Architecture:
 
-- [Connector packages](adr/connector-packages.md) -- 2026-10-24 -- declared: purity (connector-owns-io), tests (core-no-interop, explicit-registration); gap: barwise-ym8.paz (core-no-interop); gap: barwise-ym8.iyw (connector-owns-io); gap: barwise-ym8.y5z (descriptor-wraps-core); gap: barwise-ym8.2n3 (explicit-registration)
+- [Connector packages](adr/connector-packages.md) -- 2026-11-06 -- declared: purity (connector-owns-io), tests (core-no-interop, format-in-its-connector, explicit-registration); gap: barwise-ym8.iyw (connector-owns-io); gap: barwise-ym8.x9w (format-in-its-connector); gap: barwise-ym8.2n3 (explicit-registration)
 - [Determinism in core](adr/determinism-in-core.md) -- 2026-11-05 -- declared: purity (pure-ops); gap: barwise-ym8.lxl (pure-ops); gap: barwise-ym8.kys (one-layer-out)
 - [Keyless model access](adr/keyless-model-access.md) -- 2026-09-12 -- declared: tests (no-key-in-argv, no-key-in-setting, keyless-defaults, library-takes-key); gap: barwise-ym8.4gl (no-key-in-argv); gap: barwise-ym8.nw4 (no-key-in-setting); gap: barwise-ym8.52o (keyless-defaults); gap: barwise-ym8.esi (measurement-key); gap: barwise-ym8.dxy (library-takes-key)
 - [Metamodel evolution policy](adr/metamodel-evolution-policy.md) -- 2026-10-17 -- gap: barwise-ym8.qpz (deliberately-lossy); gap: barwise-ym8.gfk (four-filters); gap: barwise-ym8.26v (tiering); gap: barwise-ym8.e05 (design-against-book); gap: barwise-ym8.3ai (recompute-derived)

@@ -11,10 +11,10 @@
  *   - Optional namespace
  *   - avroSchemaToJson produces valid formatted JSON
  */
+import { RelationalMapper } from "@barwise/core/mapping";
 import { describe, expect, it } from "vitest";
-import { RelationalMapper } from "../../src/mapping/RelationalMapper.js";
-import { avroSchemaToJson, renderAvro } from "../../src/mapping/renderers/avro.js";
-import { ModelBuilder } from "../helpers/ModelBuilder.js";
+import { avroSchemaToJson, renderAvro } from "../src/avro/renderAvro.js";
+import { ModelBuilder } from "./helpers/ModelBuilder.js";
 
 const mapper = new RelationalMapper();
 

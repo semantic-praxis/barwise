@@ -37,6 +37,7 @@ interface ObjectTypeOptions {
   valueConstraint?: ValueConstraintDef;
   dataType?: DataTypeDef;
   aliases?: string[];
+  defaultValue?: string;
 }
 
 /**
@@ -254,6 +255,7 @@ export class ModelBuilder {
         valueConstraint: options.valueConstraint,
         dataType: options.dataType,
         aliases: options.aliases,
+        defaultValue: options.defaultValue,
       });
     }
 
@@ -307,9 +309,12 @@ export class ModelBuilder {
             });
             break;
           case "both":
+            // A preferred flag goes on role1, as "role1" puts it; an
+            // entity-value binary is identified whichever role carries it.
             constraints.push({
               type: "internal_uniqueness",
               roleIds: [role1Id],
+              ...(preferred ? { id: flag(name) } : {}),
             });
             constraints.push({
               type: "internal_uniqueness",

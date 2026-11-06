@@ -5,10 +5,14 @@
  * or other format-specific representations.
  */
 
-import type { RelationalSchema, Table } from "../mapping/RelationalSchema.js";
-import { type IdentifyingComponent, preferredIdentifiers } from "../model/identification.js";
-import type { OrmModel } from "../model/OrmModel.js";
-import type { FactInstance } from "../model/Population.js";
+import {
+  type FactInstance,
+  type IdentifyingComponent,
+  type OrmModel,
+  preferredIdentifiers,
+} from "@barwise/core";
+import type { RelationalSchema, Table } from "@barwise/core/mapping";
+import { quoteIdent } from "../ddl/sqlIdentifiers.js";
 
 /**
  * Render populations as SQL INSERT statements.
@@ -205,18 +209,6 @@ function externalIdentifierExample(
     example[model.getObjectType(farRole.playerId)?.name ?? farRole.name] = value;
   }
   return example;
-}
-
-/**
- * Quote an identifier (table or column name) for SQL.
- */
-function quoteIdent(name: string): string {
-  // Simple quoting: wrap in double quotes if the name contains special chars,
-  // otherwise return as-is.
-  if (/^[a-z_][a-z0-9_]*$/.test(name)) {
-    return name;
-  }
-  return `"${name.replace(/"/g, '""')}"`;
 }
 
 /**

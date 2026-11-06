@@ -2,15 +2,17 @@
  * Tests for population rendering utilities.
  */
 
+import { OrmModel, OrmYamlSerializer } from "@barwise/core";
+import { RelationalMapper, type RelationalSchema } from "@barwise/core/mapping";
+import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import {
   renderPopulationAsOpenApiExamples,
   renderPopulationAsSql,
-} from "../../src/export/populationRenderer.js";
-import { RelationalMapper } from "../../src/mapping/RelationalMapper.js";
-import type { RelationalSchema } from "../../src/mapping/RelationalSchema.js";
-import { OrmModel } from "../../src/model/OrmModel.js";
-import { ModelBuilder } from "../helpers/ModelBuilder.js";
+} from "../src/population/populationRenderer.js";
+import { ModelBuilder } from "./helpers/ModelBuilder.js";
 
 describe("renderPopulationAsSql", () => {
   it("should render SQL INSERT statements for a populated model", () => {
@@ -393,5 +395,33 @@ describe("renderPopulationAsOpenApiExamples", () => {
 
     const examples = renderPopulationAsOpenApiExamples(model);
     expect(examples.has("Customer")).toBe(false);
+  });
+});
+
+const here = dirname(fileURLToPath(import.meta.url));
+
+// Moved from core's externalPreferredIdentifier.test.ts with the renderer
+// (format-renderers-to-connectors.spec.md, WS1); the fixture is the same
+// Rooms model that file builds as roomYaml().
+describe("an external preferred identifier", () => {
+  it("an OpenAPI example joins the components on the entity", () => {
+    const yaml = readFileSync(resolve(here, "fixtures/externalIdentifier.orm.yaml"), "utf8")
+      + `  populations:
+    - id: p-rib
+      fact_type: ft-room-in-building
+      instances:
+        - { id: i1, role_values: { r-rib-room: "R1", r-rib-building: "HQ" } }
+    - id: p-rhn
+      fact_type: ft-room-has-nr
+      instances:
+        - { id: i2, role_values: { r-rhn-room: "R2", r-rhn-nr: "7" } }
+        - { id: i3, role_values: { r-rhn-room: "R1", r-rhn-nr: "101" } }
+`;
+    expect(
+      renderPopulationAsOpenApiExamples(new OrmYamlSerializer().deserializeAsWritten(yaml)).get(
+        "Room",
+      ),
+    )
+      .toEqual({ Building: "HQ", RoomNr: "101" });
   });
 });

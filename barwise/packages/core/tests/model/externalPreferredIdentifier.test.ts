@@ -8,7 +8,6 @@
 import { describe, expect, it } from "vitest";
 import { diffModels } from "../../src/diff/ModelDiff.js";
 import { MERGE_DIFF_OPTIONS, mergeModels } from "../../src/diff/ModelMerge.js";
-import { renderPopulationAsOpenApiExamples } from "../../src/export/populationRenderer.js";
 import { RelationalMapper } from "../../src/mapping/RelationalMapper.js";
 import {
   externallyIdentifiedEntity,
@@ -274,22 +273,6 @@ describe("the other readers of an external identifier", () => {
     // An identifier that is no longer stored is.
     expect(changed(load(roomYaml("a-")), load(roomYaml("b-", { preferred: false }))))
       .toHaveLength(1);
-  });
-
-  it("an OpenAPI example joins the components on the entity", () => {
-    const yaml = roomYaml() + `  populations:
-    - id: p-rib
-      fact_type: ft-room-in-building
-      instances:
-        - { id: i1, role_values: { r-rib-room: "R1", r-rib-building: "HQ" } }
-    - id: p-rhn
-      fact_type: ft-room-has-nr
-      instances:
-        - { id: i2, role_values: { r-rhn-room: "R2", r-rhn-nr: "7" } }
-        - { id: i3, role_values: { r-rhn-room: "R1", r-rhn-nr: "101" } }
-`;
-    expect(renderPopulationAsOpenApiExamples(load(yaml)).get("Room"))
-      .toEqual({ Building: "HQ", RoomNr: "101" });
   });
 
   it("merge follows an external identifier to the other side's copy", () => {

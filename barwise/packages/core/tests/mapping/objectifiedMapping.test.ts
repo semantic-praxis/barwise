@@ -11,7 +11,6 @@
  */
 import { describe, expect, it } from "vitest";
 import { RelationalMapper } from "../../src/mapping/RelationalMapper.js";
-import { renderDdl } from "../../src/mapping/renderers/ddl.js";
 import { ModelBuilder } from "../helpers/ModelBuilder.js";
 
 const mapper = new RelationalMapper();
@@ -229,12 +228,23 @@ describe("objectified fact type relational mapping", () => {
         .build();
 
       const schema = mapper.map(model);
-      const ddl = renderDdl(schema);
+      const employment = schema.tables.find((t) => t.name === "employment")!;
 
-      expect(ddl).toContain("CREATE TABLE employment");
-      expect(ddl).toContain("PRIMARY KEY (company_id, person_id)");
-      expect(ddl).toContain("FOREIGN KEY (company_id) REFERENCES company (company_id)");
-      expect(ddl).toContain("FOREIGN KEY (person_id) REFERENCES person (person_id)");
+      expect(employment.primaryKey.columnNames).toEqual(["company_id", "person_id"]);
+      expect(employment.foreignKeys).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            columnNames: ["company_id"],
+            referencedTable: "company",
+            referencedColumns: ["company_id"],
+          }),
+          expect.objectContaining({
+            columnNames: ["person_id"],
+            referencedTable: "person",
+            referencedColumns: ["person_id"],
+          }),
+        ]),
+      );
     });
   });
 });

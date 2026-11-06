@@ -8,8 +8,8 @@ Tracking: barwise-7tx, barwise-9g3, barwise-om4
 Plan-reviewed: 5ab23120 (code-review, pr-review)
 Touches: barwise/packages/core/src/verbalization/constraints/sentence.ts,
 barwise/packages/core/src/verbalization/constraints/phase2.ts,
-barwise/packages/core/src/mapping/renderers/openapi.ts,
-barwise/packages/core/src/mapping/renderers/avro.ts,
+barwise/packages/formats/src/openapi/renderOpenApi.ts,
+barwise/packages/formats/src/avro/renderAvro.ts,
 +barwise/packages/core/src/mapping/renderers/names.ts,
 barwise/packages/core/src/mapping/index.ts,
 barwise/packages/formats/src/avro/,

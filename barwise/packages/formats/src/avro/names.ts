@@ -5,7 +5,7 @@
  * and an Avro schema that their parsers refuse (barwise-9g3).
  */
 
-import type { Table } from "../RelationalSchema.js";
+import type { Table } from "@barwise/core/mapping";
 
 /**
  * An Avro name: a letter or `_`, then letters, digits and `_` (Avro 1.11
@@ -60,4 +60,16 @@ export function uniqueNames(
  */
 export function avroFieldNames(table: Table): Map<string, string> {
   return uniqueNames(table.columns.map((c) => c.name), (n) => AVRO_NAME.test(n), toAvroName);
+}
+
+/**
+ * A snake_case table or column name as a PascalCase record or schema name,
+ * the one rule the Avro and OpenAPI renderers and exporters share
+ * (format-renderers-to-connectors.spec.md, WS1: four copies became one).
+ */
+export function toPascalCase(name: string): string {
+  return name
+    .split("_")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+    .join("");
 }

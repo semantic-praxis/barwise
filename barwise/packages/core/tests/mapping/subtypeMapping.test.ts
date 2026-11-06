@@ -9,7 +9,6 @@
  */
 import { describe, expect, it } from "vitest";
 import { RelationalMapper } from "../../src/mapping/RelationalMapper.js";
-import { renderDdl } from "../../src/mapping/renderers/ddl.js";
 import { ModelBuilder } from "../helpers/ModelBuilder.js";
 
 const mapper = new RelationalMapper();
@@ -75,7 +74,6 @@ describe("subtype relational mapping", () => {
       const key = schema.tables.find((t) => t.name === "employee")!.columns[0]!;
       expect(key).toMatchObject({ name: "employee_id", dataType: "UUID" });
       expect(key.identity).toBeUndefined();
-      expect(renderDdl(schema)).not.toContain("UUID GENERATED");
     });
 
     it("still creates tables for both entity types", () => {
@@ -200,9 +198,15 @@ describe("subtype relational mapping", () => {
         .build();
 
       const schema = mapper.map(model);
-      const ddl = renderDdl(schema);
+      const employee = schema.tables.find((t) => t.name === "employee")!;
 
-      expect(ddl).toContain("FOREIGN KEY (employee_id) REFERENCES person (person_id)");
+      expect(employee.foreignKeys).toContainEqual(
+        expect.objectContaining({
+          columnNames: ["employee_id"],
+          referencedTable: "person",
+          referencedColumns: ["person_id"],
+        }),
+      );
     });
   });
 });

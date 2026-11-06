@@ -1,6 +1,6 @@
 # Format renderers live in their connectors, and dbt composes formats' SQL parser
 
-Status: Draft -- no workstream implemented
+Status: WS1 implemented 2026-11-06 (the DDL, OpenAPI, Avro and population renderers in `@barwise/formats`; `connector-packages.md#format-in-its-connector` held by `core/tests/public/exports.test.ts`); WS2-WS4 not started
 
 Created: 2026-11-06
 Last-updated: 2026-11-06

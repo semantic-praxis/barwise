@@ -9,12 +9,11 @@
  *   - Associative tables for many-to-many relationships
  *   - Value-type columns (absorbed into the entity table)
  */
+import { OrmModel } from "@barwise/core";
+import { RelationalMapper, type RelationalSchema } from "@barwise/core/mapping";
 import { describe, expect, it } from "vitest";
-import { RelationalMapper } from "../../src/mapping/RelationalMapper.js";
-import type { RelationalSchema } from "../../src/mapping/RelationalSchema.js";
-import { renderDdl } from "../../src/mapping/renderers/ddl.js";
-import { OrmModel } from "../../src/model/OrmModel.js";
-import { ModelBuilder } from "../helpers/ModelBuilder.js";
+import { renderDdl } from "../src/ddl/renderDdl.js";
+import { ModelBuilder } from "./helpers/ModelBuilder.js";
 
 const mapper = new RelationalMapper();
 

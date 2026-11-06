@@ -207,3 +207,16 @@ export function blankComments(input: string): string {
 
 /** A PostgreSQL dollar-quote opener: `$$` or `$body$`. */
 const DOLLAR_TAG = /^\$[A-Za-z_]*\$/;
+
+/**
+ * An identifier as DDL writes it: bare when it is a plain lower-case name,
+ * double-quoted otherwise (the DDL and population renderers share it).
+ */
+export function quoteIdent(name: string): string {
+  // Simple quoting: wrap in double quotes if the name contains special chars,
+  // otherwise return as-is.
+  if (/^[a-z_][a-z0-9_]*$/.test(name)) {
+    return name;
+  }
+  return `"${name.replace(/"/g, '""')}"`;
+}

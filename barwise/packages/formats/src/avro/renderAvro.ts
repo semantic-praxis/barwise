@@ -20,8 +20,9 @@
  * Nullable columns become Avro unions: ["null", type].
  */
 
-import type { Column, RelationalSchema, Table } from "../RelationalSchema.js";
+import type { Column, RelationalSchema, Table } from "@barwise/core/mapping";
 import { avroFieldNames } from "./names.js";
+import { toPascalCase } from "./names.js";
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -179,14 +180,4 @@ function sqlTypeToAvro(sqlType: string): AvroFieldType {
     default:
       return "string";
   }
-}
-
-/**
- * Convert a snake_case name to PascalCase for Avro record names.
- */
-function toPascalCase(name: string): string {
-  return name
-    .split("_")
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
-    .join("");
 }

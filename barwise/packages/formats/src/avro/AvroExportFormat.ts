@@ -17,17 +17,20 @@ import {
 import { collectExportAnnotations, type ExportAnnotation } from "@barwise/core/annotation";
 import { generateDdlLineage } from "@barwise/core/lineage";
 import {
-  type AvroField,
-  avroFieldNames,
-  type AvroSchema,
-  type AvroSchemaSet,
-  avroSchemaToJson,
   RelationalMapper,
   type RelationalSchema,
-  renderAvro,
   unreportedConstraintSpecs,
   withConstraintSpecs,
 } from "@barwise/core/mapping";
+import { avroFieldNames } from "./names.js";
+import { toPascalCase } from "./names.js";
+import {
+  type AvroField,
+  type AvroSchema,
+  type AvroSchemaSet,
+  avroSchemaToJson,
+  renderAvro,
+} from "./renderAvro.js";
 
 /**
  * Apache Avro schema export format.
@@ -201,18 +204,4 @@ function injectDocAnnotations(
   });
 
   return { schemas };
-}
-
-/**
- * Convert a snake_case name to PascalCase.
- *
- * Registered in parity.manifest.json ("pascal-case-avro") with the
- * copy in core's avro renderer: record names must align, and
- * check:parity fails when the copies differ.
- */
-function toPascalCase(name: string): string {
-  return name
-    .split("_")
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
-    .join("");
 }

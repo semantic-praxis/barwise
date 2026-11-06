@@ -11,48 +11,6 @@
       ]
     },
     {
-      "name": "pascal-case-avro",
-      "why": "record names must align between core's Avro mapper and the formats exporter or exported schemas reference names the mapping never produced",
-      "members": [
-        {
-          "file": "packages/core/src/mapping/renderers/avro.ts",
-          "symbol": "toPascalCase"
-        },
-        {
-          "file": "packages/formats/src/avro/AvroExportFormat.ts",
-          "symbol": "toPascalCase"
-        }
-      ]
-    },
-    {
-      "name": "pascal-case-openapi",
-      "why": "schema names must align between core's OpenAPI mapper and the formats exporter, same shape as the Avro pair",
-      "members": [
-        {
-          "file": "packages/core/src/mapping/renderers/openapi.ts",
-          "symbol": "toPascalCase"
-        },
-        {
-          "file": "packages/formats/src/openapi/OpenApiExportFormat.ts",
-          "symbol": "toPascalCase"
-        }
-      ]
-    },
-    {
-      "name": "sql-quote-ident",
-      "why": "CREATE TABLE and its own population INSERTs must quote identifiers identically or the INSERTs target tables the DDL never created",
-      "members": [
-        {
-          "file": "packages/core/src/mapping/renderers/ddl.ts",
-          "symbol": "quoteIdent"
-        },
-        {
-          "file": "packages/core/src/export/populationRenderer.ts",
-          "symbol": "quoteIdent"
-        }
-      ]
-    },
-    {
       "name": "import-alternatives-diff-summary",
       "why": "the alternative-framing diff summary is one sentence shape shown on both surfaces; the surrounding wrappers deliberately differ (plain text vs markdown), the summary may not",
       "members": [

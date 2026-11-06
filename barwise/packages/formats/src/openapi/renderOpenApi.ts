@@ -21,10 +21,11 @@
  * Foreign key columns reference their target schema via `$ref`.
  */
 
-import { renderPopulationAsOpenApiExamples } from "../../export/populationRenderer.js";
-import type { OrmModel } from "../../model/OrmModel.js";
-import type { RelationalSchema, Table } from "../RelationalSchema.js";
-import { uniqueNames } from "./names.js";
+import type { OrmModel } from "@barwise/core";
+import type { RelationalSchema, Table } from "@barwise/core/mapping";
+import { uniqueNames } from "../avro/names.js";
+import { toPascalCase } from "../avro/names.js";
+import { renderPopulationAsOpenApiExamples } from "../population/populationRenderer.js";
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -385,14 +386,6 @@ function sqlTypeToOpenApi(
 // ---------------------------------------------------------------------------
 // String helpers
 // ---------------------------------------------------------------------------
-
-/** Convert a snake_case name to PascalCase. */
-function toPascalCase(name: string): string {
-  return name
-    .split("_")
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
-    .join("");
-}
 
 /** Convert a snake_case name to kebab-case for URL paths. */
 function toKebabCase(name: string): string {

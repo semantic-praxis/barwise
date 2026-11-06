@@ -13,14 +13,22 @@
  *   - Options (title, version, basePath)
  *   - openApiToJson produces valid formatted JSON
  */
+import { type InternalConstraint, OrmModel, storePreferredFlags } from "@barwise/core";
+import { RelationalMapper, type RelationalSchema } from "@barwise/core/mapping";
 import { describe, expect, it } from "vitest";
-import { RelationalMapper } from "../../src/mapping/RelationalMapper.js";
-import type { RelationalSchema } from "../../src/mapping/RelationalSchema.js";
-import { openApiToJson, renderOpenApi } from "../../src/mapping/renderers/openapi.js";
-import type { OpenApiSpec } from "../../src/mapping/renderers/openapi.js";
-import { OrmModel } from "../../src/model/OrmModel.js";
-import { ModelBuilder } from "../helpers/ModelBuilder.js";
-import { placeFlags } from "../helpers/placeFlags.js";
+import { type OpenApiSpec, openApiToJson, renderOpenApi } from "../src/openapi/renderOpenApi.js";
+import { ModelBuilder } from "./helpers/ModelBuilder.js";
+
+// Store the `isPreferred` flags a fixture sets on its uniqueness constraints,
+// as the 2.0 reader does (orm-format-3 WS4b); moved with this test from core.
+function placeFlags<M extends OrmModel>(model: M): M {
+  storePreferredFlags(
+    model,
+    (c: InternalConstraint) =>
+      (c as InternalConstraint & { isPreferred?: boolean; }).isPreferred === true,
+  );
+  return model;
+}
 
 const mapper = new RelationalMapper();
 

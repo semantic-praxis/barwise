@@ -8,7 +8,7 @@
  * (avro-namespace-from-file-name.spec.md, barwise-1c2).
  */
 
-import { AVRO_NAME as SEGMENT, toAvroName } from "@barwise/core/mapping";
+import { AVRO_NAME as SEGMENT, toAvroName } from "./names.js";
 
 /** Whether a namespace is one Avro's specification accepts. */
 export function isAvroNamespace(namespace: string): boolean {
