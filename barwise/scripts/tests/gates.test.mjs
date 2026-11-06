@@ -53,7 +53,11 @@ import { ciLocalLibs } from "./ci-local-files.mjs";
 // The real list, imported statically (as dependency-cruiser requires
 // intended.cjs) so the plants below are written against what core declares.
 import EXTERNAL from "../lib/external-deps.cjs";
-import { RATCHETS, SOURCE_FILES as FINDING_SOURCE_FILES } from "../lib/findings.mjs";
+import {
+  RATCHETS,
+  SOURCE_FILES as FINDING_SOURCE_FILES,
+  SOURCE_KEYS as FINDING_SOURCE_KEYS,
+} from "../lib/findings.mjs";
 
 const SCRIPTS = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const REPO = execFileSync("git", ["rev-parse", "--show-toplevel"], {
@@ -2585,26 +2589,73 @@ const A_CORRECTION =
   "# Probe\n\nThe draft said the loader was pure, and implementing it showed the\n"
   + "loader reads the environment, so the claim was wrong in kind.\n";
 
-// Every ratchet in the registry fails --check on a baseline row its
-// detector does not produce: the stale half of decision 2, for each ratchet
-// rather than for the one that happened to get a test (barwise-2af).
-for (const rt of RATCHETS.filter((x) => x.staleRow)) {
-  test(`${rt.script} --check fails on a stale baseline row${rt.needsDist === undefined ? " [adr:findings-close-by-mechanism#ratchet-both-ways]" : ""}`, (t) => {
-    if (rt.needsDist !== undefined && !existsSync(join(REPO, "barwise", rt.needsDist))) {
-      t.skip(`${rt.needsDist} not built; run npm run build first`);
+/**
+ * The stale half of findings-close-by-mechanism decision 2, per ratchet:
+ * a row planted in the real baseline that its detector does not produce
+ * (restored in `finally`), or the name of a test that already plants one
+ * in a sandbox. Keyed by RATCHETS' sources, which a test below holds to
+ * cover them all.
+ */
+const STALE_CASES = {
+  duplication: {
+    row: { status: "accepted-benign", note: "a planted stale row", detail: "none" },
+    output: /^\s*STALE baseline entry no longer detected: zz-planted-stale-row\b/m,
+  },
+  rubric: {
+    row: {
+      case: "none",
+      kind: "must_validate",
+      message: "x",
+      verdict: "accepted-benign: a planted stale row",
+    },
+    output: /Baseline entry no longer detected: zz-planted-stale-row\b/,
+    // Scores through the built promptlab, as its writer test does.
+    needsDist: "packages/promptlab/dist/index.js",
+  },
+  specs: {
+    row: { status: "Draft", commits: ["00000000"], note: "a planted stale row" },
+    output: /STALE baseline row: zz-planted-stale-row\b/,
+  },
+  corrections: {
+    testedBy: [
+      "barwise/scripts/tests/gates.test.mjs",
+      "audit-corrections fails on a baseline entry no longer detected",
+    ],
+  },
+  trial: {
+    testedBy: [
+      "barwise/trial/tests/oracles.test.mjs",
+      "evaluateGate: a new failure, a stale row and an unclassified row each fail the gate",
+    ],
+  },
+};
+
+for (const [source, c] of Object.entries(STALE_CASES).filter(([, x]) => x.row)) {
+  const rt = RATCHETS.find((x) => x.source === source);
+  test(`${rt.script} --check fails on a stale baseline row${c.needsDist === undefined ? " [adr:findings-close-by-mechanism#ratchet-both-ways]" : ""}`, (t) => {
+    if (c.needsDist !== undefined && !existsSync(join(REPO, "barwise", c.needsDist))) {
+      t.skip(`${c.needsDist} not built; run npm run build first`);
       return;
     }
-    const path = join(REPO, "barwise", FINDING_SOURCE_FILES[rt.source]);
+    const path = join(REPO, "barwise", FINDING_SOURCE_FILES[source]);
     const before = readFileSync(path, "utf8");
     try {
       const json = JSON.parse(before);
-      const key = Object.keys(json).find((k) => k !== "$comment");
-      json[key]["zz-planted-stale-row"] = rt.staleRow;
+      json[FINDING_SOURCE_KEYS[source]]["zz-planted-stale-row"] = c.row;
       writeFileSync(path, JSON.stringify(json, null, 2) + "\n");
-      const r = gate(rt.script, REPO, "--check");
-      assert.equal(r.status, 1, `expected a finding (1), got ${r.status}:\n${r.stdout}${r.stderr}`);
-      assert.match(`${r.stdout}${r.stderr}`, rt.staleOutput);
-      assert.match(`${r.stdout}${r.stderr}`, /zz-planted-stale-row/);
+      const r = spawnSync(process.execPath, [join(REPO, "barwise", rt.script), "--check"], {
+        cwd: REPO,
+        encoding: "utf8",
+      });
+      const out = `${r.stdout}${r.stderr}`;
+      // A build that exists but will not load is not the ratchet's verdict.
+      if (c.needsDist !== undefined && /dist not found|Cannot find module/.test(out)) {
+        t.skip("the promptlab build does not load; run npm run build first");
+        return;
+      }
+      assert.equal(r.status, 1, `expected a finding (1), got ${r.status}:\n${out}`);
+      // The stale message names the planted row itself, on one line.
+      assert.match(out, c.output);
     } finally {
       writeFileSync(path, before);
     }
@@ -2614,35 +2665,50 @@ for (const rt of RATCHETS.filter((x) => x.staleRow)) {
 test("every baseline has a registered ratchet, wired into CI with a stale-row case, or a stated reason [adr:findings-close-by-mechanism#ratchet-in-ci]", async () => {
   // RATCHETS (scripts/lib/findings.mjs) must cover every baseline the
   // findings reader reads, so a new audit cannot land with neither check.
-  // Each ratchet's ci line must be a run: step ci.yml actually carries; an
-  // exemption must say why, in words, rather than be an omission.
+  // A ci line must be a step that can fail CI (the judgement adr-judge
+  // makes for a declared gate), and the npm script it runs must be the
+  // script the stale case runs. An exemption says why, in words.
   assert.deepEqual(
     RATCHETS.map((rt) => rt.source).sort(),
     Object.keys(FINDING_SOURCE_FILES).sort(),
     "a baseline has no ratchet in RATCHETS, or a ratchet names no baseline",
   );
+  assert.deepEqual(
+    Object.keys(STALE_CASES).sort(),
+    RATCHETS.map((rt) => rt.source).sort(),
+    "a ratchet has no stale-row case",
+  );
   const { ciStepOccurrences } = await import("../lib/ci-occurrences.mjs");
+  const { stepGates } = await import("../lib/adr-judge.mjs");
   const steps = ciStepOccurrences(join(REPO, ".github", "workflows", "ci.yml"));
+  const scripts = JSON.parse(readFileSync(join(REPO, "barwise", "package.json"), "utf8")).scripts;
   for (const rt of RATCHETS) {
     assert.ok(
       (rt.ci === undefined) !== (rt.noCi === undefined),
       `${rt.source}: a ratchet has a ci line or a noCi reason, exactly one`,
     );
+    if (rt.noCi !== undefined) {
+      assert.ok(rt.noCi.length > 20, `${rt.source}: an exemption needs its reason`);
+      continue;
+    }
     assert.ok(
-      (rt.staleRow === undefined) !== (rt.noStale === undefined),
-      `${rt.source}: a ratchet has a staleRow case or a noStale reason, exactly one`,
+      steps.some((st) => st.run === rt.ci && stepGates(st)),
+      `${rt.source}: no ci.yml step running "${rt.ci}" can fail CI`,
     );
-    for (const why of [rt.noCi, rt.noStale]) {
-      if (why !== undefined) {
-        assert.ok(why.length > 20, `${rt.source}: an exemption needs its reason`);
-      }
-    }
-    if (rt.ci !== undefined) {
-      assert.ok(
-        steps.some((st) => st.run === rt.ci),
-        `${rt.source}: ci.yml has no step running "${rt.ci}"`,
-      );
-    }
+    const name = /^npm run (\S+)/.exec(rt.ci)[1];
+    assert.equal(
+      scripts[name],
+      `node ${rt.script}`,
+      `${rt.source}: ${name} does not run ${rt.script}, the script the stale case runs`,
+    );
+  }
+  for (const [source, c] of Object.entries(STALE_CASES)) {
+    if (!c.testedBy) continue;
+    const [file, title] = c.testedBy;
+    assert.ok(
+      readFileSync(join(REPO, file), "utf8").includes(title),
+      `${source}: its stale-row test "${title}" is not in ${file}`,
+    );
   }
 });
 

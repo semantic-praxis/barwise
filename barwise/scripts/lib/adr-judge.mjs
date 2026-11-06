@@ -30,6 +30,17 @@ const guard = (condition) => {
 };
 
 /**
+ * Whether a ci.yml step (as ci-occurrences.mjs reads it) can fail CI on
+ * every code change: run in barwise/, never continue-on-error, under a guard
+ * this reader understands and that runs it. The judgement the declaration
+ * pass makes for an npm entry, for any other check that needs it.
+ */
+export const stepGates = (s) => {
+  const g = guard(s.condition);
+  return s.workingDirectory === "barwise" && s.continueOnError === false && g.understood && g.runs;
+};
+
+/**
  * Whether the code judge's reader needs the workflow reader: some ADR
  * declares a gate. ci-occurrences.mjs needs the `yaml` package, so a tree
  * with no such entry runs on builtins.

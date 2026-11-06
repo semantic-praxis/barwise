@@ -66,16 +66,23 @@ verdict on every row is safe to gate on, when raw detection is not.
     a fixed site forces its row out.
 - `RATCHETS` in `scripts/lib/findings.mjs` lists one ratchet per
   baseline the findings reader reads, with the `ci.yml` line that runs
-  it and a row its detector does not produce. A test fails when a
-  baseline has no ratchet, when a ratchet's line is not a `ci.yml`
-  step, and, per ratchet, when `--check` passes over the planted stale
-  row. An exemption is stated, not omitted:
-  - `trial:gate` is exempt from both, because a run needs
-    `trial:offline` results, which no CI job produces (barwise-ym8.ld2
-    for decision 4).
-  - The `audit:rubric` stale-row case needs the built promptlab, so it
-    skips in CI, which runs `test:scripts` before the build
-    (barwise-ym8.k4d for decision 2, with barwise-ym8.fi5).
+  it. A test fails when a baseline has no ratchet, when a ratchet's line
+  is not a step that can fail CI (run in `barwise/`, not
+  continue-on-error, under a guard that runs it on every code change, as
+  `adr-judge.mjs` judges a declared gate), when its npm script runs a
+  different file, or when a ratchet has no stale-row case:
+  - `audit:duplication`, `audit:specs` and `audit:rubric` get a row
+    planted in their real baseline and must fail `--check` naming it;
+    the rubric case needs the built promptlab, so it skips in CI, which
+    runs `test:scripts` before the build (barwise-ym8.k4d, with
+    barwise-ym8.fi5);
+  - `audit:corrections` and `trial:gate` are covered by tests that
+    plant a stale row in a sandbox, which the registry names and checks
+    exist;
+  - `trial:gate` alone has no CI step: a run needs `trial:offline`
+    results, which no CI job produces (barwise-ym8.ld2).
+- The other half of decision 2, a new candidate with no row, is tested
+  for `audit:corrections` only (barwise-ym8.k4d).
 - Decision 4 beyond the registry:
   - `trial:gate` ratchets `trial-baseline.json`, but only the trial's
     unit tests run in CI. The enterprise-trial spec plans the small
