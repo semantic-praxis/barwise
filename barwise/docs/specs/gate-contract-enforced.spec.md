@@ -1,6 +1,6 @@
 # The gate refusal contract, enforced: the fault matrix green and in CI
 
-Status: WS1 under way 2026-11-06 (barwise-ydl fixed: check-tracker-closes refuses an empty merge-base and an empty tracker read; check-tracker-closes refuses a close whose diff omits the tracker; test-adr-model refuses when git cannot answer; the shallow-clone cases of test:scripts skip, and the matrix shim answers only for the repository under test; audit-rubric and check-depcruise-gate refuse a missing input, barwise-shq; npm run depcruise exits by its violation count, barwise-vt2); WS2 waits on open decision 1; WS3 and WS4 not started
+Status: WS1 implemented 2026-11-06 (#962, #963, #964: barwise-ydl, barwise-shq, barwise-vt2 and barwise-w43 fixed, test-adr-model refuses a broken git, the matrix's shallow shim answers only for the repository under test, and test:scripts' history-reading cases skip on a shallow clone); WS4 implemented 2026-11-06 (ci:local over a mixed run, the pre-commit secrets step, barwise-jha; the skip rule stays a gap); WS2 waits on open decision 1; WS3 needs its own design pass
 Created: 2026-11-06
 Last-updated: 2026-11-06
 Tracking: barwise-ym8.gc9 (adr-refactor batch 2), barwise-ym8.j31,
