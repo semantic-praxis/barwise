@@ -34,6 +34,7 @@
     "check:book-citations": "node scripts/check-book-citations.mjs",
     "check:instruction-refs": "node scripts/check-instruction-refs.mjs",
     "check:architecture": "node scripts/check-architecture.mjs",
+    "check:capability-matrix": "node scripts/check-capability-matrix.mjs",
     "check:adr-tests": "node scripts/check-adr-tests.mjs",
     "check:adr-model": "node scripts/check-adr-model.mjs",
     "test:scripts": "node scripts/run-script-tests.mjs",

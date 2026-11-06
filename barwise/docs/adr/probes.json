@@ -100,5 +100,23 @@
     "file": ".github/workflows/ci.yml",
     "old": "python3 -m pip install --quiet uv==",
     "new": "python3 -m pip install --quiet uv>="
+  },
+  {
+    "decision": "surface-capability-parity#matrix-records-reach",
+    "file": "CLAUDE.md",
+    "old": "| `review`                                              | yes | yes | yes     |",
+    "new": "| `review`                                              | yes | no  | yes     |"
+  },
+  {
+    "decision": "surface-capability-parity#matrix-same-commit",
+    "file": "barwise/packages/vscode/package.json",
+    "old": "\"languageModelTools\": [",
+    "new": "\"languageModelTools\": [\n      { \"name\": \"barwise_history\", \"displayName\": \"History\", \"modelDescription\": \"probe\" },"
+  },
+  {
+    "decision": "surface-capability-parity#vscode-yes-means",
+    "file": "barwise/packages/vscode/package.json",
+    "old": "\"command\": \"barwise.export\",",
+    "new": "\"command\": \"barwise.exportAll\","
   }
 ]

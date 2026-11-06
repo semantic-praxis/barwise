@@ -1,13 +1,14 @@
 # The capability matrix, checked against what each surface registers
 
-Status: Draft -- no workstream implemented
+Status: WS1 implemented 2026-11-06 (check:capability-matrix, full run and --static, with capability-map.json for all 22 rows; probes for matrix-records-reach, matrix-same-commit and vscode-yes-means CAUGHT; the gate agreed with main on its first run); WS2 provisional
 Created: 2026-11-06
 Last-updated: 2026-11-06
 Plan-reviewed: 8d9588bb (code-review, pr-review)
 Tracking: barwise-ym8.gc9 (adr-refactor batch 5), barwise-ym8.wfy,
 barwise-ym8.3nm, barwise-ym8.0hi, barwise-ym8.0pq, barwise-1005, barwise-xpt
-Touches: CLAUDE.md, +barwise/scripts/check-capability-matrix.mjs,
+Touches: CLAUDE.md, package.json, +barwise/scripts/check-capability-matrix.mjs,
 +barwise/scripts/lib/capability-map.json, barwise/scripts/tests/,
++barwise/scripts/tests/check-capability-matrix.test.mjs,
 barwise/package.json, .github/workflows/ci.yml,
 barwise/docs/adr/surface-capability-parity.md, barwise/docs/adr/probes.json,
 barwise/docs/ARCHITECTURE.md, barwise/scripts/check-adr-tests.mjs
