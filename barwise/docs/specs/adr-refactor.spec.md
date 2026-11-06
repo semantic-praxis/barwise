@@ -39,8 +39,10 @@ criteria for a choice, and retires to prose.
 | judgment  | 0         | 0       | 7      | 7     |
 | total     | 60        | 18      | 7      | 85    |
 
-The table is the sort before WS1; the owner's WS1 answers move rows
-between columns, and the counts are recomputed when WS1 closes.
+The table is the sort before WS1. After WS1 (2026-11-06) the 25 WS1 rows
+are 15 restated or kept as checkable decisions, 8 retired to prose and 2
+whose decision changes in a spec of their own; the restated rows join
+the buildable batches.
 
 The sort was made on 2026-11-05 from each decision's text and its gap
 issue's "Unguarded" clause, reading the gate a clause names where the
@@ -149,7 +151,7 @@ changed the rule. A restatement keeps `Date:`; a retirement moves it,
 renumbers the decisions after it and updates their numbered references.
 The owner answers per row: accept, reject, or edit.
 
-**Decided (owner, 2026-11-06)**
+**All 25 rows decided (owner, 2026-11-06).** Outcomes: 15 restated or kept as checkable decisions (rows 3 to 16 and 20), 8 retired to prose (rows 2, 17, 18, 19, 21, 22, 23, 25), and 2 whose decision changes in a spec of its own (rows 1 and 24).
 
 - **Row 1.** `connector-packages#descriptor-wraps-core`: **owner, 2026-11-06: the decision changes**, so it leaves WS1 for a spec of its own. `renderDdl`, `renderOpenApi` and `renderAvro` move to `@barwise/formats` and `renderDbt` to `@barwise/dbt`; `RelationalMapper` stays in core (ORM is relational). `@barwise/dbt` depends on `@barwise/formats`, and one SQL-parsing function there (the sqlglot bridge with the regex fallback) replaces the copy in each importer, by composition, not inheritance; whether `parseSqlFile` leaves core with it is settled in that spec. The `pascal-case-avro`, `pascal-case-openapi` and `sqlglot-bridge` parity sets go with the copies.
 - **Row 2.** `credential-handling#rotate-not-revert`: **owner, 2026-11-06: retire.** Obvious to anyone who handles a leak, and the project does not prescribe what a person does in their provider console. The guidance moves to Consequences (rotation is the remedy; reverting or rewriting history does not undo a leak, though a revert may still be wanted), and the root CLAUDE.md convention that restates it is cut to match in the same PR.
@@ -171,17 +173,15 @@ The owner answers per row: accept, reject, or edit.
 
 **Medium: shapes code or checks**
 
-**Low: text only, likely accepted as written**
-
-- **Row 15.** `plan-before-code#open-decisions-reviewer`: "Every spec has an Open decisions section, and each entry gives its options, the trade-off and a recommended default."
-- **Row 11.** `must-agree-copies#check-on-copy`: restate, revised after rows 4, 5 and 24: "Every `audit:duplication` candidate carries a verdict from the duplication spec's table (shared, guarded by a named check, or declared divergent), read through row 4's common reader." With row 24's share-by-default, a guarded copy is the exception that `INTENDED` forces. Low confidence until the mechanical-duplication spec (barwise-ym8.gc9.7fb) shows which copies its detectors see.
-- **Row 17.** `constraint-coverage-policy#trust-statement` (changes, first proposal added a feature): it says how a reader treats extracted constraints, which is guidance to consumers. Move to Consequences.
-- **Row 18.** `metamodel-evolution-policy#four-filters` (changes, first proposal checked existing constructs instead of candidates): criteria for admitting a construct are judgment. Move to Context as the filters a candidate is weighed against.
-- **Row 19.** `constraint-coverage-policy#compares-not-certifies`: to Context.
-- **Row 21.** `metamodel-evolution-policy#deliberately-lossy`: to Context.
-- **Row 22.** `metamodel-evolution-policy#tiering`: to Context, beside the tiers.
-- **Row 23.** `metamodel-evolution-policy#design-against-book`: to Context.
-- **Row 25.** `review-policy#prevent-upstream`: to Consequences.
+- **Row 15.** `plan-before-code#open-decisions-reviewer` **owner, 2026-11-06: accepted as listed**: "Every spec has an Open decisions section, and each entry gives its options, the trade-off and a recommended default."
+- **Row 11.** `must-agree-copies#check-on-copy` **owner, 2026-11-06: accepted as listed**: restate, revised after rows 4, 5 and 24: "Every `audit:duplication` candidate carries a verdict from the duplication spec's table (shared, guarded by a named check, or declared divergent), read through row 4's common reader." With row 24's share-by-default, a guarded copy is the exception that `INTENDED` forces. Low confidence until the mechanical-duplication spec (barwise-ym8.gc9.7fb) shows which copies its detectors see.
+- **Row 17.** `constraint-coverage-policy#trust-statement` **owner, 2026-11-06: accepted as listed** (changes, first proposal added a feature): it says how a reader treats extracted constraints, which is guidance to consumers. Move to Consequences.
+- **Row 18.** `metamodel-evolution-policy#four-filters` **owner, 2026-11-06: accepted as listed** (changes, first proposal checked existing constructs instead of candidates): criteria for admitting a construct are judgment. Move to Context as the filters a candidate is weighed against.
+- **Row 19.** `constraint-coverage-policy#compares-not-certifies` **owner, 2026-11-06: accepted as listed**: to Context.
+- **Row 21.** `metamodel-evolution-policy#deliberately-lossy` **owner, 2026-11-06: accepted as listed**: to Context.
+- **Row 22.** `metamodel-evolution-policy#tiering` **owner, 2026-11-06: accepted as listed**: to Context, beside the tiers.
+- **Row 23.** `metamodel-evolution-policy#design-against-book` **owner, 2026-11-06: accepted as listed**: to Context.
+- **Row 25.** `review-policy#prevent-upstream` **owner, 2026-11-06: accepted as listed**: to Consequences.
 
 Two pieces of work come before the batches, from the owner's WS1
 answers (2026-11-06):
