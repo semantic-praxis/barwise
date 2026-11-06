@@ -169,11 +169,20 @@ Restatements (the rule stays; `Date:` stays):
    (batch 8): a depcruise rule forbidding `@anthropic-ai/sdk` and
    `openai` outside `@barwise/llm`, with a probe; a plain `fetch` to a
    provider host stays a gap.
-4. `findings-close-by-mechanism#mechanism-closes`: "An issue filed from
-   an audit finding is closed with a reason naming the check or the
-   baseline row that holds it, and that file is in the tree." Low
-   confidence: no label marks a finding issue today, so a check needs
-   one (a convention this restatement would add).
+4. `findings-close-by-mechanism#mechanism-closes`: **owner,
+   2026-11-06: restate**, strictly enforced through a common finding
+   shape: "A finding an audit ratchet records is held by its baseline
+   row: every open finding (`tracked:<issue>`) names a beads issue that
+   exists and is open, and a closed issue keeps no open finding." The
+   five baselines keep their files, but one reader returns their rows as
+   `{ id, source, state, issue?, classification, note }`, where `state`
+   is open, classified or unclassified and `classification` keeps each
+   audit's own vocabulary (`caught_by` is a taxonomy, not a status). The
+   broader "close any finding by a mechanism, not a document" becomes
+   prose; a sweep of closed beads issues that look like findings is an
+   optional on-demand report, never a gate. The same reader holds rows 5
+   and 11. Batch 4 builds it and moves up to run right after row 1's
+   spec.
 5. `findings-close-by-mechanism#person-classifies`: "A baseline writer
    never sets a verdict: a new row gets the placeholder, and a row
    already classified keeps its verdict."
