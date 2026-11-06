@@ -17,6 +17,12 @@
 import { spawnSync } from "node:child_process";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+// The cases build sandbox repositories and run check-adr-model over them,
+// so a git that fails or answers emptily fails cases, which this runner
+// reports as a finding (the fault matrix's git-empty and git-absent
+// axes, gate-contract-enforced WS1). tracked.mjs refuses at import when
+// git cannot name the repository root, which is the precondition here.
+import "./lib/tracked.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const refuse = (message) => {

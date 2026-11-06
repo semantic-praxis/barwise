@@ -126,6 +126,9 @@ const ROOT_DEPENDENT_GATES = [
   "check-lockfile-agrees.mjs",
   "check-git-listing.mjs",
   "check-plan-review.mjs",
+  // A test runner whose cases need git: it refused nothing and reported
+  // failed cases as a finding until gate-contract-enforced WS1.
+  "test-adr-model.mjs",
 ];
 
 for (const script of ROOT_DEPENDENT_GATES) {
@@ -5530,6 +5533,30 @@ test("check-tracker-closes, run as ci:local --commit runs it, fails a close besi
   } finally {
     rmSync(tree, { recursive: true, force: true });
     rmSync(r.dir, { recursive: true, force: true });
+  }
+});
+
+test("run-script-tests refuses a shallow clone rather than reporting failed cases [adr:gate-refusal-contract#refuse-not-find]", () => {
+  // Cases that run history-reading gates fail on a shallow clone; the
+  // runner read that as a finding (the fault matrix's git-shallow axis).
+  const dir = mkdtempSync(join(tmpdir(), "barwise-shallow-"));
+  try {
+    const realGit = execFileSync("sh", ["-c", "command -v git"], { encoding: "utf8" }).trim();
+    const stub = join(dir, "git");
+    writeFileSync(
+      stub,
+      `#!/bin/sh\nif [ "$1" = rev-parse ] && [ "$2" = --is-shallow-repository ]; then echo true; exit 0; fi\nexec "${realGit}" "$@"\n`,
+    );
+    chmodSync(stub, 0o755);
+    const r = spawnSync(process.execPath, [join(SCRIPTS, "run-script-tests.mjs")], {
+      cwd: REPO,
+      encoding: "utf8",
+      env: { ...process.env, PATH: `${dir}:${process.env.PATH ?? ""}` },
+    });
+    assert.equal(r.status, 2, r.stdout + r.stderr);
+    assert.match(r.stderr, /the clone is shallow/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
   }
 });
 
