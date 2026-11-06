@@ -71,10 +71,12 @@ format lives and how it reaches the surfaces.
   and environment access in core, so the I/O half of `connector-packages.md#connector-owns-io` and the
   "no discovery" half of `connector-packages.md#explicit-registration`
   have a backstop
-  (`architecture-scenarios.md` S-EXPL-5). It misses dynamic imports,
-  `process.cwd()` and global `fetch` (barwise-fzd), and a `require`
-  call, which no issue tracks yet (barwise-fzd's list is measured and
-  does not include it).
+  (`architecture-scenarios.md` S-EXPL-5). It parses each file with
+  TypeScript, so dynamic imports, `require`, `createRequire`,
+  `node:process`, `process.cwd()`, global `fetch` and a comment-led
+  import line are caught (`purity-and-model-boundary.spec.md`). Format
+  I/O placed in a package other than its connector (a surface, `llm`,
+  `learn`, `promptlab`, `diagram`) is outside it (barwise-ym8.iyw).
 - `npm run depcruise` (ci.yml, `if: steps.changes.outputs.docs_only !=
   'true'`) fails when core's source imports another internal package's
   source, so core cannot reach a connector; tests and external

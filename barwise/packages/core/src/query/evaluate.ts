@@ -21,6 +21,7 @@ import { type ObjectType, referenceModeOf } from "../model/ObjectType.js";
 import type { ConstraintInView, OrmModel } from "../model/OrmModel.js";
 import { expandReading } from "../model/ReadingOrder.js";
 import type { Role } from "../model/Role.js";
+import { compareCodeUnits } from "../util/compareCodeUnits.js";
 import { Verbalizer } from "../verbalization/Verbalizer.js";
 import type {
   ConstraintRef,
@@ -416,7 +417,7 @@ class QueryContext {
 
     const anchors = entities
       .map((e) => this.entityAnchors(e))
-      .sort((a, b) => a.entity.localeCompare(b.entity));
+      .sort((a, b) => compareCodeUnits(a.entity, b.entity));
     return { kind: "anchors", anchors };
   }
 
@@ -495,7 +496,7 @@ class QueryContext {
 // ---------------------------------------------------------------------------
 
 function byName<T extends { name: string; }>(a: T, b: T): number {
-  return a.name.localeCompare(b.name);
+  return compareCodeUnits(a.name, b.name);
 }
 
 function notFoundEntity(name: string): QueryResult {

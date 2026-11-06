@@ -11,9 +11,10 @@
 //      size, and which files in different packages change together
 //      (temporal coupling, an orthogonality smell)?
 //
-// No npm dependencies: the gate tool (dependency-cruiser) is decided in
-// WS4. The one local require is the package graph itself
-// (lib/intended.cjs), so this snapshot cannot drift from the gate.
+// No npm dependencies of its own: the gate tool (dependency-cruiser) is
+// decided in WS4. The local imports are the package graph itself
+// (lib/intended.cjs) and core purity's rules (check-core-purity.mjs, which
+// reads TypeScript's scanner), so this snapshot cannot drift from either gate.
 //
 // Usage: node barwise/scripts/arch-triage.mjs [--base <ref>]
 //
@@ -26,6 +27,7 @@ import { execFileSync } from "node:child_process";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { createRequire } from "node:module";
 import { join, relative } from "node:path";
+import { purityFindings } from "./check-core-purity.mjs";
 
 const gitRoot = execFileSync("git", ["rev-parse", "--show-toplevel"], {
   encoding: "utf8",
@@ -95,35 +97,19 @@ for (const pkg of PACKAGES) {
 
 // ---- 1b. Core-purity reflexion (S-DET-1..3) ----
 
-const FORBIDDEN = [
-  { name: "node:fs", re: /from\s+['"](node:)?fs(\/promises)?['"]|require\(\s*['"](node:)?fs['"]/ },
-  { name: "node:child_process", re: /from\s+['"](node:)?child_process['"]/ },
-  { name: "node:os", re: /from\s+['"](node:)?os['"]/ },
-  { name: "network", re: /from\s+['"](node:)?(net|http|https|tls|dgram|http2)['"]/ },
-  { name: "process.env", re: /\bprocess\.env\b/ },
-  { name: "new Date()", re: /\bnew\s+Date\s*\(/ },
-  { name: "Date.now()", re: /\bDate\.now\s*\(/ },
-  { name: "Math.random()", re: /\bMath\.random\s*\(/ },
-  { name: "global crypto.*", re: /(?<!node:)\bcrypto\.\w/ },
-  { name: "@anthropic-ai/sdk", re: /from\s+['"]@anthropic-ai\/sdk['"]/ },
-  { name: "openai", re: /from\s+['"]openai['"]/ },
-];
-
+// The rules are check-core-purity's own, imported rather than copied: a
+// second list here drifted from the gate with nothing to notice
+// (docs/specs/purity-and-model-boundary.spec.md, Scope 1).
 const purityViolations = [];
 for (const file of srcFiles("core")) {
-  const text = readFileSync(file, "utf8");
-  text.split("\n").forEach((line, i) => {
-    if (/^\s*(\/\/|\*)/.test(line)) return; // skip comment lines
-    for (const f of FORBIDDEN) {
-      if (f.re.test(line)) {
-        purityViolations.push({
-          rule: f.name,
-          where: `${relative(gitRoot, file)}:${i + 1}`,
-          text: line.trim().slice(0, 80),
-        });
-      }
-    }
-  });
+  if (/\.(test|spec)\.tsx?$/.test(file)) continue;
+  for (const f of purityFindings(readFileSync(file, "utf8"), file)) {
+    purityViolations.push({
+      rule: f.rule,
+      where: `${relative(gitRoot, file)}:${f.line}`,
+      text: f.text.slice(0, 80),
+    });
+  }
 }
 
 // ---- 2. Hotspots and temporal coupling (git history) ----
@@ -252,7 +238,9 @@ L.push("");
 L.push("## Reflexion: core purity (S-DET-1..3)");
 L.push("");
 if (purityViolations.length === 0) {
-  L.push("No violations. core/src imports no I/O, clock, randomness, or LLM SDK.");
+  L.push(
+    "No violations. core/src uses no I/O, clock, randomness, process state, locale, or model SDK.",
+  );
 } else {
   for (const v of purityViolations) {
     L.push(`- ${v.rule}: ${v.where}  | ${v.text}`);
