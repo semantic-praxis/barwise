@@ -1,6 +1,6 @@
 # Format renderers live in their connectors, and dbt composes formats' SQL parser
 
-Status: WS1 implemented 2026-11-06 (the DDL, OpenAPI, Avro and population renderers in `@barwise/formats`; `connector-packages.md#format-in-its-connector` held by `core/tests/public/exports.test.ts`); WS2 implemented 2026-11-06 (`renderDbt` and `annotateDbtExport` in `@barwise/dbt`); WS3 implemented 2026-11-06 (the SQL parser cascade in `@barwise/formats`, `parseSqlPatterns`, dbt depends on formats, `must-agree-copies.md#share-by-composition`); WS4 not started
+Status: WS1 implemented 2026-11-06 (the DDL, OpenAPI, Avro and population renderers in `@barwise/formats`; `connector-packages.md#format-in-its-connector` held by `core/tests/public/exports.test.ts`); WS2 implemented 2026-11-06 (`renderDbt` and `annotateDbtExport` in `@barwise/dbt`); WS3 implemented 2026-11-06 (the SQL parser cascade in `@barwise/formats`, `parseSqlPatterns`, dbt depends on formats, `must-agree-copies.md#share-by-composition`); WS4 implemented 2026-11-06 (`external-deps.cjs`, `package-graph-authority.md#core-external-deps` held by check:architecture and knip)
 
 Created: 2026-11-06
 Last-updated: 2026-11-06
@@ -221,6 +221,10 @@ measured in plan review with a planted `fast-xml-parser` import), so the
 decision declares knip beside `check:architecture` instead of adding a
 dependency-cruiser rule, which cannot see external edges under the
 config's `includeOnly`.
+(Implemented: `knip` is not a gate name `check:architecture` accepts in
+`Enforced-by:`, so the header names `check:architecture` alone and the
+Consequences record `knip`'s part; adding `knip` to the gate exceptions
+is left to the owner.)
 
 ## Order and PRs
 

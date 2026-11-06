@@ -24,6 +24,12 @@
     "new": "  |--- @barwise/diagram         (core, llm)"
   },
   {
+    "decision": "package-graph-authority#core-external-deps",
+    "file": "barwise/packages/core/package.json",
+    "old": "\"dependencies\": {\n    \"ajv\"",
+    "new": "\"dependencies\": {\n    \"z3-solver\": \"^4.13.0\",\n    \"ajv\""
+  },
+  {
     "decision": "package-graph-authority#runtime-deps-within",
     "file": "barwise/packages/diagram/package.json",
     "old": "\"dependencies\": {\n    \"@barwise/core\"",
