@@ -555,9 +555,16 @@ workstream delivers the query and a report.
   `model.ts`). `audit:specs` reads a main merge that touched one of them
   as work since the spec's last edit, at CI's merge ref only, even when
   the merge's own diff on those paths is empty (barwise-ibf,
-  barwise-dm0; it happened to this spec's own PR on #932's merge). Until
-  that gate is fixed, a Draft spec re-edited after merging main passes;
-  one that merges main and is not re-edited goes red at the merge ref.
+  barwise-dm0; it happened to this spec's own PR on #932's merge). The
+  same gate also reads real, unrelated commits on `probes.json` as this
+  spec's work: every ADR enforcement PR adds probe rows, and eight such
+  commits landed on 2026-11-06 alone, so the file is shared wiring in
+  practice and should join the audit's `WIRING` list (barwise-tpi).
+  Until those gates are fixed, a Draft spec re-edited after merging main
+  passes; one that merges main and is not re-edited goes red at the
+  merge ref.
+
+## Non-goals
 
 - No solver, SMT library or Alloy dependency in any npm package; nothing
   in `packages/` imports `reasoner/`.
