@@ -37,13 +37,10 @@ condition, is a separate decision (`steward` section 4b).
 2. **Nothing blocks a merge on Copilot.**{#copilot-never-blocks} A refusal from an exhausted
    quota is not a review and not a blocker: work carries on without it,
    and the workflow asks again on the next push.
-3. **`REVIEW.md` owns which review lane runs when.**{#review-md-owns-lanes} CI on every push
-   to `main` and every pull request into it;
-   `/code-review` by the author before opening; `/security-review`
-   before opening when the diff meets a trigger REVIEW.md lists;
-   `/pr-review`, which runs `/code-review` itself, on the head being
-   merged; the Claude Code Review service on every pull request once an
-   Owner enables it. A review does not report what CI enforces.
+3. **`REVIEW.md`'s lane table names every review lane and its trigger,
+   and the CI lane's triggers match `ci.yml`.**{#review-md-owns-lanes}
+   The merge lane's timing is
+   `merge-delegation.md#review-before-merge`.
 4. **The tier is information, and routing orders rather than filters.**{#tier-informs}
    `npm run pr:risk` prints the tier, the checklist groups and the
    REVIEW.md failure modes a diff triggers, with the files. Author and
@@ -52,6 +49,19 @@ condition, is a separate decision (`steward` section 4b).
    fails on the tier or the routing.
 
 ## Consequences
+
+- Decision 3 was restated on 2026-11-06 (`adr-refactor.spec.md`, row
+  16) to what a check can read. What it listed stays true as practice:
+  CI runs on every push to `main` and every pull request into it;
+  `/code-review` by the author before opening; `/security-review`
+  before opening when the diff meets a trigger REVIEW.md lists;
+  `/pr-review`, which runs `/code-review` itself, on the head being
+  merged; the Claude Code Review service on every pull request once an
+  Owner enables it. A review does not report what CI enforces, which is
+  judgment and audit material, not a gate. `REVIEW.md`'s CI row says
+  "Every push", which the restated decision makes a violation; the
+  pull request that lands its gate corrects the row, so the gate's
+  first run is seen to find it.
 
 - `npm run check:review-tiers` (a `ci.yml` step with no `if:` guard)
   keeps the routing table in step. It fails on a checklist heading or
