@@ -1,9 +1,10 @@
 # Batch 9: schema, Ossie, eval-coverage and package-graph decisions enforced
 
-Status: Draft revised after plan review 2026-11-06
+Status: Planned; plan reviewed 2026-11-06 (one code-review round, ten findings, all addressed in the revision); no workstream implemented
 
 Created: 2026-11-06
 Last-updated: 2026-11-06
+Plan-reviewed: f74f0125 (code-review, pr-review)
 Tracking: barwise-ym8.gc9 (adr-refactor batch 9), barwise-ym8.3ai,
 barwise-ym8.4i2, barwise-ym8.31z, barwise-ym8.8l3, barwise-ym8.yfi,
 barwise-ym8.zec, barwise-ym8.yc6, barwise-ym8.k74, barwise-ym8.oor,
