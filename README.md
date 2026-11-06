@@ -46,11 +46,11 @@ The definitive reference is Terry Halpin and Tony Morgan's _Information Modeling
 
 ## Prerequisites
 
-| Tool    | Version                                              |
-| ------- | ---------------------------------------------------- |
-| Node.js | the version in [`.nvmrc`](.nvmrc)                    |
-| npm     | >= 10                                                |
-| VS Code | >= 1.101                                             |
+| Tool    | Version                           |
+| ------- | --------------------------------- |
+| Node.js | the version in [`.nvmrc`](.nvmrc) |
+| npm     | >= 10                             |
+| VS Code | >= 1.101                          |
 
 `.nvmrc` is the authority, not this table -- `nvm use` in the repo root
 picks it up, and CI reads the same file. The pin is not a preference: V8
