@@ -2192,6 +2192,11 @@ test("check-python-uv needs no lock flag on a uv call that resolves nothing, and
   });
   assert.equal(both.status, 1, both.stderr);
   assert.match(both.stderr, /neither --frozen nor --locked/);
+  // Named by what is safe: a uv subcommand that resolves, such as lock,
+  // still needs the flag even with no run or sync beside it.
+  const lock = pythonUv({ "a.mjs": 'spawnSync("uv", ["lock"]);\n' });
+  assert.equal(lock.status, 1, lock.stderr);
+  assert.match(lock.stderr, /neither --frozen nor --locked/);
 });
 
 test("check-python-uv passes a compliant uv args array", () => {

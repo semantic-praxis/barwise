@@ -124,6 +124,8 @@ jobs:
       # the build), so front-loading it fails a misformatted PR in seconds
       # instead of after the build. It always runs -- dprint also formats
       # Markdown, so docs-only PRs are still gated on prose formatting.
+      - run: npm run fmt:check
+
       # Each runtime is pinned where its tools read it, and the runtime that
       # runs is the pinned one: Node read back against .nvmrc, Python as
       # `uv python find` resolves it for the project, against
@@ -132,8 +134,6 @@ jobs:
       # step, which installs uv and the pinned minor; no docs-only guard,
       # because every later step runs on these runtimes.
       - run: npm run check:pins
-
-      - run: npm run fmt:check
 
       # Validate the beads issue tracker on every PR (always runs, like
       # fmt:check, and cheap). CI checks out the post-merge tree, so this is

@@ -12,7 +12,7 @@
     "check-adr-tests.test.mjs": 12,
     "check-capability-matrix.test.mjs": 15,
     "check-findings.test.mjs": 9,
-    "check-pins.test.mjs": 9,
+    "check-pins.test.mjs": 11,
     "ci-conditions.test.mjs": 19,
     "credential-handling.test.mjs": 7,
     "gates.test.mjs": 337,

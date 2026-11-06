@@ -74,18 +74,42 @@ export function pythonPinProblem(text) {
   return MINOR.test(v) ? null : `names "${v}", not a minor such as 3.13`;
 }
 
-/** A refusal when the running versions are not the pinned ones, or null. */
+/** A Node version's [major, minor, patch], with or without a leading v. */
+export const nodeParts = (v) => v.trim().replace(/^v/, "").split(".");
+
+/**
+ * A refusal when the running versions are not the pinned ones, or null.
+ * Node is held to its major and minor: CLAUDE.md says coverage thresholds
+ * are not portable across Node versions, and a minor can change V8. Only a
+ * patch that differs is printed rather than refused (the spec's open
+ * decision 2). `pin` is the file uv read, beside pyproject.toml.
+ */
 export function runningProblem({ nvmrc, node, pin, python }) {
-  const want = nvmrc.trim().replace(/^v/, "").split(".")[0];
-  const have = node.replace(/^v/, "").split(".")[0];
-  if (want !== have) return `Node ${node} is running, another major than .nvmrc's ${nvmrc.trim()}`;
+  const [wantMajor, wantMinor] = nodeParts(nvmrc);
+  const [haveMajor, haveMinor] = nodeParts(node);
+  if (wantMajor !== haveMajor || wantMinor !== haveMinor) {
+    return `Node ${node} is running, another major or minor than .nvmrc's ${nvmrc.trim()}`;
+  }
+  if (pin === undefined) return null;
   const [, major, minor] = MINOR.exec(pin.trim()) ?? [];
   const m = /^(\d+)\.(\d+)/.exec(python ?? "");
   if (!m) return `uv resolved no Python version for the project (read "${python}")`;
   if (m[1] !== major || m[2] !== minor) {
-    return `uv resolves Python ${python} for the project, another minor than .python-version's ${pin.trim()}`;
+    return `uv resolves Python ${python} for the project, another minor than barwise/.python-version's ${pin.trim()}`;
   }
   return null;
+}
+
+/**
+ * True when a session hook reads .nvmrc: a line that names it outside a
+ * comment and is not a message an echo or printf prints. A trailing
+ * comment or an echoed mention is not a read.
+ */
+export function hookReadsNvmrc(text) {
+  return text.split("\n").some((line) => {
+    const code = line.replace(/(^|\s)#.*$/, "$1");
+    return /\.nvmrc/.test(code) && !/^\s*(echo|printf)\b/.test(code);
+  });
 }
 
 /** The Python uv would start for the project, read without syncing. */
@@ -109,6 +133,10 @@ function uvPython(project) {
 function main(argv) {
   const say = (s) => console.error(`check:pins: ${s}`);
   const at = argv.indexOf("--root");
+  if (at >= 0 && !argv[at + 1]) {
+    say("cannot answer: --root needs a path");
+    return 2;
+  }
   // The project path is absolute, from this script's own location, so the
   // reading is the same from the root, barwise/ and a package
   // (gate-refusal-contract decision 3).
@@ -138,9 +166,12 @@ function main(argv) {
   }
   findings.push(...workflowFindings(workflows));
 
+  // A deleted hook loses the .nvmrc read as surely as an edited one, so it
+  // is a finding, like a missing .python-version.
   const hook = join(repo, ".claude", "hooks", "session-start.sh");
-  if (!existsSync(hook)) refuse("the session hook would not read");
-  else if (!/\.nvmrc/.test(readFileSync(hook, "utf8").replace(/^\s*#.*$/gm, ""))) {
+  if (!existsSync(hook)) {
+    findings.push(".claude/hooks/session-start.sh is missing, so nothing reads .nvmrc there");
+  } else if (!hookReadsNvmrc(readFileSync(hook, "utf8"))) {
     findings.push(".claude/hooks/session-start.sh does not read .nvmrc");
   }
 
@@ -170,23 +201,21 @@ function main(argv) {
   } catch (e) {
     refuse(e.message);
   }
-  if (python !== null && pins[".python-version"] && !pythonPinProblem(pins[".python-version"])) {
-    const r = runningProblem({
-      nvmrc,
-      node: process.version,
-      pin: pins[".python-version"],
-      python,
-    });
-    if (r) refuse(r);
-  } else if (
-    !refusal && process.version.replace(/^v/, "").split(".")[0] !== nvmrc.trim().split(".")[0]
-  ) {
-    refuse(`Node ${process.version} is running, another major than .nvmrc's ${nvmrc.trim()}`);
-  }
+  // Held against the copy uv read, beside pyproject.toml; when that copy is
+  // missing or malformed, the finding above stands and only Node is read.
+  const uvPin = pins["barwise/.python-version"];
+  const usable = uvPin !== undefined && !pythonPinProblem(uvPin);
+  const r = runningProblem({
+    nvmrc,
+    node: process.version,
+    pin: usable && python !== null ? uvPin : undefined,
+    python,
+  });
+  if (r) refuse(r);
 
   const ran = `ran Node ${process.version} (.nvmrc ${nvmrc.trim()}), Python ${
     python ?? "unknown"
-  } (.python-version ${(pins[".python-version"] ?? "missing").trim()})`;
+  } (barwise/.python-version ${(uvPin ?? "missing").trim()})`;
   for (const f of findings) say(f);
   if (findings.length > 0) {
     say(`FAIL -- ${findings.length} finding(s); ${ran}.`);
@@ -197,7 +226,7 @@ function main(argv) {
     say(`cannot answer: ${refusal}; ${ran}.`);
     return 2;
   }
-  const patch = process.version.replace(/^v/, "") === nvmrc.trim()
+  const patch = nodeParts(process.version).join(".") === nodeParts(nvmrc).join(".")
     ? ""
     : " (Node patch differs from .nvmrc; printed, not refused)";
   say(
@@ -207,5 +236,13 @@ function main(argv) {
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1]).href) {
-  process.exitCode = main(process.argv.slice(2));
+  // Anything unforeseen (an unreadable pin, a directory where a file should
+  // be) is "could not answer", never the finding code
+  // (docs/adr/gate-refusal-contract.md).
+  try {
+    process.exitCode = main(process.argv.slice(2));
+  } catch (e) {
+    console.error(`check:pins: cannot answer: ${e instanceof Error ? e.message : String(e)}`);
+    process.exitCode = 2;
+  }
 }

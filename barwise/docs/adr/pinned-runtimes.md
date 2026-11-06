@@ -62,14 +62,16 @@ declared authority is proposed, not built: workstream 4 of
   `ci.yml` step with no `if:`, after the Python toolchain step, and the
   pre-push hook runs it through `ci:local`. It fails when a workflow's
   `setup-node` names a version or does not read `.nvmrc`, when the
-  session hook stops reading `.nvmrc`, and when a `.python-version` is
-  missing at the root or beside `pyproject.toml` or names more than a
-  minor. It refuses (exit 2) when the Node running it is another major
-  than `.nvmrc`, or the Python `uv python find` resolves for the project
-  is another minor than the pin, or uv is absent; it prints the exact
-  versions on every run. A Node patch that differs is printed, not
-  refused. On a machine without uv it refuses, so `fault-matrix` reads it
-  UNREADABLE there.
+  session hook stops reading `.nvmrc` or is deleted, and when a
+  `.python-version` is missing at the root or beside `pyproject.toml` or
+  names more than a minor. It refuses (exit 2) when the Node running it is
+  another major or minor than `.nvmrc`, or the Python `uv python find`
+  resolves for the project is another minor than `barwise/.python-version`
+  (the copy uv read), or uv is absent; it prints the exact versions on
+  every run. A Node patch that differs is printed, not refused. On a
+  machine without uv it refuses, so the pre-push hook blocks a push there
+  until uv is installed (the session hook installs it), and
+  `fault-matrix` reads it UNREADABLE.
 - uv reads `.python-version` only from the project directory (`uv python
   install` also reads the root one; `find`, `run` and `sync` do not;
   measured with uv 0.11.32). So `barwise/.python-version` is a copy of

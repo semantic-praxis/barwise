@@ -6,12 +6,17 @@
  */
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
-import { pythonPinProblem, runningProblem, workflowFindings } from "../check-pins.mjs";
+import {
+  hookReadsNvmrc,
+  pythonPinProblem,
+  runningProblem,
+  workflowFindings,
+} from "../check-pins.mjs";
 
 const GATE = resolve(dirname(fileURLToPath(import.meta.url)), "..", "check-pins.mjs");
 const NODE = process.version.replace(/^v/, "");
@@ -39,17 +44,38 @@ test("a .python-version names a minor only [adr:pinned-runtimes#python-minor]", 
   assert.match(pythonPinProblem(">=3.13\n"), /not a minor/);
 });
 
-test("another Node major, or another Python minor, is a refusal [adr:pinned-runtimes#verify-running]", () => {
+test("another Node major or minor, or another Python minor, is a refusal; a Node patch is not [adr:pinned-runtimes#verify-running]", () => {
   const base = { nvmrc: "26.7.0\n", node: "v26.7.0", pin: "3.13\n", python: "3.13.17" };
   assert.equal(runningProblem(base), null);
   assert.equal(
-    runningProblem({ ...base, node: "v26.1.0" }),
+    runningProblem({ ...base, node: "v26.7.3" }),
     null,
-    "a patch or minor is printed, not refused",
+    "a patch is printed, not refused",
   );
-  assert.match(runningProblem({ ...base, node: "v24.11.0" }), /another major/);
-  assert.match(runningProblem({ ...base, python: "3.12.3" }), /another minor/);
+  assert.equal(
+    runningProblem({ ...base, nvmrc: "v26.7.0\n" }),
+    null,
+    "a leading v in .nvmrc reads the same",
+  );
+  assert.match(runningProblem({ ...base, node: "v26.1.0" }), /another major or minor/);
+  assert.match(runningProblem({ ...base, node: "v24.11.0" }), /another major or minor/);
+  assert.match(
+    runningProblem({ ...base, python: "3.12.3" }),
+    /another minor than barwise\/\.python-version/,
+  );
   assert.match(runningProblem({ ...base, python: "" }), /no Python version/);
+  assert.equal(
+    runningProblem({ ...base, pin: undefined, python: null }),
+    null,
+    "with no usable pin, only Node is read",
+  );
+});
+
+test("a hook reads .nvmrc only where code names it, not in a comment or an echoed message", () => {
+  assert.ok(hookReadsNvmrc('node_want="$(tr -d \'[:space:]\' <"${DIR}/.nvmrc")"'));
+  assert.ok(!hookReadsNvmrc("# reads .nvmrc\nnvm install 26"));
+  assert.ok(!hookReadsNvmrc("nvm install 26  # was .nvmrc"));
+  assert.ok(!hookReadsNvmrc('echo "ignoring .nvmrc"'));
 });
 
 /** A tree holding what the gate reads, and a stand-in uv answering `version`. */
@@ -81,7 +107,10 @@ function tree(
   mkdirSync(join(dir, "barwise"));
   if (copy !== null) writeFileSync(join(dir, "barwise", ".python-version"), `${copy}\n`);
   if (uv !== null) {
-    writeFileSync(join(bin, "uv"), `#!/bin/sh\necho ran > "${bin}/uv-ran"\necho ${uv}\n`);
+    writeFileSync(
+      join(bin, "uv"),
+      `#!/bin/sh\nprintf '%s\\n' "$@" > "${bin}/uv-argv"\necho ${uv}\n`,
+    );
     chmodSync(join(bin, "uv"), 0o755);
   }
   return { dir, bin };
@@ -95,8 +124,18 @@ function run({ dir, bin }) {
 }
 
 test("the gate passes a tree whose pins are read, and prints the versions that ran", (t) => {
-  const r = run(tree(t));
+  const tr = tree(t);
+  const r = run(tr);
   assert.equal(r.status, 0, r.stderr);
+  // `uv python find` on the absolute project path: never `uv run`, which
+  // would sync the project and could rebuild a venv.
+  assert.deepEqual(readFileSync(join(tr.bin, "uv-argv"), "utf8").trim().split("\n"), [
+    "python",
+    "find",
+    "--show-version",
+    "--project",
+    join(tr.dir, "barwise"),
+  ]);
   assert.match(r.stderr, new RegExp(`ran Node ${process.version} .*Python 3\\.13\\.4`));
 });
 
@@ -133,6 +172,20 @@ test("the gate refuses when uv resolves another minor, and when uv is absent [ad
   assert.equal(absent.status, 2, absent.stderr);
   assert.match(absent.stderr, /cannot answer: uv could not be run/);
   assert.doesNotMatch(absent.stderr, /OK/);
+});
+
+test("the gate: a deleted session hook is a finding, and an unreadable pin a refusal", (t) => {
+  const tr = tree(t);
+  rmSync(join(tr.dir, ".claude", "hooks", "session-start.sh"));
+  const gone = run(tr);
+  assert.equal(gone.status, 1, gone.stderr);
+  assert.match(gone.stderr, /session-start\.sh is missing/);
+  const dir = tree(t);
+  rmSync(join(dir.dir, "barwise", ".python-version"));
+  mkdirSync(join(dir.dir, "barwise", ".python-version"));
+  const odd = run(dir);
+  assert.equal(odd.status, 2, odd.stderr);
+  assert.match(odd.stderr, /cannot answer/);
 });
 
 test("a finding outranks a refusal", (t) => {

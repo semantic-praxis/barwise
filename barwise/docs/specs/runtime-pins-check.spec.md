@@ -1,6 +1,6 @@
 # `check:pins`: the runtime pins, and the runtimes that ran
 
-Status: WS1 implemented 2026-11-06 (barwise/.python-version with a parity set, README's copy of the Node version removed, check:pins in CI, probes for node-from-nvmrc and python-minor, verify-running recorded unprobed; check:python-uv's JS rule now asks for --frozen only where run or sync appears, as its shell rule does)
+Status: WS1 implemented 2026-11-06 (barwise/.python-version with a parity set, README's copy of the Node version removed, check:pins in CI, probes for node-from-nvmrc and python-minor, verify-running recorded unprobed; check:python-uv's JS rule exempts only read-only uv python find, by name; code review made the Node check major-and-minor and compared Python with the copy uv read)
 Created: 2026-11-06
 Last-updated: 2026-11-06
 Plan-reviewed: 9e07b177 (code-review, pr-review)
@@ -57,14 +57,17 @@ spec's Alternatives chose over a second must-agree mechanism.
 3. **`check:pins`**, findings (exit 1), on the declared authorities:
    - a workflow `actions/setup-node` step without `node-version-file:
      .nvmrc`, or with `node-version`;
-   - the session hook not reading `.nvmrc`;
+   - the session hook not reading `.nvmrc`, or deleted;
    - `.python-version` missing at the root or beside `pyproject.toml`,
      or naming more than a minor (`3.13`, never `3.13.12`, decision 2).
 
    Refusals (exit 2), reading back what runs:
-   - the Node running the gate on another major than `.nvmrc`;
+   - the Node running the gate on another major or minor than `.nvmrc`
+     (code review: a minor can change V8, and CLAUDE.md says coverage is
+     not portable across Node versions);
    - the Python that `uv python find --show-version` resolves for the
-     project on another minor than the pin; or uv absent or failing.
+     project on another minor than `barwise/.python-version`, the copy uv
+     read; or uv absent or failing.
      The project is passed by absolute path from the script's own
      location, so the answer is the same from the root, `barwise/` and
      a package (gate-refusal-contract decision 3). `find` reads and
@@ -122,8 +125,8 @@ ADR states.
    in four workflows, which this session cannot confirm against what
    `ubuntu-latest` serves today. Recommended: the owner picks it, and
    `check:pins` then adds the rule.
-2. **Node patch at pre-push.** Recommended: refuse another major, print
-   a patch difference; CI runs the exact pin.
+2. **Node patch at pre-push.** Recommended: refuse another major or
+   minor, print a patch difference; CI runs the exact pin.
 3. **Copy or move `.python-version`.** Recommended: the checked copy.
 
 ## Risks and testing

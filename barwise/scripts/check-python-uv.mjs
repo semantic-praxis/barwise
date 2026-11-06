@@ -64,6 +64,7 @@ import {
   INTERPRETER,
   logicalLines,
   shellCommandFindings,
+  UV_SUBCOMMANDS,
   uvFindings,
 } from "./lib/python-uv-rules.mjs";
 import { REPO_ROOT, trackedFiles } from "./lib/tracked.mjs";
@@ -178,13 +179,15 @@ function uvArgsArray(file, text) {
     const banned = bannedFlag(lit);
     if (banned) out.push({ file, line, what: `\`${lit.split("=")[0]}\` (${banned[1]})`, raw });
   }
-  // The assertion is about resolving: `uv run` and `uv sync` re-lock
-  // without it, as the shell rule says. `uv python find` resolves no
-  // packages, so a file whose literals name neither subcommand needs no
-  // flag. Per file, like the rest of this check: "run" anywhere in the
-  // file still requires one, so this can only spare a file that runs
-  // nothing (check-pins.mjs, runtime-pins-check.spec.md).
-  const resolves = lits.has("run") || lits.has("sync");
+  // The one exemption is read-only interpreter discovery: `uv python find`
+  // resolves no packages (check-pins.mjs, runtime-pins-check.spec.md).
+  // Named by what is safe, not by what resolves, so `lock`, `export`,
+  // `tree` and any subcommand added later still need the flag; and per
+  // file, so a file that also names any of them is not spared.
+  const READ_ONLY = new Set(["python", "find", "--show-version", "--project"]);
+  const subcommands = [...lits].filter((l) => UV_SUBCOMMANDS.has(l));
+  const resolves =
+    !(lits.has("python") && lits.has("find") && subcommands.every((l) => READ_ONLY.has(l)));
   if (resolves && !lits.has("--frozen") && !lits.has("--locked")) {
     out.push({
       file,
