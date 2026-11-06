@@ -139,6 +139,7 @@ const ROOT_DEPENDENT_GATES = [
   "check-python-uv.mjs",
   "check-book-citations.mjs",
   "check-core-purity.mjs",
+  "check-source-sites.mjs",
   "check-file-size.mjs",
   "check-secrets.mjs",
   "audit-corrections.mjs",

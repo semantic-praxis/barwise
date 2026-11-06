@@ -1,0 +1,8 @@
+{
+  "$comment": "The Ossie commit these files were copied from, and each file's git blob id (sha1 of \"blob <length>\\0\" + bytes, what `git ls-tree <commit> <path>` prints upstream). tests/OssiePin.test.ts recomputes each id from the bytes here and checks README.md names the same commit, so an edit to a vendored file, or a re-pin that leaves either record behind, fails (ossie-interchange#pinned-version). Moving the pin replaces the files, this record and the README's commit in one commit.",
+  "commit": "01a5488d840deda309aac68cc0b312c195369b8d",
+  "files": {
+    "ontology.json": "9d021c2c708c24e9c5c891bb61b41c5a7b1b9198",
+    "ossie-schema.json": "350b09105a7b3328c50aa24eadc64973dfbce3dc"
+  }
+}

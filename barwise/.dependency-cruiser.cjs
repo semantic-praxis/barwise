@@ -52,6 +52,40 @@ module.exports = {
       to: { circular: true },
     },
     ...directionRules,
+    // ossie-interchange#peer-standard and #own-vocabulary: Ossie documents
+    // enter and leave only through the `ossie` descriptor, and translation
+    // lives only there. The ADR first described one rule, "only ossie/
+    // imports Ossie modules"; it fails on main, because the barrel exports
+    // the descriptor's types, and with the barrel allowed it misses a
+    // re-export. So two rules (adr-batch9-enforcers.spec.md, WS3). The
+    // vendored schema under formats/schemas/ is outside includeOnly, so
+    // this cannot see it; check:source-sites' ossie-schema-refs does.
+    {
+      name: "ossie-only-in-descriptor",
+      severity: "error",
+      comment:
+        "ossie-interchange#peer-standard: only formats/src/ossie/ and the package's two entry "
+        + "files (index.ts, registration.ts) reach an Ossie module.",
+      from: {
+        pathNot: "^packages/formats/src/(ossie/|index\\.ts$|registration\\.ts$)",
+      },
+      to: { path: "^packages/formats/src/ossie/" },
+    },
+    {
+      // Keyed on the target file, not the exported name, so an aliased
+      // re-export (`export { parseOssie as parse }`) is still an edge to
+      // parseOssie.ts and fails here.
+      name: "ossie-entry-points",
+      severity: "error",
+      comment: "ossie-interchange#own-vocabulary: the entry files reach only the adapters and the "
+        + "document types, never the parser, mapper or writer behind them.",
+      from: { path: "^packages/formats/src/(index|registration)\\.ts$" },
+      to: {
+        path: "^packages/formats/src/ossie/",
+        pathNot:
+          "^packages/formats/src/ossie/(OssieExportFormat|OssieImportFormat|OssieTypes)\\.ts$",
+      },
+    },
   ],
   options: {
     tsConfig: { fileName: "tsconfig.depcruise.json" },

@@ -1,6 +1,6 @@
 # Batch 9: schema, Ossie, eval-coverage and package-graph decisions enforced
 
-Status: Planned; plan reviewed 2026-11-06 (one code-review round, ten findings, all addressed in the revision); WS1 (`recompute-derived`) implemented; WS2 (schema-versioning tests, `minor-and-major` restated) implemented; WS3-WS8 not started
+Status: Planned; plan reviewed 2026-11-06 (one code-review round, ten findings, all addressed in the revision); WS1 (`recompute-derived`) implemented; WS2 (schema-versioning tests, `minor-and-major` restated) implemented; WS3 (`check:source-sites`, ossie-interchange) implemented; WS4-WS8 not started
 
 Created: 2026-11-06
 Last-updated: 2026-11-06

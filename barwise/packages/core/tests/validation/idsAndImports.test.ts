@@ -8,6 +8,7 @@
 import { describe, expect, it } from "vitest";
 import { diffModels } from "../../src/diff/ModelDiff.js";
 import { MERGE_DIFF_OPTIONS, mergeModels } from "../../src/diff/ModelMerge.js";
+import { localName } from "../../src/model/name.js";
 import { OrmModel } from "../../src/model/OrmModel.js";
 import { OrmProject } from "../../src/model/OrmProject.js";
 import { renameInModel } from "../../src/rename/renameInModel.js";
@@ -81,7 +82,26 @@ describe("structural/id-not-from-name (decision 13)", () => {
     expect(found(read(SMOKERS), "structural/id-not-from-name")).toEqual([]);
   });
 
-  it("reports an object type, a fact type and a role whose ids differ, naming the id each name gives", () => {
+  it("gives a model built with no ids the local names of its names, which the rule accepts [adr:ossie-interchange#readable-iri]", () => {
+    // Computed with localName itself, not with the model's id rule, so a
+    // rule that drifted from Ossie-style local names (lower-cased, prefixed,
+    // a UUID) fails here even though the model and the warning, which share
+    // that rule, would still agree with each other.
+    const model = new OrmModel({ name: "M" });
+    const person = model.addObjectType({ name: "Order Line", kind: "entity", referenceMode: "nr" });
+    const ft = model.addFactType({
+      name: "Order Line is shipped",
+      roles: [{ name: "is shipped", playerId: person.id }],
+      readings: ["{0} is shipped"],
+    });
+    expect(person.id).toBe(localName("Order Line"));
+    expect(person.id).toBe("Order_Line");
+    expect(ft.id).toBe(localName("Order Line is shipped"));
+    expect(ft.roles.map((r) => r.id)).toEqual([`${ft.id}.${localName("is shipped")}`]);
+    expect(found(model, "structural/id-not-from-name")).toEqual([]);
+  });
+
+  it("reports an object type, a fact type and a role whose ids differ, naming the id each name gives [adr:ossie-interchange#readable-iri]", () => {
     const model = read(
       SMOKERS.replace("{ id: Person, name: Person", "{ id: Human, name: Person")
         .replaceAll("player: Person", "player: Human")

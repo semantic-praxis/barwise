@@ -52,6 +52,16 @@ test("classify: an ADR is Markdown but not docs-only, so check:adr-tests runs wh
   assert.equal(classify(["barwise/docs/adr/README.md"]).docsOnly, true);
 });
 
+test("classify: the vendored Ossie schema README is not docs-only, so the pin test runs", () => {
+  // It names the commit pin.json records, and the formats test that holds the
+  // two to each other runs only when test:coverage does (adr-batch9-enforcers WS3).
+  assert.equal(classify(["barwise/packages/formats/schemas/ossie/README.md"]).docsOnly, false);
+  assert.equal(
+    classify(["barwise/packages/formats/tests/fixtures/ossie/README.md"]).docsOnly,
+    true,
+  );
+});
+
 test("classify: optimizer fires on the lane or the CLI it shells out to, and nothing else", () => {
   assert.equal(classify(["barwise/optimizer/CLAUDE.md"]).optimizer, true);
   assert.equal(classify(["barwise/packages/cli/src/index.ts"]).optimizer, true);

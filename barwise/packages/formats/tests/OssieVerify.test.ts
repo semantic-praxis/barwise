@@ -83,7 +83,7 @@ function people(opts: { nameMandatory?: InternalConstraint["modality"] | false; 
 describe("Ossie export: the read-back check", () => {
   afterEach(() => vi.restoreAllMocks());
 
-  it("names a deontic mandatory that comes back alethic", () => {
+  it("names a deontic mandatory that comes back alethic [adr:ossie-interchange#nothing-lost-silently]", () => {
     expect(verified(people({ nameMandatory: "deontic" }).m)).toEqual([
       "Fact type: Person.name: comes back changed: constraints added: mandatory; constraints removed: mandatory (deontic)",
     ]);
@@ -91,7 +91,7 @@ describe("Ossie export: the read-back check", () => {
     expect(verified(people().m)).toEqual([]);
   });
 
-  it("names an entity that comes back with a preferred identifier the model does not store", () => {
+  it("names an entity that comes back with a preferred identifier the model does not store [adr:ossie-interchange#nothing-lost-silently]", () => {
     const m = new OrmModel({ name: "M" });
     const room = m.addObjectType({
       id: id("ot"),
@@ -168,7 +168,7 @@ describe("Ossie export: the read-back check", () => {
     expect(verified(m)).toEqual([]);
   });
 
-  it("returns a document the importer refuses, with a line saying so", () => {
+  it("returns a document the importer refuses, with a line saying so [adr:ossie-interchange#nothing-lost-silently]", () => {
     vi.spyOn(OssieImportFormat.prototype, "parse").mockImplementation(() => {
       throw new Error("refused for the test");
     });

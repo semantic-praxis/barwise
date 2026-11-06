@@ -18,6 +18,7 @@
     "knip": "npm --prefix barwise run knip --",
     "depcruise": "npm --prefix barwise run depcruise --",
     "check:depcruise-gate": "npm --prefix barwise run check:depcruise-gate --",
+    "check:source-sites": "npm --prefix barwise run check:source-sites --",
     "check:parity": "npm --prefix barwise run check:parity --",
     "check:pins": "npm --prefix barwise run check:pins --",
     "check:review-tiers": "npm --prefix barwise run check:review-tiers --",
