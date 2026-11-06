@@ -12,6 +12,7 @@ barwise/scripts/test-adr-model.mjs, barwise/scripts/run-script-tests.mjs,
 barwise/scripts/check-depcruise-gate.mjs, barwise/scripts/audit-rubric.mjs,
 barwise/scripts/ci-local.mjs, barwise/scripts/lib/ci-gates.mjs,
 +barwise/scripts/run-depcruise.mjs, barwise/package.json,
++barwise/scripts/hooks/check-staged-secrets.sh, barwise/docs/adr/credential-handling.md,
 barwise/scripts/tests/,
 barwise/.husky/pre-commit, .github/workflows/ci.yml,
 barwise/docs/adr/gate-refusal-contract.md, barwise/docs/adr/probes.json,
@@ -224,10 +225,26 @@ design meets what this spec's two plan-review rounds found:
   seen by a preload would answer with different codes; both must be a
   `no-writes` finding.
 
-### 4. Readers keep the third value (provisional: not yet grounded)
+### 4. Readers keep the third value
 
-The three `readers-keep-third` cases, tagged
-`[adr:gate-refusal-contract#readers-keep-third]`.
+Two of the gap issue's three cases, tagged
+`[adr:gate-refusal-contract#readers-keep-third]`, each mutation-checked:
+
+- `ci:local` over one failing and one refusing gate exits 1, counts only
+  the failure, and names the refusal apart; the existing case planted a
+  refusal alone, so a `ci:local` that counted refusals as failures passed
+  it;
+- the pre-commit hook's secrets step moves to
+  `scripts/hooks/check-staged-secrets.sh`, as the tracker step already
+  did, and branches on the status: 1 prints the rotate advice, a refusal
+  says nothing was scanned (barwise-jha). Both still block the commit. A
+  stub `npm` answering 0, 1 and 2 tests it without running the hook's
+  build and test steps.
+
+The third, "a test skips only when every run refuses", has no mechanism
+here: a rule about how tests are written is not something a test of a
+gate can check. It stays the gap issue's, and the `audit-gate` cwd test
+remains the one worked instance of it.
 
 ## Open decisions (for review)
 
