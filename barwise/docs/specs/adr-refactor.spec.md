@@ -140,175 +140,51 @@ buildable row.
 
 #### WS1 proposals
 
-Each row: the decision, what is proposed, and the replacement text or
-where the prose goes. "Changes" marks a row where the inventory's first
-proposal would have changed the rule; the proposal here does not, or
-says so. The owner answers per row: accept, reject, or edit.
+Each row keeps its original number as a stable label, grouped by
+priority: decided rows first, then the open rows by how much of the
+project's everyday work each one governs (owner, 2026-11-06). A row
+says the decision, what is proposed, and the replacement text or where
+the prose goes; "changes" marks a row whose first proposal would have
+changed the rule. A restatement keeps `Date:`; a retirement moves it,
+renumbers the decisions after it and updates their numbered references.
+The owner answers per row: accept, reject, or edit.
 
-Restatements (the rule stays; `Date:` stays):
+**Decided (owner, 2026-11-06)**
 
-1. `connector-packages#descriptor-wraps-core`: **owner, 2026-11-06:
-   the decision changes**, so it leaves WS1 for a spec of its own.
-   `renderDdl`, `renderOpenApi` and `renderAvro` move to
-   `@barwise/formats` and `renderDbt` to `@barwise/dbt`;
-   `RelationalMapper` stays in core (ORM is relational). `@barwise/dbt`
-   depends on `@barwise/formats`, and one SQL-parsing function there
-   (the sqlglot bridge with the regex fallback) replaces the copy in
-   each importer, by composition, not inheritance; whether
-   `parseSqlFile` leaves core with it is settled in that spec. The
-   `pascal-case-avro`, `pascal-case-openapi` and `sqlglot-bridge`
-   parity sets go with the copies.
-2. `credential-handling#rotate-not-revert`: **owner, 2026-11-06:
-   retire.** Obvious to anyone who handles a leak, and the project does
-   not prescribe what a person does in their provider console. The
-   guidance moves to Consequences (rotation is the remedy; reverting or
-   rewriting history does not undo a leak, though a revert may still be
-   wanted), and the root CLAUDE.md convention that restates it is cut
-   to match in the same PR.
-3. `determinism-in-core#one-layer-out`: **owner, 2026-11-06: restate**
-   to its one checkable rule, by composition: "Outside core, only
-   `@barwise/llm` imports a model SDK; a package that needs a model
-   reaches it through `@barwise/llm`'s `LlmClient`." The rest becomes
-   prose: a host-mediated client (VS Code's language-model API, MCP
-   sampling) lives in the surface that owns the host connection, which
-   is true by construction; "core calls no model" and "non-determinism
-   lives outside core" are decision 1, held by `purity`; a format's own
-   I/O is `connector-packages#connector-owns-io`. With the tool-layer
-   clause gone, `learn` and `promptlab` need no placement. Enforcer
-   (batch 8): a depcruise rule forbidding `@anthropic-ai/sdk` and
-   `openai` outside `@barwise/llm`, with a probe; a plain `fetch` to a
-   provider host stays a gap.
-   Also (owner, 2026-11-06): the dependency-weight reason the old
-   decision 2 carried, which `schema-satisfiability.spec.md` cites for
-   its reasoner lane, becomes a new decision in
-   `package-graph-authority`: core's runtime dependencies are only those
-   listed beside `INTENDED` (today `ajv`, `effect`, `yaml`). Enforcer:
-   `check:architecture` extends `runtime-deps-within` to external
-   packages, with a probe planting `z3-solver` in core's `package.json`;
-   a depcruise rule that every import is declared in the importing
-   package's `package.json` closes the hoisted-import gap.
-4. `findings-close-by-mechanism#mechanism-closes`: **owner,
-   2026-11-06: restate**, strictly enforced through a common finding
-   shape: "A finding an audit ratchet records is held by its baseline
-   row: every open finding (`tracked:<issue>`) names a beads issue that
-   exists and is open, and a closed issue keeps no open finding." The
-   five baselines keep their files, but one reader returns their rows as
-   `{ id, source, state, issue?, classification, note }`, where `state`
-   is open, classified or unclassified and `classification` keeps each
-   audit's own vocabulary (`caught_by` is a taxonomy, not a status). The
-   broader "close any finding by a mechanism, not a document" becomes
-   prose; a sweep of closed beads issues that look like findings is an
-   optional on-demand report, never a gate. The same reader holds rows 5
-   and 11. Batch 4 builds it and moves up to run right after row 1's
-   spec.
-5. `findings-close-by-mechanism#person-classifies`: **owner,
-   2026-11-06: restate, made mechanical.** "A detector never invents a
-   verdict: a new row gets the placeholder unless a declared rule or
-   the duplication spec's verdict table decides it, `--check` fails while
-   a placeholder remains, and every verdict comes from its audit's
-   declared list with a note." The placeholder, `--check` and
-   vocabulary parts are held by row 4's common reader (batch 4). The
-   derived verdicts come from the mechanical-duplication spec: sameness
-   by normalized syntax-tree equality (proof), differential property
-   tests (strong evidence) and, for small pure functions, SMT
-   equivalence through the reasoner lane of
-   `schema-satisfiability.spec.md`; whether two copies may share an
-   owner by `INTENDED`; and a declared divergence as the one human
-   input, checked for presence and form.
-6. `keyless-model-access#measurement-key`: keep the first sentence;
-   move "That key must be a workspace-scoped key with a spend limit,
-   never a personal one" to Consequences as operator guidance, since the
-   key's scope lives in the provider console, outside the tree. The
-   decision then states only what the tree can show: the measurement
-   lane is the one place that reads a key.
-7. `merge-delegation#review-before-merge` (owner: restate): "Before the
-   agent driving a pull request merges it, a comment on the pull request
-   names the head being merged and the `pr-review` recommendation of
-   `merge` on that head; 'merge after', 'do not merge' and 'cannot tell'
-   do not license a merge, nor does a review run where `/code-review`
-   was unavailable."
-8. `merge-delegation#no-size-exemption`: "Decision 1's comment is
-   required on every pull request, tracker-only and docs-only included."
-9. `merge-delegation#owner-overrides` (changes, first proposal dropped
-   the owner's override): "When the owner says to merge a pull request,
-   the agent merges it, and its merge comment says the owner directed
-   the merge. A reviewer who is not the driving agent recommends, and
-   never approves or merges."
-10. `metamodel-evolution-policy#recompute-derived`: "The `.orm.yaml`
-    schema defines no property for relational mapping, DDL or any other
-    rendered output, and the serializer writes none; each is recomputed
-    from the conceptual model."
-11. `must-agree-copies#check-on-copy`: restate, revised after rows 4,
-    5 and 24: "Every `audit:duplication` candidate carries a verdict
-    from the duplication spec's table (shared, guarded by a named check,
-    or declared divergent), read through row 4's common reader." With
-    row 24's share-by-default, a guarded copy is the exception that
-    `INTENDED` forces. Low confidence until the mechanical-duplication
-    spec (barwise-ym8.gc9.7fb) shows which copies its detectors see.
-12. `ossie-interchange#peer-standard` (changes, first proposal dropped a
-    clause): keep the checkable part as the decision ("core names
-    nothing specific to Ossie, and Ossie documents enter and leave only
-    through the `ossie` descriptor in `@barwise/formats`"), and move "an
-    idea from Ossie enters barwise because it serves barwise, never only
-    because Ossie has it" to Context as the reasoning, since it is the
-    judgment the metamodel filters apply.
-13. `ossie-interchange#own-vocabulary`: "Only `formats/src/ossie`
-    imports Ossie's types, `mapOssieToOrm.ts` or `writeOssie.ts`; barwise
-    keeps its ORM 2 terms, and the construct-by-construct translation is
-    the spec's Scope."
-14. `plan-before-code#spec-first`: "A pull request that changes package
-    source names the spec it implements, in its body or a commit
-    message." Owner choice: plan-scope never fails by decision, so this
-    needs that choice reopened; with no exemption line, a small fix
-    needs a spec too, which is the rule as written.
-15. `plan-before-code#open-decisions-reviewer`: "Every spec has an Open
-    decisions section, and each entry gives its options, the trade-off
-    and a recommended default."
-16. `review-policy#review-md-owns-lanes`: "`REVIEW.md`'s lane table
-    lists each review lane and when it runs, and no other file states
-    when a lane runs."
+- **Row 1.** `connector-packages#descriptor-wraps-core`: **owner, 2026-11-06: the decision changes**, so it leaves WS1 for a spec of its own. `renderDdl`, `renderOpenApi` and `renderAvro` move to `@barwise/formats` and `renderDbt` to `@barwise/dbt`; `RelationalMapper` stays in core (ORM is relational). `@barwise/dbt` depends on `@barwise/formats`, and one SQL-parsing function there (the sqlglot bridge with the regex fallback) replaces the copy in each importer, by composition, not inheritance; whether `parseSqlFile` leaves core with it is settled in that spec. The `pascal-case-avro`, `pascal-case-openapi` and `sqlglot-bridge` parity sets go with the copies.
+- **Row 2.** `credential-handling#rotate-not-revert`: **owner, 2026-11-06: retire.** Obvious to anyone who handles a leak, and the project does not prescribe what a person does in their provider console. The guidance moves to Consequences (rotation is the remedy; reverting or rewriting history does not undo a leak, though a revert may still be wanted), and the root CLAUDE.md convention that restates it is cut to match in the same PR.
+- **Row 3.** `determinism-in-core#one-layer-out`: **owner, 2026-11-06: restate** to its one checkable rule, by composition: "Outside core, only `@barwise/llm` imports a model SDK; a package that needs a model reaches it through `@barwise/llm`'s `LlmClient`." The rest becomes prose: a host-mediated client (VS Code's language-model API, MCP sampling) lives in the surface that owns the host connection, which is true by construction; "core calls no model" and "non-determinism lives outside core" are decision 1, held by `purity`; a format's own I/O is `connector-packages#connector-owns-io`. With the tool-layer clause gone, `learn` and `promptlab` need no placement. Enforcer (batch 8): a depcruise rule forbidding `@anthropic-ai/sdk` and `openai` outside `@barwise/llm`, with a probe; a plain `fetch` to a provider host stays a gap. Also (owner, 2026-11-06): the dependency-weight reason the old decision 2 carried, which `schema-satisfiability.spec.md` cites for its reasoner lane, becomes a new decision in `package-graph-authority`: core's runtime dependencies are only those listed beside `INTENDED` (today `ajv`, `effect`, `yaml`). Enforcer: `check:architecture` extends `runtime-deps-within` to external packages, with a probe planting `z3-solver` in core's `package.json`; a depcruise rule that every import is declared in the importing package's `package.json` closes the hoisted-import gap.
+- **Row 4.** `findings-close-by-mechanism#mechanism-closes`: **owner, 2026-11-06: restate**, strictly enforced through a common finding shape: "A finding an audit ratchet records is held by its baseline row: every open finding (`tracked:<issue>`) names a beads issue that exists and is open, and a closed issue keeps no open finding." The five baselines keep their files, but one reader returns their rows as `{ id, source, state, issue?, classification, note }`, where `state` is open, classified or unclassified and `classification` keeps each audit's own vocabulary (`caught_by` is a taxonomy, not a status). The broader "close any finding by a mechanism, not a document" becomes prose; a sweep of closed beads issues that look like findings is an optional on-demand report, never a gate. The same reader holds rows 5 and 11. Batch 4 builds it and moves up to run right after row 1's spec.
+- **Row 5.** `findings-close-by-mechanism#person-classifies`: **owner, 2026-11-06: restate, made mechanical.** "A detector never invents a verdict: a new row gets the placeholder unless a declared rule or the duplication spec's verdict table decides it, `--check` fails while a placeholder remains, and every verdict comes from its audit's declared list with a note." The placeholder, `--check` and vocabulary parts are held by row 4's common reader (batch 4). The derived verdicts come from the mechanical-duplication spec: sameness by normalized syntax-tree equality (proof), differential property tests (strong evidence) and, for small pure functions, SMT equivalence through the reasoner lane of `schema-satisfiability.spec.md`; whether two copies may share an owner by `INTENDED`; and a declared divergence as the one human input, checked for presence and form.
+- **Row 24.** `must-agree-copies#check-first`: **owner, 2026-11-06: the decision changes**, with row 1. The default becomes: share where sharing does not couple packages that should not know each other, by composition (a function both sides call) rather than inheritance, and add a parity check only where sharing would couple them. A separate ADR edit; leaves WS1.
 
-Proposed as retirements instead of restatements (no restatement keeps
-the rule and is checkable):
+**High: affects every pull request**
 
-17. `constraint-coverage-policy#trust-statement` (changes, first
-    proposal added a feature): it says how a reader treats extracted
-    constraints, which is guidance to consumers. Move to Consequences.
-18. `metamodel-evolution-policy#four-filters` (changes, first proposal
-    checked existing constructs instead of candidates): criteria for
-    admitting a construct are judgment. Move to Context as the filters
-    a candidate is weighed against.
+- **Row 14.** `plan-before-code#spec-first`: "A pull request that changes package source names the spec it implements, in its body or a commit message." Owner choice: plan-scope never fails by decision, so this needs that choice reopened; with no exemption line, a small fix needs a spec too, which is the rule as written.
+- **Row 7.** `merge-delegation#review-before-merge` (owner: restate): "Before the agent driving a pull request merges it, a comment on the pull request names the head being merged and the `pr-review` recommendation of `merge` on that head; 'merge after', 'do not merge' and 'cannot tell' do not license a merge, nor does a review run where `/code-review` was unavailable."
+- **Row 8.** `merge-delegation#no-size-exemption`: "Decision 1's comment is required on every pull request, tracker-only and docs-only included."
+- **Row 9.** `merge-delegation#owner-overrides` (changes, first proposal dropped the owner's override): "When the owner says to merge a pull request, the agent merges it, and its merge comment says the owner directed the merge. A reviewer who is not the driving agent recommends, and never approves or merges."
+- **Row 20.** `merge-delegation#ask-owner`: to Consequences, as when the driving agent asks instead of merging. Low confidence: "after two reviews that did not recommend merge" could be read from the comments decision 1 now requires; if the owner prefers, it stays a decision and moves to batch 10.
+- **Row 16.** `review-policy#review-md-owns-lanes`: "`REVIEW.md`'s lane table lists each review lane and when it runs, and no other file states when a lane runs."
 
-Retirements (judgment; the text moves to prose, `Date:` moves, later
-decisions renumber and their numbered references are updated):
+**Medium: shapes code or checks**
 
-19. `constraint-coverage-policy#compares-not-certifies`: to Context.
-20. `merge-delegation#ask-owner`: to Consequences, as when the driving
-    agent asks instead of merging. Low confidence: "after two reviews
-    that did not recommend merge" could be read from the comments
-    decision 1 now requires; if the owner prefers, it stays a decision
-    and moves to batch 10.
-21. `metamodel-evolution-policy#deliberately-lossy`: to Context.
-22. `metamodel-evolution-policy#tiering`: to Context, beside the tiers.
-23. `metamodel-evolution-policy#design-against-book`: to Context.
-24. `must-agree-copies#check-first`: **owner, 2026-11-06: the
-    decision changes**, with row 1. The default becomes: share where
-    sharing does not couple packages that should not know each other,
-    by composition (a function both sides call) rather than
-    inheritance, and add a parity check only where sharing would
-    couple them. A separate ADR edit; leaves WS1.
-25. `review-policy#prevent-upstream`: to Consequences.
+- **Row 12.** `ossie-interchange#peer-standard` (changes, first proposal dropped a clause): keep the checkable part as the decision ("core names nothing specific to Ossie, and Ossie documents enter and leave only through the `ossie` descriptor in `@barwise/formats`"), and move "an idea from Ossie enters barwise because it serves barwise, never only because Ossie has it" to Context as the reasoning, since it is the judgment the metamodel filters apply.
+- **Row 13.** `ossie-interchange#own-vocabulary`: "Only `formats/src/ossie` imports Ossie's types, `mapOssieToOrm.ts` or `writeOssie.ts`; barwise keeps its ORM 2 terms, and the construct-by-construct translation is the spec's Scope."
+- **Row 10.** `metamodel-evolution-policy#recompute-derived`: "The `.orm.yaml` schema defines no property for relational mapping, DDL or any other rendered output, and the serializer writes none; each is recomputed from the conceptual model."
+- **Row 6.** `keyless-model-access#measurement-key`: keep the first sentence; move "That key must be a workspace-scoped key with a spend limit, never a personal one" to Consequences as operator guidance, since the key's scope lives in the provider console, outside the tree. The decision then states only what the tree can show: the measurement lane is the one place that reads a key.
 
-If every row is accepted, `metamodel-evolution-policy` keeps one
-decision (recompute-derived) and `constraint-coverage-policy` three.
+**Low: text only, likely accepted as written**
 
-### 2 to 10. Buildable batches
-
-Each batch is designed in its own section of this spec, plan-reviewed,
-before any code, because each is a real change to gates or tests. The
-inventory tags every buildable row with its batch; the counts sum to the
-60 buildable rows. Order, most decisions per enforcer and high
-confidence first:
+- **Row 15.** `plan-before-code#open-decisions-reviewer`: "Every spec has an Open decisions section, and each entry gives its options, the trade-off and a recommended default."
+- **Row 11.** `must-agree-copies#check-on-copy`: restate, revised after rows 4, 5 and 24: "Every `audit:duplication` candidate carries a verdict from the duplication spec's table (shared, guarded by a named check, or declared divergent), read through row 4's common reader." With row 24's share-by-default, a guarded copy is the exception that `INTENDED` forces. Low confidence until the mechanical-duplication spec (barwise-ym8.gc9.7fb) shows which copies its detectors see.
+- **Row 17.** `constraint-coverage-policy#trust-statement` (changes, first proposal added a feature): it says how a reader treats extracted constraints, which is guidance to consumers. Move to Consequences.
+- **Row 18.** `metamodel-evolution-policy#four-filters` (changes, first proposal checked existing constructs instead of candidates): criteria for admitting a construct are judgment. Move to Context as the filters a candidate is weighed against.
+- **Row 19.** `constraint-coverage-policy#compares-not-certifies`: to Context.
+- **Row 21.** `metamodel-evolution-policy#deliberately-lossy`: to Context.
+- **Row 22.** `metamodel-evolution-policy#tiering`: to Context, beside the tiers.
+- **Row 23.** `metamodel-evolution-policy#design-against-book`: to Context.
+- **Row 25.** `review-policy#prevent-upstream`: to Consequences.
 
 Two pieces of work come before the batches, from the owner's WS1
 answers (2026-11-06):
