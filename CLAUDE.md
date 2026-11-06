@@ -162,12 +162,12 @@ working in a package:
   |--- @barwise/code-analysis   (core)  -- connector package: registers
   |                                        code importers into the
   |                                        FormatDescriptor registry
-  |--- @barwise/dbt             (core)  -- connector package: registers
-  |                                        the dbt importer/exporter; owns
-  |                                        its fs + subprocess I/O
   |--- @barwise/formats         (core)  -- connector package: registers
   |                                        the standard DDL/OpenAPI/Avro/
   |                                        NORMA/SQL/Ossie descriptors
+  |--- @barwise/dbt             (core, formats)  -- connector package:
+  |                                        registers the dbt importer/exporter;
+  |                                        composes formats' SQL parser
   |--- @barwise/learn           (core)  -- learning artifacts: the modeling
   |                                        gym (exercise format, deterministic
   |                                        evaluator, miss-card emission) and

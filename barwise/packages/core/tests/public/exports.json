@@ -226,15 +226,8 @@
   ],
   "./sql": [
     "SQL_DIALECTS",
-    "detectStatementType",
-    "extractSqlPatterns",
-    "mapSqlTypeToConceptual",
-    "parseSqlDataType",
-    "parseSqlFile",
-    "parseSqlStatement",
     "parseValuePredicate",
-    "renderValuePredicate",
-    "splitSqlStatements"
+    "renderValuePredicate"
   ],
   "./verbalization": [
     "ConstraintVerbalizer",

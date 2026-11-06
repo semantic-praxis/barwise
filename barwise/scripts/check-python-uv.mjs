@@ -134,8 +134,9 @@ function stripYamlPrefix(line) {
 }
 
 /**
- * `execFileSync("uv", [...UV_PYTHON, "-c", src])` -- the form all six
- * converted call sites use. Its flags live in a spread const several lines
+ * `execFileSync("uv", [...UV_PYTHON, "-c", src])` -- the form every
+ * converted call site uses (six across two bridges once; three since dbt's
+ * copy was deleted in format-renderers-to-connectors WS3). Its flags live in a spread const several lines
  * away, so no line carries the whole invocation and the line rules below
  * cannot see it. Checked over the file instead: a file that spawns uv must
  * carry an assertion flag and no bypass, as a string literal somewhere.

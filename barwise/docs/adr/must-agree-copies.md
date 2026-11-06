@@ -1,14 +1,15 @@
 # Must-agree copies carry a check
 
 Scope: process
-Date: 2026-08-30
+Date: 2026-11-06
 Tracking: barwise-ubc, barwise-868, barwise-871, barwise-872, barwise-tdu,
 barwise-u5d, barwise-tml, barwise-iil,
 barwise-919, docs/specs/duplication-drift-guards.spec.md,
-docs/specs/deterministic-guards.spec.md
+docs/specs/deterministic-guards.spec.md,
+docs/specs/format-renderers-to-connectors.spec.md
 Enforced-by: npm run audit:duplication -- --check (every-candidate-verdict),
 npm run check:parity (registered-sets-identical),
-none (barwise-ym8.edf: check-on-copy), none (barwise-ym8.3tg: check-first),
+none (barwise-ym8.edf: check-on-copy), none (barwise-ym8.3tg: share-by-composition),
 none (barwise-ym8.8nq: registered-sets-identical),
 none (barwise-ym8.onf: every-candidate-verdict)
 
@@ -35,13 +36,15 @@ members.
    owner, a derivation from the authority, an entry in
    `barwise/parity.manifest.json`, or a drift test. A comment asking
    the editor to update the other copy is not a check.
-2. **Check first; share case by case.** {#check-first} The spec settled this ("the
-   check is the cheap, universal move and the share is a case-by-case
-   optimization"). A check costs a manifest line and forbids nothing
-   about the design. An extraction is a design change, decided each
-   time, and the check is what proves that the extraction preserved
-   behaviour. Where sharing would couple packages, the copies stay
-   parallel.
+2. **Share by composition where the package graph allows it.** {#share-by-composition}
+   A new copy that must agree is shared by composition -- one function
+   both sides call -- wherever the package graph lets both sides reach
+   one owner. A parity check is for copies whose sharing would couple
+   packages `INTENDED` keeps apart, and for values that cannot be
+   shared, such as a version field in each package's manifest. Sharing
+   removes the second copy rather than watching it, and composition
+   rather than inheritance keeps the owner's interface the only thing
+   the callers depend on.
 3. **A registered set stays identical, and a member that does not
    resolve counts as drift.** {#registered-sets-identical} A member is a whole file, a named
    symbol or a JSON field value. Per the spec, a whole file is
@@ -78,6 +81,18 @@ members.
   silenced". `REVIEW.md`'s "Do not report" tells reviewers to skip
   registered copies and the duplication ratchet because CI enforces
   them, so the review instructions contradict each other (barwise-iil).
+- The manifest's CLI and MCP pairs (`staged-write`, the three
+  `lineage-*` sets, `import-alternatives-diff-summary`) and its test
+  builder sets (`package-model-builder`, `model-builder-roleId`,
+  `model-builder-preferredId`) predate
+  `must-agree-copies.md#share-by-composition` and are unclassified, not
+  known violations. A set whose members `INTENDED` lets one owner serve
+  violates the decision; one whose sharing would need an edge `INTENDED`
+  refuses (cli and mcp cannot import each other, and core cannot hold
+  their file I/O) is what decision 2 keeps a parity check for. Sorting
+  each is barwise-ym8.gc9.e76; until then they stay checked. The SQL bridge was the
+  first set retired under it (format-renderers-to-connectors.spec.md,
+  WS3).
 - Decision 1 is gated only partly, and only inside the detectors'
   scope. A new detectable copy fails `audit:duplication` until it has a
   verdict, but `accepted-benign` passes as well as a check does.

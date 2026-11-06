@@ -44,7 +44,8 @@ format lives and how it reaches the surfaces.
    formats, through one `register*Formats()` function: `@barwise/formats`
    (DDL, OpenAPI, Avro, NORMA, SQL, Ossie; the SQL importer scans
    directories and runs the sqlglot subprocess), `@barwise/dbt` (its
-   file-system and `dbt compile` I/O), and `@barwise/code-analysis`
+   file-system and `dbt compile` I/O; the sqlglot subprocess that parses
+   its models' SQL is formats', reached through `parseSqlPatterns`), and `@barwise/code-analysis`
    (TypeScript, Java and Kotlin, with LSP sessions and repository
    scanning).
 3. **A format's rendering and parsing live in its connector.**{#format-in-its-connector}
@@ -54,7 +55,10 @@ format lives and how it reaches the surfaces.
    and its export annotator are `@barwise/dbt`'s. Core keeps the
    relational mapping (`RelationalMapper`, which ORM, a relational
    technology, owns) and the SQL dialect types and value predicates its
-   own mapping uses; a format reaches them from its connector.
+   own mapping uses; a format reaches them from its connector. A format
+   whose input embeds another format composes that format's connector
+   rather than copying its code: dbt parses its models' SQL through
+   `@barwise/formats`' `parseSqlPatterns`, and depends on formats to do so.
 4. **Registration is explicit and by name.**{#explicit-registration} Each tool surface calls the
    `register*Formats()` functions it needs; the registry discovers
    nothing on its own, and a format no one registered fails as an
@@ -86,10 +90,11 @@ format lives and how it reaches the surfaces.
   registry's own file (barwise-2uz). Not seen: a renderer core keeps
   unexported and calls from an exported function, a type-only export,
   and an untyped literal that only matches an interface's shape.
-- One known violation of `connector-packages.md#format-in-its-connector`
-  remains until `format-renderers-to-connectors.spec.md` WS3 lands: the
-  SQL parser (`parseSqlFile` and its cascade) is still in core
-  (barwise-ym8.x9w).
+- `connector-packages.md#format-in-its-connector` has no known
+  violation since `format-renderers-to-connectors.spec.md` WS3: the SQL
+  parser cascade is formats', and dbt composes it through
+  `parseSqlPatterns`. Nothing checks that a format's code sits in its own
+  connector rather than another one (barwise-ym8.x9w).
 - That each surface registers what it needs is review-only (S-EXPL-5).
   A missing registration fails loudly ("not registered", "Unknown
   format") when a test or a user asks for that format. One copy is

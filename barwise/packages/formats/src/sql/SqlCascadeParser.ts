@@ -13,13 +13,9 @@
  * has an LLM client, and it never reports back through `ParseLevel`.
  */
 
+import type { SqlDialect } from "@barwise/core/sql";
 import { extractSqlPatterns, splitSqlStatements } from "./SqlPatternExtractor.js";
-import type {
-  CascadeFileResult,
-  CascadeStatementResult,
-  SqlDialect,
-  SqlPatternContext,
-} from "./types.js";
+import type { CascadeFileResult, CascadeStatementResult, SqlPatternContext } from "./types.js";
 
 /**
  * Parse a SQL file through the cascade.

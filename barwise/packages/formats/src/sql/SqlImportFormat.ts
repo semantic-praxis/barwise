@@ -15,17 +15,13 @@
  */
 
 import { type ImportFormat, type ImportOptions, type ImportResult, OrmModel } from "@barwise/core";
-import {
-  parseSqlFile,
-  SQL_DIALECTS,
-  type SqlDialect,
-  type SqlPatternContext,
-} from "@barwise/core/sql";
+import { SQL_DIALECTS, type SqlDialect } from "@barwise/core/sql";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { DdlImportFormat } from "../ddl/DdlImportFormat.js";
 import { findCreateTables } from "../ddl/sqlIdentifiers.js";
-import { normalizeCascadeResult, parseSqlWithSqlglot } from "./SqlglotBridge.js";
+import { parseSqlPatterns } from "./parseSqlPatterns.js";
+import type { SqlPatternContext } from "./types.js";
 
 /**
  * The explicit dialect, refused when barwise does not support it, the way
@@ -375,8 +371,7 @@ export class SqlImportFormat implements ImportFormat {
     const modelName = options?.modelName ?? "SQL Import";
     const dialect = explicitDialect(options) ?? detectDialectFromHints(input) ?? "ansi";
 
-    const fileResult = parseSqlWithSqlglot(input, "input.sql", dialect)
-      ?? normalizeCascadeResult(parseSqlFile(input, "input.sql", dialect));
+    const fileResult = parseSqlPatterns(input, "input.sql", dialect);
 
     const model = buildModel(
       input,
@@ -429,8 +424,7 @@ export class SqlImportFormat implements ImportFormat {
           detectedDialect = detectDialectFromHints(sql);
         }
 
-        const fileResult = parseSqlWithSqlglot(sql, filePath, detectedDialect ?? "ansi")
-          ?? normalizeCascadeResult(parseSqlFile(sql, filePath, detectedDialect ?? "ansi"));
+        const fileResult = parseSqlPatterns(sql, filePath, detectedDialect ?? "ansi");
         allPatterns.push(...fileResult.patterns);
       } catch (err) {
         warnings.push(

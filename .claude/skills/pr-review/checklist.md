@@ -135,9 +135,9 @@ here, and none of them fails a build today.
 - **A result whose fields depend on a flag is a union, not a record
   with optionals.** `{ success: boolean; ast?: ...; error?: string }`
   makes every reader test the flag and then the field, and lets a
-  success carry no `ast`. `CalciteParseResponse` (`sql/types.ts`) has
-  that shape, and `MergeValidationResult` (`diff/ModelMerge.ts`) pairs
-  `isValid: boolean` with `model: OrmModel | null`, so
+  success carry no `ast`. `MergeValidationResult` (`diff/ModelMerge.ts`)
+  has that shape: it pairs `isValid: boolean` with
+  `model: OrmModel | null`, so
   `cli/src/commands/merge.ts` checks both for one fact. `MigrationPlan` (`schemaVersion.ts`) is
   the shape to copy: `ok: true` carries `steps`, `ok: false` carries
   `reason`, and neither arm is optional. Authority: root `CLAUDE.md`,

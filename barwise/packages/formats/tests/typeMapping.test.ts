@@ -7,7 +7,7 @@
  * swallowing an unrelated type.
  */
 import { describe, expect, it } from "vitest";
-import { mapSqlTypeToConceptual, parseSqlDataType } from "../../src/sql/typeMapping.js";
+import { mapSqlTypeToConceptual, parseSqlDataType } from "../src/sql/typeMapping.js";
 
 describe("mapSqlTypeToConceptual", () => {
   it("maps the common families, any case, with length suffixes", () => {

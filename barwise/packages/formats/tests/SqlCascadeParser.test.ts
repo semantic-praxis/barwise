@@ -9,7 +9,7 @@ import {
   detectStatementType,
   parseSqlFile,
   parseSqlStatement,
-} from "../../src/sql/SqlCascadeParser.js";
+} from "../src/sql/SqlCascadeParser.js";
 
 describe("parseSqlFile", () => {
   it("parses a file with multiple CREATE TABLE statements", () => {
