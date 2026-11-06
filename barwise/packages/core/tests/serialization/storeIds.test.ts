@@ -122,13 +122,21 @@ model:
     expect(serializer.serialize(read(text))).toBe(serializer.serialize(read(hand)));
   });
 
-  it("give back the bytes a save wrote, for every minted id in every tracked model", () => {
-    // Required by 6b-3a's second pr-review pass: each element barwise
-    // writes, with its id and key taken out, stored again. Most anchors
-    // here are block lists (a constraint's `roles:`), which no hand-built
-    // case above reached.
-    let sites = 0;
-    for (const c of modelCorpus()) {
+  // Required by 6b-3a's second pr-review pass: each element barwise
+  // writes, with its id and key taken out, stored again. Most anchors here
+  // are block lists (a constraint's `roles:`), which no hand-built case
+  // above reached. One case per model, not one loop: the loop's cost grew
+  // with the corpus and passed 30s under the pre-commit hook's parallel
+  // run while taking 5s alone (barwise-ov2, barwise-6yu).
+  // Sequential on purpose: the last case reads what the per-model cases
+  // recorded, so it must run after them even under a concurrent run.
+  describe("give back the bytes a save wrote, for every minted id in every tracked model", {
+    sequential: true,
+  }, () => {
+    const corpus = modelCorpus();
+    const sites = new Map<string, number>();
+
+    it.each(corpus.map((c) => [c.file, c] as const))("%s", (_file, c) => {
       const text = serializer.serialize(
         replayInto40(serializer.deserializeAsWritten(JSON.stringify(c.doc))),
       );
@@ -152,12 +160,19 @@ model:
           i += 1;
         }
       }
-      if (here === 0) continue;
-      sites += here;
+      // A model with no minted id is checked too: storing nothing must give
+      // back its text byte for byte.
       const back = storeIds(removed.join("\n"));
       expect([c.file, back.stored.length, back.text]).toEqual([c.file, here, text]);
-    }
-    expect(sites).toBeGreaterThan(200);
+      sites.set(c.file, here);
+    });
+
+    // A model is recorded only once its round trip passed, so a failed or
+    // skipped case shows here as a missing file, by name.
+    it("reach more than 200 sites across the corpus", () => {
+      expect(corpus.map((c) => c.file).filter((f) => !sites.has(f))).toEqual([]);
+      expect([...sites.values()].reduce((a, b) => a + b, 0)).toBeGreaterThan(200);
+    });
   });
 
   it("keep a file's CRLF line endings", () => {
