@@ -1,6 +1,6 @@
 # Batch 9: schema, Ossie, eval-coverage and package-graph decisions enforced
 
-Status: Draft -- no workstream implemented
+Status: Draft revised after plan review 2026-11-06
 
 Created: 2026-11-06
 Last-updated: 2026-11-06
@@ -29,10 +29,11 @@ barwise/packages/core/CLAUDE.md, barwise/packages/learn/CLAUDE.md,
 barwise/packages/promptlab/CLAUDE.md,
 barwise/packages/learn/src/evaluate/checks/forbidsPopulation.ts,
 barwise/packages/learn/src/index.ts,
-+barwise/packages/promptlab/tests/coverageInventory.test.ts,
 barwise/docs/specs/constraint-extraction-coverage.spec.md,
 barwise/scripts/lib/changed-class.mjs,
-+barwise/scripts/check-schema-bump.mjs, barwise/scripts/tests/,
++barwise/scripts/check-schema-bump.mjs,
++barwise/scripts/check-source-sites.mjs,
++barwise/scripts/check-eval-coverage.mjs, barwise/scripts/tests/,
 barwise/package.json, package.json, .github/workflows/ci.yml
 
 ## Principle
@@ -42,8 +43,8 @@ issue. Eight are already partly held by tagged tests or a gate. The
 other eight have no declared enforcer: `recompute-derived`,
 `shared-minor`, `peer-standard`, `own-vocabulary`, `readable-iri`
 (which, as it turns out, code already holds without a tag) and all three
-`constraint-coverage-policy` decisions. Every decision here is
-an invariant over files the repository tracks: a schema, a migration
+`constraint-coverage-policy` decisions. Every decision here is an
+invariant over files the repository tracks: a schema, a migration
 registry, a vendored copy, an import edge, a manifest, an eval rubric.
 Each one can be checked, and this spec adds the check that fails when
 the decision is broken ("explicit over implicit": a decision only review
@@ -51,16 +52,38 @@ holds reads as a rule and gets followed as advice).
 
 The plan's enforcer suggestions were checked against the code before
 being adopted. Five needed correcting, and the corrected forms are
-below: row 12's depcruise rule fails on main as
-worded and cannot see the vendored schema; `readable-iri`'s "to design"
-rule already exists; `tiered-types` named transcripts, which no check can
-read; the coverage drift test would not run on the one change it guards;
-and `shared-minor`'s gate cannot fail on any real change until a release
-is tagged.
+below: row 12's depcruise rule fails on main as worded and cannot see
+the vendored schema; `readable-iri`'s "to design" rule already exists;
+`tiered-types` named transcripts, which no check can read; the coverage
+drift check would not run on the one change it guards; and
+`shared-minor`'s gate cannot fail on any real change until a release is
+tagged.
+
+Plan review added a sixth constraint on where checks live. A vitest test
+is cached by turbo against its own package's inputs. A test in one
+package that scans other packages' source, or files under `docs/`,
+replays a cached pass when only those files change. Every scanner that
+crosses package boundaries is therefore an uncached script gate under
+`barwise/scripts/` (`check:source-sites`, `check:eval-coverage`,
+`check:architecture`, `check:schema-bump`). Tagged vitest tests are
+used only where every input is inside the host package or reaches it
+through its turbo dependency graph.
 
 ## The reading this spec starts from (main at 312894fd)
 
 - `npm run check:architecture` exits 0 (80 decisions, 26 with a gate).
+- **Turbo caching.** `turbo.json` keys `test` and `test:coverage` on
+  each package's `src/**`, `tests/**`, `schemas/**`, `vitest.config.ts`,
+  `package.json` and four `$TURBO_ROOT$` paths, none under `docs/`
+  except `docs/getting-started/**`. No package has its own
+  `turbo.json`. CI restores `barwise/.turbo` across runs (`ci.yml:80`).
+  So a vitest test hosted in promptlab that reads
+  `docs/specs/constraint-extraction-coverage.spec.md` replays a cached
+  pass when only that file changes. So does a core test scanning
+  `vscode/src`, because vscode is not in core's dependency graph.
+  Measured in passing: promptlab's `evals/**` is not a test input either,
+  although five promptlab test files read it (`referenceDrift`,
+  `loadSuite`, `collapseSplit`, `errorsByRule`, `history`).
 - **Coverage.** The suite (`promptlab/evals/suite.yaml`, 2.13.0) has ten
   cases, seven in `train` and three in `dev`, and no `domain` field: a
   case is its own domain. A rubric check names `constraint: ring`, never
@@ -73,20 +96,24 @@ is tagged.
   kind, so `subset` and `exclusion` cannot be rubric-tested yet.
 - **Tiers.** Core's `RingType` has eight members
   (`core/src/model/Constraint.ts:200`). The ADR's decision 2 tiers seven
-  of them and leaves out **`asymmetric`**, which is in neither tier.
+  of them and leaves out `asymmetric` (owner, 2026-11-06: common).
 - **The inventory** (`constraint-extraction-coverage.spec.md`, lines
   38-43) is prose. It lumps six ring types into one row and gives counts
   as free text ("one (project-staffing)", "yes (2.5.0)"). Its claims
-  match the suite today. A PR that changes only this `.md` file is
-  docs-only (`scripts/lib/changed-class.mjs:25`), so CI skips
-  `test:coverage` for it.
+  match the suite today. A PR that changes only a `.md` file outside
+  `docs/adr/` is docs-only (`scripts/lib/changed-class.mjs:25,33`), and
+  CI then skips `build`, `test:coverage` and every step guarded on
+  `docs_only`. That covers this file and
+  `formats/schemas/ossie/README.md`.
 - **Ossie boundary.** Measured with depcruise over `packages/`: the only
   edges into `formats/src/ossie/` from outside it are `formats/src/index.ts`
-  (OssieExportFormat, OssieImportFormat, OssieTypes) and
-  `formats/src/registration.ts`. MCP reads `OSSIE_VERSION` through
-  `@barwise/formats` (`mcp/src/tools/importModel.ts:9`). A trial rule
-  that forbids those edges from anywhere except `ossie/`, `index.ts` and
-  `registration.ts` exits 0 on main. Depcruise **does not see** the
+  (to `OssieExportFormat.ts`, `OssieImportFormat.ts`, `OssieTypes.ts`)
+  and `formats/src/registration.ts` (to the first two). `OssieTypes.ts`
+  imports nothing. MCP reads `OSSIE_VERSION` through `@barwise/formats`
+  (`mcp/src/tools/importModel.ts:9`). Two trial rules with a scratch
+  config exit 0 on main: no edge into `ossie/` except from `ossie/`,
+  `index.ts` and `registration.ts`; and from those two files, edges
+  only to the three entry modules. Depcruise **does not see** the
   vendored-schema imports: `ossieSchema.ts:20-21` imports
   `../../schemas/ossie/*.json`, and depcruise lists only `OssieTypes.ts`
   and `requiresShapes.ts` as that module's dependencies, because
@@ -103,6 +130,12 @@ is tagged.
   (`OssieImportFormat.test.ts:906`), which carries none. The export
   tests validate against `ontology.json`, which allows
   `ontology_mappings`, so writing one would pass them.
+- **Ossie read-back.** `OssieExportFormat.readBack` calls `verifyOssie`
+  (`OssieExportFormat.ts:64`). `OssieVerify.test.ts:86` ("names a deontic
+  mandatory that comes back alethic") calls `exporter.export` and
+  expects the line `Fact type: Person.name: comes back changed:
+  constraints added: mandatory; constraints removed: mandatory
+  (deontic)`, a line only `verifyOssie` writes. The test is untagged.
 - **Readable IRI.** This is already enforced in three places, none of
   them tagged: the 4.0 decoder checks id shape (`core/src/decode/ids.ts`,
   `LOCAL_NAME_PATTERN`); the warning rule `structural/id-not-from-name`
@@ -115,9 +148,11 @@ is tagged.
 - **Package graph.** No script outside `scripts/lib/intended.cjs` has a
   literal of the form `"pkg": ["pkg", ...]` (searched across tracked
   `barwise/scripts`, `.husky`, `.github`, `.claude/hooks`; the only other
-  hit is a fixture string in `gates.test.mjs:7536`). In the package
-  CLAUDE.md files, nine `## Dependencies` tables list Upstream rows that
-  equal `INTENDED`. `core`, `learn` and `promptlab` have no table, and
+  hit is a fixture string in `gates.test.mjs:7536`). Nine package
+  CLAUDE.md files have a `## Dependencies` table, and in each the
+  `@barwise/*` and `barwise-vscode` Upstream rows equal `INTENDED`.
+  `diagram-ui`'s table also lists `react` and `react-dom` as Upstream,
+  which are external. `core`, `learn` and `promptlab` have no table, and
   their dependency names exist only as prose in `## Dependency Rule`.
   Core's `src` imports exactly `effect`, `yaml` and `ajv` (measured
   across 177 files with `ts.preProcessFile`). `fast-check` is already in
@@ -126,23 +161,47 @@ is tagged.
 - **Versioning.** `CURRENT_ORM_VERSION` is `"4.0"`, and the schema
   `const` is `"4.0"`. `ORM_VERSION_MIGRATIONS` has 1.0->1.1 and
   1.1->2.0. The 2.0->3.0 step goes through the model, and 3.0 is read
-  by its own reader. A document with no `orm_version` is refused with
-  "orm_version is missing" (run against core's dist), but no test pins
-  that. Outside `core/src/serialization` and `core/src/decode`, two
-  places write `orm_version`: `vscode/src/commands/projectScaffold.ts`
-  (a template using `CURRENT_ORM_VERSION`) and
-  `core/src/project/splitModel.ts:488` (copies `writeDocument40`'s
-  version). `merge.test.ts:44` checks that both 1.0 inputs stay
-  unchanged, but not that the merge ran.
+  by its own reader. `planMigration` takes the first registered step
+  whose `from` matches (`migrations.find`), so a second step from the
+  same version is ignored without a word. A document with no
+  `orm_version` is refused with "orm_version is missing" (run against
+  core's dist), but no test pins that.
+- **`orm_version` write sites.** A full TypeScript parse of
+  `packages/*/src` finds 11 sites that set `orm_version` (object key,
+  assignment, or YAML text), in 9 (file, function, form) groups:
+  - decoder schemas: `decode/document.ts` (module) and
+    `decode/document40.ts` (module);
+  - in-memory configs and documents: `decode/document40.ts`
+    `document40Configs`, and `formats/src/ossie/verifyOssie.ts:169`
+    `document30`, which **assigns** `doc.orm_version = "3.0"` on an
+    in-memory 3.0 document built for the read-back diff and never
+    written to disk;
+  - migration restamps: `serialization/schemaVersion.ts` `migrate`, and
+    `serialization/migrations/diagramReferencesToIds.ts` (x3);
+  - the serializer: `OrmYamlSerializer.ts` `documentOf`;
+  - file writers outside the serializer: `core/src/project/splitModel.ts`
+    `splitModel` (copies `writeDocument40`'s 4.0) and
+    `vscode/src/commands/projectScaffold.ts` (YAML text interpolating
+    `CURRENT_ORM_VERSION`).
+
+  The first draft's "two places, plus a type in `verifyOssie.ts`" was
+  wrong: a key-and-template scan misses the assignment form.
+  `mcp/src/workspace/resolve.ts:198` mentions `orm_version` only in a
+  regex that reads.
+- `merge.test.ts:44` checks that both 1.0 inputs stay unchanged, but not
+  that the merge ran.
 - **Releases.** `git ls-remote --tags origin` lists `v0.3.0`..`v1.7.0`
-  and `edge`, with **no `v2.0.0`**, though the packages say 2.0.0 and
+  and `edge`, with no `v2.0.0`, though the packages say 2.0.0 and
   schema-versioning's Consequences say "v2.0.0 is the first release
   since, writing 4.0". The last `v*` tag is v1.7.0, which wrote 1.1.
-- **Schema shape.** `orm-model.schema.json` has 194 property slots under
-  81 distinct names. Every object that declares `properties` is closed
-  (37 of 37; the 38th is an `if` clause). `writer40.test.ts` validates
-  the 4.0 writer's output against the schema, and
-  `document40SchemaDrift.test.ts` holds the Effect decoders to it.
+- **Schema shape.** `orm-model.schema.json` has 40 `properties` maps at
+  any depth, holding 194 property slots under 81 distinct names. 37 maps
+  are closed (`additionalProperties: false`). The other 3 are
+  `object_type`'s `if`/`then`/`else`, whose slots sit under the closed
+  `object_type` map. `/properties/model` is closed with 13 properties.
+  `writer40.test.ts` validates the 4.0 writer's output against the
+  schema, and `document40SchemaDrift.test.ts` holds the Effect decoders
+  to it.
 
 ## Decision by decision
 
@@ -150,8 +209,8 @@ Each entry gives what holds the decision today, the proposed enforcer,
 whether the decision's wording changes, the planted violation that
 proves the enforcer works, and what happens to the gap issue. "Tests"
 means vitest or node tests carrying `[adr:<adr>#<id>]`, held in CI by
-`check:adr-tests`. Each one's plant goes in the PR body
-(`spec-writer/adr-writing.md`).
+`check:adr-tests`. Each one's plant goes in the PR body. A gate entry
+gets a `probes.json` row (`spec-writer/adr-writing.md`).
 
 ### metamodel-evolution-policy
 
@@ -159,73 +218,107 @@ means vitest or node tests carrying `[adr:<adr>#<id>]`, held in CI by
 it. The schema is closed, so a derived property has to be added to the
 schema on purpose, and nothing reviews that addition. Enforcer: a table
 beside the schema, `orm-model.property-classes.json`, that classifies
-every property slot by JSON pointer
-(`/definitions/<def>/properties/<name>`) as `conceptual`, `identity`
-(`id`, `minted_from`, `imports`, `namespace`, `orm_version`) or
-`presentation` (diagram layout). It is keyed by slot, not by name, so
-reusing an existing name like `expression` in a new place still has to
-be classified. A tagged core test walks the schema and fails on any slot
-the table lacks and on any table row with no slot. The writer side is
-already covered: the schema is closed and `writer40.test.ts` validates
-the writer's output, so the serializer cannot write a property the
-schema lacks. Wording: unchanged. Plant: add a `tables` property to
-`definitions/fact_type` -> the test fails naming the slot. Gap: 3ai
-closes. The classification of diagram positions goes to the owner (Open
-decision 5).
+every property slot as `conceptual`, `identity` (`id`, `minted_from`,
+`imports`, `namespace`, `orm_version`) or `presentation` (diagram
+layout; owner, 2026-11-06, as recommended). Slots are keyed by full
+JSON pointer. A tagged core test walks every `properties` map at any
+depth: root, `/properties/model`, `definitions`, `oneOf`/`anyOf`/`allOf`
+branches, `items`, `additionalProperties` schemas, and `if`/`then`/`else`.
+It fails on any slot the table lacks and on any table row with no slot.
+Keying by slot rather than by name means that reusing a name like
+`expression` in a new place still has to be classified. The test's own
+self-check asserts it found 40 maps and 194 slots, so a walker that
+stops early cannot pass. The writer side is already covered: every map
+an output object passes through is closed, and `writer40.test.ts`
+validates the writer's output. Every input is under core's `schemas/`
+and `tests/`, both turbo inputs, so a vitest test is enough here.
+Wording: unchanged. Plants: add `tables` at
+`/properties/model/properties/tables` -> fails naming that pointer. Add
+it under `/definitions/fact_type/properties` -> fails. Gap: 3ai closes.
 
 ### schema-versioning
 
 **`version-signal`** (4i2). Today: tagged tests cover current, newer
 and stamped files. Unguarded: a file with no version, and writers that
-bypass the serializer. Enforcer: (1) a tagged test that deserializing
-`model:\n  name: T\n` throws a message naming `orm_version`. (2) A
-tagged test that uses TypeScript's scanner to find every `orm_version`
-property key (identifier or string literal) and every template text
-containing `orm_version:` in `packages/*/src`. It fails on any file
-outside an allowlist (`core/src/serialization/`, `core/src/decode/`,
-`core/src/project/splitModel.ts`,
-`vscode/src/commands/projectScaffold.ts`, and
-`formats/src/ossie/verifyOssie.ts`, which only has a type). Each
-allowlisted writer outside `serialization/` has a tagged test that its
-output states `CURRENT_ORM_VERSION`. Plants: make the serializer stop
-throwing on a missing version -> (1) fails; add `orm_version: "3.0"` to
-a new object literal in `cli/src` -> (2) fails. Wording: unchanged. Gap:
-4i2 closes. A schema failure on a same-version file using an unknown
-construct stays outside the decision, as the ADR says.
+bypass the serializer. Enforcer:
 
-**`minor-and-major`** (31z). Today: a tagged test checks that the
-current major's chain reaches `CURRENT_ORM_VERSION`. Enforcer: a tagged
-test that every registered step is either a minor step (same major, `to`
-minor = `from` minor + 1) or a major step (`to` = next major's `.0`).
-That catches 3.0->3.2, which the reach test passes. A second tagged
-assertion: the schema `const` equals `CURRENT_ORM_VERSION` directly,
-rather than indirectly through a load. Plants: register `{from:"1.0",
-to:"2.0"}` in a test-local copy of the real registry passed to the shape
-function, and replace the real 1.0->1.1 step's `to` with `"1.2"` -> the
-shape test fails. Set the schema const to `"4.1"` -> the parity test
-fails. Wording: the decision also says "a change an older reader would
-misread rather than ignore is structural", which is a judgment no check
-can make. Owner choice (Open decision 3): restate to the checkable rule
-and move the classification to Context, or keep the wording and leave
-31z open, narrowed to that judgment.
+1. A tagged core test that deserializing `model:\n  name: T\n` throws a
+   message naming `orm_version`.
+2. A rule `orm-version-writers` in a new uncached gate,
+   `check:source-sites` (`scripts/check-source-sites.mjs`, which runs
+   with `depcruise` and before `build`, guarded on `docs_only` like it).
+   It parses every tracked `packages/*/src` file with TypeScript and
+   lists each site that sets `orm_version`: a property key (identifier,
+   string literal, or shorthand), an assignment to `.orm_version` or
+   `["orm_version"]`, or string or template text matching
+   `orm_version\s*:`. Each site's key is (file, enclosing function,
+   form), with a count. The allowlist names the nine groups above,
+   each with its reason and expected count. A site not on the list, or
+   an extra site in a listed group, is a finding. Rows with a lower
+   count than expected are findings too, so the list cannot go stale.
+   The two file writers outside the serializer get tagged tests that
+   their output states `CURRENT_ORM_VERSION`: `projectScaffold` in
+   vscode, and `splitModel` in core. A cached core test could not hold
+   this rule, because vscode's source is outside core's turbo hash.
 
-**`shared-minor`** (8l3, barwise-vvg). Today: nothing. Enforcer: a new
-gate, `check:schema-bump`. It finds the latest `v*` tag reachable from
-HEAD, reads that tag's `orm-model.schema.json` and `CURRENT_ORM_VERSION`,
-and exits 1 when the schema differs (ignoring `description`, `title`
-and `$comment`) while the version is equal. It exits 2 when no `v*` tag
-is reachable (a shallow clone) or the tag's files cannot be read. It
-needs a `ci.yml` step with no `if:`, a root forwarder, and a node test
-in a `tempRepo()`. It does not judge additive versus structural. It
-**cannot fail on main today**: the last tag wrote 1.1 and main writes
-4.0, so every schema change since then is covered by a bump that
-already happened. It starts to bite at the next `v*` tag. Plant (for
-`probes.json`, valid today): set `CURRENT_ORM_VERSION = "1.1"` in
-`schemaVersion.ts` -> exit 1. After v2.0.0 is tagged, the row changes
-to planting a schema property. Wording: decision 3 says "released"
-without defining it. The gate reads a `v*` tag as a release, which is
-barwise-6om's open question (Open decision 4). Gap: 8l3 and vvg close
-once 6om is decided.
+Residue, review-only and stated in Consequences: a computed key
+(`["orm_" + "version"]`), a name built by concatenation, an
+`Object.assign` or `defineProperty` from a variable key, a document
+copied by spread from a source other than the serializer, and YAML
+assembled from string fragments that do not hold `orm_version:` whole.
+
+Plants: make the serializer stop throwing on a missing version -> (1)
+fails. Add `const doc = { orm_version: "3.0", model: {} };` to
+`cli/src/commands/verbalize.ts` -> the gate exits 1 (not on the list).
+Add a second `doc.orm_version = "3.0"` to `document30` -> exit 1 (count
+2, expected 1). Enforced-by gains `npm run check:source-sites
+(version-signal)` and keeps `tests (version-signal)`. Wording:
+unchanged. Gap: 4i2 closes, with the residue moved to Consequences.
+
+**`minor-and-major`** (31z; owner, 2026-11-06: restate). Today: a tagged
+test checks that the current major's chain reaches
+`CURRENT_ORM_VERSION`. Restated decision: "A minor step goes to the next
+minor, a major step to the next major's first; the schema const equals
+`CURRENT_ORM_VERSION`." The decision's existing sentence that the loader
+reads every version "by applying those steps" stays. The
+additive-versus-structural classification moves to Context. Enforcer,
+tagged core tests:
+
+- **Shape.** Every step is a minor step (same major, `to` minor =
+  `from` minor + 1) or a major step (`to` = the next major's `.0`).
+- **Chain.** The steps form one path. Each version is the `from` of at
+  most one step. A major step leaves its major's last minor, so no step
+  or `CURRENT_ORM_VERSION` names a later minor of the major it leaves.
+  The shape rule alone accepts `{1.0->2.0}` beside `{1.0->1.1}`, and
+  `planMigration`'s `find` would read the first and ignore the second.
+- **Parity.** The schema `const` equals `CURRENT_ORM_VERSION`, checked
+  directly rather than through a load.
+
+The functions take the registry as a parameter, as `planRead` does, and
+the tagged tests call them on the real `ORM_VERSION_MIGRATIONS`.
+Plants, all on the real registry: change 1.0->1.1's `to` to `"1.2"` ->
+shape fails. Add `{from: "1.0", to: "2.0"}` after 1.0->1.1 -> chain
+fails twice (two steps from 1.0, and a major step leaving 1.0 while 1.1
+exists). Set the schema const to `"4.1"` -> parity fails. Gap: 31z
+closes.
+
+**`shared-minor`** (8l3, barwise-vvg; owner, 2026-11-06: "released"
+means a `v*` tag). Enforcer: a new gate, `check:schema-bump`. It finds
+the latest `v*` tag reachable from HEAD, reads that tag's
+`orm-model.schema.json` and `CURRENT_ORM_VERSION`, and exits 1 when the
+schema differs (ignoring `description`, `title` and `$comment`) while
+the version is equal. It exits 2 when no `v*` tag is reachable (a
+shallow clone) or the tag's files cannot be read. It gets a `ci.yml`
+step with no `if:`, a root forwarder, and node tests in a `tempRepo()`.
+It does not judge additive versus structural. It cannot fail on main
+today: the last tag wrote 1.1 and main writes 4.0, so it starts to bite
+at the next `v*` tag. Plant (for `probes.json`, valid today): set
+`CURRENT_ORM_VERSION = "1.1"` in `schemaVersion.ts` -> exit 1. After a
+tag writing 4.0 exists, the row changes to planting a schema property.
+Wording: decision 3 gains "a released version is one a `v*` tag names;
+`edge` is not one". Consequences' "v2.0.0 is the first release since,
+writing 4.0" is corrected to the tags that exist. Gap: 8l3, vvg and 6om
+close.
 
 **`load-forward`** (yfi). Today: tagged tests cover the 1.0 forward load
 and `migrate`. The merge "inputs untouched" test passes even if the
@@ -237,56 +330,59 @@ runs on a copied 3.0 fixture and must exit 0, produce output, and leave
 the file's bytes unchanged. The editing set (`migrate`, `rename`, MCP
 `merge_models`, `rename_element`, `split_model`) is the declared
 exception. A command with neither a fixture row nor an exemption fails,
-so new commands are covered as they are declared (`importerIds.test.ts`
-works the same way). Without the success assertion, a command that
-refuses the file would pass the byte check, which is the
-cannot-fail-test trap. `tested-in.json` gets a row naming both files.
-Plants: make `barwise verbalize` write the model back after reading ->
-the CLI test fails. Drop the success assertion -> the self-check test
-(a refusing stub command) fails. VS Code is provisional: its
+so new commands are covered as they are declared. Each test reads only
+its own package's commands, which run code from its turbo dependency
+graph, so a cached pass is invalidated by any change it could see. The
+success assertion matters: without it, a command that refused the file
+would pass the byte check. `tested-in.json` gets a row naming both
+files. Plants: make `barwise verbalize` write the model back after
+reading -> the CLI test fails. Drop the success assertion -> the
+self-check (a refusing stub command) fails. VS Code is provisional. Its
 language-model tools reach the same core paths as MCP, but the language
 server's open/save path has no headless harness here (unverified: `npx
-vitest run` in `packages/vscode` shows which unit seams exist). Wording:
-unchanged. Gap: yfi narrows to VS Code. Comment loss (barwise-ok6) and
-project/mapping files (no steps yet) stay where the ADR puts them.
+vitest run` in `packages/vscode` shows which unit seams exist).
+Wording: unchanged. Gap: yfi narrows to VS Code.
 
 ### ossie-interchange
 
 **`peer-standard`** and **`own-vocabulary`** (rows 12 and 13,
-owner-restated; zec, yc6). Today: nothing. The enforcer the ADR's
-decision 6 describes would fail on main: as worded ("only
-`formats/src/ossie/` imports Ossie's types"), `formats/src/index.ts`
-imports `OssieTypes.ts`. It also cannot see the vendored schema. So the
-enforcer is three pieces:
+owner-restated; zec, yc6). Today: nothing. As worded, the ADR's
+decision 6 check ("only `formats/src/ossie/` imports Ossie's types")
+fails on main, because `index.ts` imports `OssieTypes.ts`, and it
+cannot see the vendored schema. The enforcer has two pieces:
 
-1. A depcruise rule `ossie-only-in-descriptor`: from any module except
-   `formats/src/ossie/`, `formats/src/index.ts` and
+1. Two depcruise rules. `ossie-only-in-descriptor`: from any module
+   except `formats/src/ossie/`, `formats/src/index.ts` and
    `formats/src/registration.ts`, no edge into `formats/src/ossie/`.
-   Measured: exits 0 on main.
-2. A tagged formats test that pins, with `toEqual`, the public exports
-   whose names match `/ossie/i`: `OSSIE_VERSION`, `OssieExportFormat`,
-   `OssieImportError`, `OssieImportFormat`, `ossieFormat`. The barrel is
-   allowlisted in (1), so a re-export of `parseOssie` or
-   `mapOssieToOrm` through it would pass (1). This test closes that.
-3. A tagged test that uses `ts.preProcessFile` over `packages/*/src` and
-   fails on any module reference containing `schemas/ossie` outside
-   `formats/src/ossie/`. Depcruise cannot do this under `includeOnly`,
-   for the same reason it could not see model SDK imports in
-   `purity-and-model-boundary.spec.md`.
+   `ossie-entry-points`: from `index.ts` or `registration.ts`, edges
+   into `ossie/` only to `OssieExportFormat.ts`, `OssieImportFormat.ts`
+   and `OssieTypes.ts`. The second rule closes the barrel: a re-export
+   of `parseOssie` or `mapOssieToOrm` from `index.ts` is an edge to
+   another file, whatever alias it exports under. A name-based export
+   pin would miss an alias. Measured: both exit 0 on main.
+2. A rule `ossie-schema-refs` in `check:source-sites`: any module
+   reference (`ts.preProcessFile`: imports, `export from`, `require`,
+   dynamic import) or string literal containing `schemas/ossie` in
+   `packages/*/src` outside `formats/src/ossie/` is a finding.
+   Depcruise cannot see these under `includeOnly`, as with model SDK
+   imports in `purity-and-model-boundary.spec.md`. A formats vitest
+   test would be cached against formats alone, so it would miss a plant
+   in another package.
 
 Plants: `import "../ossie/mapOssieToOrm.js";` in
 `formats/src/avro/AvroExportFormat.ts` (no cycle: ossie imports only
-`naming.ts` outside itself) -> depcruise exits 1. `export { parseOssie }
-from "./ossie/parseOssie.js"` in `index.ts` -> (2) fails. A JSON import
-of `../../schemas/ossie/ontology.json` in `formats/src/sql/` -> (3)
-fails. Enforced-by gains `npm run depcruise (peer-standard,
-own-vocabulary)` with a `probes.json` row, and `tests (peer-standard,
-own-vocabulary)`. Wording: the rule stays as the owner restated it. The
-sentence in decision 6 describing the check is corrected to the three
-pieces. Residue: an Ossie reader written from scratch outside the
-descriptor that imports nothing from it passes all three, and so does
-mapping-document support built the same way. The gaps narrow to that
-residue, and closing them is the owner's call (Open decision 6).
+`naming.ts` outside itself) -> depcruise exits 1. `export { parseOssie
+as parse } from "./ossie/parseOssie.js"` in `index.ts` -> depcruise
+exits 1. A JSON import of `../../schemas/ossie/ontology.json` in
+`formats/src/sql/` -> `check:source-sites` exits 1. Enforced-by gains
+`npm run depcruise (peer-standard, own-vocabulary)` and `npm run
+check:source-sites (peer-standard, own-vocabulary)`, each with a probe.
+The rule's wording is unchanged. The sentence in decision 6 describing
+the check is corrected to these rules. Residue, review-only (owner,
+2026-11-06): an Ossie reader written from scratch that imports nothing
+of the descriptor, mapping-document support built the same way, and a
+re-export routed through one of the three entry modules. zec and yc6
+close.
 
 **`ontology-layer-only`** (k74). Enforcer: (1) a tagged import test
 whose fixture has an `ontology_mappings` entry carrying a
@@ -296,51 +392,69 @@ model. (2) A tagged export test over the example's export and the built
 model's export: the top-level keys are a subset of `version`, `name`,
 `description`, `requires`, `ontology`, `prefixes`, and there is no
 `ontology_mappings`. Core-layer keys at the top level are already
-refused by the closed schema. Plants: in `mapOssieToOrm.ts`, add one
-entity per `semantic_model.datasets[].name` -> (1) fails. In
-`writeOssie.ts`, add `ontology_mappings: []` to the document -> (2)
-fails. Wording: unchanged. Gap: k74 narrows to the residue shared with
-zec.
+refused by the closed schema. Both read only formats files. Plants: in
+`mapOssieToOrm.ts`, add one entity per `semantic_model.datasets[].name`
+-> (1) fails. In `writeOssie.ts`, add `ontology_mappings: []` to the
+document -> (2) fails. Wording: unchanged. Gap: k74 closes, with the
+residue shared with zec review-only.
 
 **`pinned-version`** (oor). Enforcer: `schemas/ossie/pin.json` records
-`{ commit, files: { name: gitBlobId } }`. A tagged test computes each
-vendored file's git blob id (`sha1("blob <len>\0" + bytes)`), compares
-it with the record, and checks that the README names the same commit.
-The existing unknown-field test ("fields the pinned schema does not
-define") is tagged too: it fails if `ossieSchema.ts` validates against
-anything else. Plants: edit one enum in `ontology.json` -> the hash test
-fails. Point `ossieSchema.ts` at `{}` -> the tagged unknown-field test
-fails. Wording: unchanged. Gap: oor closes. An upstream change to a
-document under the same version string is not a barwise violation; it
-is a limit of what can be measured, stated in Consequences. **Unverified:**
-that `9d021c2c`/`350b0910` are upstream's blob ids at `01a5488d`. A
-reviewer runs `git ls-tree 01a5488d ontology/ontology.json
-core-spec/ossie-schema.json` in an apache/ossie clone (this session has
-no GitHub access to that repository).
+`{ commit, files: { name: gitBlobId } }`. A tagged formats test computes
+each vendored file's git blob id (`sha1("blob <len>\0" + bytes)`),
+compares it with the record, and checks that the README names the same
+commit. The existing unknown-field test ("fields the pinned schema does
+not define") is tagged too: it fails if `ossieSchema.ts` validates
+against anything else. Every input is under `formats/schemas/**`, a
+turbo input. The README is docs-only, so `changed-class.mjs` adds it to
+`GATE_INPUT`, and a README-only PR runs `test:coverage`. Plants: edit
+one enum in `ontology.json` -> the hash test fails. Change the README's
+commit -> it fails. Point `ossieSchema.ts` at `{}` -> the tagged
+unknown-field test fails. Wording: unchanged. Gap: oor closes. An
+upstream change under the same version string is a limit of
+measurement, stated in Consequences. Unverified: that
+`9d021c2c`/`350b0910` are upstream's blob ids at `01a5488d`. A reviewer
+runs `git ls-tree 01a5488d ontology/ontology.json
+core-spec/ossie-schema.json` in an apache/ossie clone.
 
 **`nothing-lost-silently`** (zkd). Today: three tagged tests cover the
-example and unit cases. The exporter reads its output back
-(`verifyOssie.ts`). Enforcer, in two steps. (1) Tag the untagged
-read-back tests in `OssieVerify.test.ts` and `OssieLossScope.test.ts`.
-(2) Provisional: a property test that runs `OssieExportFormat.export`
-over core's model arbitrary (`core/tests/arbitraries/model.ts`). For
-every element whose serialized form differs between the source and the
-re-imported, id-aligned model, a loss line must name it. The oracle
-compares serialized YAML, not `diffModels`, because a blind spot in
-`diffModels` is also a blind spot in `verifyOssie`, and a property using
-the same oracle would share it. Plants: make `OssieExportFormat` skip
-`verifyOssie` -> (2) fails (and (1) only if a tagged case depends on the
-read-back). Wording: unchanged. Gap: zkd closes with (2). The missing
-`ExportResult.warnings` and the caller-supplied name are decisions the
-ADR records, not gaps.
+example and unit cases. Enforcer, in two steps:
+
+1. Tag the read-back tests in `OssieVerify.test.ts` and
+   `OssieLossScope.test.ts`. "names a deontic mandatory that comes back
+   alethic" goes through `exporter.export` and expects a line only
+   `verifyOssie` writes (see the reading above). Plant: make
+   `readBack` in `OssieExportFormat.ts` return `{ losses: [],
+   constraintSpecs: [] }` instead of calling `verifyOssie`. The test's
+   `verified(...)` then returns `[]` against an expected one-line array,
+   so it fails. This needs no generated input.
+2. Provisional (WS8): a property test running `OssieExportFormat.export`
+   over core's model arbitrary. For every element whose serialized form
+   differs between the source and the re-imported, id-aligned model, a
+   loss line must name it. The oracle compares serialized YAML, not
+   `diffModels`, so a blind spot in `diffModels` does not hide itself.
+   The same plant fails it only if the arbitrary produces a shape that
+   only the read-back names. The arbitrary has `deontic: fc.boolean()`
+   on constraints and `mandatory` among `CONSTRAINT_TYPES`
+   (`core/tests/arbitraries/model.ts:319,324`), so a deontic mandatory
+   is the candidate. The test therefore carries a coverage self-check:
+   across its runs, at least one generated model has a deontic
+   mandatory on a fact type's first role, or the test fails. That keeps
+   the property from passing a corpus that cannot distinguish.
+   Unverified: that `RUNS = 250` at `SEED` produces one. If it does not,
+   the self-check fails first and the arbitrary is widened.
+
+Wording: unchanged. Gap: zkd narrows with (1) and closes with (2). The
+missing `ExportResult.warnings` and the caller-supplied name are
+decisions the ADR records, not gaps.
 
 **`readable-iri`** (m1l). The rule the plan said was "to design" is
-already built (see the reading above). Enforcer: tag
-`idsAndImports.test.ts` "reports an object type, a fact type and a role
-whose ids differ" and `importerIds.test.ts`'s per-importer tests, and
-add one tagged core test: a model built with no ids gets
-`localName(name)` ids and no `id-not-from-name` diagnostic. Plants:
-`nameIdBase` returns `localName(name).toLowerCase()` -> the new test and
+already built. Enforcer: tag `idsAndImports.test.ts` "reports an object
+type, a fact type and a role whose ids differ" and `importerIds.test.ts`'s
+per-importer tests, and add one tagged core test: a model built with no
+ids gets `localName(name)` ids and no `id-not-from-name` diagnostic.
+`importerIds` runs in cli, whose turbo hash covers core and every
+importer package through its build dependencies. Plants: `nameIdBase`
+returns `localName(name).toLowerCase()` -> the new test and
 `importerIds` fail. Remove `checkIdsFromNames` from the structural rules
 -> the tagged `idsAndImports` test fails. Wording: unchanged. Gap: m1l
 closes. `equivalent_iri` stays deferred (barwise-wcg.vn2).
@@ -348,115 +462,132 @@ closes. `equivalent_iri` stays deferred (barwise-wcg.vn2).
 ### package-graph-authority
 
 **`intended-is-graph`** (d3m). Today: depcruise holds the import half.
-Enforcer: extend `check:architecture` in two ways. (1) In tracked
-`barwise/scripts/**` (it already reads these for citations), excluding
-`scripts/tests/` and `intended.cjs`, flag any property whose key is a
-package directory name and whose value is an array literal of package
-names: the shape of one adjacency entry, found by TypeScript's parser.
-(2) Compare each package CLAUDE.md's `## Dependencies` Upstream rows
-with `INTENDED`, both ways, and require the table in all twelve.
-`core`, `learn` and `promptlab` gain one (core's says "none"). Plants:
-add `const COPY = { "promptlab": ["core"] };` to `arch-triage.mjs` ->
-exit 1. Add an Upstream `@barwise/llm` row to `diagram/CLAUDE.md` ->
-exit 1. Both go in `probes.json`. The shadow: a copy written another
-way (a list of `"cli->core"` strings, a `Map`) passes (1). Every copy
-found so far had the adjacency shape. Wording: unchanged. Gap: d3m
-closes. Prose in `## Dependency Rule` that names packages stays
-unchecked (Open decision 7).
+Enforcer: extend `check:architecture` (uncached, no `if:`) in two ways.
+(1) In tracked `barwise/scripts/**` (which it already reads for
+citations), excluding `scripts/tests/` and `intended.cjs`, flag any
+property whose key is a package directory name and whose value is an
+array literal of package names, found by TypeScript's parser. That is
+the shape of one adjacency entry. (2) Compare each package CLAUDE.md's
+`## Dependencies` Upstream rows that name an internal package
+(`@barwise/*` or `barwise-vscode`, resolved through the manifests as
+the check already does) with `INTENDED`, both ways. External rows like
+`react` are ignored. Require the table in all twelve, so `core`,
+`learn` and `promptlab` gain one (core's says "none"). `## Dependency
+Rule` prose stops listing internal packages (owner, 2026-11-06, as
+recommended). Plants: add `const COPY = { "promptlab": ["core"] };` to
+`arch-triage.mjs` -> exit 1. Add an Upstream `@barwise/llm` row to
+`diagram/CLAUDE.md` -> exit 1. Both go in `probes.json`. The shadow: a
+copy written another way (`"cli->core"` strings, a `Map`) passes (1).
+Every copy found so far had the adjacency shape. Wording: unchanged.
+Gap: d3m closes.
 
-**`core-external-deps`** (xyn). Today: `check:architecture` compares
-manifest fields, and knip runs in default mode, so an import of a
-devDependency from `core/src` passes both. Enforcer (recommended):
-`check:architecture` reads `core/src`'s bare module specifiers with
-`ts.preProcessFile` (skipping relative paths and `node:`, which purity
-owns) and fails on any package missing from core's runtime fields.
-Measured clean on main. Type-only imports count, because core's `.d.ts`
-re-exposes them. Plant: `import "fast-check";` at the top of
-`core/src/index.ts` -> exit 1, as a second `probes.json` row for the
-decision. **Unverified:** that this plant passes knip today, as the gap
-issue states. A reviewer runs it with `node scripts/mutate.mjs` (see
-`adr-writing.md`) against `npm run knip`. Wording: unchanged. Gap: xyn
-closes. Choosing between this and knip `--production` changes a CI gate,
-which the issue reserves for the owner (Open decision 2).
+**`core-external-deps`** (xyn; option (a), owner, 2026-11-06, as
+recommended). Enforcer: `check:architecture` reads the bare module
+specifiers in `core/src` with `ts.preProcessFile`, skipping relative
+paths and `node:` (purity owns those), and fails on any package
+missing from core's runtime fields. Measured clean on main. Type-only
+imports count, because core's `.d.ts` re-exposes them. Plant: `import
+"fast-check";` at the top of `core/src/index.ts` -> exit 1, as a second
+`probes.json` row. Unverified: that this plant passes knip today, as
+the gap issue states (run it through `node scripts/mutate.mjs` against
+`npm run knip`). Wording: unchanged. Gap: xyn closes.
 
 ### constraint-coverage-policy
 
-All three are held by one drift test, `coverageInventory.test.ts` in
-promptlab. It loads the suite and each reference and resolves every
-`forbids_population` ring check to its ring type through a function
-exported from `learn` (`referenceConstraint`, the selection
-`forbidsPopulation.ts:208` already does). The test does not copy that
-selection, because a second copy is a must-agree copy. The inventory
-becomes one row per type: eight ring types plus `subset`, `equality`
-and `exclusion`. Columns: tier, reference cases, rubric-tested train
-cases, rubric-tested dev cases, covered. A free-text "settled in a
-transcript" column stays prose, and the test ignores it. Tiers are
-parsed from the ADR's decision 2 backticks, not copied. The ADR stays
-the authority, and a parse that finds no tier refuses (fails with "could
-not read the tiers").
+All three are held by one new uncached gate, `check:eval-coverage`
+(`scripts/check-eval-coverage.mjs`), not by a promptlab vitest test.
+Its inputs are three: the suite under `promptlab/evals/`, this ADR, and
+`docs/specs/constraint-extraction-coverage.spec.md`. None of them is in
+promptlab's turbo test inputs (see the reading), so a promptlab test
+would replay a cached pass on an inventory-only or evals-only PR. The
+alternative was a package-level `promptlab/turbo.json` adding
+`evals/**` and two `$TURBO_ROOT$/docs/...` paths. That works but keeps
+correctness tied to an input list that must track the check's reads,
+and the evals hole it would also close is a wider fix than this batch.
+The gate always reads what it reads.
 
-**`two-instances`** (5yl). The rule checked: `covered: yes` exactly when
-the type has at least one rubric-tested instance in a train case and one
-in a dev case, in different cases. The rest of the test also fails a
-type the suite covers but the inventory does not mark. Plant: mark
-`acyclic` covered in the inventory -> fails ("covered with 1 train, 0
-dev"). Wording: "different domains with different surface phrasing".
-The test reads a case as a domain, and phrasing stays review (Open
-decision 8). Gap: 5yl closes if the owner accepts the case-as-domain
-reading.
+It runs in CI after `npm run build` with the `docs_only` guard, because
+it imports `@barwise/core` (to read references) and `@barwise/learn`
+(for `referenceConstraint`). It refuses with exit 2 when either dist is
+missing, as `check:adr-model` does. `changed-class.mjs` adds the
+inventory spec to `GATE_INPUT`, so an inventory-only PR is not docs-only
+and both `build` and the gate run. The ADR is already a gate input. The
+transcripts (`*.transcript.md`) stay docs-only, which is correct: the
+gate reads `*.eval.yaml` and `*.reference.orm.yaml`, neither of them
+`.md`.
 
-**`tiered-types`** (vq8). The plan's enforcer ("a rubric that tests a
-rare-tier type") cannot see the decision's object, a transcript, and a
-rubric names only `ring`. The check that can be built: no reference in
-the suite carries a rare-tier constraint, so no rubric can resolve to
-one. References are authored to carry what each transcript settles
-(barwise-878), which is why this proxy tracks the decision, and it
-diverges exactly when a transcript settles a rare rule the reference
-leaves out. Every type must also have a tier: `asymmetric` has none
-today, so the test cannot pass until the owner places it (Open decision
-1). Plant: change project-staffing's reference `ring_type: acyclic` to
-`transitive` -> fails. Wording: Open decision 9 offers a restatement
-("never enters an eval case: no reference or rubric in the suite holds a
-rare-tier constraint"). Without it, vq8 narrows to transcript prose.
+It resolves each `forbids_population` ring check to its ring type
+through `referenceConstraint`, a function newly exported from `learn`
+that holds the selection `forbidsPopulation.ts:208` already does. It
+does not copy the selection, because a copy would be a must-agree copy.
+The inventory becomes one row per type: eight ring types plus `subset`,
+`equality` and `exclusion`. Columns: tier, reference cases,
+rubric-tested train cases, rubric-tested dev cases, covered. A
+free-text "settled in a transcript" column stays prose, and the gate
+ignores it. Tiers are parsed from the ADR's decision 2 backticks. A
+parse that finds no tier, or a `RingType` member with no tier, is a
+refusal (exit 2). WS5 adds `asymmetric` to the common tier in the
+ADR's text (owner, 2026-11-06). Enforced-by: `npm run
+check:eval-coverage (two-instances, tiered-types, inventory-outside)`,
+with a probe per decision. The node tests under `scripts/tests/` use a
+fixture suite.
+
+**`two-instances`** (5yl; case-as-domain, owner, 2026-11-06, as
+recommended). The rule checked: `covered: yes` exactly when the type has
+at least one rubric-tested instance in a train case and one in a dev
+case, in different cases. Phrasing stays review. Plant: mark `acyclic`
+covered in the inventory -> exit 1 ("covered with 1 train, 0 dev").
+Wording: unchanged. Gap: 5yl closes.
+
+**`tiered-types`** (vq8; owner, 2026-11-06: not restated). The decision's
+object, a transcript, cannot be read by a check, and a rubric names only
+`ring`. The part the gate holds: no reference in the suite carries a
+rare-tier constraint, so no rubric can resolve to one. Plant: change
+project-staffing's reference `ring_type: acyclic` to `transitive` ->
+exit 1. Enforced-by keeps `none (barwise-ym8.vq8: tiered-types)` beside
+the gate entry, and vq8 narrows to transcript prose that settles a
+rare-tier rule its reference leaves out.
 
 **`inventory-outside`** (k6g). The rule checked: the inventory's derived
-columns equal the suite. Plant: change project-staffing's reference ring
-to `irreflexive` -> fails (irreflexive becomes 1 train + 1 dev and
-covered, acyclic drops to 0). The same commit that edits the suite must
-edit the inventory, which is the decision. For the test to run on an
-inventory-only PR, `changed-class.mjs` adds
-`constraint-extraction-coverage.spec.md` to `GATE_INPUT` (not
-docs-only), as it does for ADRs. Without that, a PR that falsifies only
-the table skips `test:coverage` and goes green. Wording: unchanged. Gap:
-k6g closes.
+columns equal the suite. Plant: change project-staffing's reference
+ring to `irreflexive` -> exit 1 (irreflexive becomes 1 train + 1 dev
+and covered, acyclic drops to 0). A second plant edits only the
+inventory's acyclic train count, which is the docs-only case that
+`GATE_INPUT` now routes through CI. Wording: unchanged. Gap: k6g
+closes.
 
 ## Alternatives considered
 
-- **Row 12 as one depcruise rule, as the ADR describes it.** Fails on
-  main (the barrel imports `OssieTypes.ts`). Fixed with an allowlist, it
-  cannot see re-exports or the vendored schema. Kept as one of three
-  pieces, not the whole.
-- **One source test for the Ossie boundary, no depcruise rule** (the
-  `modelSdkBoundary` precedent). It would see everything the rule sees.
-  The owner chose a depcruise rule with a probe for row 12, and the rule
-  is exact for edges inside `src`. Both kept.
-- **`check:recompute-derived` as a gate.** A gate adds a script, a CI
-  step and a forwarder, and reaches nothing a core test does not (the
-  `credential-handling-held.spec.md` reasoning). A tagged test.
+- **Row 12 as one depcruise rule, as the ADR describes it.** It fails
+  on main, because the barrel imports `OssieTypes.ts`. With the barrel
+  allowlisted it misses re-exports, and depcruise never sees the
+  vendored schema. Two rules plus a source-site rule instead.
+- **A `toEqual` pin on `/ossie/i` public exports** (first draft). An
+  aliased re-export (`parseOssie as parse`) evades it. Replaced by the
+  entry-point rule, which is keyed on the target file.
+- **Cross-package scanners as vitest tests** (first draft: the
+  `orm_version` allowlist in core, the schema-reference test in
+  formats, the coverage test in promptlab). Turbo caches each against
+  its own package's inputs, so a plant elsewhere replays a pass.
+  `$TURBO_ROOT$/packages/*/src/**` inputs would fix it, but would make
+  every source change rerun that package's whole suite. Script gates
+  instead.
+- **One gate per rule** (`check:orm-version-writers`,
+  `check:ossie-schema-refs`). Each would parse the same files, and
+  each would need a script, a step and a forwarder. One
+  `check:source-sites` with named rules reads the tree once, as
+  `purity` does for its rules. Each ADR names it for its own ids.
+- **`check:recompute-derived` as a gate.** Every input is in core's
+  turbo hash, so a tagged test reaches everything a gate would.
 - **A name list of derived properties (`tables`, `ddl`, ...).** Misses a
   derived property under a new name. Row 10 chose an allowlist.
-- **Coverage counts by name match** (`factType` text to reference ring
-  type) **in the test.** A second copy of `forbidsPopulation`'s
-  selection. Exported from `learn` instead.
 - **Moving the inventory to JSON** so it is not docs-only. The ADR names
   the spec file as the inventory's home. `GATE_INPUT` is one line.
-- **knip `--production` for `core-external-deps`.** Also catches the
-  plant, but knip is not a declarable gate name (`GATE_EXCEPTIONS`).
-  Declaring it means widening that list, and it changes how knip reads
-  the other packages unless scoped. Offered in Open decision 2.
-- **Load-forward by static scan** (writes only from editing commands).
-  It cannot tell a write of the input path from a write of `--output`.
-  The behavioural test over each surface's own command list can.
+- **knip `--production` for `core-external-deps`.** Not a declarable
+  gate name without widening `GATE_EXCEPTIONS` (open decision 2, taken
+  as (a)).
+- **Load-forward by static scan.** Cannot tell a write of the input
+  path from a write of `--output`.
 
 ## Workstreams (each independently shippable)
 
@@ -468,34 +599,43 @@ merge.
 
 ### 1. `recompute-derived`
 
-The property-class table and its test. One core test file, one JSON
-file, one ADR. Needs Open decision 5 only for one row's category.
+The property-class table (`presentation` for diagram layout) and its
+tagged core test with the 40-map self-check.
 
-### 2. schema-versioning tests
+### 2. schema-versioning tests and the minor-and-major restatement
 
-`version-signal` (missing-version and writer-allowlist tests),
-`minor-and-major` (step shape and const parity), and the `merge.test.ts`
-success assertion for `load-forward`. Core and CLI tests only. 31z's
-outcome follows Open decision 3.
+`version-signal`'s missing-version test, plus the `projectScaffold` and
+`splitModel` output tests. `minor-and-major`'s shape, chain and parity
+tests, with decision 2 restated in the ADR and the classification moved
+to Context. The `merge.test.ts` success assertion. The
+`orm-version-writers` rule lands in WS3 with `check:source-sites`, and
+`version-signal`'s gate entry lands with it.
 
-### 3. ossie-interchange
+### 3. `check:source-sites` and ossie-interchange
 
-The depcruise rule, export pin and schema-reference test (rows 12 and
-13); `ontology-layer-only` fixtures; `pin.json` and the hash test;
-`readable-iri` and `nothing-lost-silently` tags. Decision 6's sentence
-on its check is corrected. Needs the blob ids verified upstream first.
+The new gate with its two rules (`orm-version-writers`,
+`ossie-schema-refs`), its `scripts/tests/` cases planting each rule red
+in a `tempRepo()`, `ci.yml` step, forwarders and probes. The two
+depcruise rules. `ontology-layer-only` fixtures. `pin.json`, the hash
+test and the README `GATE_INPUT` line. `readable-iri` and
+`nothing-lost-silently` tags. Decision 6's description of its check is
+corrected, the residue goes to Consequences, and zec, yc6, k74, oor and
+m1l close. Needs the blob ids verified upstream first.
 
 ### 4. package-graph-authority
 
 The `check:architecture` extensions for `intended-is-graph` and
-`core-external-deps`, three package CLAUDE.md tables, and two probes.
-Waits on Open decisions 2 and 7.
+`core-external-deps` (option (a)), three new package CLAUDE.md tables,
+internal-package lists removed from `## Dependency Rule` prose, and two
+probes.
 
 ### 5. constraint-coverage-policy
 
-The `learn` export, the inventory rewrite, `coverageInventory.test.ts`,
-and the `GATE_INPUT` line. Waits on Open decisions 1, 8 and 9: the test
-cannot pass while `asymmetric` has no tier.
+`asymmetric` added to the common tier in the ADR's decision 2. The
+`learn` export. The inventory rewritten one row per type. The
+`check:eval-coverage` gate with its node tests, `ci.yml` step after
+`build`, forwarders and three probes. The `GATE_INPUT` line for the
+inventory. vq8 is narrowed in the tracker PR. 5yl and k6g close.
 
 ### 6. load-forward across surfaces (provisional: VS Code not grounded)
 
@@ -503,99 +643,95 @@ The CLI and MCP surface tests with their self-checks, and the
 `tested-in.json` row. VS Code gets its own design pass once its seams
 are measured.
 
-### 7. `check:schema-bump` (blocked on Open decision 4)
+### 7. `check:schema-bump`
 
-The gate, its node tests, `ci.yml` step, forwarders, and a probe. It
-lands either way once 6om is decided. Until a `v*` tag writes 4.0, the
-probe plants the version, not the schema.
+The gate, its node tests, `ci.yml` step, forwarders and a probe.
+Decision 3 gains the definition of "released" as a `v*` tag, and
+Consequences' v2.0.0 sentence is corrected to the tags that exist on
+origin. 8l3, vvg and 6om close. Until a `v*` tag writes 4.0, the probe
+plants the version, not the schema.
 
 ### 8. Ossie export property test (provisional: not yet grounded)
 
 `fast-check` becomes a formats devDependency, and the test imports
 core's arbitrary by relative path (no package depends on another's
 `tests/` today; this is the first, test-only). The serialized-YAML
-oracle needs id alignment, which `verifyOssie`'s `align` does; reusing
-it would share its blind spots, so alignment by the writer's
-correspondence is to be designed.
+oracle needs id alignment. `verifyOssie`'s `align` would share its
+blind spots, so alignment by the writer's correspondence is to be
+designed. The deontic-mandatory coverage self-check comes first.
 
 ## Open decisions (for review)
 
-1. **Which tier is `asymmetric`?** **Resolved (owner, 2026-11-06): common.** It is a core ring type and in neither
-   tier of `tiered-types`. Adding it changes the decision's text.
-   Recommended: common, because "no one approves their own request in
-   both directions" is the shape of rules real sessions state; the owner
-   may judge it rare.
-2. **How `core-external-deps` sees devDependency imports.** **Taken as recommended (owner not asked; 2026-11-06).** (a)
-   `check:architecture` reads `core/src` specifiers, which is
-   declarable, probed and core-only. (b) knip `--production` for core,
-   which needs `GATE_EXCEPTIONS` widened. Recommended: (a).
-3. **`minor-and-major`: restate or narrow.** **Resolved (owner, 2026-11-06): restate.** (a) Restate to "a minor
-   step goes to the next minor, a major step to the next major's first;
-   the schema const equals `CURRENT_ORM_VERSION`" and move the
-   additive/structural classification to Context, closing 31z. (b)
-   Keep the text and leave 31z open on the judgment. Recommended: (a).
-   Plan open decision 4 listed this as the owner's to reopen.
-4. **What "released" means for `shared-minor` (barwise-6om).** **Resolved (owner, 2026-11-06): a `v*` tag; the ADR's v2.0.0 sentence is corrected.**
-   Recommended: a `v*` tag, not `edge`. If `edge` counted, every PR
-   that changes the schema would need a bump, which contradicts the
-   decision. The ADR's "v2.0.0 is the first release since" names a tag
-   that does not exist on origin. Either the tag is cut or the sentence
-   is corrected in the same decision.
-5. **Are diagram positions "rendered output"?** **Taken as recommended (owner not asked; 2026-11-06).** `diagrams[].positions`
-   persist pixel coordinates. Recommended: `presentation`, authored and
-   not recomputed (users place elements). If the owner reads them as
-   rendered layout, `recompute-derived` is violated today.
-6. **The Ossie boundary's residue.** **Resolved (owner, 2026-11-06): close, the residue review-only.** A reader written from scratch that
-   imports nothing Ossie (or a mapping-document reader built the same
-   way) passes every check. (a) Close zec, yc6 and k74 with the residue
-   moved to Consequences as review-only. (b) Keep them open, narrowed.
-   Recommended: (a). No source scan tells a new YAML reader apart from
-   the others.
-7. **Package CLAUDE.md dependency prose.** **Taken as recommended (owner not asked; 2026-11-06).** (a) The Upstream table is
-   the checked copy, and `## Dependency Rule` prose stops listing
-   internal packages. (b) Keep the prose lists unchecked. Recommended:
-   (a), applied to the three files that lack a table and any prose list
-   that disagrees.
-8. **Case as domain for `two-instances`.** **Taken as recommended (owner not asked; 2026-11-06).** (a) Accept that two cases
-   are two domains (employee-hierarchy and project-staffing are both HR
-   settings). (b) Add a `domain:` field to eval cases and count
-   distinct values. Recommended: (a) now, with (b) when a case set
-   shares a domain in practice.
-9. **Restate `tiered-types`** **Resolved (owner, 2026-11-06): not restated; barwise-ym8.vq8 stays open on transcript prose.** to "never enters an eval case: no
-   reference or rubric in the suite holds a rare-tier constraint", or
-   keep "transcript" with vq8 open on prose. Recommended: restate. The
-   reference is where the suite records what a transcript settles.
+1. **Which tier is `asymmetric`?** **Resolved (owner, 2026-11-06):
+   common.** WS5 adds it to decision 2's common tier.
+2. **How `core-external-deps` sees devDependency imports.** **Taken as
+   recommended (owner not asked; 2026-11-06): (a)** `check:architecture`
+   reads `core/src` specifiers. (b) was knip `--production`.
+3. **`minor-and-major`: restate or narrow.** **Resolved (owner,
+   2026-11-06): restate** to "a minor step goes to the next minor, a
+   major step to the next major's first; the schema const equals
+   `CURRENT_ORM_VERSION`", with the classification moved to Context.
+   The enforcer also checks the chain (one step out of each version; a
+   major step leaves its major's last minor). That follows from the
+   sentence the decision keeps, that the loader reads every version "by
+   applying those steps". If the owner wants it in the restated text
+   too, it is one more clause.
+4. **What "released" means for `shared-minor` (barwise-6om).**
+   **Resolved (owner, 2026-11-06): a `v*` tag;** the ADR's v2.0.0
+   sentence is corrected (WS7).
+5. **Are diagram positions "rendered output"?** **Taken as recommended
+   (owner not asked; 2026-11-06): no,** `presentation`, authored.
+6. **The Ossie boundary's residue.** **Resolved (owner, 2026-11-06):
+   close zec, yc6 and k74,** the residue review-only in Consequences.
+7. **Package CLAUDE.md dependency prose.** **Taken as recommended (owner
+   not asked; 2026-11-06): (a),** the Upstream table is the checked copy.
+8. **Case as domain for `two-instances`.** **Taken as recommended (owner
+   not asked; 2026-11-06): (a),** with a `domain:` field later if two
+   cases ever share one.
+9. **Restate `tiered-types`.** **Resolved (owner, 2026-11-06): not
+   restated;** barwise-ym8.vq8 stays open on transcript prose.
 
 ## Risks and testing
 
 - **Probes that can only plant a regression.** `check:schema-bump`'s
   probe sets the version back to 1.1 until a 4.0 release exists. It
-  proves the comparison, not a realistic edit. WS7 says so in the row.
+  proves the comparison, not a realistic edit. The probe row says so.
 - **CI tags.** `check:schema-bump` needs `v*` tags. `ci.yml:36` checks
-  out with `fetch-depth: 0`. **Unverified:** that this fetches tags on
-  pull-request runs. A reviewer reads the checkout step's log for
-  `git tag` output, or the gate's own exit 2 on the first CI run shows
-  it.
-- **Self-checks.** Each scanner test (writer allowlist, schema
-  reference, graph literal) carries positive and negative self-cases,
-  as `modelSdkBoundary.test.ts` does, so an empty reading cannot pass.
-  The surface tests assert success before bytes.
-- **Docs-only skips.** Only the inventory needs `GATE_INPUT`. The ADRs
-  already are inputs. `check:architecture` runs on every PR, so the
-  CLAUDE.md check needs nothing. The Ossie README is docs-only, but the
-  hash test compares it with `pin.json`, which is not.
-- **`check:review-tiers`** may need a row for
-  `scripts/check-schema-bump.mjs`. **Unverified:** run `npm run
-  check:review-tiers` after adding the file.
-- Each workstream runs `npm run build` (core and learn exports cross
+  out with `fetch-depth: 0`. Unverified: that this fetches tags on
+  pull-request runs. A reviewer reads the checkout step's log, or the
+  gate's exit 2 on its first CI run shows it.
+- **New gates under fault-matrix.** `check:source-sites`,
+  `check:eval-coverage` and `check:schema-bump` join the matrix's axes
+  (git faults, three working directories) automatically, because it
+  runs every node gate CI runs. `check:eval-coverage` reads core and
+  learn dist, which exist where the matrix runs (last, after `build`).
+  Each gate resolves paths from its own location. Unverified until
+  `npm run fault-matrix` runs on the WS branch.
+- **Self-checks.** Each scanner (writer sites, schema references, graph
+  literals, the schema walk) carries positive and negative self-cases,
+  as `modelSdkBoundary.test.ts` does, and the gates refuse on zero files
+  read. The surface tests assert success before bytes.
+- **Docs-only skips.** `GATE_INPUT` gains the inventory spec and
+  `formats/schemas/ossie/README.md`. The ADRs already are inputs.
+  `check:architecture` has no `if:`, so the CLAUDE.md check runs on
+  every PR.
+- **Pre-existing caching holes, outside this batch.** promptlab's
+  `evals/**` is not a turbo test input, though five of its test files
+  read it, so an evals-only change replays their cached pass.
+  `llm/tests/modelSdkBoundary.test.ts` scans every package's `src`
+  from llm's vitest, so a plant in cli or mcp replays llm's cached pass
+  in the same way. Both want a tracker issue. They are not fixed here.
+- **`check:review-tiers`** may need rows for the three new scripts.
+  Unverified: run `npm run check:review-tiers` after adding them.
+- Each workstream runs `npm run build` (the learn export crosses
   packages), the touched packages' `npx vitest run`, `npm run
-  check:architecture`, `npm run depcruise`, `npm run adr-probes`, and
-  `npm run ci:local` before push.
+  test:scripts`, `npm run check:architecture`, `npm run depcruise`,
+  `npm run adr-probes`, and `npm run ci:local` before push.
 
 ## Non-goals
 
 - No change to what any decision decides beyond the owner-restated rows
-  10, 12 and 13 and the open decisions above.
+  10, 12 and 13 and the resolved open decisions above.
 - Not authoring eval instances, a set-comparison check kind, or the
   rare-tier gym exercise (`constraint-extraction-coverage.spec.md`
   workstreams 2-4).
@@ -603,3 +739,4 @@ correspondence is to be designed.
   project and mapping files.
 - Not a report of Ossie terms in core (row 12 made it a report, not a
   gate; it is not built here).
+- Not fixing the pre-existing caching holes named under Risks.
