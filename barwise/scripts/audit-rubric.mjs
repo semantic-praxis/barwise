@@ -45,8 +45,12 @@ let promptlab;
 try {
   promptlab = await import(resolve(ROOT, "packages/promptlab/dist/index.js"));
 } catch {
-  console.error("error: packages/promptlab/dist not found; run 'npm run build' first");
-  process.exit(1);
+  // Could not answer, not a finding: exit 2 (gate-refusal-contract,
+  // barwise-shq). The text stays: the stale-row test skips on it.
+  console.error(
+    "audit-rubric: cannot answer -- packages/promptlab/dist not found; run 'npm run build' first",
+  );
+  process.exit(2);
 }
 const { defaultSuitePath, loadSuite, scoreExtraction } = promptlab;
 const KEYS = resolve(ROOT, "packages/promptlab/tests/fixtures/responses");

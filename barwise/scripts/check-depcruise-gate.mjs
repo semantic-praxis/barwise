@@ -29,6 +29,9 @@ import { fileURLToPath } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const failures = [];
+// Could not answer is exit 2, never this gate's finding code
+// (gate-refusal-contract, barwise-shq).
+let refusal;
 
 // --- 1. Coverage: every subpath export has a matching paths entry ---
 
@@ -97,13 +100,20 @@ try {
     // depcruise exits nonzero when violations exist; the JSON is on stdout.
     out = e.stdout;
   }
-  const violations = JSON.parse(out).summary.violations ?? [];
+  let parsed;
+  try {
+    parsed = JSON.parse(out ?? "");
+  } catch {
+    refusal =
+      "dependency-cruiser did not answer (npx depcruise printed no JSON; is it installed? npm ci)";
+  }
+  const violations = parsed?.summary?.violations ?? [];
   const hit = violations.some(
     (v) =>
       v.from.includes("__depcruise-gate-probe__")
       && v.to.includes("packages/diagram-ui/src/server.ts"),
   );
-  if (!hit) {
+  if (!hit && refusal === undefined) {
     failures.push(
       "probe: a forbidden subpath import from core (@barwise/diagram-ui/server) produced no violation -- "
         + "the gate has gone blind to subpath edges again (check tsconfig.depcruise.json paths)",
@@ -113,6 +123,10 @@ try {
   unlinkSync(probePath);
 }
 
+if (refusal !== undefined) {
+  console.error(`check-depcruise-gate: cannot answer -- ${refusal}`);
+  process.exit(2);
+}
 if (failures.length > 0) {
   console.error(`check-depcruise-gate: ${failures.length} failure(s)`);
   for (const f of failures) console.error("  " + f);
