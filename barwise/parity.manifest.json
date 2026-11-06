@@ -16,6 +16,14 @@
       ]
     },
     {
+      "name": "python-version",
+      "why": "uv reads .python-version only from the project directory, so barwise/ carries a copy of the root pin beside pyproject.toml; the root file is the one decision 2 of pinned-runtimes names and CI's uv python install reads (docs/specs/runtime-pins-check.spec.md)",
+      "members": [
+        "../.python-version",
+        ".python-version"
+      ]
+    },
+    {
       "name": "node-engines",
       "why": "package-lock.json embeds its own copy of the root package's engines field; 0f8bdaa raised package.json to >=26.0.0 and left the lock at >=20.0.0, and every gate stayed green (barwise-919)",
       "members": [

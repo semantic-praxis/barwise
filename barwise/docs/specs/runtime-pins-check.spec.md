@@ -1,6 +1,6 @@
 # `check:pins`: the runtime pins, and the runtimes that ran
 
-Status: Draft -- no workstream implemented
+Status: WS1 implemented 2026-11-06 (barwise/.python-version with a parity set, README's copy of the Node version removed, check:pins in CI, probes for node-from-nvmrc and python-minor, verify-running recorded unprobed; check:python-uv's JS rule now asks for --frozen only where run or sync appears, as its shell rule does)
 Created: 2026-11-06
 Last-updated: 2026-11-06
 Plan-reviewed: 9e07b177 (code-review, pr-review)
@@ -12,7 +12,8 @@ barwise/parity.manifest.json, barwise/review-tiers.json, README.md,
 barwise/scripts/tests/, barwise/package.json, package.json,
 .github/workflows/ci.yml, barwise/docs/adr/pinned-runtimes.md,
 barwise/docs/adr/probes.json, barwise/docs/ARCHITECTURE.md,
-barwise/docs/specs/deterministic-guards.spec.md
+barwise/docs/specs/deterministic-guards.spec.md,
+barwise/scripts/check-python-uv.mjs
 
 ## Principle
 

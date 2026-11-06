@@ -6,8 +6,8 @@ Tracking: barwise-ubc, barwise-915, barwise-1059, barwise-920, barwise-g32,
 barwise-8hs, barwise-1045, barwise-921,
 docs/specs/session-node-pin.spec.md,
 docs/specs/deterministic-guards.spec.md
-Enforced-by: none (barwise-ym8.q89: node-from-nvmrc),
-none (barwise-ym8.52y: python-minor), none (barwise-ym8.eq3: verify-running)
+Enforced-by: npm run check:pins (node-from-nvmrc, python-minor, verify-running),
+none (barwise-ym8.q89: node-from-nvmrc)
 
 ## Context
 
@@ -58,32 +58,36 @@ declared authority is proposed, not built: workstream 4 of
   `npm ci`)". On a developer machine no repo tooling checks the Node
   version; a version manager that reads `.nvmrc` may, and npm warns
   below the `engines.node` major.
-- The Python pin is only partly in effect. CI's `uv python install`,
-  run in `barwise/`, reads the repo-root `.python-version` and
-  installs 3.13. But uv's selection for `find`, `sync` and `run` looks
-  for a version file only up to the project root at `barwise/`, and
-  falls back to `requires-python = ">=3.13"`. Where nothing installs the
-  pinned minor first -- a developer machine, a web session -- the
-  interpreter floats within the floor (barwise-g32). Measured with uv
-  0.11.32; CI's uv 0.12.7 was not measured.
+- `npm run check:pins` (`docs/specs/runtime-pins-check.spec.md`) is a
+  `ci.yml` step with no `if:`, after the Python toolchain step, and the
+  pre-push hook runs it through `ci:local`. It fails when a workflow's
+  `setup-node` names a version or does not read `.nvmrc`, when the
+  session hook stops reading `.nvmrc`, and when a `.python-version` is
+  missing at the root or beside `pyproject.toml` or names more than a
+  minor. It refuses (exit 2) when the Node running it is another major
+  than `.nvmrc`, or the Python `uv python find` resolves for the project
+  is another minor than the pin, or uv is absent; it prints the exact
+  versions on every run. A Node patch that differs is printed, not
+  refused. On a machine without uv it refuses, so `fault-matrix` reads it
+  UNREADABLE there.
+- uv reads `.python-version` only from the project directory (`uv python
+  install` also reads the root one; `find`, `run` and `sync` do not;
+  measured with uv 0.11.32). So `barwise/.python-version` is a copy of
+  the root pin beside `pyproject.toml`, held equal by `check:parity`
+  (the `python-version` set), and the interpreter no longer floats within
+  `requires-python = ">=3.13"` outside CI (barwise-g32).
 - What each decision lacks:
-  - 1: `README.md` "Prerequisites" restates the version ("currently
-    26.7.0") with nothing checking it (barwise-8hs). Nothing checks
-    `.nvmrc` against `engines.node`, which `check:parity` pairs only
-    with the lockfile's copy; nothing stops a workflow from naming a
-    literal version; CI's classifier runs on an unpinned Node; and the
-    runner image is `ubuntu-latest` (barwise-920, a proposed
-    `check:pins`, not built);
-  - 2: see the gap above. Nothing checks that `uv.lock` stays a single
-    resolution (barwise-g32);
-  - 3: no gate checks the running version against the pin; the
-    web-session hook reads Node back, and measurement tools
-    (`measure-comparison.mjs`, `fault-matrix.mjs`) record it.
-    `ci:local`, which the pre-push hook runs, and the pre-commit hook do
-    not check it (barwise-1045). Whether `test:coverage` should refuse on
-    another major is left open: `gate-refusal-contract.spec.md`, Open
-    decisions, only recommends it. Nothing reads back the Python version
-    that ran (barwise-920; barwise-915's close note carries it there).
+  - 1: CI's docs-only classifier runs before `setup-node`, on the runner
+    image's own Node, and the runner image is `ubuntu-latest`
+    (barwise-ym8.q89; pinning the image is the spec's open decision 1).
+    `engines.node` is a floor, not a copy of the pin, and is not
+    compared with it. `README.md` names `.nvmrc` without restating its
+    number (barwise-8hs);
+  - 2: nothing checks that `uv.lock` stays a single resolution
+    (barwise-g32);
+  - 3: `check:pins` reads back both runtimes in CI and at pre-push; the
+    pre-commit hook does not run it. Whether a Node patch should be
+    refused is the spec's open decision 2.
 - uv itself is pinned only in CI (0.12.7, "a version input like any
   other"). The web-session hook installs the latest release. Whether to
   pin it locally is an open question recorded on barwise-921.

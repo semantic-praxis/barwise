@@ -19,6 +19,7 @@
     "depcruise": "npm --prefix barwise run depcruise --",
     "check:depcruise-gate": "npm --prefix barwise run check:depcruise-gate --",
     "check:parity": "npm --prefix barwise run check:parity --",
+    "check:pins": "npm --prefix barwise run check:pins --",
     "check:review-tiers": "npm --prefix barwise run check:review-tiers --",
     "check:spec-touches": "npm --prefix barwise run check:spec-touches --",
     "check:plan-review": "npm --prefix barwise run check:plan-review --",

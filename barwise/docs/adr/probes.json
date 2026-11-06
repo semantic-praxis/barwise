@@ -118,5 +118,21 @@
     "file": "barwise/packages/vscode/package.json",
     "old": "\"command\": \"barwise.export\",",
     "new": "\"command\": \"barwise.exportAll\","
+  },
+  {
+    "decision": "pinned-runtimes#node-from-nvmrc",
+    "file": ".github/workflows/release.yml",
+    "old": "node-version-file: .nvmrc",
+    "new": "node-version: 26"
+  },
+  {
+    "decision": "pinned-runtimes#python-minor",
+    "file": "barwise/.python-version",
+    "old": "3.13",
+    "new": "3.13.12"
+  },
+  {
+    "decision": "pinned-runtimes#verify-running",
+    "unprobed": "check:pins reads back the Node running it and the Python uv resolves; a probe edits one file's content, which cannot change the runtime that runs, and the gate's tests plant both refusals with a stand-in uv"
   }
 ]

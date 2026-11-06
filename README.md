@@ -48,7 +48,7 @@ The definitive reference is Terry Halpin and Tony Morgan's _Information Modeling
 
 | Tool    | Version                                              |
 | ------- | ---------------------------------------------------- |
-| Node.js | the version in [`.nvmrc`](.nvmrc) (currently 26.7.0) |
+| Node.js | the version in [`.nvmrc`](.nvmrc)                    |
 | npm     | >= 10                                                |
 | VS Code | >= 1.101                                             |
 
