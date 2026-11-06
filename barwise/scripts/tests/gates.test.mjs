@@ -39,6 +39,7 @@ import {
   readdirSync,
   readFileSync,
   rmSync,
+  statSync,
   symlinkSync,
   writeFileSync,
 } from "node:fs";
@@ -52,6 +53,7 @@ import { ciLocalLibs } from "./ci-local-files.mjs";
 // The real list, imported statically (as dependency-cruiser requires
 // intended.cjs) so the plants below are written against what core declares.
 import EXTERNAL from "../lib/external-deps.cjs";
+import { SOURCE_FILES as FINDING_SOURCE_FILES } from "../lib/findings.mjs";
 
 const SCRIPTS = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const REPO = execFileSync("git", ["rev-parse", "--show-toplevel"], {
@@ -2888,6 +2890,32 @@ for (const w of BASELINE_WRITERS) {
     }
   });
 
+  test(`${w.script} writes rows sorted by id and prints the merge summary${w.needsDist === undefined ? " [adr:baselines-merge-on-write#findings-order]" : ""}`, (t) => {
+    if (w.needsDist !== undefined && !existsSync(join(REPO, "barwise", w.needsDist))) {
+      t.skip(`${w.needsDist} not built; run npm run build first`);
+      return;
+    }
+    // The order a writer writes, whatever order its baseline held: the
+    // committed rows are reversed first so the input is never already the
+    // answer. The sort itself is the helper's (and, for audit-spec-status,
+    // its detector's too), so removing it fails the corrections and rubric
+    // cases here and the helper's own test.
+    const path = join(REPO, w.file);
+    const before = readFileSync(path, "utf8");
+    try {
+      const json = JSON.parse(before);
+      json[w.key] = Object.fromEntries(Object.entries(json[w.key]).reverse());
+      writeFileSync(path, JSON.stringify(json, null, 2) + "\n");
+      const r = gate(w.script, REPO, ...w.args);
+      assert.equal(r.status, 0, `writer failed:\n${r.stdout}${r.stderr}`);
+      const ids = Object.keys(JSON.parse(readFileSync(path, "utf8"))[w.key]);
+      assert.deepEqual(ids, [...ids].sort(), `${w.file}: the writer left its rows out of id order`);
+      assert.match(r.stdout, /\d+ verdict\(s\) kept/, `${w.script}: no merge summary printed`);
+    } finally {
+      writeFileSync(path, before);
+    }
+  });
+
   test(`${w.file} has no unclassified row, so the round trip is not vacuous`, () => {
     // The round-trip test above is strong because every row in the committed
     // tree carries a real verdict: a placeholder row would survive a clobber
@@ -3046,6 +3074,149 @@ test("audit-spec-status writes nothing without --write [adr:baselines-merge-on-w
   } finally {
     writeFileSync(path, before);
   }
+});
+
+test("audit-spec-status leaves a stale, unsorted baseline alone unless asked, and rewrites it with --write [adr:baselines-merge-on-write#specs-write-on-ask]", () => {
+  // The committed baseline already equals what --write would produce, so a
+  // bare run that wrote identical bytes would pass the test above. Reversing
+  // the rows makes a write visible: a bare run must leave them reversed, and
+  // --write must change them.
+  const path = join(REPO, "barwise/spec-status-baseline.json");
+  const before = readFileSync(path, "utf8");
+  try {
+    const json = JSON.parse(before);
+    json.specs = Object.fromEntries(Object.entries(json.specs).reverse());
+    const scrambled = JSON.stringify(json, null, 2) + "\n";
+    assert.notEqual(scrambled, before, "the fixture must differ from what --write produces");
+    writeFileSync(path, scrambled);
+    const bare = gate("audit-spec-status.mjs", REPO);
+    assert.equal(bare.status, 0, `survey failed:\n${bare.stdout}${bare.stderr}`);
+    assert.equal(readFileSync(path, "utf8"), scrambled, "a bare invocation wrote the baseline");
+    const written = gate("audit-spec-status.mjs", REPO, "--write");
+    assert.equal(written.status, 0, `--write failed:\n${written.stdout}${written.stderr}`);
+    assert.notEqual(readFileSync(path, "utf8"), scrambled, "--write did not write");
+  } finally {
+    writeFileSync(path, before);
+  }
+});
+
+test("audit-duplication --check changes neither its baseline nor the tree [adr:baselines-merge-on-write#duplication-no-writer]", () => {
+  // The text check below sees writeFileSync only; a write through
+  // fs.promises, a stream or a helper module would pass it. Running the gate
+  // shows any write it makes on the run CI makes: the baseline's bytes and
+  // its modification time (a write of identical bytes still moves it), and
+  // the whole tree's git status.
+  const path = join(REPO, "barwise/audit-baseline.json");
+  const status = () =>
+    execFileSync("git", ["status", "--porcelain"], { cwd: REPO, encoding: "utf8" });
+  const bytes = readFileSync(path, "utf8");
+  const mtime = statSync(path).mtimeMs;
+  const statusBefore = status();
+  const r = gate("audit-duplication.mjs", REPO, "--check");
+  // A finding (exit 1) is the gate's business, not this test's; a refusal or
+  // a crash is not a run whose writes mean anything.
+  assert.ok(
+    r.status === 0 || r.status === 1,
+    `audit:duplication --check did not run:\n${r.stdout}${r.stderr}`,
+  );
+  assert.equal(readFileSync(path, "utf8"), bytes, "audit-duplication rewrote its baseline");
+  assert.equal(statSync(path).mtimeMs, mtime, "audit-duplication wrote its baseline (same bytes)");
+  assert.equal(status(), statusBefore, "audit-duplication changed the working tree");
+});
+
+/**
+ * Source without its comments: whole-line `//` comments and block comments
+ * that open a line. A `/*` or `//` inside a string (a glob, a URL) is
+ * left alone, so code after it is never mistaken for a comment.
+ */
+const codeOnly = (src) =>
+  src.replace(/^[ \t]*\/\*[\s\S]*?\*\//gm, "").replace(/^[ \t]*\/\/.*$/gm, "");
+
+/** Every script file under `dir` (relative to the repo root), recursively, tests and fixtures aside. */
+function scriptFiles(dir) {
+  return readdirSync(join(REPO, dir), { withFileTypes: true }).flatMap((e) => {
+    const rel = `${dir}/${e.name}`;
+    if (e.isDirectory()) {
+      return ["tests", "fixtures", "node_modules"].includes(e.name)
+        ? []
+        : scriptFiles(rel);
+    }
+    return /\.(mjs|cjs|js)$/.test(e.name) ? [rel] : [];
+  });
+}
+
+test("every baseline has one registered writer, and each merges through baseline-merge.mjs [adr:baselines-merge-on-write#one-merge-owner]", () => {
+  // The five baselines are the ones scripts/lib/findings.mjs reads, so a new
+  // baseline that lands with a reader but no row here fails. Each writer
+  // reads and merges through the helper, or is declared an exception with
+  // its reason; each helper-using writer is also one BASELINE_WRITERS runs;
+  // and no other script writes a baseline at all.
+  const WRITERS = {
+    "audit-baseline.json": { none: "decision 5: edited by hand" },
+    "correction-baseline.json": { script: "barwise/scripts/audit-corrections.mjs" },
+    "rubric-baseline.json": { script: "barwise/scripts/audit-rubric.mjs" },
+    "spec-status-baseline.json": { script: "barwise/scripts/audit-spec-status.mjs" },
+    "trial-baseline.json": {
+      script: "barwise/trial/lib/gate.mjs",
+      exception: "additive: a run covers some scopes or one tier, and mergeBaselineRows "
+        + "writes only the ids it is given (audit-finding-reader.spec.md, Open decision 4)",
+    },
+  };
+  assert.deepEqual(
+    Object.keys(WRITERS).sort(),
+    Object.values(FINDING_SOURCE_FILES).sort(),
+    "a baseline the findings reader reads has no row in WRITERS, or a row names no baseline",
+  );
+  // The runtime tests above run BASELINE_WRITERS; a writer listed here and
+  // not there would be held to its import and never run.
+  assert.deepEqual(
+    Object.values(WRITERS).filter((w) => w.script && !w.exception).map((w) =>
+      w.script.split("/").pop()
+    ).sort(),
+    BASELINE_WRITERS.map((w) => w.script).sort(),
+    "WRITERS and BASELINE_WRITERS disagree about which writers merge through the helper",
+  );
+  for (const w of Object.values(WRITERS)) {
+    if (w.none) continue;
+    const src = codeOnly(readFileSync(join(REPO, w.script), "utf8"));
+    if (w.exception) {
+      assert.ok(
+        !/baseline-merge\.mjs/.test(src),
+        `${w.script} now imports the helper; drop its exception`,
+      );
+      continue;
+    }
+    // The helper's read and merge, imported by name and called, with no
+    // local stand-in: importing the module for its summary while reading or
+    // merging some other way would pass a check on the import line alone.
+    for (const fn of ["readExistingRows", "mergeBaselineRows"]) {
+      assert.match(
+        src,
+        new RegExp(`import\\s*\\{[^}]*\\b${fn}\\b[^}]*\\}\\s*from "\\./lib/baseline-merge\\.mjs"`),
+        `${w.script} does not import ${fn} from the helper`,
+      );
+      assert.match(src, new RegExp(`\\b${fn}\\(`), `${w.script} never calls ${fn}`);
+      assert.doesNotMatch(
+        src,
+        new RegExp(`\\b(const|let|var|function)\\s+${fn}\\b`),
+        `${w.script} defines its own ${fn}`,
+      );
+    }
+  }
+  // Any other script that names a baseline and writes or moves a file is a
+  // second writer the registry does not know.
+  const registered = new Set(Object.values(WRITERS).flatMap((w) => (w.script ? [w.script] : [])));
+  const WRITE =
+    /\b(writeFileSync|writeFile|writeSync|createWriteStream|appendFileSync|appendFile|renameSync|rename|copyFileSync|copyFile|cpSync)\b/;
+  const strays = [...scriptFiles("barwise/scripts"), ...scriptFiles("barwise/trial/lib")].filter(
+    (rel) => {
+      if (registered.has(rel)) return false;
+      const src = codeOnly(readFileSync(join(REPO, rel), "utf8"));
+      return WRITE.test(src)
+        && (Object.keys(WRITERS).some((b) => src.includes(b)) || /\bBASELINE_PATH\b/.test(src));
+    },
+  );
+  assert.deepEqual(strays, [], "these scripts write a baseline outside the registry");
 });
 
 test("audit-duplication.mjs still has no baseline writer [adr:baselines-merge-on-write#duplication-no-writer]", () => {

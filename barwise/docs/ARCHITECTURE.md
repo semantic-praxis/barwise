@@ -50,7 +50,7 @@ Architecture:
 
 Process:
 
-- [Baseline writers merge verdicts](adr/baselines-merge-on-write.md) -- 2026-10-23 -- declared: tests (merge-not-regenerate, specs-write-on-ask, findings-order, duplication-no-writer); gap: barwise-ym8.fi5 (merge-not-regenerate); gap: barwise-ym8.3yv (one-merge-owner); gap: barwise-ym8.6jy (specs-write-on-ask); gap: barwise-ym8.nhy (findings-order); gap: barwise-ym8.79m (duplication-no-writer)
+- [Baseline writers merge verdicts](adr/baselines-merge-on-write.md) -- 2026-11-06 -- declared: tests (merge-not-regenerate, one-merge-owner, specs-write-on-ask, findings-order, duplication-no-writer); gap: barwise-ym8.fi5 (merge-not-regenerate); gap: barwise-ym8.nhy (findings-order)
 - [Constraint-extraction coverage policy](adr/constraint-coverage-policy.md) -- 2026-08-27 -- gap: barwise-ym8.fmt (trust-statement); gap: barwise-ym8.nzv (compares-not-certifies); gap: barwise-ym8.5yl (two-instances); gap: barwise-ym8.vq8 (tiered-types); gap: barwise-ym8.k6g (inventory-outside)
 - [Credential handling](adr/credential-handling.md) -- 2026-09-12 -- declared: tests (gitleaks-detects, wrapper-contract); gap: barwise-ym8.yhs (rotate-not-revert); gap: barwise-ym8.7zs (gitleaks-detects); gap: barwise-ym8.kf3 (scan-index-and-history); gap: barwise-ym8.gc7 (wrapper-contract); gap: barwise-ym8.nxs (pinned-gitleaks)
 - [Findings close by mechanism](adr/findings-close-by-mechanism.md) -- 2026-11-06 -- declared: audit:specs -- --check (person-classifies), check:findings (mechanism-closes, person-classifies), tests (ratchet-both-ways); gap: barwise-ym8.k4d (ratchet-both-ways); gap: barwise-ym8.h0l (person-classifies); gap: barwise-ym8.ld2 (ratchet-in-ci)

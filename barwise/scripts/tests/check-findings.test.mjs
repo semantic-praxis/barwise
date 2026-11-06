@@ -5,8 +5,8 @@
  * unmappable input is exit 2, never a clean pass.
  */
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { execFileSync, spawnSync } from "node:child_process";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { test } from "node:test";
@@ -24,12 +24,20 @@ const BASELINES = [
 const CATALOG = "barwise/trial/findings/catalog.json";
 const TRACKER = ".beads/issues.jsonl";
 
-/** A tree holding only what the gate reads, copied from this checkout. */
+/**
+ * A tree holding only what the gate reads, as committed at HEAD. Not the
+ * working tree: gates.test.mjs rewrites these baselines (and restores them)
+ * while this file runs beside it, so a copy taken mid-rewrite would be a
+ * reversed or half-written file.
+ */
 function fixture() {
   const dir = mkdtempSync(join(tmpdir(), "barwise-findings-"));
   for (const rel of [...BASELINES.map((b) => `barwise/${b}`), CATALOG, TRACKER]) {
     mkdirSync(dirname(join(dir, rel)), { recursive: true });
-    cpSync(join(REPO, rel), join(dir, rel));
+    writeFileSync(
+      join(dir, rel),
+      execFileSync("git", ["show", `HEAD:${rel}`], { cwd: REPO, maxBuffer: 64 * 1024 * 1024 }),
+    );
   }
   return dir;
 }
@@ -62,7 +70,13 @@ const first = (rows) => {
 
 /** An issue id in the tracker with the given status. */
 function issueWith(status) {
-  for (const line of readFileSync(join(REPO, TRACKER), "utf8").split("\n")) {
+  for (
+    const line of execFileSync("git", ["show", `HEAD:${TRACKER}`], {
+      cwd: REPO,
+      encoding: "utf8",
+      maxBuffer: 64 * 1024 * 1024,
+    }).split("\n")
+  ) {
     if (!line) continue;
     const o = JSON.parse(line);
     if (o.status === status) return o.id;
@@ -75,8 +89,14 @@ const found = (r, pattern) => {
   assert.match(r.stderr, pattern);
 };
 
-test("check:findings passes the real baselines", () => {
-  const r = spawnSync(process.execPath, [GATE], { encoding: "utf8" });
+test("check:findings passes the committed baselines", () => {
+  const dir = fixture();
+  let r;
+  try {
+    r = run(dir);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
   assert.equal(r.status, 0, r.stdout + r.stderr);
   assert.match(r.stdout, /5 baselines .* OK$/m);
 });
