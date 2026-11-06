@@ -1,6 +1,6 @@
 # The gate refusal contract, enforced: the fault matrix green and in CI
 
-Status: Draft 2026-11-06; no workstream implemented
+Status: WS1 under way 2026-11-06 (barwise-ydl fixed: check-tracker-closes refuses an empty merge-base and an empty tracker read; test-adr-model and run-script-tests refuse when git cannot answer or the clone is shallow); WS2 waits on open decision 1; WS3 and WS4 not started
 Created: 2026-11-06
 Last-updated: 2026-11-06
 Tracking: barwise-ym8.gc9 (adr-refactor batch 2), barwise-ym8.j31,
