@@ -5557,6 +5557,57 @@ test("check-tracker-closes, run as ci:local --commit runs it, fails a close besi
   }
 });
 
+test("audit-rubric refuses when promptlab is not built, never its finding code (barwise-shq) [adr:gate-refusal-contract#refuse-not-find]", () => {
+  // The script finds packages/promptlab/dist relative to itself, so a copy
+  // of scripts/ in an empty root is an unbuilt checkout.
+  const dir = mkdtempSync(join(tmpdir(), "barwise-unbuilt-"));
+  try {
+    for (const f of ["audit-rubric.mjs", join("lib", "baseline-merge.mjs")]) {
+      mkdirSync(dirname(join(dir, "scripts", f)), { recursive: true });
+      writeFileSync(join(dir, "scripts", f), readFileSync(join(SCRIPTS, f)));
+    }
+    const r = spawnSync(process.execPath, [join(dir, "scripts", "audit-rubric.mjs"), "--check"], {
+      cwd: dir,
+      encoding: "utf8",
+    });
+    assert.equal(r.status, 2, r.stdout + r.stderr);
+    assert.match(r.stderr, /dist not found/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("check-depcruise-gate refuses when dependency-cruiser cannot run, never a stack trace (barwise-shq) [adr:gate-refusal-contract#refuse-not-find]", () => {
+  // A PATH with no npx: the probe's depcruise call cannot start, and the
+  // gate used to hand the missing output to JSON.parse and exit 1.
+  const dir = mkdtempSync(join(tmpdir(), "barwise-nonpx-"));
+  try {
+    const r = spawnSync(process.execPath, [join(SCRIPTS, "check-depcruise-gate.mjs")], {
+      cwd: REPO,
+      encoding: "utf8",
+      env: { ...process.env, PATH: dir },
+    });
+    assert.equal(r.status, 2, r.stdout + r.stderr);
+    assert.match(r.stderr, /cannot answer/);
+    assert.doesNotMatch(r.stderr, /at .*\.mjs:\d+/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("depcruise exits by its violation count, never by the 8-bit exit code (barwise-vt2) [adr:gate-refusal-contract#three-results]", async () => {
+  // dependency-cruiser exits with its violation count, which the OS keeps
+  // mod 256: two violations read as a refusal, 256 as a pass.
+  const { exitFor } = await import(pathToFileURL(join(SCRIPTS, "run-depcruise.mjs")).href);
+  assert.equal(exitFor({ summary: { error: 0, warn: 3 } }), 0);
+  assert.equal(exitFor({ summary: { error: 1 } }), 1);
+  assert.equal(exitFor({ summary: { error: 2 } }), 1);
+  assert.equal(exitFor({ summary: { error: 256 } }), 1);
+  assert.equal(exitFor({ summary: {} }), 2);
+  assert.equal(exitFor(undefined), 2);
+  // The real tree is CI's own depcruise step, not this unit test's.
+});
+
 test("check-tracker-closes refuses when git answers emptily, with and without BASE_SHA (barwise-ydl) [adr:gate-refusal-contract#refuse-not-find]", () => {
   // The fault matrix's git-empty axis read a FALSE GREEN here: an empty
   // merge-base became base "", and an empty `git show` of the tracker a
