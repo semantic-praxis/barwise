@@ -9,14 +9,14 @@
  * RelationalMapper already follows absorption-based normalization.
  */
 
-import { stringify } from "yaml";
 import type {
   Column,
   ForeignKey,
   RelationalSchema,
   RoutedUnique,
   Table,
-} from "../RelationalSchema.js";
+} from "@barwise/core/mapping";
+import { stringify } from "yaml";
 
 // ---------------------------------------------------------------------------
 // Public types

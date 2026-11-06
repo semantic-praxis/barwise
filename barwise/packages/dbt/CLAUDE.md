@@ -10,9 +10,9 @@ the same pattern as `@barwise/code-analysis`. Core ships no dbt format.
 
 This package depends on `@barwise/core` for model types, the
 `ImportFormat` / `ExportFormatAdapter` interfaces, the format registry,
-the SQL cascade parser (`parseSqlFile`), and the dbt rendering
-capability (`renderDbt`, `annotateDbtExport`). It does NOT depend on any
-editor or tool package.
+the relational mapping (`RelationalMapper`) and the SQL cascade parser
+(`parseSqlFile`). It owns the dbt renderer (`render/`). It does NOT
+depend on any editor or tool package.
 
 Allowed runtime dependencies: `@barwise/core`, `yaml`. No others without
 discussion. The package uses `node:fs` for project discovery and
@@ -40,6 +40,10 @@ src/
                          skip-list of never-source directories (target/,
                          dbt_packages/, logs/, ...)
   DbtExportFormat.ts     ExportFormatAdapter: ORM model -> dbt schema YAML
+  render/renderDbt.ts    The dbt renderer: RelationalSchema -> schema.yml
+                         and model SQL files; DBT_KEY_TEST
+  render/DbtExportAnnotator.ts  Writes the export's barwise notes into
+                         the rendered schema.yml
   sql/SqlglotBridge.ts   Optional sqlglot sidecar for SQL mining (parallel
                          to formats' bridge by design; connectors own
                          their subprocess I/O)
@@ -72,15 +76,15 @@ Lint is run from the repo root: `npm run lint`.
 
 - The importer follows the `ImportFormat` interface from `@barwise/core`
   (`inputKind: "directory"`; `parseAsync` scans the project).
-- The exporter follows the `ExportFormatAdapter` interface and wraps
-  core's `renderDbt` -- the rendering capability stays in core; this
-  package owns only the descriptor.
+- The exporter follows the `ExportFormatAdapter` interface and calls
+  `render/renderDbt.ts`: a format's rendering lives with its descriptor
+  (docs/adr/connector-packages.md#format-in-its-connector).
 - Format registration uses `registerDbtFormats()` called at tool
   startup, alongside `registerStandardFormats()` and
   `registerCodeFormats()`.
 
 ## Dependencies
 
-| Direction | Package         | What is used                                                       |
-| --------- | --------------- | ------------------------------------------------------------------ |
-| Upstream  | `@barwise/core` | Model types, ImportFormat/ExportFormatAdapter, registry, renderDbt |
+| Direction | Package         | What is used                                                     |
+| --------- | --------------- | ---------------------------------------------------------------- |
+| Upstream  | `@barwise/core` | Model types, ImportFormat/ExportFormatAdapter, registry, mapping |

@@ -8,7 +8,7 @@ Tracking: barwise-ivl
 Plan-reviewed: ad6f7a0a (code-review, pr-review)
 Touches: barwise/packages/formats/src/ddl/DdlImportFormat.ts,
 barwise/packages/formats/src/ddl/barwiseAnnotation.ts,
-barwise/packages/core/src/mapping/renderers/dbt.ts,
+barwise/packages/dbt/src/render/renderDbt.ts,
 barwise/packages/dbt/src/DbtSchemaTypes.ts,
 barwise/packages/dbt/src/DbtSchemaParser.ts,
 barwise/packages/dbt/src/dbtMapping/,

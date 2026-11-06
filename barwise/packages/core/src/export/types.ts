@@ -7,7 +7,7 @@
  * optional file breakdown, annotations, constraint specifications, and lineage.
  */
 
-import type { ExportAnnotation } from "../mapping/renderers/DbtExportAnnotator.js";
+import type { ExportAnnotation } from "../annotation/ExportAnnotationCollector.js";
 import type { OrmModel } from "../model/OrmModel.js";
 import type { PreferredIdentifierStrategy } from "../model/OrmProject.js";
 

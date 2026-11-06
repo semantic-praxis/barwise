@@ -2,7 +2,7 @@
  * Analysis phase: identify PKs, FKs, and custom tests across models.
  */
 
-import { DBT_KEY_TEST } from "@barwise/core/mapping";
+import { DBT_KEY_TEST } from "../render/renderDbt.js";
 import {
   candidateKeysOf,
   combinationOf,

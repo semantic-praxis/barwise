@@ -14,14 +14,15 @@
  * preserve YAML formatting and is idempotent.
  */
 
+import type { OrmModel } from "@barwise/core";
 import {
   collectExportAnnotations,
   type ExportAnnotation,
-} from "../../annotation/ExportAnnotationCollector.js";
-import { formatBarwiseComment, stripBarwiseComments } from "../../annotation/helpers.js";
-import type { OrmModel } from "../../model/OrmModel.js";
-import type { RelationalSchema, RoutedUnique } from "../RelationalSchema.js";
-import { DBT_KEY_TEST, dbtKeyTestColumns } from "./dbt.js";
+  formatBarwiseComment,
+  stripBarwiseComments,
+} from "@barwise/core/annotation";
+import type { RelationalSchema, RoutedUnique } from "@barwise/core/mapping";
+import { DBT_KEY_TEST, dbtKeyTestColumns } from "./renderDbt.js";
 
 // ---------------------------------------------------------------------------
 // Public API
@@ -29,7 +30,7 @@ import { DBT_KEY_TEST, dbtKeyTestColumns } from "./dbt.js";
 
 // Re-export for backward compatibility -- consumers that imported
 // ExportAnnotation from this module continue to work.
-export type { ExportAnnotation } from "../../annotation/ExportAnnotationCollector.js";
+export type { ExportAnnotation } from "@barwise/core/annotation";
 
 export interface ExportAnnotationResult {
   /** The annotated schema.yml string. */

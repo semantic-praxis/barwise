@@ -28,14 +28,6 @@ export type {
   Table,
 } from "./RelationalSchema.js";
 export {
-  DBT_KEY_TEST,
-  type DbtModelFile,
-  type DbtProject,
-  type DbtRenderOptions,
-  renderDbt,
-} from "./renderers/dbt.js";
-export { annotateDbtExport, type ExportAnnotationResult } from "./renderers/DbtExportAnnotator.js";
-export {
   hasGeneratedKeys,
   SURROGATE_KEY_TYPE,
   SURROGATE_POPULATION_NOTE,

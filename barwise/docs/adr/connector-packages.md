@@ -50,7 +50,8 @@ format lives and how it reaches the surfaces.
 3. **A format's rendering and parsing live in its connector.**{#format-in-its-connector}
    A format's descriptor and the code that writes or reads its text sit
    in one package: the DDL, OpenAPI and Avro renderers and the
-   population renderers are `@barwise/formats`'. Core keeps the
+   population renderers are `@barwise/formats`', and the dbt renderer
+   and its export annotator are `@barwise/dbt`'s. Core keeps the
    relational mapping (`RelationalMapper`, which ORM, a relational
    technology, owns) and the SQL dialect types and value predicates its
    own mapping uses; a format reaches them from its connector.
@@ -85,10 +86,10 @@ format lives and how it reaches the surfaces.
   registry's own file (barwise-2uz). Not seen: a renderer core keeps
   unexported and calls from an exported function, a type-only export,
   and an untyped literal that only matches an interface's shape.
-- Two known violations of `connector-packages.md#format-in-its-connector`
-  remain until `format-renderers-to-connectors.spec.md` WS2 and WS3 land:
-  the dbt renderer (`renderDbt`, `annotateDbtExport`) and the SQL parser
-  (`parseSqlFile` and its cascade) are still in core (barwise-ym8.x9w).
+- One known violation of `connector-packages.md#format-in-its-connector`
+  remains until `format-renderers-to-connectors.spec.md` WS3 lands: the
+  SQL parser (`parseSqlFile` and its cascade) is still in core
+  (barwise-ym8.x9w).
 - That each surface registers what it needs is review-only (S-EXPL-5).
   A missing registration fails loudly ("not registered", "Unknown
   format") when a test or a user asks for that format. One copy is

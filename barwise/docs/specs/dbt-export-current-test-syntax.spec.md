@@ -6,8 +6,8 @@ Created: 2026-10-28
 Last-updated: 2026-10-28
 Tracking: barwise-fnt
 Plan-reviewed: a22cc134 (code-review, pr-review)
-Touches: barwise/packages/core/src/mapping/renderers/dbt.ts,
-barwise/packages/core/tests/mapping/dbt.test.ts,
+Touches: barwise/packages/dbt/src/render/renderDbt.ts,
+barwise/packages/dbt/tests/render/renderDbt.test.ts,
 barwise/packages/dbt/src/DbtSchemaParser.ts,
 barwise/packages/dbt/tests/DbtSchemaParser.test.ts,
 barwise/docs/IMPORT_EXPORT.md,
