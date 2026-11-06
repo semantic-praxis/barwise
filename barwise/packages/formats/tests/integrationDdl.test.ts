@@ -15,7 +15,6 @@ import { renderDdl } from "../src/ddl/renderDdl.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const serializer = new OrmYamlSerializer();
-const modelSerializer = serializer;
 const mapper = new RelationalMapper();
 
 function loadFixture(...parts: string[]): string {
@@ -123,7 +122,7 @@ describe("Multi-file project: each domain renders DDL", () => {
 
   describe("relational mapping per domain", () => {
     it("CRM domain renders valid DDL", () => {
-      const model = modelSerializer.deserialize(crmYaml);
+      const model = serializer.deserialize(crmYaml);
       const schema = mapper.map(model);
       const ddl = renderDdl(schema);
 
@@ -138,7 +137,7 @@ describe("Multi-file project: each domain renders DDL", () => {
     });
 
     it("Billing domain renders valid DDL", () => {
-      const model = modelSerializer.deserialize(billingYaml);
+      const model = serializer.deserialize(billingYaml);
       const schema = mapper.map(model);
       const ddl = renderDdl(schema);
 

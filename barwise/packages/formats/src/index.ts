@@ -29,7 +29,7 @@ export { SqlImportFormat } from "./sql/SqlImportFormat.js";
 
 // Renderers: each format's text writer, beside its descriptor
 // (format-renderers-to-connectors.spec.md, WS1).
-export { AVRO_NAME, avroFieldNames, toAvroName } from "./avro/names.js";
+export { AVRO_NAME, avroFieldNames, toAvroName } from "./avro/avroNames.js";
 export {
   type AvroField,
   type AvroFieldType,

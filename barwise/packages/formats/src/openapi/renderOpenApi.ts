@@ -23,8 +23,7 @@
 
 import type { OrmModel } from "@barwise/core";
 import type { RelationalSchema, Table } from "@barwise/core/mapping";
-import { uniqueNames } from "../avro/names.js";
-import { toPascalCase } from "../avro/names.js";
+import { toPascalCase, uniqueNames } from "../naming.js";
 import { renderPopulationAsOpenApiExamples } from "../population/populationRenderer.js";
 
 // ---------------------------------------------------------------------------

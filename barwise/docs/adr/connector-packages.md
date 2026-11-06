@@ -78,10 +78,13 @@ format lives and how it reaches the surfaces.
   `connector-packages.md#format-in-its-connector` are held by
   `core/tests/public/exports.test.ts`: it pins every runtime name core
   and its subpath exports export to a reviewed list (`exports.json`), so
-  a renderer cannot come back into core unseen, and it fails on a value
-  in `core/src` that implements `ImportFormat` or `ExportFormatAdapter`
-  (barwise-2uz). A `formatRegistry.register` call in core is not looked
-  for.
+  an exported renderer cannot come back into core unseen, and it fails on
+  code in `core/src` that declares a value as an `ImportFormat`,
+  `ExportFormatAdapter` or `FormatDescriptor` (`implements`, `satisfies`,
+  `as`, or a type annotation) or registers a format outside the
+  registry's own file (barwise-2uz). Not seen: a renderer core keeps
+  unexported and calls from an exported function, a type-only export,
+  and an untyped literal that only matches an interface's shape.
 - Two known violations of `connector-packages.md#format-in-its-connector`
   remain until `format-renderers-to-connectors.spec.md` WS2 and WS3 land:
   the dbt renderer (`renderDbt`, `annotateDbtExport`) and the SQL parser

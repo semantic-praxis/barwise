@@ -401,8 +401,9 @@ describe("renderPopulationAsOpenApiExamples", () => {
 const here = dirname(fileURLToPath(import.meta.url));
 
 // Moved from core's externalPreferredIdentifier.test.ts with the renderer
-// (format-renderers-to-connectors.spec.md, WS1); the fixture is the same
-// Rooms model that file builds as roomYaml().
+// (format-renderers-to-connectors.spec.md, WS1). The fixture started as
+// that file's Rooms model and is this test's own: the case asserts only on
+// it, so the two may diverge without either test going wrong.
 describe("an external preferred identifier", () => {
   it("an OpenAPI example joins the components on the entity", () => {
     const yaml = readFileSync(resolve(here, "fixtures/externalIdentifier.orm.yaml"), "utf8")

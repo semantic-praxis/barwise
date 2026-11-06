@@ -47,10 +47,31 @@ describe("core's public surface [adr:connector-packages#core-no-interop]", () =>
   });
 
   it("holds no format adapter in its source [adr:connector-packages#core-no-interop]", () => {
-    const adapter =
-      /\b(?:implements|satisfies)\s+(?:ImportFormat|ExportFormatAdapter)\b|:\s*(?:ImportFormat|ExportFormatAdapter)\s*=/;
+    // A format's declared shapes: a value typed as an adapter or a
+    // descriptor however the type is written, and a registration call. The
+    // registry's own file defines registerFormat and is the one place a
+    // register call belongs. An untyped literal that only structurally
+    // matches is not seen; exports.json is the backstop for one exported.
+    const shape = "(?:ImportFormat|ExportFormatAdapter|FormatDescriptor)";
+    const declared = new RegExp(
+      [
+        `\\bimplements\\b[^{]*\\b${shape}\\b`, // class X implements A, ImportFormat
+        `\\b(?:satisfies|as)\\s+${shape}\\b`, // {...} satisfies / as X
+        `:\\s*${shape}\\s*=`, // const x: X = ...
+        `\\)\\s*:\\s*${shape}\\s*(?:\\{|=>)`, // function f(): X {  /  (): X =>
+      ].join("|"),
+    );
+    const registers = /\b(?:formatRegistry\.register|registerFormat)\(/;
+    const registry = join(pkgRoot, "src/format/registry.ts");
     const found = sourceFiles(join(pkgRoot, "src"))
-      .filter((f) => adapter.test(readFileSync(f, "utf8")))
+      .filter((f) => {
+        // Comments say "implements this interface" in prose; only code counts.
+        const text = readFileSync(f, "utf8").replace(/\/\*[\s\S]*?\*\//g, "").replace(
+          /\/\/.*$/gm,
+          "",
+        );
+        return declared.test(text) || (f !== registry && registers.test(text));
+      })
       .map((f) => relative(pkgRoot, f));
     expect(found).toEqual([]);
   });

@@ -22,8 +22,8 @@ import {
   unreportedConstraintSpecs,
   withConstraintSpecs,
 } from "@barwise/core/mapping";
-import { avroFieldNames } from "./names.js";
-import { toPascalCase } from "./names.js";
+import { toPascalCase } from "../naming.js";
+import { avroFieldNames } from "./avroNames.js";
 import {
   type AvroField,
   type AvroSchema,

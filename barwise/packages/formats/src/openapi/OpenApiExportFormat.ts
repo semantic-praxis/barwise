@@ -22,7 +22,7 @@ import {
   unreportedConstraintSpecs,
   withConstraintSpecs,
 } from "@barwise/core/mapping";
-import { toPascalCase } from "../avro/names.js";
+import { toPascalCase } from "../naming.js";
 import { openApiToJson, renderOpenApi } from "./renderOpenApi.js";
 
 /**

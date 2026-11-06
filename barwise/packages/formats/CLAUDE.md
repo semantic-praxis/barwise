@@ -34,7 +34,8 @@ absent).
 src/
   index.ts                       Public API
   registration.ts                The 6 descriptors + registerStandardFormats()
-  naming.ts                      Name helpers shared by the adapters (snakeCase)
+  naming.ts                      Name helpers shared by the adapters (snakeCase,
+                                 toPascalCase, uniqueNames)
   constraintReport.ts            The text the export surfaces show for a result's
                                  constraintSpecs (CLI stderr, MCP block)
   ddl/DdlImportFormat.ts         SQL DDL -> ORM
@@ -52,9 +53,9 @@ src/
   openapi/renderOpenApi.ts       The OpenAPI renderer
   avro/AvroExportFormat.ts       ORM -> Avro schema (calls renderAvro)
   avro/renderAvro.ts             The Avro renderer
-  avro/names.ts                  Record and field names, and toPascalCase
-  avro/avroNames.ts              Avro's namespace rule, and the repair the editor
-                                 uses for a namespace taken from a file name
+  avro/avroNames.ts              Avro's name and namespace rules, field names,
+                                 and the repair the editor uses for a
+                                 namespace taken from a file name
   sql/SqlImportFormat.ts         Raw SQL files -> ORM (text + directory scan)
   sql/SqlglotBridge.ts           Optional sqlglot sidecar: structural SQL tier
                                  + sourceText normalization

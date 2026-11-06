@@ -48,8 +48,9 @@ describe("subtype relational mapping", () => {
 
     it("does not keep the subtype's own identity on the shared key", () => {
       // The shared key takes the supertype's value, so an auto_counter
-      // subtype key must not generate one -- nor render UUID GENERATED ...
-      // AS IDENTITY after copying a UUID supertype key (PR #586 review).
+      // subtype key must not generate one after copying a UUID supertype
+      // key (PR #586 review). That the DDL renderer then writes no identity
+      // is formats' renderDdl test.
       const model = new ModelBuilder("Test")
         .withEntityType("Person", { referenceMode: "person_id" })
         .withValueType("PersonId", { dataType: { name: "uuid" } })
