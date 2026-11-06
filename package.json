@@ -51,6 +51,7 @@
     "test:mcp-checks": "npm --prefix barwise run test:mcp-checks --",
     "audit:specs": "npm --prefix barwise run audit:specs --",
     "audit:corrections": "npm --prefix barwise run audit:corrections --",
+    "check:findings": "npm --prefix barwise run check:findings --",
     "survey:specs": "npm --prefix barwise run survey:specs --",
     "audit:rubric": "npm --prefix barwise run audit:rubric --",
     "ci:local": "npm --prefix barwise run ci:local --",

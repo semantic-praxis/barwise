@@ -11,7 +11,7 @@ Enforced-by: npm run audit:duplication -- --check (every-candidate-verdict),
 npm run check:parity (registered-sets-identical),
 none (barwise-ym8.edf: check-on-copy), none (barwise-ym8.3tg: share-by-composition),
 none (barwise-ym8.8nq: registered-sets-identical),
-none (barwise-ym8.onf: every-candidate-verdict)
+npm run check:findings (every-candidate-verdict)
 
 ## Context
 

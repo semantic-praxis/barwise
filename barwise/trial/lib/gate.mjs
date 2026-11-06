@@ -14,6 +14,7 @@
  */
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { isTrialRowUnclassified } from "../../scripts/lib/findings.mjs";
 import { classify, loadCatalog } from "./classify.mjs";
 import { BASELINE_PATH, FINDINGS_DIR, resultsPath } from "./paths.mjs";
 
@@ -48,9 +49,8 @@ export function evaluateGate(results, baseline, {
   // checked, so a row with `issue: null`, or an issue with nothing to
   // reproduce it, passed. A blind-spot row needs the note and the issue;
   // there is no defect to reproduce, so it needs no directory.
-  const unclassified = Object.entries(rows).filter(([, v]) =>
-    !v.note || /^\(unclassified\)/.test(v.note) || !v.issue
-  ).map(([k]) => k);
+  const unclassified = Object.entries(rows).filter(([, v]) => isTrialRowUnclassified(v))
+    .map(([k]) => k);
   // Whether a row is a blind spot is decided by what the step did THIS
   // run, not by what the baseline recorded: a known could_not_answer row
   // whose step starts failing is a definite finding, and exempting it from

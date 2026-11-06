@@ -1,13 +1,15 @@
 # Findings close by mechanism
 
 Scope: process
-Date: 2026-08-29
+Date: 2026-11-06
 Tracking: barwise-ubc, barwise-903, barwise-910, barwise-2af, barwise-uuy,
 barwise-uuh, barwise-u5d, barwise-iil,
 docs/specs/duplication-drift-guards.spec.md,
-docs/specs/correction-record-ratchet.spec.md
+docs/specs/correction-record-ratchet.spec.md,
+docs/specs/audit-finding-reader.spec.md
 Enforced-by: npm run audit:specs -- --check (person-classifies),
-tests (ratchet-both-ways), none (barwise-ym8.1b2: mechanism-closes),
+npm run check:findings (mechanism-closes, person-classifies),
+tests (ratchet-both-ways),
 none (barwise-ym8.k4d: ratchet-both-ways), none (barwise-ym8.h0l: person-classifies),
 none (barwise-ym8.ld2: ratchet-in-ci)
 
@@ -24,21 +26,24 @@ verdict on every row is safe to gate on, when raw detection is not.
 
 ## Decision
 
-1. **A finding is closed by a mechanism, not by a document.**{#mechanism-closes} The rule
-   for must-agree copies applies to anything an audit turns up. In the
-   same commit, land a check that fails if the finding comes back, or a
-   baseline row that has to be removed when the finding is fixed. A
-   findings document can record the reasoning, but it does not close
-   the finding.
+1. **A finding an audit ratchet records is held by its baseline row.**{#mechanism-closes}
+   Every open finding (`tracked:<issue>`, or a trial row's `issue`)
+   names a beads issue that exists and is not closed, and a closed issue
+   keeps no open finding. The five baselines keep their files and
+   vocabularies; `scripts/lib/findings.mjs` reads every row as
+   `{ id, source, state, issue, classification, note }` so the rule is
+   checked once, by `check:findings`, which also holds the trial
+   catalog's issues to it.
 2. **A ratchet fails both ways.**{#ratchet-both-ways} A detector reports candidates, and a
    committed baseline holds a verdict for each. `--check` fails on a
    new candidate with no row and on a row no longer detected, so the
    baseline always lists exactly what is open.
-3. **A script detects, and a person classifies.**{#person-classifies} The detector assigns
-   no verdict. A person records each verdict in the baseline:
-   `tracked:<issue>` for an open finding, or a classification with its
-   reason. (`audit:specs --write` reopens a verdict whose commits
-   grew, asking for it again; barwise-qs8.)
+3. **A detector never invents a verdict.**{#person-classifies} A new row gets its
+   writer's placeholder, `--check` fails while a placeholder remains,
+   and every verdict comes from its audit's declared list, with a note.
+   (`audit:specs --write` reopens a verdict whose commits grew, asking
+   for it again; barwise-qs8.) Each audit's placeholder and list live in
+   `scripts/lib/findings.mjs`, which the ratchets import.
 4. **An audit's ratchet is wired into CI.**{#ratchet-in-ci}
 
 ## Consequences
@@ -74,31 +79,36 @@ verdict on every row is safe to gate on, when raw detection is not.
     drift-guards spec recommends in an unresolved Open decision.
     Whether a scheduled run satisfies decision 4 is open, not decided
     here.
-- Decision 1 has no gate. It is held in review: `session-review` has
-  each entry name its mechanism or say it has none, the pull request
-  template and `pr-creation` require that section, and the `pr-review`
-  checklist checks each entry names where it landed. The
-  `duplication-audit` skill still calls its deliverable "a dated
-  findings doc" (barwise-uuh).
-- Decision 3 has no gate on who classifies, and verdict content is
-  checked only partly.
-  - `audit:corrections` checks a verdict's form: `caught_by` must come
-    from a fixed list.
-  - `audit:specs` checks form too: it rejects an empty or `TODO` note.
-  - `trial:gate` requires a note and an issue, and a reproduction
-    directory for a definite finding; a `could_not_answer` row needs
-    none.
-  - `audit:duplication` reads the verdict to word its message but
-    does not validate it, and a row with no `status` crashes `--check`;
-    `audit:rubric` never reads it. A `test:scripts` case (guarded by
-    the same docs-only condition) rejects a placeholder in
-    `rubric-baseline.json`.
-  - No ratchet checks that a named issue exists in the tracker, or that
-    it is open (barwise-u5d).
-  - `pr-review`'s "Ratchets silenced" item and its checklist ask the
-    reviewer to report a row added to make a ratchet pass, while
-    `REVIEW.md`'s "Do not report" tells reviewers to skip the
-    duplication ratchet (barwise-iil).
+- `findings-close-by-mechanism.md#mechanism-closes` and
+  `findings-close-by-mechanism.md#person-classifies` are held by
+  `check:findings` (a CI step with no `if:`), over all five baselines
+  and the trial catalog:
+  - an open row naming an issue that is missing or closed fails; an
+    `in_progress` issue counts as live, as `adr-judge.mjs` decides for
+    ADR gap issues;
+  - a row with its writer's placeholder fails, in every baseline,
+    `rubric-baseline.json` and `audit-baseline.json` included;
+  - a verdict outside its audit's list fails: `accepted-benign` or
+    `tracked` for duplication and rubric, `CAUGHT_BY` for
+    corrections, a `catalog.json` class for trial. A spec-status note
+    is free text, checked only for being present and not a placeholder.
+  - Spec-status and correction rows name no issue; an issue their notes
+    mention is prose, not a claim the gate checks.
+- The broader rule the first decision once stated, that any finding an
+  audit turns up is closed by a mechanism and not by a document, is now
+  prose held in review: `session-review` has each entry name its
+  mechanism or say it has none, the pull request template and
+  `pr-creation` require that section, and the `pr-review` checklist
+  checks each entry names where it landed. The `duplication-audit`
+  skill still calls its deliverable "a dated findings doc"
+  (barwise-uuh).
+- Whether a verdict is right is not checked: the decision's derived
+  verdicts (syntax-tree sameness, differential tests, the package-graph
+  rule) wait on the mechanical duplication spec (barwise-ym8.h0l,
+  barwise-ym8.gc9.7fb). `pr-review`'s "Ratchets silenced" item asks
+  the reviewer to report a row added to make a ratchet pass, while
+  `REVIEW.md`'s "Do not report" tells reviewers to skip the
+  duplication ratchet (barwise-iil).
 - Open findings that no mechanism holds yet, each tracked:
   - the mutation score (barwise-994);
   - the assertion-audit fixture pass (barwise-1073);

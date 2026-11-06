@@ -85,13 +85,6 @@
       "note": "Reading barwise's own NORMA export back yields a model that fails barwise's own validation with population/mandatory-violation. The cause is the lost `sample: true` flag: NORMA has no seat for a sample instance, so the populations come back significant, their instances enter the object universe, and every mandatory role they must play reports a violation (barwise-oph). Restoring only that flag takes the round-tripped model from 49 errors to 0."
     },
     {
-      "id": "diff-rename-no-synonym",
-      "issue": "barwise-rkm",
-      "severity": "S5",
-      "step": "^diff:\\d+:rename_object_type$",
-      "note": "diff reports this rename as a removal plus an addition with no synonym candidate while other renames in the same history are reported as candidates (barwise-rkm)."
-    },
-    {
       "id": "code-import-utility-name-skip",
       "issue": "barwise-tn4",
       "severity": "S1",

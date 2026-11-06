@@ -331,6 +331,13 @@ jobs:
       # spec edit IS the change this gate checks.
       - run: npm run audit:corrections -- --check
 
+      # The rules about findings, over all five audit baselines at once
+      # (docs/specs/audit-finding-reader.spec.md): an open row names a live
+      # issue, no row keeps its placeholder, every verdict is in its
+      # audit's vocabulary. Reads JSON and the tracker only, so no build
+      # and no docs-only skip: a baseline edit IS the change it checks.
+      - run: npm run check:findings
+
       # The gates' own tests. Every enumerating gate is proven to report
       # the same coverage from three different cwds (barwise-905: one of
       # them silently scanned 1426 of 1483 files under `npm run`), and

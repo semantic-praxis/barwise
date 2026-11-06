@@ -1,13 +1,6 @@
 {
   "$comment": "Specs whose Status claims no implementation while commits have landed on the source files they name. Each row needs a note saying why the header is still right, or what it should say instead. Ratcheted by `npm run audit:specs -- --check` (scripts/audit-spec-status.mjs).",
   "specs": {
-    "audit-finding-reader.spec.md": {
-      "status": "Draft -- no workstream implemented",
-      "commits": [
-        "f198d087"
-      ],
-      "note": "Genuinely unimplemented: f198d087 is format-renderers-to-connectors WS4 (core-external-deps), which touched files this plan also lists (probes.json, ARCHITECTURE.md, scripts/tests/) for its own decision; no part of the finding reader was built."
-    },
     "conformance-property.spec.md": {
       "status": "Accepted (all decisions resolved 2026-08-25; both workstreams\nopen -- design only, no implementation in this PR)",
       "commits": [

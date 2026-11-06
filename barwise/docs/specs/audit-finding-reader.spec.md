@@ -1,6 +1,6 @@
 # Audit findings: one reader over the five baselines, and the gates it makes possible
 
-Status: Draft -- no workstream implemented
+Status: WS1 implemented 2026-11-06 (`scripts/lib/findings.mjs` and `check:findings`, a CI step; findings-close-by-mechanism decisions 1 and 3 restated; the dead catalog class removed); WS2-WS4 not started
 
 Created: 2026-11-06
 Last-updated: 2026-11-06
