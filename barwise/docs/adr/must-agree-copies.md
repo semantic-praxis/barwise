@@ -70,15 +70,22 @@ members.
   fails. `ci:local` runs both before each push, and it keeps going
   after a failure.
 - `check:parity` fails when members differ, when a member does not
-  resolve, and when a set has fewer than two members, which used to pass
-  as a check and was how a half-retired entry looked; it refuses (exit
-  2) an `ignore` it does not apply and an `ignore` on a symbol or field
-  set, which it used to skip without saying so (audit-finding-reader
-  WS4). Two parts of decision 3 still escape it (barwise-tdu):
-  - it compares raw text, not normalised text or printed syntax trees;
-  - it resolves only top-level function and variable declarations.
-- Nothing gates decision 3's retirement clause: an entry deleted while
-  both copies remain passes (barwise-ym8.8nq). `pr-review` lists both under "Ratchets
+  resolve, when a set has fewer than two distinct members (a set that
+  compares a copy with nothing, or with itself, which is how a
+  half-retired entry used to pass), and when a set names an `ignore` it
+  does not apply or puts one on a symbol or field set, which it used to
+  skip without saying so; each names its set, and the other sets are
+  still compared. An unreadable manifest is a refusal (audit-finding-reader
+  WS4). Three parts of decision 3 still escape it:
+  - it compares raw text, not normalised text or printed syntax trees
+    (barwise-tdu);
+  - it resolves only top-level function and variable declarations
+    (barwise-tdu);
+  - its retirement clause: an entry deleted while both copies remain
+    passes (barwise-ym8.8nq).
+- Nothing gates decision 4's verdict content beyond `check:findings`'s
+  vocabulary and open-issue rules (related barwise-u5d). `pr-review`
+  lists the retirement clause and verdict content under "Ratchets
   silenced". `REVIEW.md`'s "Do not report" tells reviewers to skip
   registered copies and the duplication ratchet because CI enforces
   them, so the review instructions contradict each other (barwise-iil).

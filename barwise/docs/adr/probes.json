@@ -37,6 +37,12 @@
   },
   {
     "decision": "must-agree-copies#registered-sets-identical",
+    "file": "barwise/parity.manifest.json",
+    "old": "\"packages/cli/src/workspace/stagedWrite.ts\",\n        \"packages/mcp/src/workspace/stagedWrite.ts\"",
+    "new": "\"packages/cli/src/workspace/stagedWrite.ts\""
+  },
+  {
+    "decision": "must-agree-copies#registered-sets-identical",
     "file": "barwise/packages/cli/src/commands/import/shared.ts",
     "old": "function summarizeDiff(diff: ModelDiffResult): string {\n  let added = 0;",
     "new": "function summarizeDiff(diff: ModelDiffResult): string {\n  let added = 1;"
