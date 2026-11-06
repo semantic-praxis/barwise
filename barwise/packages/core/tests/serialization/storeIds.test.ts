@@ -128,7 +128,11 @@ model:
   // above reached. One case per model, not one loop: the loop's cost grew
   // with the corpus and passed 30s under the pre-commit hook's parallel
   // run while taking 5s alone (barwise-ov2, barwise-6yu).
-  describe("give back the bytes a save wrote, for every minted id in every tracked model", () => {
+  // Sequential on purpose: the last case reads what the per-model cases
+  // recorded, so it must run after them even under a concurrent run.
+  describe("give back the bytes a save wrote, for every minted id in every tracked model", {
+    sequential: true,
+  }, () => {
     const corpus = modelCorpus();
     const sites = new Map<string, number>();
 
@@ -156,16 +160,17 @@ model:
           i += 1;
         }
       }
-      sites.set(c.file, here);
-      if (here === 0) return;
+      // A model with no minted id is checked too: storing nothing must give
+      // back its text byte for byte.
       const back = storeIds(removed.join("\n"));
       expect([c.file, back.stored.length, back.text]).toEqual([c.file, here, text]);
+      sites.set(c.file, here);
     });
 
-    // Runs after the cases above (a file's tests run in order). A filtered
-    // run that skipped some of them fails here by name, not by a low count.
+    // A model is recorded only once its round trip passed, so a failed or
+    // skipped case shows here as a missing file, by name.
     it("reach more than 200 sites across the corpus", () => {
-      expect(sites.size).toBe(corpus.length);
+      expect(corpus.map((c) => c.file).filter((f) => !sites.has(f))).toEqual([]);
       expect([...sites.values()].reduce((a, b) => a + b, 0)).toBeGreaterThan(200);
     });
   });
