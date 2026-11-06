@@ -412,8 +412,8 @@ skill (`.claude/skills/release/`).
   are fine.
 - **Every Python execution resolves from the project lockfile.** The
   form is `uv run --frozen [--only-group <g>] ...`, and `--locked` in
-  CI. Never a bare `python3`, `python`, `pip` or `pip3` (the one
-  exception is CI's pinned uv bootstrap); never `--with`,
+  CI. Never a bare `python3`, `python`, `pip` or `pip3` (uv itself
+  comes from `scripts/install-uv.sh`, pinned and verified); never `--with`,
   `--with-requirements`, `--isolated`, `--no-project`, `uv pip`, `uvx`,
   `uv tool run` or PEP 723 inline metadata. An optional tier (sqlglot)
   is a dependency-group in the single `pyproject.toml`. Keep

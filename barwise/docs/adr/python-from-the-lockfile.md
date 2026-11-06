@@ -8,9 +8,9 @@ docs/specs/python-lockfile-execution.spec.md,
 docs/specs/agent-python-uv-hook.spec.md,
 docs/specs/python-uv-widened.spec.md
 Enforced-by: npm run check:python-uv (lockfile-only, no-outside-forms, project-ancestor,
-groups-and-one-offs, uv-bootstrap), tests (project-ancestor),
-none (barwise-ym8.fq7: lockfile-only), none (barwise-ym8.l69: no-outside-forms),
-none (barwise-ym8.q07: project-ancestor), none (barwise-ym8.suc: uv-bootstrap)
+groups-and-one-offs), npm run check:pins (uv-bootstrap), tests (project-ancestor,
+uv-bootstrap), none (barwise-ym8.fq7: lockfile-only),
+none (barwise-ym8.l69: no-outside-forms), none (barwise-ym8.q07: project-ancestor)
 
 ## Context
 
@@ -30,8 +30,8 @@ project, and the rejected alternatives are in the two specs above.
 1. **Every Python execution resolves from `barwise/uv.lock`.**{#lockfile-only} Code,
    scripts and commands use `uv run --frozen [--only-group <g>] ...`.
    CI asserts the lock with `--locked`, so a stale lock fails the build
-   rather than being re-resolved. Apart from decision 5, a bare
-   `python3`, `python`, `pip` or `pip3` is never used.
+   rather than being re-resolved. A bare `python3`, `python`, `pip` or
+   `pip3` is never used.
 2. **No form that resolves outside the lock.**{#no-outside-forms} `--with`,
    `--with-requirements`, `--isolated`, `--no-project`, `uv pip`, `uvx`,
    `uv tool run` and PEP 723 inline script metadata are banned outright.
@@ -47,8 +47,14 @@ project, and the rejected alternatives are in the two specs above.
 4. **Optional tiers are dependency groups in the one `pyproject.toml`,
    and a one-off is a run of this project.**{#groups-and-one-offs} sqlglot is the `sqlglot`
    group. A throwaway script goes in the repo and runs `--frozen`.
-5. **The one exception is bootstrapping uv itself.**{#uv-bootstrap} CI installs uv with
-   `python3 -m pip install uv==<pinned>`.
+5. **uv is installed only by `scripts/install-uv.sh`, at its pinned
+   version, verified before it is unpacked.**{#uv-bootstrap} CI and the
+   session hook call it; it downloads uv's release tarball and checks
+   its published SHA-256 before `tar` runs. (Restated by the owner on
+   2026-11-06 from "the one exception is bootstrapping uv itself: CI
+   installs uv with `python3 -m pip install uv==<pinned>`", which left
+   decision 1 one bare `python3` and pinned uv only in CI;
+   `python-uv-widened.spec.md`, open decision 1 and WS4.)
 
 ## Consequences
 
@@ -68,8 +74,9 @@ project, and the rejected alternatives are in the two specs above.
   rules. For decisions 3 and 4 it fails when `barwise/pyproject.toml` or
   `barwise/uv.lock` is not tracked, and on any other tracked
   `pyproject.toml`, `requirements*.txt`, `setup.py`, `setup.cfg`,
-  `Pipfile`, `uv.toml`, `pylock.toml` or `uv.lock`. Its one-row
-  allowlist (decision 5) fails when stale. The pre-push hook runs it through
+  `Pipfile`, `uv.toml`, `pylock.toml` or `uv.lock`. It exempts nothing:
+  with uv installed from its release tarball, no bare interpreter is
+  allowed anywhere. The pre-push hook runs it through
   `ci:local` where the git hooks are wired; the session-start hook
   warns when they are not, and nothing gates on it (barwise-1016).
 - A `PreToolUse` hook on the Bash tool (`scripts/hooks/python-uv-guard.mjs`)
@@ -103,12 +110,13 @@ project, and the rejected alternatives are in the two specs above.
   - 4: a one-off kept outside the repository is outside anything a
     check of the tracked tree can see; the checklist names the rule for
     review;
-  - 5: the allowlist matches any `ci.yml` line containing its text, so a
-    second line with the bootstrap prefix, or a command chained onto it,
-    would pass (barwise-c81); and the session-start hook installs uv
-    unpinned, so the pinned bootstrap holds only in CI (barwise-921).
-    One installer for uv is `python-uv-widened.spec.md` WS4, which waits
-    on that spec's open decision 1 because it rewords decision 5.
+  - 5: held by what runs. `npm run check:pins`, in CI after the Python
+    step and at pre-push, refuses (exit 2) when `uv --version` is not
+    `install-uv.sh`'s `VERSION`, however that uv was installed; the
+    installer's tests show it stops before `tar` on a digest mismatch,
+    replaces a uv at another version in its directory, and removes a
+    `uvx` there; the session hook runs it on every start. A machine
+    whose PATH puts another uv first is refused, not passed.
 - A sqlglot test that skips locally, or is disabled with `.skip`, is
   not caught. barwise-921's `audit:skips` (workstream 4) would have
   caught it, and the owner deferred that workstream on 2026-09-06.

@@ -13,8 +13,10 @@ import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 import {
   hookReadsNvmrc,
+  installerVersion,
   pythonPinProblem,
   runningProblem,
+  uvVersionProblem,
   workflowFindings,
 } from "../check-pins.mjs";
 
@@ -78,7 +80,29 @@ test("a hook reads .nvmrc only where code names it, not in a comment or an echoe
   assert.ok(!hookReadsNvmrc('echo "ignoring .nvmrc"'));
 });
 
-/** A tree holding what the gate reads, and a stand-in uv answering `version`. */
+test("the uv that runs is held to install-uv.sh's VERSION [adr:python-from-the-lockfile#uv-bootstrap]", () => {
+  assert.equal(installerVersion('set -e\nVERSION="0.12.7"\n'), "0.12.7");
+  assert.throws(() => installerVersion("VERSION=0.12.7\n"), /no VERSION="\.\.\." line/);
+  const pinned = "0.12.7";
+  assert.equal(
+    uvVersionProblem({ pinned, reported: "uv 0.12.7 (x86_64-unknown-linux-gnu)\n" }),
+    null,
+  );
+  assert.equal(uvVersionProblem({ pinned, reported: "uv 0.12.7" }), null);
+  assert.match(
+    uvVersionProblem({ pinned, reported: "uv 0.11.32 (x86_64-unknown-linux-gnu)" }),
+    /uv 0\.11\.32 is running, not scripts\/install-uv\.sh's 0\.12\.7; run `bash barwise\/scripts\/install-uv\.sh/,
+  );
+  assert.match(uvVersionProblem({ pinned, reported: "uv 0.12.70" }), /uv 0\.12\.70 is running/);
+  assert.match(uvVersionProblem({ pinned, reported: "garbage" }), /"garbage" is running/);
+});
+
+/**
+ * A tree holding what the gate reads, and a stand-in uv answering
+ * `--version` with `uvVersion` (as the real one does: "uv 0.12.7 (target)")
+ * and `python find` with `uv`. `installer` is install-uv.sh's text, or
+ * null for none.
+ */
 function tree(
   t,
   {
@@ -87,6 +111,8 @@ function tree(
     pin = "3.13",
     copy = "3.13",
     uv = "3.13.4",
+    uvVersion = "0.12.7",
+    installer = 'set -euo pipefail\nVERSION="0.12.7"\n',
   } = {},
 ) {
   const dir = mkdtempSync(join(tmpdir(), "barwise-pins-"));
@@ -106,10 +132,18 @@ function tree(
   writeFileSync(join(dir, ".claude", "hooks", "session-start.sh"), `#!/bin/sh\n${hook}\n`);
   mkdirSync(join(dir, "barwise"));
   if (copy !== null) writeFileSync(join(dir, "barwise", ".python-version"), `${copy}\n`);
+  if (installer !== null) {
+    mkdirSync(join(dir, "barwise", "scripts"));
+    writeFileSync(join(dir, "barwise", "scripts", "install-uv.sh"), installer);
+  }
   if (uv !== null) {
     writeFileSync(
       join(bin, "uv"),
-      `#!/bin/sh\nprintf '%s\\n' "$@" > "${bin}/uv-argv"\necho ${uv}\n`,
+      `#!/bin/sh
+if [ "$1" = --version ]; then echo "uv ${uvVersion} (x86_64-unknown-linux-gnu)"; exit 0; fi
+printf '%s\\n' "$@" > "${bin}/uv-argv"
+echo ${uv}
+`,
     );
     chmodSync(join(bin, "uv"), 0o755);
   }
@@ -137,6 +171,26 @@ test("the gate passes a tree whose pins are read, and prints the versions that r
     join(tr.dir, "barwise"),
   ]);
   assert.match(r.stderr, new RegExp(`ran Node ${process.version} .*Python 3\\.13\\.4`));
+  assert.match(r.stderr, /uv 0\.12\.7 \(x86_64-unknown-linux-gnu\)\. OK/);
+});
+
+test("the gate refuses a uv on another version than install-uv.sh's, naming both [adr:python-from-the-lockfile#uv-bootstrap]", (t) => {
+  const r = run(tree(t, { uvVersion: "0.11.32" }));
+  assert.equal(r.status, 2, r.stderr);
+  assert.match(
+    r.stderr,
+    /cannot answer: uv 0\.11\.32 is running, not scripts\/install-uv\.sh's 0\.12\.7; run `bash barwise\/scripts\/install-uv\.sh ~\/\.local\/bin`/,
+  );
+  assert.doesNotMatch(r.stderr, /OK/);
+});
+
+test("a missing install-uv.sh, or one with no VERSION line, is a finding about the tree", (t) => {
+  const gone = run(tree(t, { installer: null }));
+  assert.equal(gone.status, 1, gone.stderr);
+  assert.match(gone.stderr, /scripts\/install-uv\.sh is missing, so there is no uv pin to hold/);
+  const noLine = run(tree(t, { installer: "set -euo pipefail\nV=0.12.7\n" }));
+  assert.equal(noLine.status, 1, noLine.stderr);
+  assert.match(noLine.stderr, /scripts\/install-uv\.sh has no VERSION/);
 });
 
 test("the gate: a workflow naming a Node version fails [adr:pinned-runtimes#node-from-nvmrc]", (t) => {

@@ -1825,15 +1825,12 @@ test("every registered field member still resolves", () => {
 
 // --- barwise-921: every Python execution resolves from the lockfile ---
 //
-// The gate's ALLOWLIST names `.github/workflows/ci.yml` and is ratcheted,
-// so a fixture repo WITHOUT that bootstrap line fails as stale -- which is
-// itself one of the cases below. Every other fixture stages the line, so
-// the only variable under test is the planted violation.
-const UV_BOOTSTRAP = "          python3 -m pip install --quiet uv==0.12.7\n";
+// The gate exempts nothing (python-uv-widened WS4: uv comes from
+// install-uv.sh, not pip), so a fixture repo holds only the project files
+// and the planted case.
 
 function pythonUvRepo(files = {}) {
   const dir = tempRepo();
-  stage(dir, ".github/workflows/ci.yml", `jobs:\n  ci:\n    steps:\n${UV_BOOTSTRAP}`);
   // The one project every Python run resolves from (python-uv-widened WS3).
   stage(dir, "barwise/pyproject.toml", '[project]\nname = "x"\n');
   stage(dir, "barwise/uv.lock", "version = 1\n");
@@ -1852,10 +1849,16 @@ function pythonUv(files) {
   }
 }
 
-test("check-python-uv passes a repo whose only Python call is the allowlisted bootstrap", () => {
-  const r = pythonUv();
-  assert.equal(r.status, 0, r.stderr);
-  assert.match(r.stdout, /no bare interpreters/);
+test("check-python-uv fails the old pip bootstrap of uv as a bare python3 [adr:python-from-the-lockfile#uv-bootstrap]", () => {
+  // It was the gate's one ALLOWLIST row until install-uv.sh replaced it; a
+  // planted copy must now fail like any other bare interpreter.
+  const r = pythonUv({
+    ".github/workflows/ci.yml":
+      "jobs:\n  ci:\n    steps:\n      - run: |\n          python3 -m pip install --quiet uv==0.12.7\n",
+  });
+  assert.equal(r.status, 1, `expected failure, got:\n${r.stdout}`);
+  assert.match(r.stderr, /\.github\/workflows\/ci\.yml:5 +bare `python3`/);
+  assert.doesNotMatch(r.stdout, /OK/);
 });
 
 // One planted defect per banned form. A gate verified only in aggregate can
@@ -1992,15 +1995,6 @@ for (const [name, files, expected] of VIOLATIONS) {
   });
 }
 
-test("check-python-uv fails on a STALE allowlist entry, so a fixed site forces its row out", () => {
-  // No ci.yml at all: the bootstrap the allowlist exempts no longer exists.
-  const dir = tempRepo();
-  stage(dir, "README.md", "nothing to see\n");
-  const r = gate("check-python-uv.mjs", dir);
-  assert.equal(r.status, 1, `expected failure, got:\n${r.stdout}`);
-  assert.match(r.stderr, /STALE allowlist entry/);
-});
-
 test("check-python-uv does not flag a mention inside a quoted string", () => {
   // `echo "== uv sync"` is a heading, not an invocation. Flagging it is how
   // a gate cries wolf on the repo's own error messages and gets disabled.
@@ -2113,7 +2107,6 @@ for (const [name, file] of MANIFESTS) {
 test("check-python-uv fails when the project file is not tracked", () => {
   const dir = tempRepo();
   try {
-    stage(dir, ".github/workflows/ci.yml", `jobs:\n  ci:\n    steps:\n${UV_BOOTSTRAP}`);
     stage(dir, "barwise/uv.lock", "version = 1\n");
     const r = gate("check-python-uv.mjs", dir);
     assert.equal(r.status, 1, r.stdout);

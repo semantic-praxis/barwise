@@ -16,8 +16,8 @@
 #
 # A third-party release tarball rather than a third-party GitHub Action: the
 # workflow uses first-party `actions/*` only, and the supply-chain spec left
-# widening that out of scope. A pinned tarball with a verified digest is the
-# same shape as `pip install uv==0.12.7` already in that workflow.
+# widening that out of scope. scripts/install-uv.sh installs uv the same
+# way, for the same reason.
 set -euo pipefail
 
 VERSION="8.28.0"
