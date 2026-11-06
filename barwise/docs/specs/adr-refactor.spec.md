@@ -162,11 +162,10 @@ The owner answers per row: accept, reject, or edit.
 - **Row 9.** `merge-delegation#owner-overrides`: **owner, 2026-11-06: restate.** "When the owner says to merge a pull request, the agent merges it with an `Owner-directed:` trailer in place of the review trailers. A reviewer who is not the driving agent recommends, and never approves or merges." Gate: the trailer stands in for the review trailers. Audit: a model reads the session transcript for the instruction. The second sentence is not checkable while every action shows the owner's login.
 - **Row 20.** `merge-delegation#ask-owner`: **owner, 2026-11-06: kept as a decision**, not retired. The verdict values include "cannot tell" and "code-review unavailable", so every condition is in the record. Gate: a merge preceded by two verdicts other than `merge` with no `Owner-directed:` trailer between them fails. Audit: a model judges whether a "cannot tell" verdict was honest.
 - **The limit, stated in the ADR (owner, 2026-11-06).** Agents act with the owner's credentials, so the gate cannot tell an agent's merge from the owner's own: an agent that omits the trailers is indistinguishable from a manual merge. The gate catches carelessness and a wrong head, not evasion; prevention needs a separate agent identity, which stays barwise-4q0's question.
+- **Row 16.** `review-policy#review-md-owns-lanes`: **owner, 2026-11-06: restate.** "`REVIEW.md`'s lane table names every review lane and its trigger, and the CI lane's triggers match `ci.yml`." Gate (deterministic): the table parses and names each lane; the CI row matches the events `ci.yml` runs on. The merge lane's timing is row 7's gate. Prose: when `/code-review` and `/security-review` run before opening, and "a review does not report what CI enforces" (judgment, audit material only). A report, not a gate, may list other files that state a lane's timing.
 - **Row 24.** `must-agree-copies#check-first`: **owner, 2026-11-06: the decision changes**, with row 1. The default becomes: share where sharing does not couple packages that should not know each other, by composition (a function both sides call) rather than inheritance, and add a parity check only where sharing would couple them. A separate ADR edit; leaves WS1.
 
 **High: affects every pull request**
-
-- **Row 16.** `review-policy#review-md-owns-lanes`: "`REVIEW.md`'s lane table lists each review lane and when it runs, and no other file states when a lane runs."
 
 **Medium: shapes code or checks**
 
