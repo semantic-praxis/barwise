@@ -36,12 +36,16 @@
  * What it deliberately does NOT read, so the next reader does not have to
  * infer the boundary from the code:
  *
- *   .md, Makefile, package.json   prose and script strings. A banned form
- *                                 there instructs a human rather than
- *                                 running, which is a real failure -- two
- *                                 such instructions were fixed alongside
- *                                 this gate -- but not one this matcher
- *                                 can separate from a mention.
+ *   .md                           prose. A banned form there instructs a
+ *                                 human rather than running, which is a
+ *                                 real failure -- two such instructions
+ *                                 were fixed alongside this gate -- but
+ *                                 not one this matcher can separate from
+ *                                 a mention. package.json scripts,
+ *                                 Makefile recipes and the git hooks ARE
+ *                                 read (python-uv-widened WS2): they run.
+ *   .beads/hooks/                 vendored by the tracker, and named as
+ *                                 unread in the gate's OK line.
  *   a command inside a string     `bash -c "python3 ..."`, or an
  *                                 interpreter held in a variable. Quoted
  *                                 text is blanked before matching (see
@@ -52,7 +56,7 @@
  *                                 question from how uv was invoked.
  */
 import { readFileSync } from "node:fs";
-import { extname, resolve } from "node:path";
+import { basename, extname, resolve } from "node:path";
 import {
   bannedFlag,
   bareInterpreter,
@@ -62,6 +66,9 @@ import {
   uvFindings,
 } from "./lib/python-uv-rules.mjs";
 import { REPO_ROOT, trackedFiles } from "./lib/tracked.mjs";
+
+/** package.json, Makefile and the git hooks: read by commandLines. */
+const COMMAND_FILE = /(^|\/)(package\.json|Makefile)$|^barwise\/\.husky\/(?!_\/)[^./]+$/;
 
 /** Files whose contents are commands. */
 const SHELLISH = new Set([".sh", ".yml", ".yaml"]);
@@ -187,17 +194,61 @@ function uvArgsArray(file, text) {
 const findings = [];
 const allowHits = new Set();
 
+/**
+ * Command lines held in files the extension rules do not reach
+ * (python-uv-widened WS2): each package.json's `scripts` values, a
+ * Makefile's recipe lines, and the extensionless git hooks under
+ * barwise/.husky/, which are shell. Each yields `{ line, text }` for the
+ * shell rules, or null when the file is not one of these.
+ */
+function commandLines(file, text) {
+  if (basename(file) === "package.json") {
+    let scripts;
+    try {
+      scripts = JSON.parse(text).scripts ?? {};
+    } catch {
+      return [];
+    }
+    const lines = text.split("\n");
+    return Object.entries(scripts).map(([name, cmd]) => ({
+      line: lines.findIndex((l) => l.includes(JSON.stringify(name) + ":")) + 1,
+      text: String(cmd),
+    }));
+  }
+  if (basename(file) === "Makefile") {
+    return logicalLines(text).filter(({ text: l }) => l.startsWith("\t"));
+  }
+  if (
+    file.startsWith("barwise/.husky/") && !file.startsWith("barwise/.husky/_/")
+    && extname(file) === ""
+  ) {
+    return logicalLines(text).filter(({ text: l }) => !l.trimStart().startsWith("#"));
+  }
+  return null;
+}
+
 for (const file of trackedFiles()) {
   const ext = extname(file);
-  if (!SHELLISH.has(ext) && !JSISH.has(ext) && ext !== ".py") continue;
   if (SELF.has(file)) continue;
   if (file.startsWith(".beads/hooks/")) continue;
+  const special = COMMAND_FILE.test(file);
+  if (!special && !SHELLISH.has(ext) && !JSISH.has(ext) && ext !== ".py") continue;
 
   let text;
   try {
     text = readFileSync(resolve(REPO_ROOT, file), "utf8");
   } catch {
     continue; // deleted in the working tree; not this gate's business
+  }
+
+  if (special) {
+    for (const { line, text: raw } of commandLines(file, text) ?? []) {
+      const cmd = blankQuoted(raw);
+      const bare = bareInterpreter(cmd);
+      if (bare) findings.push({ file, line, what: `bare \`${bare}\``, raw });
+      for (const what of uvFindings(cmd)) findings.push({ file, line, what, raw });
+    }
+    continue;
   }
 
   if (JSISH.has(ext)) findings.push(...uvArgsArray(file, text));
@@ -273,5 +324,5 @@ if (findings.length > 0 || stale.length > 0) {
 
 console.log(
   `check-python-uv: no bare interpreters, no lock bypasses; `
-    + `${ALLOWLIST.length} allowlisted (uv bootstrap). OK`,
+    + `${ALLOWLIST.length} allowlisted (uv bootstrap); .beads/hooks/ not read, vendored. OK`,
 );

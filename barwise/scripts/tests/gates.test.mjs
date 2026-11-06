@@ -2051,6 +2051,65 @@ for (const [name, source, expected] of ARGS_ARRAY) {
   });
 }
 
+// python-uv-widened WS2: files the extension rules did not reach.
+const COMMAND_FILES = [
+  [
+    "a package.json script",
+    {
+      "package.json": JSON.stringify({ scripts: { opt: "uv run --with x pytest" } }, null, 2)
+        + "\n",
+    },
+    /package\.json:3 .*--with.*lock bypass/,
+  ],
+  [
+    "a Makefile recipe",
+    { "Makefile": "test:\n\tpython3 -m pytest\n" },
+    /Makefile:2 .*bare `python3`/,
+  ],
+  [
+    "a git hook, which has no extension",
+    { "barwise/.husky/pre-commit": "uv run python -V\n" },
+    /barwise\/\.husky\/pre-commit:1 .*neither --frozen nor --locked/,
+  ],
+];
+
+for (const [name, files, expected] of COMMAND_FILES) {
+  test(`check-python-uv reads ${name}`, () => {
+    const r = pythonUv(files);
+    assert.equal(r.status, 1, `expected failure, got:\n${r.stdout}`);
+    assert.match(r.stderr, expected);
+  });
+}
+
+test("check-python-uv passes compliant command files, and names what it does not read", () => {
+  const r = pythonUv({
+    "package.json": JSON.stringify({ scripts: { opt: "uv run --frozen --extra dev pytest -q" } })
+      + "\n",
+    "Makefile": "test:\n\tnpm test\n",
+    "barwise/.husky/pre-push": "npm run ci:local\n",
+  });
+  assert.equal(r.status, 0, r.stderr);
+  assert.match(r.stdout, /\.beads\/hooks\/ not read, vendored/);
+});
+
+test("UV_SUBCOMMANDS holds every subcommand the installed uv lists", async (t) => {
+  // The parser finds a uv call's subcommand by name, so a missing name
+  // reads that call as no uv call at all: the list is a copy of uv's CLI
+  // that fails open, and it was wrong once when written from memory.
+  const help = spawnSync("uv", ["help"], { encoding: "utf8" });
+  if (help.error || help.status !== 0) {
+    t.skip("uv is not installed here; CI installs it before this suite");
+    return;
+  }
+  const { UV_SUBCOMMANDS } = await import(
+    pathToFileURL(join(SCRIPTS, "lib", "python-uv-rules.mjs")).href
+  );
+  const section = help.stdout.split(/^Commands:$/m)[1]?.split(/^\S/m)[0] ?? "";
+  const listed = [...section.matchAll(/^\s{2}([a-z][\w-]*)\s/gm)].map((m) => m[1]);
+  assert.ok(listed.length > 10, `could not read uv help:\n${help.stdout}`);
+  assert.deepEqual(listed.filter((c) => !UV_SUBCOMMANDS.has(c)), []);
+});
+
 test("check-python-uv passes the correct parsed forms", () => {
   // Each of these is right, and each would be wrong under a careless parse:
   // a flag that belongs to the launched program, the env spelling of the
