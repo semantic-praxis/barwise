@@ -12,7 +12,11 @@
  *                   "unclassified" the writer's placeholder is still there
  *   classification  the audit's own word for the verdict
  *   vocabulary      the Set it must belong to, or null when the verdict is
- *                   free text (a spec-status note)
+ *                   free text (a spec-status note) or not recorded (a trial
+ *                   row classified by hand, with no catalog class)
+ *   issue           for an open row, the issue it names, or null when it
+ *                   says `tracked` and names none (a finding of its own)
+ *   note            the reason; a recorded verdict needs one
  *
  * Each source's placeholder test and vocabulary live here and nowhere
  * else: the ratchet scripts import them, so a value is added in one place.
@@ -23,7 +27,9 @@
  */
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { isMap } from "./architecture-section.mjs";
+// A leaf module: the ratchets and the trial gate import their rules from
+// here, so it imports nothing else from scripts/lib.
+const isMap = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
 
 /** audit:corrections' verdicts: how a correction was caught, a taxonomy. */
 export const CAUGHT_BY = new Set([
@@ -54,11 +60,29 @@ export const isTrialRowUnclassified = (row) =>
 /** audit:duplication's and audit:rubric's two verdicts. */
 const BENIGN_OR_TRACKED = new Set(["accepted-benign", "tracked"]);
 
-/** `tracked:<issue>` at the start of a status or verdict, and the issue it names. */
-const trackedIssue = (text) => /^tracked:([\w.-]+)/.exec(text)?.[1] ?? null;
+/**
+ * Whether a status or verdict says `tracked`, and the issue it names: the
+ * `<issue>` of `tracked:<issue>`, or null when it says `tracked` and names
+ * none (`tracked`, `tracked: soon`), which the gate reports rather than
+ * reading the row as classified.
+ */
+const tracked = (text) =>
+  /^tracked\b/.test(text) ? { issue: /^tracked:([\w.-]+)/.exec(text)?.[1] ?? null } : null;
 
 const fail = (source, id, why) => {
   throw new Error(`${source}: row ${id} ${why}`);
+};
+
+/**
+ * A row's verdict field: absent or empty is the writer's placeholder (a
+ * finding, exit 1); present but not a string is a row nobody can read
+ * (a refusal, exit 2).
+ */
+const verdictOf = (source, id, row, field) => {
+  const v = row[field];
+  if (v === undefined || v === "") return null;
+  if (typeof v !== "string") fail(source, id, `has a ${field} that is not a string`);
+  return v;
 };
 
 const SOURCES = [
@@ -67,15 +91,13 @@ const SOURCES = [
     file: "audit-baseline.json",
     key: "candidates",
     map(id, row) {
-      if (row.status === undefined || row.status === "") return { state: "unclassified" };
-      if (typeof row.status !== "string") {
-        fail(this.source, id, "has a status that is not a string");
-      }
-      const issue = trackedIssue(row.status);
+      const status = verdictOf(this.source, id, row, "status");
+      if (status === null) return { state: "unclassified" };
+      const t = tracked(status);
       return {
-        state: issue ? "open" : "classified",
-        issue,
-        classification: issue ? "tracked" : row.status,
+        state: t ? "open" : "classified",
+        issue: t?.issue,
+        classification: t ? "tracked" : status,
         vocabulary: BENIGN_OR_TRACKED,
         note: row.note,
       };
@@ -86,16 +108,16 @@ const SOURCES = [
     file: "rubric-baseline.json",
     key: "checks",
     map(id, row) {
-      if (typeof row.verdict !== "string") fail(this.source, id, "has no verdict string");
-      if (row.verdict === "TODO") return { state: "unclassified" };
-      const issue = trackedIssue(row.verdict);
+      const verdict = verdictOf(this.source, id, row, "verdict");
+      if (verdict === null || verdict === "TODO") return { state: "unclassified" };
+      const t = tracked(verdict);
       return {
-        state: issue ? "open" : "classified",
-        issue,
+        state: t ? "open" : "classified",
+        issue: t?.issue,
         // `accepted-benign: <reason>`, or `tracked:<issue> <reason>`.
-        classification: row.verdict.split(":")[0],
+        classification: verdict.split(":")[0],
         vocabulary: BENIGN_OR_TRACKED,
-        note: row.verdict,
+        note: verdict,
       };
     },
   },
@@ -104,13 +126,11 @@ const SOURCES = [
     file: "spec-status-baseline.json",
     key: "specs",
     map(id, row) {
-      if (row.note !== undefined && typeof row.note !== "string") {
-        fail(this.source, id, "has a note that is not a string");
-      }
-      if (isSpecNotePlaceholder(row.note)) return { state: "unclassified" };
+      const note = verdictOf(this.source, id, row, "note");
+      if (isSpecNotePlaceholder(note)) return { state: "unclassified" };
       // The verdict is the note itself; issues it mentions are prose, not
       // claims the gate checks (the spec's Open decision 2).
-      return { state: "classified", classification: row.note, vocabulary: null, note: row.note };
+      return { state: "classified", classification: note, vocabulary: null, note };
     },
   },
   {
@@ -118,11 +138,11 @@ const SOURCES = [
     file: "correction-baseline.json",
     key: "records",
     map(id, row) {
-      if (typeof row.caught_by !== "string") fail(this.source, id, "has no caught_by string");
-      if (row.caught_by.startsWith("TODO")) return { state: "unclassified" };
+      const caughtBy = verdictOf(this.source, id, row, "caught_by");
+      if (caughtBy === null || caughtBy.startsWith("TODO")) return { state: "unclassified" };
       return {
         state: "classified",
-        classification: row.caught_by,
+        classification: caughtBy,
         vocabulary: CAUGHT_BY,
         note: row.note,
       };
@@ -134,21 +154,33 @@ const SOURCES = [
     key: "findings",
     map(id, row, { catalogClasses }) {
       if (isTrialRowUnclassified(row)) return { state: "unclassified" };
+      // A row classified by hand has a note and an issue but no catalog
+      // class, which trial:gate and the trial README accept.
+      const hasClass = row.class !== undefined && row.class !== null;
       return {
         state: "open",
         issue: row.issue,
-        classification: row.class,
-        vocabulary: catalogClasses,
+        classification: hasClass ? row.class : null,
+        vocabulary: hasClass ? catalogClasses : null,
         note: row.note,
       };
     },
   },
 ];
 
+/** A JSON file, refused with its path when it is absent or does not parse. */
+function readJson(path) {
+  try {
+    return JSON.parse(readFileSync(path, "utf8"));
+  } catch (err) {
+    throw new Error(`${path}: ${err.message}`);
+  }
+}
+
 /** The trial catalog's classes, `{ id, issue }`, from `barwise/trial/findings/catalog.json`. */
 export function readTrialCatalog(root) {
   const path = join(root, "barwise", "trial", "findings", "catalog.json");
-  const json = JSON.parse(readFileSync(path, "utf8"));
+  const json = readJson(path);
   if (!Array.isArray(json?.classes)) throw new Error(`${path}: no classes array`);
   return json.classes.map((c, i) => {
     if (typeof c?.id !== "string") throw new Error(`${path}: class ${i} has no id`);
@@ -158,16 +190,17 @@ export function readTrialCatalog(root) {
 
 /**
  * Every row of the five baselines in the common shape, in source order and
- * then the file's row order. Throws on an absent or malformed file, or a
- * row its adapter cannot map.
+ * then the file's row order, with the trial catalog they were read
+ * against. Throws on an absent or malformed file, or a row its adapter
+ * cannot map.
  */
 export function readFindings(root) {
-  const catalogClasses = new Set(readTrialCatalog(root).map((c) => c.id));
+  const catalog = readTrialCatalog(root);
+  const catalogClasses = new Set(catalog.map((c) => c.id));
   const findings = [];
   for (const s of SOURCES) {
     const path = join(root, "barwise", s.file);
-    const json = JSON.parse(readFileSync(path, "utf8"));
-    const rows = json?.[s.key];
+    const rows = readJson(path)?.[s.key];
     if (!isMap(rows)) throw new Error(`${s.file}: no "${s.key}" object`);
     for (const [id, row] of Object.entries(rows)) {
       if (!isMap(row)) fail(s.source, id, "is not an object");
@@ -183,7 +216,7 @@ export function readFindings(root) {
       });
     }
   }
-  return findings;
+  return { findings, catalog };
 }
 
 /** The baseline file each source reads, for messages and tests. */

@@ -94,6 +94,12 @@ verdict on every row is safe to gate on, when raw detection is not.
     is free text, checked only for being present and not a placeholder.
   - Spec-status and correction rows name no issue; an issue their notes
     mention is prose, not a claim the gate checks.
+  - A recorded verdict needs a note (a spec-status note is the verdict
+    itself), and a row that says `tracked` without naming an issue fails.
+  - The ratchets' own `--check` still differ, and `check:findings` is
+    what holds the verdict rules for all of them: `audit:duplication`
+    crashes on a row with no `status` rather than reporting it, and
+    `audit:rubric --check` reads ids only.
 - The broader rule the first decision once stated, that any finding an
   audit turns up is closed by a mechanism and not by a document, is now
   prose held in review: `session-review` has each entry name its

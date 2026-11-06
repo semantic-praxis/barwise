@@ -37,9 +37,13 @@ function fixture() {
 const run = (dir) => spawnSync(process.execPath, [GATE, "--root", dir], { encoding: "utf8" });
 
 /** Edit one JSON file of the fixture, run the gate, and clean up. */
-function planted(rel, edit) {
+function planted(rel, edit, { trackerLine } = {}) {
   const dir = fixture();
   try {
+    if (trackerLine) {
+      const t = join(dir, TRACKER);
+      writeFileSync(t, readFileSync(t, "utf8") + JSON.stringify(trackerLine) + "\n");
+    }
     const path = join(dir, rel);
     const json = JSON.parse(readFileSync(path, "utf8"));
     edit(json);
@@ -100,10 +104,41 @@ test("check:findings fails an open row whose issue is closed or missing", () => 
 });
 
 test("check:findings keeps a claimed (in_progress) issue live", () => {
-  const claimed = issueWith("in_progress");
+  // The fixture's own issue, so the case does not depend on the live
+  // tracker happening to hold one in progress.
+  const claimed = { id: "barwise-claimed", title: "claimed", status: "in_progress" };
   const r = planted("barwise/audit-baseline.json", (j) => {
-    first(j.candidates)[1].status = `tracked:${claimed}`;
-  });
+    first(j.candidates)[1].status = `tracked:${claimed.id}`;
+  }, { trackerLine: claimed });
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+});
+
+test("check:findings fails a row that says tracked and names no issue", () => {
+  found(
+    planted("barwise/audit-baseline.json", (j) => (first(j.candidates)[1].status = "tracked")),
+    /audit-baseline\.json: .*says tracked but names no issue/,
+  );
+  found(
+    planted(
+      "barwise/rubric-baseline.json",
+      (j) => (first(j.checks)[1].verdict = "tracked: someday"),
+    ),
+    /rubric-baseline\.json: .*says tracked but names no issue/,
+  );
+});
+
+test("check:findings fails a recorded verdict with no note, and accepts a hand-classified trial row", () => {
+  found(
+    planted("barwise/correction-baseline.json", (j) => (first(j.records)[1].note = "")),
+    /correction-baseline\.json: .*no note saying why/,
+  );
+  found(
+    planted("barwise/audit-baseline.json", (j) => delete first(j.candidates)[1].note),
+    /audit-baseline\.json: .*no note saying why/,
+  );
+  // trial:gate and the trial README accept a note and an issue with no
+  // catalog class; the vocabulary rule does not apply to it.
+  const r = planted("barwise/trial-baseline.json", (j) => delete first(j.findings)[1].class);
   assert.equal(r.status, 0, r.stdout + r.stderr);
 });
 
@@ -111,6 +146,8 @@ test("check:findings fails a row that still has its writer's placeholder, in eve
   const cases = [
     ["barwise/audit-baseline.json", (j) => delete first(j.candidates)[1].status],
     ["barwise/rubric-baseline.json", (j) => (first(j.checks)[1].verdict = "TODO")],
+    ["barwise/rubric-baseline.json", (j) => delete first(j.checks)[1].verdict],
+    ["barwise/correction-baseline.json", (j) => delete first(j.records)[1].caught_by],
     ["barwise/spec-status-baseline.json", (j) => (first(j.specs)[1].note = "TODO: classify")],
     ["barwise/correction-baseline.json", (j) => (first(j.records)[1].caught_by = "TODO: classify")],
     ["barwise/trial-baseline.json", (j) => (first(j.findings)[1].issue = null)],
@@ -167,13 +204,13 @@ test("check:findings cannot answer when an input is absent, malformed or unmappa
   const dir = fixture();
   try {
     writeFileSync(join(dir, "barwise", BASELINES[0]), "{ not json");
-    refused(run(dir), /cannot answer/);
+    refused(run(dir), /cannot answer -- \S*audit-baseline\.json: /);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
   refused(
     planted("barwise/correction-baseline.json", (j) => (first(j.records)[1].caught_by = 7)),
-    /cannot answer -- corrections: row .* has no caught_by string/,
+    /cannot answer -- corrections: row .* has a caught_by that is not a string/,
   );
   refused(
     planted("barwise/rubric-baseline.json", (j) => (j.checks = [])),

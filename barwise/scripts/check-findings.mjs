@@ -9,7 +9,8 @@
  * gate holds three rules over them:
  *   - an `open` row names an issue the tracker has and has not closed, so a
  *     finding cannot point at a fixed issue and read as handled;
- *   - no row keeps its writer's placeholder;
+ *   - no row keeps its writer's placeholder, and a recorded verdict has a
+ *     note saying why;
  *   - a row's classification is in its audit's declared vocabulary.
  * And the trial catalog's issues are held to the first rule, because the
  * catalog is where trial rows get their issue.
@@ -27,7 +28,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createGovernanceReader } from "./lib/adr-facts.mjs";
 import { opt } from "./lib/args.mjs";
-import { readFindings, readTrialCatalog, SOURCE_FILES } from "./lib/findings.mjs";
+import { readFindings, SOURCE_FILES } from "./lib/findings.mjs";
 
 const refuse = (why) => {
   console.error(`check:findings: cannot answer -- ${why}`);
@@ -37,8 +38,7 @@ const refuse = (why) => {
 let root, findings, catalog;
 try {
   root = resolve(opt("--root") ?? join(dirname(fileURLToPath(import.meta.url)), "..", ".."));
-  findings = readFindings(root);
-  catalog = readTrialCatalog(root);
+  ({ findings, catalog } = readFindings(root));
 } catch (err) {
   refuse(err.message);
 }
@@ -62,14 +62,19 @@ for (const f of findings) {
     problems.push(`${where}: still has its writer's placeholder; record a verdict`);
     continue;
   }
+  if (!f.note) problems.push(`${where}: records a verdict with no note saying why`);
   if (f.vocabulary !== null && !f.vocabulary.has(f.classification)) {
     problems.push(
       `${where}: "${f.classification}" is not one of ${[...f.vocabulary].sort().join(", ")}`,
     );
   }
   if (f.state === "open") {
-    const why = dead(f.issue);
-    if (why) problems.push(`${where}: names ${f.issue}, which ${why}`);
+    if (f.issue === null) {
+      problems.push(`${where}: says tracked but names no issue; write tracked:<issue>`);
+    } else {
+      const why = dead(f.issue);
+      if (why) problems.push(`${where}: names ${f.issue}, which ${why}`);
+    }
   }
 }
 for (const c of catalog) {
