@@ -2181,6 +2181,24 @@ test("check-python-uv passes the correct parsed forms", () => {
   assert.equal(r.status, 0, r.stderr);
 });
 
+test("check-python-uv needs no lock flag on a uv call that resolves nothing, and still needs one beside a run", () => {
+  const find = pythonUv({
+    "a.mjs": 'spawnSync("uv", ["python", "find", "--show-version", "--project", dir]);\n',
+  });
+  assert.equal(find.status, 0, find.stderr);
+  const both = pythonUv({
+    "a.mjs": 'spawnSync("uv", ["python", "find", "--show-version"]);\n'
+      + 'spawnSync("uv", ["run", "python", "x.py"]);\n',
+  });
+  assert.equal(both.status, 1, both.stderr);
+  assert.match(both.stderr, /neither --frozen nor --locked/);
+  // Named by what is safe: a uv subcommand that resolves, such as lock,
+  // still needs the flag even with no run or sync beside it.
+  const lock = pythonUv({ "a.mjs": 'spawnSync("uv", ["lock"]);\n' });
+  assert.equal(lock.status, 1, lock.stderr);
+  assert.match(lock.stderr, /neither --frozen nor --locked/);
+});
+
 test("check-python-uv passes a compliant uv args array", () => {
   const r = pythonUv({
     "a.ts": 'const UV = ["run", "--frozen", "--only-group", "sqlglot", "python"] as const;\n'

@@ -127,7 +127,8 @@
         "barwise/optimizer/",
         "barwise/pyproject.toml",
         "barwise/uv.lock",
-        ".python-version"
+        ".python-version",
+        "barwise/.python-version"
       ],
       "why": "dev-time only and never a runtime dependency (root CLAUDE.md); check:python-uv holds the lockfile discipline"
     },
