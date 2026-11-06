@@ -21,6 +21,21 @@ const SCRIPTS = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 /** `barwise/scripts/lib` -> `barwise` -> the repo root -> the workflow. */
 export const WORKFLOW = resolve(SCRIPTS, "../../.github/workflows/ci.yml");
 
+/**
+ * The npm steps ci.yml runs that `fault-matrix` does not, each with why
+ * (docs/specs/gate-contract-enforced.spec.md, WS2). The one list: the
+ * matrix excludes exactly these, and `gates.test.mjs` fails on a ci.yml
+ * step that resolves to a node gate and is neither run by the matrix nor
+ * named here, and on a name here that ci.yml does not run.
+ */
+export const MATRIX_EXCEPTIONS = Object.freeze({
+  "fault-matrix": "the matrix itself: as one of its own gates it would run itself under every axis",
+  "test:scripts":
+    "a runner of gate tests, not a gate; the matrix reads the gates its cases spawn directly, and a runner's loud skip on a shallow clone reads as a false green (owner, 2026-11-06)",
+  audit:
+    "npm audit calls the registry, so one registry error across the cwd axis's runs reads as a moved reading on a change that did not cause it; it stays in the on-demand run",
+});
+
 /** `npm ci` installs rather than checks. Everything else CI runs, this runs. */
 const SKIP = [/^ci$/];
 

@@ -2624,7 +2624,9 @@ test("BARWISE_COVERAGE_DIR survives Turborepo and redirects a real package's cov
 // `docs/specs/gate-refusal-contract.spec.md`.
 
 const fm = await import(pathToFileURL(join(SCRIPTS, "fault-matrix.mjs")).href);
-const { ciGates } = await import(pathToFileURL(join(SCRIPTS, "lib", "ci-gates.mjs")).href);
+const { ciGates, ciSteps, shouldRun, MATRIX_EXCEPTIONS } = await import(
+  pathToFileURL(join(SCRIPTS, "lib", "ci-gates.mjs")).href
+);
 
 test("classify: a gate that answers 0 having reached for the broken thing is a false green", () => {
   // The verdict the harness exists for. No gate returns it today, which
@@ -2773,6 +2775,56 @@ test("every node gate CI runs is a script that exists", () => {
     gates.some((g) => g.script === "scripts/fmt-root.mjs"),
     "the compound `fmt:check` script must still resolve to its node half",
   );
+});
+
+test("every ci.yml node gate is in the matrix or on MATRIX_EXCEPTIONS, and every exception is a ci.yml step [adr:gate-refusal-contract#three-results]", () => {
+  // gate-contract-enforced WS2: the one list of what the matrix leaves out.
+  // A step whose npm script runs a node gate is either a matrix gate or
+  // named on the list with its reason; a stale name on the list is a
+  // finding too, since it would read as an exception nothing needs.
+  const scripts = JSON.parse(
+    readFileSync(join(REPO, "barwise", "package.json"), "utf-8"),
+  ).scripts;
+  const steps = ciGates();
+  const inMatrix = new Set(fm.nodeGates(steps, scripts).map((g) => g.name));
+  const resolved = steps.map((step) => fm.resolveNodeGate(step, scripts)).filter(Boolean);
+  for (const g of resolved) {
+    assert.ok(
+      inMatrix.has(g.name) || Object.hasOwn(MATRIX_EXCEPTIONS, g.name),
+      `${g.name} runs ${g.script} and is neither in the matrix nor on MATRIX_EXCEPTIONS`,
+    );
+    assert.ok(
+      !(inMatrix.has(g.name) && Object.hasOwn(MATRIX_EXCEPTIONS, g.name)),
+      `${g.name} is both in the matrix and on MATRIX_EXCEPTIONS`,
+    );
+  }
+  const names = new Set(resolved.map((g) => g.name));
+  for (const name of Object.keys(MATRIX_EXCEPTIONS)) {
+    assert.ok(names.has(name), `MATRIX_EXCEPTIONS names ${name}, which ci.yml does not run`);
+    assert.ok(MATRIX_EXCEPTIONS[name].length > 20, `${name} needs its reason`);
+  }
+  // --all brings the exceptions back, except the matrix itself.
+  const all = new Set(fm.nodeGates(steps, scripts, { all: true }).map((g) => g.name));
+  assert.ok(all.has("test:scripts"), "--all runs test:scripts");
+  assert.ok(!all.has("fault-matrix"), "the matrix never runs itself, --all included");
+});
+
+test("the fault matrix runs in CI on every change that is not docs-only, last in the job [adr:gate-refusal-contract#cwd-invariant]", () => {
+  // Option D (owner, 2026-11-06). ci:local reads the same step and guard,
+  // so pre-push runs it on the same changes.
+  const steps = ciSteps();
+  const at = steps.findIndex((s) => s.args === "run fault-matrix");
+  assert.ok(at >= 0, "ci.yml runs npm run fault-matrix");
+  assert.equal(at, steps.length - 1, "the matrix is the last npm step, after every gate it reads");
+  const { condition } = steps[at];
+  assert.deepEqual(shouldRun(condition, { docsOnly: false, optimizer: false }), {
+    run: true,
+    understood: true,
+  });
+  assert.deepEqual(shouldRun(condition, { docsOnly: true, optimizer: false }), {
+    run: false,
+    understood: true,
+  });
 });
 
 // --- barwise-984: an id names one issue, and created_at says which ---------
