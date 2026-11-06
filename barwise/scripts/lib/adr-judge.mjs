@@ -15,8 +15,9 @@ import {
   parseEnforcedBy,
   tagsIn,
 } from "./adr-enforcement.mjs";
-import { ADR_DIR } from "./architecture-section.mjs";
+import { ADR_DIR, TESTED_IN } from "./architecture-section.mjs";
 import { shouldRun } from "./ci-gates.mjs";
+import { reportFor } from "./test-reports.mjs";
 
 // A step counts as the gate's when it runs in barwise/, cannot be told to
 // keep going on failure, and has a guard that runs it on every code change:
@@ -233,6 +234,24 @@ export function judgeDeclarations(adrs, reader, refusals) {
   return { problems, held };
 }
 
+const quoted = (titles) => titles.map((s) => `"${s}"`).join(", ");
+
+/**
+ * What a set of tagged tests answers, for the decision rule and the per-file
+ * rule alike, so the two cannot order it differently: one passed proves it;
+ * else one failed is an answer against; else any skipped (vitest's
+ * `pending` is a test queued or cut short, never run) is "cannot tell",
+ * with their titles; else (none, or only todos) there is no evidence.
+ */
+export function verdict(tests) {
+  const statuses = new Set(tests.map((t) => t.status));
+  if (statuses.has("passed")) return { kind: "passed" };
+  if (statuses.has("failed")) return { kind: "failed" };
+  const skipped = tests.filter((t) => t.status === "skipped" || t.status === "pending")
+    .map((t) => t.title);
+  return skipped.length > 0 ? { kind: "skipped", skipped } : { kind: "none" };
+}
+
 /**
  * Each tested decision, and each tag, judged against the tests that ran
  * (check:adr-tests). `reports` is readTestReports()'s; `refusals` is the
@@ -281,26 +300,18 @@ export function judgeTestedDecisions(adrs, reports, refusals) {
     }
   }
 
-  // The evidence: a test, by its own title, that passed. Beside it, by
-  // decision, the tagged tests that failed (an answer) and that skipped (none).
-  const passed = new Set();
-  const failed = new Set();
-  const skipped = new Map();
+  // The evidence: each tagged test, by its own title, with its status.
+  const tagged = new Map();
   for (const t of ran) {
     if (t.type !== "test") continue;
     for (const { adr, id } of tagsIn(t.title)) {
       const key = `${adr}#${id}`;
-      if (t.status === "passed") passed.add(key);
-      else if (t.status === "failed") failed.add(key);
-      else if (t.status === "skipped" || t.status === "pending") {
-        if (!skipped.has(key)) skipped.set(key, []);
-        skipped.get(key).push(t.title);
-      }
+      if (!tagged.has(key)) tagged.set(key, []);
+      tagged.get(key).push(t);
     }
   }
   let skipOnly = 0;
   let unproven = 0;
-  const quoted = (titles) => titles.map((s) => `"${s}"`).join(", ");
   const suiteOnly = new Set(
     ran.flatMap((t) => [...(t.type === "suite" ? [t.title] : []), ...t.ancestors])
       .flatMap((title) => tagsIn(title).map(({ adr, id }) => `${adr}#${id}`)),
@@ -308,19 +319,20 @@ export function judgeTestedDecisions(adrs, reports, refusals) {
   for (const a of declaring) {
     for (const id of testedIds(a)) {
       const key = `${a.name}#${id}`;
-      if (passed.has(key)) continue;
+      const v = verdict(tagged.get(key) ?? []);
+      if (v.kind === "passed") continue;
       const hint = suiteOnly.has(key)
         ? "; the tag is on a describe, and must be on the test itself"
         : "";
       const message =
         `${a.f}: tests (${id}): no test carrying [adr:${key}] passed in this run${hint}`;
-      if (failed.has(key)) {
+      if (v.kind === "failed") {
         findings.push(`${a.f}: tests (${id}): a test carrying [adr:${key}] failed in this run`);
-      } else if (skipped.has(key)) {
+      } else if (v.kind === "skipped") {
         skipOnly++;
         refusals.push(
           `${a.f}: tests (${id}): every test carrying [adr:${key}] skipped, so this run cannot`
-            + ` tell: ${quoted(skipped.get(key))}`,
+            + ` tell: ${quoted(v.skipped)}`,
         );
       } else if (unreadableReports > 0) {
         // With a report missing or unreadable, its passing test may be the one
@@ -342,8 +354,8 @@ export function judgeTestedDecisions(adrs, reports, refusals) {
  * names the files that must each carry one. `testedIn` is readTestedIn()'s,
  * never null here. The verdicts per file are the decision rule's, in its
  * order: a pass proves it, a failure is a finding, all skipped is a
- * refusal, and none at all is a refusal while any report is unread and a
- * finding once all were read. A row whose decision is no `tests` entry, or
+ * refusal, and none at all is a refusal while the file's own report is
+ * unread (reportFor()) and a finding once it was read. A row whose decision is no `tests` entry, or
  * a path git does not track, is a finding: the row outlived what it named.
  * Returns the findings and the two refusal counts, which the gate prints
  * apart from the decision rule's.
@@ -352,7 +364,7 @@ export function judgeTestedIn(adrs, reports, testedIn, refusals) {
   const findings = [];
   let skipOnly = 0;
   let unproven = 0;
-  const { ran, unreadable } = reports;
+  const { ran, unread } = reports;
   const testsEntries = new Map(
     adrs.map(({ f, text }) => [
       f.slice(ADR_DIR.length, -".md".length),
@@ -361,52 +373,49 @@ export function judgeTestedIn(adrs, reports, testedIn, refusals) {
       ),
     ]),
   );
-  const at = `${ADR_DIR}tested-in.json`;
+  const keys = (title) => tagsIn(title).map((x) => `${x.adr}#${x.id}`);
   for (const { decision, files } of testedIn.rows) {
     const [adr, id] = decision.split("#");
     if (!testsEntries.get(adr)?.has(id)) {
       findings.push(
-        `${at}: "${decision}" is not a tests entry of ${adr}'s Enforced-by; a row that outlived its decision`,
+        `${TESTED_IN}: "${decision}" is not a tests entry of ${adr}'s Enforced-by; a row that outlived its decision`,
       );
       continue;
     }
     const tag = `[adr:${decision}]`;
     for (const file of files) {
       if (!testedIn.tracked.has(file)) {
-        findings.push(`${at}: "${decision}" names ${file}, which git does not track`);
+        findings.push(`${TESTED_IN}: "${decision}" names ${file}, which git does not track`);
         continue;
       }
-      const statuses = new Set();
-      const skippedTitles = [];
-      let onSuite = false;
-      for (const t of ran) {
-        if (t.file !== file) continue;
-        const keys = (title) => tagsIn(title).map((x) => `${x.adr}#${x.id}`);
-        if (t.type !== "test") {
-          if (keys(t.title).includes(decision)) onSuite = true;
-          continue;
-        }
-        if (t.ancestors.some((a) => keys(a).includes(decision))) onSuite = true;
-        if (!keys(t.title).includes(decision)) continue;
-        const status = t.status === "pending" ? "skipped" : t.status;
-        statuses.add(status);
-        if (status === "skipped") skippedTitles.push(t.title);
-      }
-      if (statuses.has("passed")) continue;
+      const inFile = ran.filter((t) => t.file === file);
+      const v = verdict(
+        inFile.filter((t) => t.type === "test" && keys(t.title).includes(decision)),
+      );
+      if (v.kind === "passed") continue;
+      const onSuite = inFile.some((t) =>
+        (t.type !== "test" && keys(t.title).includes(decision))
+        || t.ancestors.some((a) => keys(a).includes(decision))
+      );
       const hint = onSuite ? "; the tag is on a describe, and must be on the test itself" : "";
       const message =
-        `${at}: "${decision}": no test in ${file} carrying ${tag} passed in this run${hint}`;
-      if (statuses.has("failed")) {
-        findings.push(`${at}: "${decision}": a test in ${file} carrying ${tag} failed in this run`);
-      } else if (skippedTitles.length > 0) {
+        `${TESTED_IN}: "${decision}": no test in ${file} carrying ${tag} passed in this run${hint}`;
+      // Only the file's own report can hold its test: another report unread
+      // leaves this file's answer standing.
+      const own = reportFor(file);
+      if (v.kind === "failed") {
+        findings.push(
+          `${TESTED_IN}: "${decision}": a test in ${file} carrying ${tag} failed in this run`,
+        );
+      } else if (v.kind === "skipped") {
         skipOnly++;
         refusals.push(
-          `${at}: "${decision}": every test in ${file} carrying ${tag} skipped, so this run`
-            + ` cannot tell: ${skippedTitles.map((s) => `"${s}"`).join(", ")}`,
+          `${TESTED_IN}: "${decision}": every test in ${file} carrying ${tag} skipped, so this run`
+            + ` cannot tell: ${quoted(v.skipped)}`,
         );
-      } else if (unreadable > 0) {
+      } else if (own !== null && unread.has(own)) {
         unproven++;
-        refusals.push(`${message}, and ${unreadable} report(s) were not read`);
+        refusals.push(`${message}, and its report ${own} was not read`);
       } else findings.push(message);
     }
   }

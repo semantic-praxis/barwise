@@ -468,21 +468,48 @@ test("check:adr-tests: a test whose report names no file proves its decision, no
     assert.match(r.stderr, /no test in barwise\/packages\/core\/tests\/a\.test\.ts carrying/);
     assert.doesNotMatch(r.stderr, /tests \(one\)/);
   });
-  // With a report unread, a named file with no tagged test cannot be told.
-  const dir = fixture({
-    script: jsonlIn(null, [[T1, "passed"], [T2, "passed"]]),
-    trial: "not a report\n",
-    testedIn: row([B]),
-  });
+  // With the file's own report unread, a named file with no tagged test
+  // cannot be told.
+  const dir = fixture({ script: "not a report\n", testedIn: row([B]) });
   try {
     put(dir, B, "");
     const r = run(dir);
     assert.equal(r.status, 2, r.stdout + r.stderr);
     assert.match(
       r.stderr,
-      /no test in barwise\/scripts\/tests\/g\.test\.mjs .* 1 report\(s\) were not read/,
+      /no test in barwise\/scripts\/tests\/g\.test\.mjs .*, and its report barwise\/test-results\/script-tests\/g\.test\.jsonl was not read/,
     );
     assert.match(r.stderr, /1 named file\(s\) left unproven by them, 0 named file\(s\)/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("check:adr-tests: another report unread leaves a named file's finding standing", () => {
+  // Only the file's own report can hold its test: A's vitest report was read
+  // and holds no tagged test, so the missing trial report changes nothing.
+  const dir = fixture({
+    core: vitestIn(`${ELSEWHERE}/packages/core/tests/a.test.ts`, [[
+      "pins one, untagged",
+      "passed",
+    ]]),
+    script: jsonl([[T1, "passed"], [T2, "passed"]]),
+    testedIn: row([A]),
+  });
+  try {
+    put(dir, A, "");
+    rmSync(join(dir, TRIAL_REPORT));
+    const r = run(dir);
+    assert.equal(r.status, 1, r.stdout + r.stderr);
+    assert.match(
+      r.stderr,
+      /FAIL -- 1 finding\(s\):\n\s+.*no test in barwise\/packages\/core\/tests\/a\.test\.ts carrying/,
+    );
+    assert.match(r.stderr, /trial\.jsonl: missing/);
+    assert.match(
+      r.stderr,
+      /1 report\(s\) not read, 0 decision\(s\) left unproven by them, 0 decision\(s\) whose tagged tests all skipped, 0 named file\(s\) left unproven/,
+    );
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -525,6 +552,20 @@ test("check:adr-tests refuses, exit 2, a tested-in.json it cannot read, and stil
         /row 1 is not/,
       ],
       ["a decision with no id", row([A], "a-concern"), /row 1 is not/],
+      // A pair named twice is one row edited and its copy not.
+      [
+        "a path twice in a row",
+        row([A, A]),
+        /row 1 names .*a\.test\.ts for a-concern#one again \(row 1\)/,
+      ],
+      [
+        "a pair across rows",
+        JSON.stringify([
+          { decision: "a-concern#one", files: [A], why: "w" },
+          { decision: "a-concern#one", files: [B, A], why: "w" },
+        ]),
+        /row 2 names .*a\.test\.ts for a-concern#one again \(row 1\)/,
+      ],
     ]
   ) {
     withFixture({ testedIn: body }, (_, r) => {

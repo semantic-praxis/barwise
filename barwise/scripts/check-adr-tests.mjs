@@ -43,11 +43,12 @@
  * above per file (docs/specs/capability-matrix-check.spec.md, WS2). The
  * reports name absolute paths, kept from the report's own directory on, so a
  * report turbo restored from another checkout still matches. Findings: a
- * named file with no passed tagged test (one failed, or none, every report
+ * named file with no passed tagged test (one failed, or none, its own report
  * read), a row whose decision is not a `tests` entry, a path git does not
  * track. Refusals: a named file whose tagged tests all skipped, one with
- * none while a report is unread, and a tested-in.json that is missing,
- * not JSON, or not a list of `{ decision, files, why }` rows.
+ * none while its own report is unread, and a tested-in.json that is missing,
+ * not JSON, not a list of `{ decision, files, why }` rows, or names one
+ * decision and file twice.
  *
  * It runs in CI after the test steps, on the same guard; on a docs-only
  * change no test ran, and an ADR change is not docs-only
@@ -62,10 +63,11 @@ import { judgeTestedDecisions, judgeTestedIn } from "./lib/adr-judge.mjs";
 import { ADR_DIR, isAdr, readFiles, trackedPaths } from "./lib/architecture-section.mjs";
 import { opt } from "./lib/args.mjs";
 
-let root, adrs;
+let root, tracked, adrs;
 try {
   root = resolve(opt("--root") ?? join(dirname(fileURLToPath(import.meta.url)), "..", ".."));
-  adrs = readFiles(root, trackedPaths(root).filter(isAdr));
+  tracked = trackedPaths(root);
+  adrs = readFiles(root, tracked.filter(isAdr));
   if (adrs.length === 0) throw new Error(`no ADR under ${join(root, ADR_DIR)}`);
 } catch (err) {
   console.error(`check:adr-tests: cannot answer -- ${err.message}`);
@@ -90,8 +92,9 @@ const { findings, declaring, tested, skipOnly, unproven } = judgeTestedDecisions
   refusals,
 );
 // The per-file rows, after the decisions; an unreadable manifest is one
-// refusal, and the decision rule above still answers.
-const testedIn = readTestedIn(root, refusals);
+// refusal, and the decision rule above still answers. The tracked paths are
+// the ones listed above, so the only refusal here is the manifest's own.
+const testedIn = readTestedIn(root, tracked, refusals);
 const perFile = testedIn === null
   ? { findings: [], skipOnly: 0, unproven: 0 }
   : judgeTestedIn(adrs, reports, testedIn, refusals);

@@ -9,7 +9,7 @@
     "baseline-merge.test.mjs": 14,
     "beads-ids.test.mjs": 3,
     "beads-merge.test.mjs": 41,
-    "check-adr-tests.test.mjs": 18,
+    "check-adr-tests.test.mjs": 19,
     "check-capability-matrix.test.mjs": 15,
     "check-core-purity.test.mjs": 43,
     "check-findings.test.mjs": 9,

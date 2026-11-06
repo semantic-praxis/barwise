@@ -17,7 +17,7 @@
  */
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { ADR_DIR, isMap, trackedPaths } from "./architecture-section.mjs";
+import { isMap, TESTED_IN } from "./architecture-section.mjs";
 import { parseTracker } from "./beads-merge.mjs";
 import { scriptReport, TRIAL_REPORT, vitestReport } from "./test-reports.mjs";
 
@@ -92,7 +92,9 @@ export async function createGovernanceReader(
 /**
  * A runner's absolute source path as a repository path: `base` is the
  * report's own directory from the root (`barwise/packages/mcp/`), and the
- * part after its last occurrence below `barwise/` is kept. Turbo's shared
+ * part after the last occurrence of `/<base>` is kept: `/barwise/` is the
+ * fixed inner folder, so a test path that repeats `packages/core/` inside
+ * its own fixtures still maps from the right one. Turbo's shared
  * cache restores a report written in another checkout (a pre-push worktree
  * under /tmp beside the main one), so the prefix before it is not this
  * root's and is never compared. `null` when the path is absent or does not
@@ -101,7 +103,7 @@ export async function createGovernanceReader(
  */
 export function repoFile(abs, base) {
   if (typeof abs !== "string" || abs === "") return null;
-  const anchor = `/${base.slice("barwise/".length)}`;
+  const anchor = `/${base}`;
   const p = `/${abs.replaceAll("\\", "/")}`;
   const i = p.lastIndexOf(anchor);
   if (i < 0) return null;
@@ -168,7 +170,7 @@ function readNodeTest(path, rel, base) {
  * derived (one per package with a `test:coverage` script, one per file in
  * scripts/tests/expected-counts.json, and the `test:trial` report), and
  * the tests each says ran. A report missing or not of the shape read is a
- * refusal; `unreadable` counts them here, before any decision is judged, so
+ * refusal; `unread` holds their paths and `unreadable` counts them here, before any decision is judged, so
  * the judge's own refusals cannot change it. Throws when the list itself
  * cannot be built, which the gate reports as it always has.
  */
@@ -198,36 +200,37 @@ export function readTestReports(root) {
 
   const ran = [];
   const refusals = [];
+  const unread = new Set();
   for (const { rel, read, base } of expected) {
     const path = join(root, rel);
     if (!existsSync(path)) {
       refusals.push(`${rel}: missing; did its test step run in this checkout?`);
+      unread.add(rel);
       continue;
     }
     try {
       ran.push(...read(path, rel, base));
     } catch (err) {
       refusals.push(`${rel}: not a report this check reads (${err.message})`);
+      unread.add(rel);
     }
   }
-  return { expected, ran, refusals, unreadable: refusals.length };
+  return { expected, ran, refusals, unreadable: refusals.length, unread };
 }
-
-/** The tested-in manifest, from the repository root. */
-export const TESTED_IN = `${ADR_DIR}tested-in.json`;
 
 const isText = (v) => typeof v === "string" && v !== "";
 
 /**
  * check:adr-tests' per-file rows (docs/specs/capability-matrix-check.spec.md,
  * WS2): `{ rows, tracked }`, the `{ decision, files, why }` rows of
- * docs/adr/tested-in.json and the set of the paths they name that git
- * tracks. `null`, with one refusal pushed onto `refusals`, when the file is
- * missing, is not JSON, is not a list of such rows, or the tracked paths
- * cannot be listed: zero rows would read as "nothing to check", which is
- * the answer it could not give.
+ * docs/adr/tested-in.json and the set of the paths they name that are in
+ * `trackedPaths` (the gate's own `git ls-files`, listed once). `null`,
+ * with one refusal pushed onto `refusals`, when the file is missing, is not
+ * JSON, is not a list of such rows, or names one decision and file twice:
+ * zero rows would read as "nothing to check", which is the answer it could
+ * not give, and a repeated pair is a row edited in one place and not the other.
  */
-export function readTestedIn(root, refusals) {
+export function readTestedIn(root, trackedPaths, refusals) {
   const refuse = (why) => {
     refusals.push(`${TESTED_IN}: ${why}`);
     return null;
@@ -249,12 +252,17 @@ export function readTestedIn(root, refusals) {
       );
     }
   }
-  let all;
-  try {
-    all = new Set(trackedPaths(root));
-  } catch (err) {
-    return refuse(`cannot list the tracked paths (${err.message})`);
+  const seen = new Map();
+  for (const [i, r] of rows.entries()) {
+    for (const f of r.files) {
+      const pair = `${r.decision} ${f}`;
+      if (seen.has(pair)) {
+        return refuse(`row ${i + 1} names ${f} for ${r.decision} again (row ${seen.get(pair)})`);
+      }
+      seen.set(pair, i + 1);
+    }
   }
+  const all = new Set(trackedPaths);
   const tracked = new Set(rows.flatMap((r) => r.files).filter((f) => all.has(f)));
   return { rows, tracked };
 }

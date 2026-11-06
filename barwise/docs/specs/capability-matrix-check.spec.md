@@ -11,6 +11,7 @@ Touches: CLAUDE.md, package.json, +barwise/scripts/check-capability-matrix.mjs,
 +barwise/scripts/tests/check-capability-matrix.test.mjs,
 barwise/package.json, .github/workflows/ci.yml, +barwise/docs/adr/tested-in.json, barwise/scripts/check-adr-tests.mjs,
 barwise/scripts/lib/adr-facts.mjs, barwise/scripts/lib/adr-judge.mjs,
+barwise/scripts/lib/test-reports.mjs, barwise/scripts/lib/architecture-section.mjs,
 barwise/docs/adr/surface-capability-parity.md, barwise/docs/adr/probes.json,
 barwise/docs/ARCHITECTURE.md, barwise/scripts/check-adr-tests.mjs
 

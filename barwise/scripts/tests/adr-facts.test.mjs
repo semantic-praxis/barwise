@@ -184,6 +184,12 @@ test("adr-facts: a report's source path is kept from the report's own directory 
     repoFile("C:\\src\\barwise\\scripts\\tests\\g.test.mjs", "barwise/scripts/tests/"),
     "barwise/scripts/tests/g.test.mjs",
   );
+  // A test that repeats the package path in its own fixtures maps from the
+  // report's directory under barwise/, not from the repeat.
+  assert.equal(
+    repoFile("/r/barwise/packages/core/tests/fixtures/packages/core/a.test.ts", core),
+    "barwise/packages/core/tests/fixtures/packages/core/a.test.ts",
+  );
   // A sibling package whose name ends the same is not this one.
   assert.equal(repoFile("/r/barwise/packages/xcore/tests/a.test.ts", core), null);
   for (const abs of [null, undefined, "", "f", "/r/barwise/packages/core/"]) {
