@@ -3,6 +3,7 @@
 Status: Draft -- no workstream implemented
 Created: 2026-11-06
 Last-updated: 2026-11-06
+Plan-reviewed: 8d9588bb (code-review, pr-review)
 Tracking: barwise-ym8.gc9 (adr-refactor batch 5), barwise-ym8.wfy,
 barwise-ym8.3nm, barwise-ym8.0hi, barwise-ym8.0pq, barwise-1005, barwise-xpt
 Touches: CLAUDE.md, +barwise/scripts/check-capability-matrix.mjs,
