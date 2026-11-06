@@ -10,8 +10,9 @@ the same pattern as `@barwise/code-analysis`. Core ships no dbt format.
 
 This package depends on `@barwise/core` for model types, the
 `ImportFormat` / `ExportFormatAdapter` interfaces, the format registry,
-the relational mapping (`RelationalMapper`) and the SQL cascade parser
-(`parseSqlFile`). It owns the dbt renderer (`render/`). It does NOT
+the relational mapping (`RelationalMapper`), the export annotation
+collector and comment helpers (`@barwise/core/annotation`), and the SQL
+cascade parser (`parseSqlFile`). It owns the dbt renderer (`render/`). It does NOT
 depend on any editor or tool package.
 
 Allowed runtime dependencies: `@barwise/core`, `yaml`. No others without
@@ -41,7 +42,9 @@ src/
                          dbt_packages/, logs/, ...)
   DbtExportFormat.ts     ExportFormatAdapter: ORM model -> dbt schema YAML
   render/renderDbt.ts    The dbt renderer: RelationalSchema -> schema.yml
-                         and model SQL files; DBT_KEY_TEST
+                         and model SQL files
+  keyTest.ts             DBT_KEY_TEST, shared by the renderer and the
+                         importer so neither depends on the other
   render/DbtExportAnnotator.ts  Writes the export's barwise notes into
                          the rendered schema.yml
   sql/SqlglotBridge.ts   Optional sqlglot sidecar for SQL mining (parallel
@@ -85,6 +88,6 @@ Lint is run from the repo root: `npm run lint`.
 
 ## Dependencies
 
-| Direction | Package         | What is used                                                     |
-| --------- | --------------- | ---------------------------------------------------------------- |
-| Upstream  | `@barwise/core` | Model types, ImportFormat/ExportFormatAdapter, registry, mapping |
+| Direction | Package         | What is used                                                                 |
+| --------- | --------------- | ---------------------------------------------------------------------------- |
+| Upstream  | `@barwise/core` | Model types, ImportFormat/ExportFormatAdapter, registry, mapping, annotation |

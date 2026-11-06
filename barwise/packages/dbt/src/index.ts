@@ -38,9 +38,9 @@ export { DbtMappingError, type DbtMapResult, mapDbtToOrm } from "./DbtToOrmMappe
 export { annotateDbtYaml, type AnnotationOptions } from "./DbtYamlAnnotator.js";
 
 // The dbt renderer and its export annotator (format-renderers-to-connectors.spec.md, WS2)
+export { DBT_KEY_TEST } from "./keyTest.js";
 export { annotateDbtExport, type ExportAnnotationResult } from "./render/DbtExportAnnotator.js";
 export {
-  DBT_KEY_TEST,
   type DbtModelFile,
   type DbtProject,
   type DbtRenderOptions,

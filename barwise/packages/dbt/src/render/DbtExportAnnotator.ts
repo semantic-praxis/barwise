@@ -22,15 +22,12 @@ import {
   stripBarwiseComments,
 } from "@barwise/core/annotation";
 import type { RelationalSchema, RoutedUnique } from "@barwise/core/mapping";
-import { DBT_KEY_TEST, dbtKeyTestColumns } from "./renderDbt.js";
+import { DBT_KEY_TEST } from "../keyTest.js";
+import { dbtKeyTestColumns } from "./renderDbt.js";
 
 // ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
-
-// Re-export for backward compatibility -- consumers that imported
-// ExportAnnotation from this module continue to work.
-export type { ExportAnnotation } from "@barwise/core/annotation";
 
 export interface ExportAnnotationResult {
   /** The annotated schema.yml string. */

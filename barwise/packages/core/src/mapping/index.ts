@@ -1,4 +1,5 @@
-// Mapping: relational mapper, schema, and format renderers.
+// Mapping: relational mapper, schema, and constraint routing. Format
+// renderers live in their connectors (connector-packages.md#format-in-its-connector).
 export {
   type ConstraintPlacement,
   type ConstraintRouting,

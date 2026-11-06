@@ -7,11 +7,12 @@
  * DDL, OpenAPI, Avro, diagram, verbalization) so they share identical
  * gap detection logic.
  *
- * Extracted from `DbtExportAnnotator.collectAnnotations()`. Its messages
+ * Extracted from `DbtExportAnnotator.collectAnnotations()`, which now
+ * lives in `@barwise/dbt` and calls this. Its messages
  * name no export format: the collector is shared by five surfaces, and a
  * DDL reader told to "edit the dbt YAML" was reading one format's remedy
  * in another's output. A format that has a remedy of its own appends it
- * when it renders (`DbtExportAnnotator`; dbt-key-type-fidelity.spec.md,
+ * when it renders (dbt's `DbtExportAnnotator`; dbt-key-type-fidelity.spec.md,
  * WS3).
  */
 

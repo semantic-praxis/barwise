@@ -12,7 +12,7 @@
 
 import { resolvePreferredIdentifier } from "@barwise/core";
 import type { DbtModel, DbtTest } from "../DbtSchemaTypes.js";
-import { DBT_KEY_TEST } from "../render/renderDbt.js";
+import { DBT_KEY_TEST } from "../keyTest.js";
 import {
   claimValueType,
   reportColumnType,
