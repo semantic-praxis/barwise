@@ -49,6 +49,9 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { decisionIds, parseEnforcedBy } from "../lib/adr-enforcement.mjs";
 import { isAdr } from "../lib/architecture-section.mjs";
 import { ciLocalLibs } from "./ci-local-files.mjs";
+// The real list, imported statically (as dependency-cruiser requires
+// intended.cjs) so the plants below are written against what core declares.
+import EXTERNAL from "../lib/external-deps.cjs";
 
 const SCRIPTS = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const REPO = execFileSync("git", ["rev-parse", "--show-toplevel"], {
@@ -6540,6 +6543,7 @@ function architectureRepo() {
   const copy = (rel) => stage(dir, rel, readFileSync(join(REPO, rel), "utf8"));
   copy("CLAUDE.md");
   copy("barwise/scripts/lib/intended.cjs");
+  copy(EXTERNAL_CJS);
   copy("barwise/docs/ARCHITECTURE.md");
   // The tracked ADRs only: the copied ARCHITECTURE.md indexes those, and
   // an untracked draft in this checkout would otherwise read as "stale".
@@ -6633,6 +6637,7 @@ const MCP_ROW =
   "  |--- @barwise/mcp             (core, diagram, diagram-ui, llm, code-analysis, dbt, formats, learn)";
 const CORE_PKG = "barwise/packages/core/package.json";
 const INTENDED_CJS = "barwise/scripts/lib/intended.cjs";
+const EXTERNAL_CJS = "barwise/scripts/lib/external-deps.cjs";
 
 /** Each planted disagreement: file, anchor, replacement, the line it must report. */
 const ARCH_DISAGREEMENTS = [
@@ -6741,6 +6746,40 @@ const ARCH_DISAGREEMENTS = [
     `"dependencies": {`,
     `"optionalDependencies": { "barwise-vscode": "*" },\n  "dependencies": {`,
     /packages\/core: optionalDependencies has barwise-vscode/,
+  ],
+  // Core's external runtime dependencies are its list, both ways
+  // (package-graph-authority#core-external-deps): an unlisted one, in a
+  // field other than dependencies too, and a listed one core dropped.
+  [
+    CORE_PKG,
+    `"dependencies": {`,
+    `"dependencies": {\n    "z3-solver": "^4.13.0",`,
+    /packages\/core: dependencies has z3-solver, external-deps\.cjs does not list it/,
+  ],
+  [
+    CORE_PKG,
+    `"dependencies": {`,
+    `"optionalDependencies": { "z3-solver": "^4.13.0" },\n  "dependencies": {`,
+    /packages\/core: optionalDependencies has z3-solver/,
+  ],
+  [
+    EXTERNAL_CJS,
+    `[${EXTERNAL.core.map((d) => JSON.stringify(d)).join(", ")}]`,
+    `[${[...EXTERNAL.core, "lodash"].map((d) => JSON.stringify(d)).join(", ")}]`,
+    /external-deps\.cjs lists lodash for core, which its manifest does not declare/,
+  ],
+  [
+    EXTERNAL_CJS,
+    `"core":`,
+    `"ghost": [],\n  "core":`,
+    /external-deps\.cjs lists ghost, which is not a package under packages\//,
+  ],
+  // A listed name that installs something else.
+  [
+    CORE_PKG,
+    `"yaml": "^`,
+    `"yaml": "npm:z3-solver@^`,
+    /packages\/core: dependencies has yaml as "npm:z3-solver@\^/,
   ],
 ];
 
@@ -6867,6 +6906,22 @@ test("check:architecture cannot answer when an input is unreadable or misshapen"
     // Valid JSON of the wrong shape: read on, each would crash with exit 1
     // or skip a field whose keys are array indices.
     refused(archPlanted(dir, CORE_PKG, () => "null\n"), core);
+    // The external-deps list, misshapen, is a refusal too.
+    // An empty list, one without core, or a name listed twice would check
+    // less than it says, so each is refused rather than read as clean.
+    for (
+      const body of [
+        'module.exports = { core: "ajv" };\n',
+        "module.exports = {};\n",
+        "module.exports = { learn: [] };\n",
+        'module.exports = { core: ["ajv", "ajv"] };\n',
+      ]
+    ) {
+      refused(
+        archPlanted(dir, EXTERNAL_CJS, () => body),
+        /external-deps\.cjs does not export a map of package to dependency list/,
+      );
+    }
     refused(
       archPlanted(dir, CORE_PKG, (s) => s.replace(`"name": "@barwise/core"`, `"name": 5`)),
       core,
