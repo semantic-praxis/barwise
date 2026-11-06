@@ -231,8 +231,8 @@ Two findings behind rows of the table:
   exporter reports that as a loss ("its subtype facts' defining rules
   differ; only the first is written", `writeOssie.ts`). **Inferred:** one
   rule per subtype is the better model. barwise's per-fact placement
-  departs from the book, which `metamodel-evolution-policy.md` decision 4
-  says to design against.
+  departs from the book, which `metamodel-evolution-policy.md` (decision 4
+  then, Context since 2026-11-06) says to design against.
 - **Subtype verbalization drops the derivation kind.** For a fact type,
   `Verbalizer.ts` says "derived", "semiderived and stored" and so on
   (`derivationPhrase`). For a subtype fact it prints only
