@@ -19,6 +19,7 @@ barwise/docs/adr/tested-in.json, barwise/docs/ARCHITECTURE.md,
 +barwise/packages/core/schemas/orm-model.property-classes.json,
 barwise/packages/core/tests/serialization/,
 barwise/packages/core/tests/project/splitModel.test.ts,
++barwise/packages/core/tests/types/ormVersion.test-d.ts,
 barwise/packages/vscode/tests/unit/projectScaffold.test.ts,
 barwise/packages/core/tests/validation/idsAndImports.test.ts,
 .claude/skills/pr-review/checklist.md,
@@ -641,8 +642,13 @@ rows.
 `version-signal`'s missing-version test, plus the `projectScaffold` and
 `splitModel` output tests. `minor-and-major`'s shape, chain and parity
 tests, with decision 2 restated in the ADR and the classification moved
-to Context. The `merge.test.ts` success assertion. The
-`orm-version-writers` rule lands in WS3 with `check:source-sites`, and
+to Context. The `merge.test.ts` success assertion. Code review
+(2026-11-06) widened the chain to the legacy readers (2.0 into 3.0, 3.0
+into 4.0), added "every move lands on the current version or on one
+another move leaves", pinned the 4.0 decoder's literal and
+`OrmYamlDocument40`'s type beside the schema `const`, and added a
+`tested-in.json` row naming the three version-signal writer test files.
+The `orm-version-writers` rule lands in WS3 with `check:source-sites`, and
 `version-signal`'s gate entry lands with it.
 
 ### 3. `check:source-sites` and ossie-interchange

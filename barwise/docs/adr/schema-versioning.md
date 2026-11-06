@@ -69,33 +69,45 @@ which a check can hold (`docs/specs/adr-batch9-enforcers.spec.md`).
 ## Consequences
 
 - Core's `SchemaVersioning.test.ts` checks decision 1: a file at the
-  current version loads (which fails if the schema `const` and
+  current version loads (a 4.0 file is read by the Effect decoders in
+  `decode/document40.ts`, not validated against `orm-model.schema.json`,
+  so this fails if the decoder's `orm_version` literal and
   `CURRENT_ORM_VERSION` disagree), output is stamped with the current
-  version, a newer version is refused with "newer barwise", never
-  the schema's `const` message, and a file with no `orm_version` is
+  version, a newer version is refused with "newer barwise" before any
+  decoder sees its fields, and a file with no `orm_version` is
   refused with a message naming the missing field. The two writers that
   build a document outside the serializer are tested the same way:
   `splitModel`'s domain files (core's `splitModel.test.ts`, from a 1.0
   source) and the editor's new-model scaffold (vscode's
-  `projectScaffold.test.ts`) both state `CURRENT_ORM_VERSION`. Any other
+  `projectScaffold.test.ts`) both state `CURRENT_ORM_VERSION`;
+  `tested-in.json` names all three files, so each must carry a passing
+  tagged test. Any other
   writer that bypasses the serializer is unchecked until
   `check:source-sites` lands (barwise-ym8.4i2;
   `adr-batch9-enforcers.spec.md` WS3). It runs in CI through
   `npm run test:coverage` (`if: steps.changes.outputs.docs_only !=
   'true'`, so skipped on a docs-only pull request and, like any step,
   once an earlier step fails). A file at the same version that uses a
-  construct the reader lacks still fails at the schema; decision 1 does
+  construct the reader lacks still fails at the decoder; decision 1 does
   not cover that.
-- Decision 2 is held by tagged tests in core's `schemaVersion.test.ts`,
-  which take the registry as a parameter and run on the real
-  `ORM_VERSION_MIGRATIONS`: every step is a minor step (same major, next
-  minor) or a major step (the next major's `.0`); no version is the
-  `from` of two steps (`planMigration` would take the first and ignore
-  the second); a major step leaves its major's last minor, so no step
-  and not `CURRENT_ORM_VERSION` names a later minor of the major it
-  leaves; and the schema's `orm_version` `const` equals
-  `CURRENT_ORM_VERSION`, read from the file rather than through a load.
-  The two chain checks follow from the kept sentence that the loader reads every
+- Decision 2 is held by tagged tests in core's `schemaVersion.test.ts`.
+  They take a build's versions as `planRead` does and run on this
+  build's: the read path is every `ORM_VERSION_MIGRATIONS` step plus each
+  legacy reader (`LEGACY_ORM_VERSION` into the next major's first,
+  `PREVIOUS_ORM_VERSION` into the current major's). Every move is a minor
+  step (same major, next minor) or a major step (the next major's first,
+  by `majorFirst`); no version is left by two moves (`planMigration`
+  would take the first step and ignore the second); every move lands on
+  `CURRENT_ORM_VERSION` or on a version another move leaves, never past
+  the current one; and a major move leaves its major's last minor, so no
+  move and not `CURRENT_ORM_VERSION` names a later minor of the major it
+  leaves. Parity is checked directly, not through a load: the schema's
+  `orm_version` `const` and the 4.0 decoder's literal each equal
+  `CURRENT_ORM_VERSION`, and `tests/types/ormVersion.test-d.ts` holds
+  `OrmYamlDocument40`'s literal type to it at compile time. A version a
+  release wrote but that nothing in the build names (a minor whose step
+  was deleted along with every mention) is invisible to these checks.
+  The chain checks follow from the kept sentence that the loader reads every
   version "by applying those steps". Whether a change is additive or
   structural (Context) stays a judgment each spec makes and its review
   checks, as `diagram-references-by-id.spec.md` D1 and
