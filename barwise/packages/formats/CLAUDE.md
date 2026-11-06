@@ -15,8 +15,9 @@ and the relational capabilities its renderers build on: `RelationalMapper`,
 the constraint router and dialect profiles
 (`routeConstraints`, `resolveDialectProfile`), the ConstraintSpec builder
 (`buildConstraintSpec`), the CHECK predicate parser (`parseValuePredicate`),
-and the SQL cascade parser (`parseSqlFile`). It
-does NOT depend on any editor or tool package.
+and the SQL dialect types. It owns the SQL parser cascade (`sql/`), which
+`@barwise/dbt` composes through `parseSqlPatterns`. It does NOT depend on
+any editor or tool package.
 
 Allowed runtime dependencies: `@barwise/core`, `yaml`, `fast-xml-parser`,
 `ajv`. No others without discussion. `ajv` is there for one reason: the
@@ -25,7 +26,7 @@ fields it does not define (`docs/specs/ossie-unknown-fields.spec.md`).
 The SQL importer uses `node:fs` for its directory-scan path and spawns an
 optional short-lived `python3`
 subprocess for the sqlglot structural tier (allowed outside core; the
-cascade degrades to core's pure regex tier when python3 or sqlglot is
+cascade degrades to its pure regex tier when python3 or sqlglot is
 absent).
 
 ## Package Layout
@@ -59,6 +60,12 @@ src/
   sql/SqlImportFormat.ts         Raw SQL files -> ORM (text + directory scan)
   sql/SqlglotBridge.ts           Optional sqlglot sidecar: structural SQL tier
                                  + sourceText normalization
+  sql/parseSqlPatterns.ts        The cascade both importers call: sqlglot,
+                                 else the regex tier, normalized
+  sql/SqlCascadeParser.ts        The regex tier's file and statement parser
+  sql/SqlPatternExtractor.ts     The regex tier's pattern extraction
+  sql/typeMapping.ts             SQL types -> conceptual data types, shared
+                                 by the DDL and dbt importers
   norma/NormaImportFormat.ts     NORMA .orm XML -> ORM
   norma/NormaExportFormat.ts     ORM -> NORMA .orm XML
   norma/NormaXmlImporter.ts      NORMA import facade

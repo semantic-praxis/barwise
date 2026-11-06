@@ -30,7 +30,7 @@ vi.mock("node:child_process", () => ({
 /** Re-import the module fresh so its `availability` cache starts empty. */
 async function freshBridge() {
   vi.resetModules();
-  return import("../../src/sql/SqlglotBridge.js");
+  return import("../src/sql/SqlglotBridge.js");
 }
 
 /** The `-c <code>` argument of an execFileSync(uv, argv, ...) invocation. */

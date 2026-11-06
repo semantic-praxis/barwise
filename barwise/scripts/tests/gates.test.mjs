@@ -6640,8 +6640,8 @@ const ARCH_DISAGREEMENTS = [
   // as its comment, so the new edge is compared, not refused.
   [
     "CLAUDE.md",
-    "@barwise/dbt             (core)",
-    "@barwise/dbt             (core, llm)",
+    "@barwise/dbt             (core, formats)",
+    "@barwise/dbt             (core, formats, llm)",
     /CLAUDE\.md draws dbt -> llm, INTENDED does not/,
   ],
   // Both directions of an edge disagreement.
@@ -6988,11 +6988,11 @@ test("check:architecture cannot answer when an input is unreadable or misshapen"
       "CLAUDE.md",
       (s) =>
         s.replace(
-          "(core)  -- connector package: registers\n  |                                        the dbt",
-          "(core)  \u2014 connector package: registers\n  |                                        the dbt",
+          "(core, formats)  -- connector package:\n  |                                        registers the dbt",
+          "(core, formats)  \u2014 connector package:\n  |                                        registers the dbt",
         ),
     );
-    refused(dash, /\(core\)  \u2014 connector package/);
+    refused(dash, /\(core, formats\)  \u2014 connector package/);
     assert.doesNotMatch(dash.stderr, /must start right of column/);
     // Nor is a misdrawn or nested connector there.
     for (

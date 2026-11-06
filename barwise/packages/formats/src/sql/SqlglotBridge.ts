@@ -7,10 +7,11 @@
  * same pattern shapes the regex tier produces, tagged
  * `parseLevel: "sqlglot"`. The sidecar is optional: availability is
  * probed once per process, and callers fall back to the pure regex
- * cascade in core when Python or sqlglot is absent -- the degradation
- * the original sidecar design promised. The subprocess lives here in
- * @barwise/formats (which owns its I/O, like the dbt connector);
- * core stays pure.
+ * cascade (SqlCascadeParser) when Python or sqlglot is absent -- the
+ * degradation the original sidecar design promised. The subprocess lives
+ * here in @barwise/formats, which owns its I/O; core stays pure. It is the
+ * only bridge: the dbt connector reaches it through parseSqlPatterns
+ * rather than keeping a copy (format-renderers-to-connectors.spec.md, WS3).
  */
 import type { CascadeFileResult, SqlDialect, SqlPatternContext } from "@barwise/core/sql";
 import { execFileSync } from "node:child_process";

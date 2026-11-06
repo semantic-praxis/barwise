@@ -1,6 +1,6 @@
 # Format renderers live in their connectors, and dbt composes formats' SQL parser
 
-Status: WS1 implemented 2026-11-06 (the DDL, OpenAPI, Avro and population renderers in `@barwise/formats`; `connector-packages.md#format-in-its-connector` held by `core/tests/public/exports.test.ts`); WS2 implemented 2026-11-06 (`renderDbt` and `annotateDbtExport` in `@barwise/dbt`); WS3 and WS4 not started
+Status: WS1 implemented 2026-11-06 (the DDL, OpenAPI, Avro and population renderers in `@barwise/formats`; `connector-packages.md#format-in-its-connector` held by `core/tests/public/exports.test.ts`); WS2 implemented 2026-11-06 (`renderDbt` and `annotateDbtExport` in `@barwise/dbt`); WS3 implemented 2026-11-06 (the SQL parser cascade in `@barwise/formats`, `parseSqlPatterns`, dbt depends on formats, `must-agree-copies.md#share-by-composition`); WS4 not started
 
 Created: 2026-11-06
 Last-updated: 2026-11-06
@@ -181,7 +181,10 @@ Move `dbt.ts` and `DbtExportAnnotator.ts`, repoint `DbtExportFormat`,
   `parseSqlPatterns` there as the bridge-then-regex cascade both importers
   inline today. Both call it.
 - Delete `dbt/src/sql/SqlglotBridge.ts` and the dbt bridge tests that
-  formats already has (the three ambient-uv ones). Move
+  formats already has (the three ambient-uv ones). (Implemented: the file held six tests, three ambient-uv and three
+  that always run; each of the six has a counterpart in formats'
+  `SqlglotBridge.test.ts` against the one remaining bridge, so all six
+  went.) Move
   `SqlglotBridge.mocked.test.ts` to formats and point it at formats'
   bridge: its 8 tests mock `node:child_process`, formats has none like
   them, and they keep the one bridge covered whether or not uv answers in

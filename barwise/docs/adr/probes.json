@@ -31,9 +31,9 @@
   },
   {
     "decision": "must-agree-copies#registered-sets-identical",
-    "file": "barwise/packages/dbt/src/sql/SqlglotBridge.ts",
-    "old": "const DIALECT_MAP: Record<SqlDialect, string> = {",
-    "new": "const DIALECT_MAP: Record<SqlDialect, string> = {\n  // drifted\n"
+    "file": "barwise/packages/cli/src/commands/import/shared.ts",
+    "old": "function summarizeDiff(diff: ModelDiffResult): string {\n  let added = 0;",
+    "new": "function summarizeDiff(diff: ModelDiffResult): string {\n  let added = 1;"
   },
   {
     "decision": "must-agree-copies#every-candidate-verdict",

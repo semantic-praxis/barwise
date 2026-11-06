@@ -86,10 +86,11 @@ format lives and how it reaches the surfaces.
   registry's own file (barwise-2uz). Not seen: a renderer core keeps
   unexported and calls from an exported function, a type-only export,
   and an untyped literal that only matches an interface's shape.
-- One known violation of `connector-packages.md#format-in-its-connector`
-  remains until `format-renderers-to-connectors.spec.md` WS3 lands: the
-  SQL parser (`parseSqlFile` and its cascade) is still in core
-  (barwise-ym8.x9w).
+- `connector-packages.md#format-in-its-connector` has no known
+  violation since `format-renderers-to-connectors.spec.md` WS3: the SQL
+  parser cascade is formats', and dbt composes it through
+  `parseSqlPatterns`. Nothing checks that a format's code sits in its own
+  connector rather than another one (barwise-ym8.x9w).
 - That each surface registers what it needs is review-only (S-EXPL-5).
   A missing registration fails loudly ("not registered", "Unknown
   format") when a test or a user asks for that format. One copy is

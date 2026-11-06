@@ -241,8 +241,7 @@
       "globs": [
         "barwise/packages/core/src/sql/",
         "barwise/packages/formats/src/sql/",
-        "barwise/packages/formats/src/ddl/",
-        "barwise/packages/dbt/src/sql/"
+        "barwise/packages/formats/src/ddl/"
       ],
       "why": "SQL and identifier handling (REVIEW.md failure mode 6)"
     },

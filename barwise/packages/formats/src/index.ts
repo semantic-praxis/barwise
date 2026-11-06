@@ -27,6 +27,7 @@ export { OssieImportFormat } from "./ossie/OssieImportFormat.js";
 export { OSSIE_VERSION, OssieImportError } from "./ossie/OssieTypes.js";
 export { SqlImportFormat } from "./sql/SqlImportFormat.js";
 // The SQL parser cascade, moved from core (format-renderers-to-connectors.spec.md, WS3)
+export { parseSqlPatterns } from "./sql/parseSqlPatterns.js";
 export { detectStatementType, parseSqlFile, parseSqlStatement } from "./sql/SqlCascadeParser.js";
 export { extractSqlPatterns, splitSqlStatements } from "./sql/SqlPatternExtractor.js";
 export { mapSqlTypeToConceptual, parseSqlDataType } from "./sql/typeMapping.js";
