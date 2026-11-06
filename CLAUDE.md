@@ -448,9 +448,8 @@ skill (`.claude/skills/release/`).
 - **A key has nowhere to be written down.** `--api-key` is refused on
   every command and the VS Code key lives in secret storage; VS Code's
   default path needs no key, nor does the MCP server's where the client
-  advertises sampling; the measurement lane is the one lane that holds
-  one, workspace-scoped with a spend limit
-  (`docs/adr/keyless-model-access.md`).
+  advertises sampling; only `@barwise/llm` reads a model key, for the
+  measurement lane (`docs/adr/keyless-model-access.md`).
 - ESLint config is shared at the repo root (`barwise/eslint.config.mjs`).
 - Turborepo (`barwise/turbo.json`) orchestrates build/test/lint with
   correct dependency ordering.
