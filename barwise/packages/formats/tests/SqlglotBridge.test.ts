@@ -48,6 +48,10 @@ WHERE o.status = 'open';
     expect(kinds).toContain("join");
     expect(kinds).toContain("where");
     expect(kinds).toContain("case");
+    // Every pattern, not just the join: a tier that tagged a WHERE or CASE
+    // "regex" would pass the join check alone (kept from dbt's copy of
+    // this test, deleted in format-renderers-to-connectors WS3).
+    expect(result!.patterns.every((p) => p.parseLevel === "sqlglot")).toBe(true);
 
     const join = result!.patterns.find((p) => p.kind === "join")!;
     expect(join.parseLevel).toBe("sqlglot");

@@ -44,7 +44,8 @@ format lives and how it reaches the surfaces.
    formats, through one `register*Formats()` function: `@barwise/formats`
    (DDL, OpenAPI, Avro, NORMA, SQL, Ossie; the SQL importer scans
    directories and runs the sqlglot subprocess), `@barwise/dbt` (its
-   file-system and `dbt compile` I/O), and `@barwise/code-analysis`
+   file-system and `dbt compile` I/O; the sqlglot subprocess that parses
+   its models' SQL is formats', reached through `parseSqlPatterns`), and `@barwise/code-analysis`
    (TypeScript, Java and Kotlin, with LSP sessions and repository
    scanning).
 3. **A format's rendering and parsing live in its connector.**{#format-in-its-connector}
@@ -54,7 +55,10 @@ format lives and how it reaches the surfaces.
    and its export annotator are `@barwise/dbt`'s. Core keeps the
    relational mapping (`RelationalMapper`, which ORM, a relational
    technology, owns) and the SQL dialect types and value predicates its
-   own mapping uses; a format reaches them from its connector.
+   own mapping uses; a format reaches them from its connector. A format
+   whose input embeds another format composes that format's connector
+   rather than copying its code: dbt parses its models' SQL through
+   `@barwise/formats`' `parseSqlPatterns`, and depends on formats to do so.
 4. **Registration is explicit and by name.**{#explicit-registration} Each tool surface calls the
    `register*Formats()` functions it needs; the registry discovers
    nothing on its own, and a format no one registered fails as an

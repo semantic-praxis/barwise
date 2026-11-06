@@ -81,13 +81,16 @@ members.
   silenced". `REVIEW.md`'s "Do not report" tells reviewers to skip
   registered copies and the duplication ratchet because CI enforces
   them, so the review instructions contradict each other (barwise-iil).
-- Known violations of `must-agree-copies.md#share-by-composition`:
-  the manifest's CLI and MCP pairs (`staged-write`, the three
+- The manifest's CLI and MCP pairs (`staged-write`, the three
   `lineage-*` sets, `import-alternatives-diff-summary`) and its test
   builder sets (`package-model-builder`, `model-builder-roleId`,
-  `model-builder-preferredId`) predate the decision. Whether each can
-  be shared without an edge `INTENDED` refuses is barwise-ym8.gc9.e76's
-  classification; until then they stay checked. The SQL bridge was the
+  `model-builder-preferredId`) predate
+  `must-agree-copies.md#share-by-composition` and are unclassified, not
+  known violations. A set whose members `INTENDED` lets one owner serve
+  violates the decision; one whose sharing would need an edge `INTENDED`
+  refuses (cli and mcp cannot import each other, and core cannot hold
+  their file I/O) is what decision 2 keeps a parity check for. Sorting
+  each is barwise-ym8.gc9.e76; until then they stay checked. The SQL bridge was the
   first set retired under it (format-renderers-to-connectors.spec.md,
   WS3).
 - Decision 1 is gated only partly, and only inside the detectors'

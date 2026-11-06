@@ -13,8 +13,9 @@
  * only bridge: the dbt connector reaches it through parseSqlPatterns
  * rather than keeping a copy (format-renderers-to-connectors.spec.md, WS3).
  */
-import type { CascadeFileResult, SqlDialect, SqlPatternContext } from "@barwise/core/sql";
+import type { SqlDialect } from "@barwise/core/sql";
 import { execFileSync } from "node:child_process";
+import type { CascadeFileResult, SqlPatternContext } from "./types.js";
 
 /** barwise dialect names -> sqlglot reader names ("" = default ANSI). */
 const DIALECT_MAP: Record<SqlDialect, string> = {

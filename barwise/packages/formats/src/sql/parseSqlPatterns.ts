@@ -9,9 +9,10 @@
  * (format-renderers-to-connectors.spec.md, WS3;
  * docs/adr/must-agree-copies.md#share-by-composition).
  */
-import type { CascadeFileResult, SqlDialect } from "@barwise/core/sql";
+import type { SqlDialect } from "@barwise/core/sql";
 import { parseSqlFile } from "./SqlCascadeParser.js";
 import { normalizeCascadeResult, parseSqlWithSqlglot } from "./SqlglotBridge.js";
+import type { CascadeFileResult } from "./types.js";
 
 export function parseSqlPatterns(
   sql: string,

@@ -21,9 +21,9 @@ dev = ["pytest>=8.0"]
 # Both groups live in uv.lock, which is what makes `uv run --frozen` a
 # pinned run rather than a fresh resolution (docs/specs/python-lockfile-execution.spec.md).
 [dependency-groups]
-# The SQL parsing tier behind @barwise/formats and @barwise/dbt. The two
-# SqlglotBridge copies name this group and never a version, so the pin
-# lives here alone.
+# The SQL parsing tier behind @barwise/formats' SQL cascade, which
+# @barwise/dbt composes. Its one SqlglotBridge names this group and never a
+# version, so the pin lives here alone.
 sqlglot = ["sqlglot==27.28.0"]
 # Empty on purpose: repo scripts that need only the standard library
 # still need a PINNED interpreter, and naming a group with no packages

@@ -5,7 +5,7 @@
  * them into the model the YAML mapping produced, so these tests need
  * no python and no filesystem.
  */
-import type { SqlPatternContext } from "@barwise/core/sql";
+import type { SqlPatternContext } from "@barwise/formats";
 import { describe, expect, it } from "vitest";
 import { ReportBuilder } from "../../src/DbtImportReport.js";
 import { mergeSqlPatterns } from "../../src/dbtMapping/sqlPatterns.js";

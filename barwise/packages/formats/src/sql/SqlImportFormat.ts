@@ -15,12 +15,13 @@
  */
 
 import { type ImportFormat, type ImportOptions, type ImportResult, OrmModel } from "@barwise/core";
-import { SQL_DIALECTS, type SqlDialect, type SqlPatternContext } from "@barwise/core/sql";
+import { SQL_DIALECTS, type SqlDialect } from "@barwise/core/sql";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { DdlImportFormat } from "../ddl/DdlImportFormat.js";
 import { findCreateTables } from "../ddl/sqlIdentifiers.js";
 import { parseSqlPatterns } from "./parseSqlPatterns.js";
+import type { SqlPatternContext } from "./types.js";
 
 /**
  * The explicit dialect, refused when barwise does not support it, the way
