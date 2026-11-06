@@ -1943,6 +1943,42 @@ const VIOLATIONS = [
     },
     /--with.*lock bypass/,
   ],
+  // WS1 code review: forms the first parse missed and the substring check caught.
+  [
+    "uv in a subshell",
+    { "s.sh": "#!/bin/sh\nout=$(uv run --frozen --with x python -V)\n" },
+    /--with.*lock bypass/,
+  ],
+  [
+    "--with after a run option the value list does not know",
+    { "s.sh": "#!/bin/sh\nuv run --frozen --cache-dir /tmp/c --with x python\n" },
+    /--with.*lock bypass/,
+  ],
+  [
+    "a banned flag in global position",
+    { "s.sh": "#!/bin/sh\nuv --isolated run --frozen python\n" },
+    /--isolated/,
+  ],
+  [
+    "-w with its value attached",
+    { "s.sh": "#!/bin/sh\nuv run --frozen -wsqlglot python\n" },
+    /-wsqlglot/,
+  ],
+  [
+    "UV_FROZEN=0, which asserts nothing",
+    { "s.sh": "#!/bin/sh\nUV_FROZEN=0 uv run python -V\n" },
+    /neither --frozen nor --locked/,
+  ],
+  [
+    "uv tool run behind a global option",
+    { "s.sh": "#!/bin/sh\nuv -q tool run ruff\n" },
+    /uv tool run/,
+  ],
+  [
+    "a uv call inside a JS string",
+    { "a.ts": 'execSync("uv run --with sqlglot python x.py");\n' },
+    /--with.*lock bypass/,
+  ],
 ];
 
 for (const [name, files, expected] of VIOLATIONS) {
@@ -2020,7 +2056,7 @@ test("check-python-uv passes the correct parsed forms", () => {
   // a flag that belongs to the launched program, the env spelling of the
   // assertion, and --frozen beside a value-taking option.
   const r = pythonUv({
-    "s.sh": "#!/bin/sh\nuv run --frozen pytest --with-foo\nUV_FROZEN=1 uv run python -V\n"
+    "s.sh": "#!/bin/sh\nUV_FROZEN=1 uv run python -V\n"
       + "uv run --frozen --only-group sqlglot python -c x\nuv --version\n",
     // Prose that mentions uv is not a call (a message in a .ts test file
     // read as `uv ... run` when the parser skipped words to a subcommand).

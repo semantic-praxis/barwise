@@ -107,9 +107,13 @@ const PY_SUBPROCESS = new RegExp(
     .raw`(?:subprocess\.\w+|os\.system|os\.exec\w*|os\.spawn\w*)\s*\(\s*\[?\s*["'](${INTERPRETER})`,
 );
 
-/** `subprocess.run(["uv", ...])`: a uv call whose words are list literals. */
-const PY_UV_LIST =
-  /(?:subprocess\.\w+|os\.exec\w*|os\.spawn\w*)\s*\(\s*\[\s*((?:["']uv["'])[^\]]*)\]/;
+/**
+ * `subprocess.run(["uv", ...])`: a uv call whose words are list literals.
+ * One line only, like every rule here: a list written one element per line
+ * is not read. `os.exec*` and `os.spawn*` take the program before the list,
+ * so they are not this shape.
+ */
+const PY_UV_LIST = /subprocess\.\w+\s*\(\s*\[\s*((?:["']uv["'])[^\]]*)\]/;
 
 /** `execFileSync("python3", ...)` and friends. A quoted name alone is not enough:
  *  `".py": "python"` in a language table is a label, not an invocation. */

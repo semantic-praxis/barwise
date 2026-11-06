@@ -49,8 +49,6 @@ const BANNED_UV_FLAGS = [
 ];
 
 /** `uvx` and `uv tool run` resolve a tool from the index, never uv.lock. */
-const UV_TOOL = /\buvx\b|\buv\s+tool\s+run\b/;
-
 /**
  * Blank the contents of quoted strings before matching a command, so an
  * `echo "== uv sync"` heading is not read as an invocation. A genuine
@@ -160,35 +158,55 @@ const RUN_VALUE_OPTIONS = new Set([
   "-m",
 ]);
 
+/** A word that is the uv executable, however it is spelled in a command:
+ *  `uv`, `(uv`, `$(uv`, `"uv` at the start of a JS string, `/usr/bin/uv`. */
+const isUvWord = (w) => w.replace(/^.*[(`"'$/{]/, "") === "uv";
+
+/** An environment assignment's value that turns a uv setting on. */
+const truthy = (v) => !["", "0", "false", "no", "off"].includes(v.toLowerCase());
+
 /**
- * A uv call in one command segment: the environment names assigned before
- * it, its subcommand, and the options uv itself receives -- for `run`,
- * those before the command it launches (or `--`), since `uv run python
- * x.py --frozen` hands `--frozen` to x.py. Null when the segment calls
- * no uv. Quotes must already be blanked.
+ * A uv call in one command segment. Null when the segment calls no uv.
+ * Quotes must already be blanked in shell text.
+ *
+ * - `env`: the names assigned a truthy value before uv;
+ * - `subcommand`: the first of uv's subcommands after it;
+ * - `words`: every word after uv up to `--`, global positions included,
+ *   which is where banned flags are looked for. Reading more than uv
+ *   receives can only add a finding, never hide one;
+ * - `options`: for `run`, the words before the command it launches, where
+ *   `--frozen` must stand (`uv run python x.py --frozen` hands it to
+ *   x.py). Where that command starts depends on which options take a
+ *   value, a hand-kept list (RUN_VALUE_OPTIONS); a missing entry ends the
+ *   options early, which can only report a missing `--frozen` that is
+ *   there, loudly, never pass one that is not.
  */
 export function parseUv(segment) {
-  const words = segment.trim().split(/\s+/).filter(Boolean);
-  const at = words.indexOf("uv");
+  const all = segment.trim().split(/\s+/).filter(Boolean);
+  const at = all.findIndex(isUvWord);
   if (at < 0) return null;
   const env = new Set(
-    words.slice(0, at).filter((w) => /^[A-Za-z_]\w*=/.test(w)).map((w) => w.split("=")[0]),
+    all.slice(0, at)
+      .filter((w) => /^[A-Za-z_]\w*=/.test(w) && truthy(w.slice(w.indexOf("=") + 1)))
+      .map((w) => w.split("=")[0]),
   );
   // Between uv and its subcommand only global options may stand, and a
   // bare word only as the value of the option just before it. Any other
-  // word means this is prose that mentions uv ("Install uv to run them"),
-  // not a call.
+  // word means prose that mentions uv ("Install uv to run them"), not a call.
   let i = at + 1;
-  while (i < words.length && !UV_SUBCOMMANDS.has(words[i])) {
-    const prev = words[i - 1];
+  while (i < all.length && !UV_SUBCOMMANDS.has(all[i])) {
+    const prev = all[i - 1];
     const isValue = i > at + 1 && prev.startsWith("-") && !prev.includes("=");
-    if (!words[i].startsWith("-") && !isValue) return null;
+    if (!all[i].startsWith("-") && !isValue) return null;
     i++;
   }
-  const subcommand = words[i] ?? null;
+  const subcommand = all[i] ?? null;
+  const next = all[i + 1] ?? null;
+  const end = all.indexOf("--", at + 1);
+  const words = all.slice(at + 1, end < 0 ? all.length : end);
   const options = [];
-  for (i++; i < words.length; i++) {
-    const w = words[i];
+  for (i++; i < all.length; i++) {
+    const w = all[i];
     if (w === "--") break;
     if (!w.startsWith("-")) {
       if (subcommand === "run") break;
@@ -196,11 +214,17 @@ export function parseUv(segment) {
       continue;
     }
     options.push(w);
-    if (!w.includes("=") && RUN_VALUE_OPTIONS.has(w) && i + 1 < words.length) {
-      options.push(words[++i]);
+    if (!w.includes("=") && RUN_VALUE_OPTIONS.has(w) && i + 1 < all.length) {
+      options.push(all[++i]);
     }
   }
-  return { env, subcommand, options };
+  return {
+    env,
+    subcommand,
+    next,
+    words,
+    options,
+  };
 }
 
 /** True when a command segment runs or syncs through uv. */
@@ -211,7 +235,9 @@ export const isUvRunOrSync = (segment) =>
 export function bannedFlag(option) {
   const name = option.split("=")[0];
   return BANNED_UV_FLAGS.find(([flag]) =>
-    flag === "-w" ? name === "-w" : name === flag || name.startsWith(flag + "-")
+    flag === "-w"
+      ? /^-w(?!-)/.test(name) && !name.startsWith("--")
+      : name === flag || name.startsWith(flag + "-")
   );
 }
 
@@ -224,16 +250,18 @@ export function bannedFlag(option) {
 export function uvFindings(cmd) {
   const out = [];
   for (const { text } of commandSegments(cmd)) {
-    if (UV_TOOL.test(text)) out.push("`uvx`/`uv tool run` (resolves outside uv.lock)");
     const uv = parseUv(text);
+    if (/\buvx\b/.test(text) || (uv?.subcommand === "tool" && uv.next === "run")) {
+      out.push("`uvx`/`uv tool run` (resolves outside uv.lock)");
+    }
     if (uv?.subcommand === "pip") {
       out.push("`uv pip`");
       continue;
     }
     if (uv === null || !["run", "sync"].includes(uv.subcommand)) continue;
-    for (const option of uv.options) {
-      const banned = bannedFlag(option);
-      if (banned) out.push(`\`${option.split("=")[0]}\` (${banned[1]})`);
+    for (const word of uv.words) {
+      const banned = bannedFlag(word);
+      if (banned) out.push(`\`${word.split("=")[0]}\` (${banned[1]})`);
     }
     // The environment spellings: UV_NO_PROJECT and UV_ISOLATED are the
     // banned flags by another name; UV_FROZEN and UV_LOCKED assert the lock.

@@ -58,6 +58,12 @@ const REFUSED = [
     /outside barwise/,
   ],
   ["--project pointing elsewhere", "uv run --frozen --project /tmp python -V", /outside barwise/],
+  // python-uv-widened WS1 review: a subshell's "(uv" was not read as uv.
+  [
+    "uv run in a subshell after cd elsewhere",
+    "cd /tmp && (uv run --frozen python -V)",
+    /outside barwise/,
+  ],
 ];
 
 test("refuses uv run from the repository root, where uv finds no pyproject [adr:python-from-the-lockfile#project-ancestor]", () => {
