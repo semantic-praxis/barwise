@@ -234,7 +234,9 @@ function commandLines(kind, text) {
 
 const unreadable = [];
 
-for (const file of trackedFiles()) {
+// Listed once: the main loop and the project check read the same tree.
+const tracked = trackedFiles();
+for (const file of tracked) {
   if (SELF.has(file)) continue;
   if (file.startsWith(".beads/hooks/")) continue;
   const kind = fileKind(file);
@@ -324,7 +326,6 @@ for (const file of trackedFiles()) {
 const PROJECT_FILES = new Set(["barwise/pyproject.toml", "barwise/uv.lock"]);
 const MANIFEST =
   /(^|\/)(pyproject\.toml|requirements[^/]*\.txt|setup\.py|setup\.cfg|Pipfile(\.lock)?|uv\.toml|pylock[^/]*\.toml|uv\.lock)$/;
-const tracked = trackedFiles();
 for (const file of tracked) {
   if (MANIFEST.test(file) && !PROJECT_FILES.has(file)) {
     findings.push({
