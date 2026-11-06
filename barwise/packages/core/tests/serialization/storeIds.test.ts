@@ -122,13 +122,17 @@ model:
     expect(serializer.serialize(read(text))).toBe(serializer.serialize(read(hand)));
   });
 
-  it("give back the bytes a save wrote, for every minted id in every tracked model", () => {
-    // Required by 6b-3a's second pr-review pass: each element barwise
-    // writes, with its id and key taken out, stored again. Most anchors
-    // here are block lists (a constraint's `roles:`), which no hand-built
-    // case above reached.
-    let sites = 0;
-    for (const c of modelCorpus()) {
+  // Required by 6b-3a's second pr-review pass: each element barwise
+  // writes, with its id and key taken out, stored again. Most anchors here
+  // are block lists (a constraint's `roles:`), which no hand-built case
+  // above reached. One case per model, not one loop: the loop's cost grew
+  // with the corpus and passed 30s under the pre-commit hook's parallel
+  // run while taking 5s alone (barwise-ov2, barwise-6yu).
+  describe("give back the bytes a save wrote, for every minted id in every tracked model", () => {
+    const corpus = modelCorpus();
+    const sites = new Map<string, number>();
+
+    it.each(corpus.map((c) => [c.file, c] as const))("%s", (_file, c) => {
       const text = serializer.serialize(
         replayInto40(serializer.deserializeAsWritten(JSON.stringify(c.doc))),
       );
@@ -152,12 +156,18 @@ model:
           i += 1;
         }
       }
-      if (here === 0) continue;
-      sites += here;
+      sites.set(c.file, here);
+      if (here === 0) return;
       const back = storeIds(removed.join("\n"));
       expect([c.file, back.stored.length, back.text]).toEqual([c.file, here, text]);
-    }
-    expect(sites).toBeGreaterThan(200);
+    });
+
+    // Runs after the cases above (a file's tests run in order). A filtered
+    // run that skipped some of them fails here by name, not by a low count.
+    it("reach more than 200 sites across the corpus", () => {
+      expect(sites.size).toBe(corpus.length);
+      expect([...sites.values()].reduce((a, b) => a + b, 0)).toBeGreaterThan(200);
+    });
   });
 
   it("keep a file's CRLF line endings", () => {
