@@ -6,6 +6,7 @@ Last-updated: 2026-11-06
 Tracking: barwise-ym8.gc9 (adr-refactor batch 2), barwise-ym8.j31,
 barwise-ym8.rl7, barwise-ym8.c42, barwise-ym8.aep, barwise-ym8.if3,
 barwise-ydl, barwise-shq, barwise-w43, barwise-vt2, barwise-1049
+Plan-reviewed: d87e9cd6 (code-review, pr-review)
 Touches: barwise/scripts/fault-matrix.mjs, barwise/scripts/check-tracker-closes.mjs,
 barwise/scripts/test-adr-model.mjs, barwise/scripts/run-script-tests.mjs,
 barwise/scripts/check-depcruise-gate.mjs, barwise/scripts/audit-rubric.mjs,
