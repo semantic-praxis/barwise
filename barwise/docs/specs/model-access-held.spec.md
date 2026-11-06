@@ -1,6 +1,6 @@
 # Keyless model access and production prompts, held by tests
 
-Status: Draft -- no workstream implemented
+Status: WS1 and WS2 implemented 2026-11-06 (nine Scope items as tagged tests, each seen red on a planted violation; the ADRs drop the gap entries for no-key-in-argv, library-takes-key, shipped-only, candidates-in-prompt-lane and library-seam); WS3 provisional
 Created: 2026-11-06
 Last-updated: 2026-11-06
 Plan-reviewed: ee781594 (code-review, pr-review)

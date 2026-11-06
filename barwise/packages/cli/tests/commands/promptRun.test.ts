@@ -22,6 +22,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { createProgram } from "../../src/cli.js";
 import { type FakeOllama, startFakeOllama } from "../workspace/fakeOllama.js";
 import { runCli, warmPromptCommand } from "../workspace/run.js";
 
@@ -236,6 +237,27 @@ describe("the production surfaces stay narrow", () => {
     const { stdout } = await runCli(["import", "transcript", "--help"]);
     expect(stdout).not.toContain("--artifacts");
   });
+
+  for (const path of [["import", "transcript"], ["review"], ["import", "batch"]]) {
+    it(`barwise ${path.join(" ")} has no artifact, prompt or candidate option, hidden included [adr:production-prompt-resolution#candidates-in-prompt-lane]`, async () => {
+      // Walked from the program, not read from --help: a hidden option is
+      // the easiest way to reopen this lane without anyone noticing.
+      let command = await createProgram();
+      for (const name of path) {
+        const next = command.commands.find((c) => c.name() === name);
+        expect(next, name).toBeDefined();
+        command = next!;
+      }
+      const longs = command.options.map((o) => o.long ?? o.flags);
+      expect(longs.length).toBeGreaterThan(0);
+      const forbidden = longs.filter((l) =>
+        l.replace(/^--/, "").split("-").some((w) =>
+          ["artifact", "artifacts", "prompt", "candidate"].includes(w)
+        )
+      );
+      expect(forbidden).toEqual([]);
+    });
+  }
 
   it("barwise prompt run does", async () => {
     // The complement, so the pair cannot both pass by the flag simply

@@ -9,12 +9,20 @@
  * barwise-850 survived for months. So this pins the candidate set and
  * the per-surface default directly, not through a surface.
  */
-import { describe, expect, it } from "vitest";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { builtinArtifacts } from "../../src/prompt/artifacts/builtins.generated.js";
 import type { PromptArtifact } from "../../src/prompt/artifacts/PromptArtifact.js";
 import { defaultReviewArtifact } from "../../src/prompt/reviewPrompt.js";
 import { assertArtifactSurface, selectArtifact } from "../../src/prompt/selectArtifact.js";
 import { defaultExtractionArtifact } from "../../src/prompt/systemPrompt.js";
+import { readCode } from "../helpers/sourceText.js";
+
+const here = dirname(fileURLToPath(import.meta.url));
+const packagesDir = resolve(here, "../../..");
 
 const reviewOverride: PromptArtifact = {
   surface: "review",
@@ -95,5 +103,134 @@ describe("assertArtifactSurface", () => {
       .toThrow('Prompt artifact surface "review" cannot drive transcript extraction.');
     expect(() => assertArtifactSurface(extractionOverride, "review"))
       .toThrow('Prompt artifact surface "extraction" cannot drive model review.');
+  });
+});
+
+/**
+ * Production can only send a shipped artifact
+ * (docs/adr/production-prompt-resolution.md, `shipped-only`;
+ * docs/specs/model-access-held.spec.md, Scope item 6). Three halves: what
+ * the resolver can reach, what it does when a candidate is lying around
+ * anyway, and whether a production call site hands it one.
+ */
+describe("shipped-only", () => {
+  /** Every module specifier the file imports, static or dynamic. */
+  function importsOf(code: string): string[] {
+    const found: string[] = [];
+    for (const m of code.matchAll(/\bimport\s+(?:type\s+)?[^"';]*?\bfrom\s*["']([^"']+)["']/g)) {
+      found.push(m[1]!);
+    }
+    for (const m of code.matchAll(/\bimport\s*["']([^"']+)["']/g)) found.push(m[1]!);
+    for (const m of code.matchAll(/\b(?:import|require)\s*\(\s*([^)]*)\)/g)) {
+      found.push(`dynamic:${m[1]!.trim()}`);
+    }
+    return found.sort();
+  }
+
+  it("selectArtifact.ts imports exactly the five modules it has today [adr:production-prompt-resolution#shipped-only]", () => {
+    // A new import -- a directory loader, node:fs, node:os -- fails here
+    // until someone reviews whether it widens the candidate set.
+    const code = readCode(join(packagesDir, "llm/src/prompt/selectArtifact.ts"));
+    expect(importsOf(code)).toEqual([
+      "./artifacts/PromptArtifact.js",
+      "./artifacts/builtins.generated.js",
+      "./artifacts/resolveArtifact.js",
+      "./reviewPrompt.js",
+      "./systemPrompt.js",
+    ]);
+  });
+
+  describe("with candidates planted where a loader would look", () => {
+    const ENV_VARS = [
+      "HOME",
+      "XDG_CONFIG_HOME",
+      "BARWISE_PROMPTS",
+      "BARWISE_PROMPT_DIR",
+      "BARWISE_PROMPTS_DIR",
+      "BARWISE_ARTIFACTS",
+      "BARWISE_ARTIFACTS_DIR",
+      "BARWISE_PROMPT_ARTIFACTS",
+    ] as const;
+    const saved = new Map<string, string | undefined>();
+    let root: string;
+
+    /** A candidate per surface that would win resolution if it were read. */
+    function plant(dir: string): void {
+      mkdirSync(dir, { recursive: true });
+      for (const surface of ["extraction", "review"]) {
+        writeFileSync(
+          join(dir, `${surface}.planted.prompt.yaml`),
+          `surface: ${surface}\nversion: planted\nmatch:\n  provider: anthropic\n`
+            + `  modelPrefix: claude\ninstructions: planted\ndemos: []\n`,
+        );
+      }
+    }
+
+    beforeEach(() => {
+      for (const k of ENV_VARS) saved.set(k, process.env[k]);
+      root = mkdtempSync(join(tmpdir(), "shipped-only-"));
+      const home = join(root, "home");
+      const xdg = join(root, "xdg");
+      const envDir = join(root, "env-prompts");
+      for (
+        const d of [
+          join(home, ".barwise/prompts"),
+          join(home, ".config/barwise/prompts"),
+          join(xdg, "barwise/prompts"),
+          envDir,
+        ]
+      ) {
+        plant(d);
+      }
+      process.env["HOME"] = home;
+      process.env["XDG_CONFIG_HOME"] = xdg;
+      for (const k of ENV_VARS.slice(2)) process.env[k] = envDir;
+    });
+
+    afterEach(() => {
+      for (const [k, v] of saved) {
+        if (v === undefined) delete process.env[k];
+        else process.env[k] = v;
+      }
+      rmSync(root, { recursive: true, force: true });
+    });
+
+    it("still returns an element of builtinArtifacts on both surfaces [adr:production-prompt-resolution#shipped-only]", () => {
+      const clients = [
+        { provider: "anthropic", model: "claude-haiku-4-5" },
+        { provider: "anthropic", model: "claude-opus-5" },
+        { provider: "ollama", model: "llama3" },
+        {},
+      ];
+      for (const surface of ["extraction", "review"] as const) {
+        for (const client of clients) {
+          const chosen = selectArtifact(surface, client);
+          expect(builtinArtifacts).toContain(chosen);
+          expect(chosen.version).not.toBe("planted");
+        }
+      }
+    });
+  });
+
+  it("no production call site passes an artifact property [adr:production-prompt-resolution#shipped-only]", () => {
+    // Read with comments stripped: several of these files explain, in a
+    // comment, the very property they must not pass.
+    const callSites = [
+      "cli/src/commands/import/transcript.ts",
+      "cli/src/commands/import/batch.ts",
+      "cli/src/commands/review.ts",
+      "mcp/src/tools/import.ts",
+      "mcp/src/tools/review.ts",
+      "vscode/src/mcp/ToolRegistration.ts",
+      "vscode/src/commands/ImportTranscriptCommand.ts",
+    ];
+    const offenders: string[] = [];
+    for (const site of callSites) {
+      const lines = readCode(join(packagesDir, site)).split("\n");
+      lines.forEach((line, i) => {
+        if (/\bartifact\s*:/.test(line)) offenders.push(`${site}:${i + 1}: ${line.trim()}`);
+      });
+    }
+    expect(offenders).toEqual([]);
   });
 });

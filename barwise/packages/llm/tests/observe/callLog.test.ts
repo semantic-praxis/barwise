@@ -253,3 +253,21 @@ describe("a credential never reaches a record", () => {
     expect(JSON.stringify(s.entries)).not.toContain(KEY);
   });
 });
+
+describe("the call-log record carries no artifact field", () => {
+  it('has no key containing "artifact", on success or failure [adr:production-prompt-resolution#recovered-not-recorded]', async () => {
+    // The version is recovered from `promptHash` by rendering the shipped
+    // set; a recorded `artifactVersion` would be a second answer that can
+    // disagree with the first.
+    const s = sink();
+    await withCallLog(client(), s, { now: () => FIXED }).complete(request);
+    const failing = client({ complete: () => Promise.reject(new Error("boom")) });
+    await withCallLog(failing, s, { now: () => FIXED }).complete(request).catch(() => {});
+
+    expect(s.entries).toHaveLength(2);
+    for (const entry of s.entries) {
+      expect(Object.keys(entry).length).toBeGreaterThan(0);
+      expect(Object.keys(entry).filter((k) => /artifact/i.test(k))).toEqual([]);
+    }
+  });
+});

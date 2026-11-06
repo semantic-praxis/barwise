@@ -11,7 +11,9 @@
  * Run through `runCli` in process, like every other command test -- a
  * subprocess is not instrumented by the parent's coverage collector.
  */
+import type { Command } from "commander";
 import { describe, expect, it } from "vitest";
+import { createProgram } from "../../src/cli.js";
 import { runCli, warmPromptCommand } from "../workspace/run.js";
 
 // Assembled, not a literal: `check:secrets` scans this repository's history
@@ -90,5 +92,41 @@ describe("--api-key is refused", () => {
     // whose failure mode is its own: a missing file, not a refused flag.
     const r = await runCli(["review", "/definitely/not/a/model.orm.yaml"]);
     expect(r.stderr).not.toMatch(/--api-key was removed/);
+  });
+});
+
+describe("no option takes a credential", () => {
+  /**
+   * barwise-xsg's rule, over every command the program registers: a long
+   * name with a hyphen-separated word key, secret, password or credential,
+   * or ending in -token. Words, not substrings, so --max-tokens and
+   * --surrogate-keys pass. --api-key is the one declared exception: it is
+   * declared so the root hook can refuse it by name.
+   */
+  function credentialOptions(command: Command, path: string[] = []): string[] {
+    const found: string[] = [];
+    for (const o of command.options) {
+      const long = o.long;
+      if (long === undefined || long === "--api-key") continue;
+      const words = long.replace(/^--/, "").split("-");
+      if (
+        words.some((w) => ["key", "secret", "password", "credential"].includes(w))
+        || long.endsWith("-token")
+      ) {
+        found.push(`${path.join(" ") || "(root)"} ${long}`);
+      }
+    }
+    for (const sub of command.commands) {
+      found.push(...credentialOptions(sub, [...path, sub.name()]));
+    }
+    return found;
+  }
+
+  it("no command or subcommand declares a key, secret, password, credential or token option besides --api-key [adr:keyless-model-access#no-key-in-argv]", async () => {
+    const program = await createProgram();
+    // The walk must reach the nested commands, or it passes on nothing.
+    const names = program.commands.flatMap((c) => [c.name(), ...c.commands.map((s) => s.name())]);
+    expect(names).toEqual(expect.arrayContaining(["review", "transcript", "batch", "run"]));
+    expect(credentialOptions(program)).toEqual([]);
   });
 });

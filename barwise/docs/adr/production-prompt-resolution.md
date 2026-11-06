@@ -6,9 +6,7 @@ Tracking: barwise-ubc, barwise-855, barwise-882, barwise-qxt, barwise-9z7, barwi
 docs/specs/artifact-resolution-parity.spec.md,
 docs/specs/artifact-resolution-in-production.spec.md
 Enforced-by: tests (shipped-only, candidates-in-prompt-lane, recovered-not-recorded,
-library-seam), none (barwise-ym8.mdg: shipped-only),
-none (barwise-ym8.w0p: candidates-in-prompt-lane),
-none (barwise-ym8.x2g: recovered-not-recorded), none (barwise-ym8.29c: library-seam)
+library-seam), none (barwise-ym8.x2g: recovered-not-recorded)
 
 ## Context
 
@@ -62,17 +60,23 @@ are in `artifact-resolution-parity.spec.md`.
     test (`llm/tests/prompt/artifacts/builtins.test.ts`) checks that the
     compiled set equals `prompts/`; review is the PR's. The CLI and MCP
     review tests assert their `reviewModel` options exactly, so an extra
-    `artifact` there fails. Nothing would fail if `selectArtifact` also
-    read a directory, or if the transcript-import call sites (CLI, MCP,
-    `import batch`) or the VS Code ones passed an `artifact`
-    (barwise-qxt).
+    `artifact` there fails. `selectArtifact.test.ts` (tagged;
+    `model-access-held.spec.md`) pins `selectArtifact.ts`'s imports to
+    the five it has, shows it returning a built-in artifact with
+    candidate directories and variables planted, and fails when any of
+    the seven production call sites (CLI transcript, batch and review;
+    MCP import and review; VS Code tool registration and transcript
+    command) passes an `artifact` property (barwise-qxt).
   - 2: `cli/tests/commands/promptRun.test.ts` ("the production surfaces
     stay narrow") checks that `review --help` and `import transcript
-    --help` carry no `--artifacts`, and that `prompt run` does. Nothing
-    checks `--artifact-version` on those commands, or `import batch`
-    (barwise-qxt).
+    --help` carry no `--artifacts`, and that `prompt run` does. Tagged
+    tests walk every option of `import transcript`, `review` and `import
+    batch`, hidden included, and the MCP and VS Code transcript and
+    review tools' input schemas, and fail on a word `artifact`,
+    `prompt` or `candidate` (barwise-qxt).
   - 3: `llm/tests/observe/callLog.test.ts` pins that a record carries no
-    part of the user message. `prompt artifact` prints only the hash of
+    part of the user message, and (tagged) no key containing `artifact`;
+    other record writers are not covered. `prompt artifact` prints only the hash of
     the rendering without `--alternatives`, so an alternatives run's hash
     has no command that prints it. The prompt lane writes to the same call
     log as production (`prompt eval` and `prompt run` wrap their clients
@@ -84,7 +88,10 @@ are in `artifact-resolution-parity.spec.md`.
     `prompt eval` passes extraction and `prompt artifact`'s `render` is
     typed to the two surfaces, but the copy would not fail the build
     itself (barwise-9z7).
-  - 4: `llm/tests/prompt/selectArtifact.test.ts` covers the surface guard.
+  - 4: `llm/tests/prompt/selectArtifact.test.ts` covers the surface guard,
+    and `llm/tests/librarySeam.test.ts` shows `processTranscript` and
+    `reviewModel`, given an artifact for the other surface, throwing the
+    guard's error without calling the client.
 - Decided: an embedder can pass an artifact to the library, within the
   surface guard (spec, Open decision 1, resolved 2026-08-26: "this
   removes no capability, only a CLI affordance on the wrong command").
