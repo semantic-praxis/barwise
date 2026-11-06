@@ -9,7 +9,7 @@ barwise-ym8.3nm, barwise-ym8.0hi, barwise-ym8.0pq, barwise-1005, barwise-xpt
 Touches: CLAUDE.md, package.json, +barwise/scripts/check-capability-matrix.mjs,
 +barwise/scripts/lib/capability-map.json, barwise/scripts/tests/,
 +barwise/scripts/tests/check-capability-matrix.test.mjs,
-barwise/package.json, .github/workflows/ci.yml, +barwise/docs/adr/tested-in.json,
+barwise/package.json, .github/workflows/ci.yml, +barwise/docs/adr/tested-in.json, barwise/scripts/check-adr-tests.mjs,
 barwise/scripts/lib/adr-facts.mjs, barwise/scripts/lib/adr-judge.mjs,
 barwise/docs/adr/surface-capability-parity.md, barwise/docs/adr/probes.json,
 barwise/docs/ARCHITECTURE.md, barwise/scripts/check-adr-tests.mjs
@@ -207,12 +207,29 @@ Consequences prose.
 - **The rule**: for each row, every named file has a passing test that
   carries the decision's tag in its own title, read from the reports
   this run wrote. A file whose tagged tests all skipped is a refusal, as
-  for a decision today; a file with no passed tagged test and at least
-  one failed, or none at all, is a finding naming the file. A row whose
-  decision is not a `tests` entry of its ADR, or whose file is not
-  tracked, is a finding (a row that outlived its decision).
-- **The reader** keeps the file, made repository-relative, on every
-  report entry; nothing else in the judge changes.
+  for a decision today; so is a file with no tagged test when any report
+  was unreadable (the decision rule's branch, reused). With every report
+  read, a file with no passed tagged test and at least one failed, or
+  none at all, is a finding naming the file. A row whose decision is not
+  a `tests` entry of its ADR, or whose file is not tracked, is a finding
+  (a row that outlived its decision).
+- **The readers** stay in `adr-facts.mjs` (the reader/judge split):
+  `readTestedIn(root)` returns the rows and the tracked paths they name,
+  or null when `tested-in.json` is missing, unparsable or not a list of
+  `{ decision, files, why }` rows, which the gate turns into a refusal,
+  never zero rows. The report readers keep each entry's file as a path
+  relative to the **report's own directory** (`packages/<pkg>/` for a
+  vitest report, `scripts/tests/` for a script report), taken from the
+  part of the absolute path after that directory's last occurrence:
+  plan review found turbo's shared cache restores a report written in
+  another checkout, so its absolute prefix is not this root's. A null
+  `file` (the tag reporter writes `d.file ?? null`) leaves the entry
+  out of the per-file rule only.
+- **The judge** returns per-file skips as their own count, and the gate's
+  summary arithmetic reads it, so a per-file refusal is neither counted
+  as an unproven decision nor counted twice with the decision rule.
+- **One copy of the list**: CLAUDE.md's sentence naming the two pinned
+  tests points at `tested-in.json` instead of restating the paths.
 - **Planted red** in the gate's own tests (a temp tree with reports): one
   of two named files passing, a named file untagged, a stale row, an
   untracked path. No probe: probes plant a source edit and run a gate
