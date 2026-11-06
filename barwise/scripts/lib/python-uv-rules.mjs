@@ -33,9 +33,17 @@ const COMMAND_POS = new RegExp(
     .raw`(?:^|[;&|(]|&&|\|\||\$\()\s*(?:[A-Za-z_]\w*=\S*\s+)*${WRAPPER}(${INTERPRETER})`,
 );
 
-export const BANNED_UV_FLAGS = [
+/**
+ * Matched as prefixes of an option uv receives, most specific first:
+ * `--with` also catches `--with-editable`, which layers packages "allowed
+ * to conflict" with the project's, and which the substring check this
+ * replaced caught only by accident (python-uv-widened WS1). `-w` is
+ * `--with`'s short form.
+ */
+const BANNED_UV_FLAGS = [
   ["--with-requirements", "reads requirements outside the lockfile"],
   ["--with", "resolves against the index, not uv.lock -- a lock bypass"],
+  ["-w", "`--with`'s short form -- a lock bypass"],
   ["--isolated", "resolves outside the project entirely"],
   ["--no-project", "runs with no project, so no lock -- --isolated by another name"],
 ];
@@ -96,8 +104,116 @@ export function commandSegments(cmd) {
   return out;
 }
 
-/** A command that runs or syncs through uv, so needs the lockfile. */
-export const UV_RUN = /\buv\s+(?:run|sync)\b/;
+/**
+ * uv's subcommands. The subcommand is the first of these after `uv`;
+ * everything before it is a global option or its value. A list of the
+ * global options that take a value is the other way to skip them, and it
+ * was wrong when written from memory (`--python` is not global,
+ * `--allow-insecure-host` is; python-uv-widened, plan review).
+ */
+const UV_SUBCOMMANDS = new Set([
+  "add",
+  "auth",
+  "build",
+  "cache",
+  "export",
+  "format",
+  "help",
+  "init",
+  "lock",
+  "pip",
+  "publish",
+  "python",
+  "remove",
+  "run",
+  "self",
+  "sync",
+  "tool",
+  "tree",
+  "venv",
+  "version",
+]);
+
+/** `uv run` options that take a value, so their value is not the command. */
+const RUN_VALUE_OPTIONS = new Set([
+  "--only-group",
+  "--group",
+  "--no-group",
+  "--extra",
+  "--no-extra",
+  "--with",
+  "--with-requirements",
+  "--with-editable",
+  "-w",
+  "--project",
+  "--directory",
+  "--env-file",
+  "--python",
+  "-p",
+  "--index",
+  "--default-index",
+  "--index-url",
+  "--extra-index-url",
+  "--package",
+  "--script",
+  "--module",
+  "-m",
+]);
+
+/**
+ * A uv call in one command segment: the environment names assigned before
+ * it, its subcommand, and the options uv itself receives -- for `run`,
+ * those before the command it launches (or `--`), since `uv run python
+ * x.py --frozen` hands `--frozen` to x.py. Null when the segment calls
+ * no uv. Quotes must already be blanked.
+ */
+export function parseUv(segment) {
+  const words = segment.trim().split(/\s+/).filter(Boolean);
+  const at = words.indexOf("uv");
+  if (at < 0) return null;
+  const env = new Set(
+    words.slice(0, at).filter((w) => /^[A-Za-z_]\w*=/.test(w)).map((w) => w.split("=")[0]),
+  );
+  // Between uv and its subcommand only global options may stand, and a
+  // bare word only as the value of the option just before it. Any other
+  // word means this is prose that mentions uv ("Install uv to run them"),
+  // not a call.
+  let i = at + 1;
+  while (i < words.length && !UV_SUBCOMMANDS.has(words[i])) {
+    const prev = words[i - 1];
+    const isValue = i > at + 1 && prev.startsWith("-") && !prev.includes("=");
+    if (!words[i].startsWith("-") && !isValue) return null;
+    i++;
+  }
+  const subcommand = words[i] ?? null;
+  const options = [];
+  for (i++; i < words.length; i++) {
+    const w = words[i];
+    if (w === "--") break;
+    if (!w.startsWith("-")) {
+      if (subcommand === "run") break;
+      options.push(w);
+      continue;
+    }
+    options.push(w);
+    if (!w.includes("=") && RUN_VALUE_OPTIONS.has(w) && i + 1 < words.length) {
+      options.push(words[++i]);
+    }
+  }
+  return { env, subcommand, options };
+}
+
+/** True when a command segment runs or syncs through uv. */
+export const isUvRunOrSync = (segment) =>
+  ["run", "sync"].includes(parseUv(segment)?.subcommand ?? "");
+
+/** The banned flag an option is, or undefined. */
+export function bannedFlag(option) {
+  const name = option.split("=")[0];
+  return BANNED_UV_FLAGS.find(([flag]) =>
+    flag === "-w" ? name === "-w" : name === flag || name.startsWith(flag + "-")
+  );
+}
 
 /**
  * What is wrong with the uv invocations on one line, as short phrases.
@@ -109,15 +225,24 @@ export function uvFindings(cmd) {
   const out = [];
   for (const { text } of commandSegments(cmd)) {
     if (UV_TOOL.test(text)) out.push("`uvx`/`uv tool run` (resolves outside uv.lock)");
-    if (/\buv\s+pip\b/.test(text)) {
+    const uv = parseUv(text);
+    if (uv?.subcommand === "pip") {
       out.push("`uv pip`");
       continue;
     }
-    if (!UV_RUN.test(text)) continue;
-    for (const [flag, why] of BANNED_UV_FLAGS) {
-      if (text.includes(flag)) out.push(`\`${flag}\` (${why})`);
+    if (uv === null || !["run", "sync"].includes(uv.subcommand)) continue;
+    for (const option of uv.options) {
+      const banned = bannedFlag(option);
+      if (banned) out.push(`\`${option.split("=")[0]}\` (${banned[1]})`);
     }
-    if (!/--frozen|--locked/.test(text)) {
+    // The environment spellings: UV_NO_PROJECT and UV_ISOLATED are the
+    // banned flags by another name; UV_FROZEN and UV_LOCKED assert the lock.
+    for (const name of ["UV_NO_PROJECT", "UV_ISOLATED"]) {
+      if (uv.env.has(name)) out.push(`\`${name}\` (resolves outside uv.lock)`);
+    }
+    const asserted = uv.options.some((o) => o === "--frozen" || o === "--locked")
+      || uv.env.has("UV_FROZEN") || uv.env.has("UV_LOCKED");
+    if (!asserted) {
       out.push("`uv run`/`uv sync` with neither --frozen nor --locked");
     }
   }

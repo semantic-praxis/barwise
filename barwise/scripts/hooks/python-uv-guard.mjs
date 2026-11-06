@@ -29,9 +29,9 @@ import { fileURLToPath } from "node:url";
 import {
   blankQuoted,
   commandSegments,
+  isUvRunOrSync,
   logicalLines,
   shellCommandFindings,
-  UV_RUN,
   withoutHeredocBodies,
 } from "../lib/python-uv-rules.mjs";
 
@@ -82,7 +82,7 @@ function unscopedUv() {
         dir = words[1] ? literalPath(words[1], dir) : homedir();
         continue;
       }
-      if (!UV_RUN.test(seg.text)) continue;
+      if (!isUvRunOrSync(seg.text)) continue;
       const flag = words.findIndex((w) => /^--(project|directory)(=|$)/.test(w));
       const target = flag < 0
         ? dir

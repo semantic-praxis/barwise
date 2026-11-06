@@ -1908,6 +1908,41 @@ const VIOLATIONS = [
   ],
   ["uvx, which resolves from the index", { "s.sh": "#!/bin/sh\nuvx sqlglot --version\n" }, /uvx/],
   ["uv tool run", { "s.sh": "#!/bin/sh\nuv tool run sqlglot\n" }, /uv tool run/],
+  // python-uv-widened WS1: a uv call is parsed, not matched.
+  [
+    "a global option before run, which hid the whole call",
+    { "s.sh": "#!/bin/sh\nuv --quiet run python -V\n" },
+    /neither --frozen nor --locked/,
+  ],
+  [
+    "--with behind a global option that takes a value",
+    { "s.sh": "#!/bin/sh\nuv --allow-insecure-host h run --frozen --with x python\n" },
+    /--with.*lock bypass/,
+  ],
+  ["-w, --with's short form", { "s.sh": "#!/bin/sh\nuv run --frozen -w x python\n" }, /-w/],
+  [
+    "--with-editable, caught by prefix",
+    { "s.sh": "#!/bin/sh\nuv run --frozen --with-editable ./p python\n" },
+    /--with-editable/,
+  ],
+  [
+    "--frozen after the launched command, which uv hands to the script",
+    { "s.sh": "#!/bin/sh\nuv run python x.py --frozen\n" },
+    /neither --frozen nor --locked/,
+  ],
+  [
+    "UV_NO_PROJECT, --no-project by another name",
+    { "s.sh": "#!/bin/sh\nUV_NO_PROJECT=1 uv run --frozen python\n" },
+    /UV_NO_PROJECT/,
+  ],
+  [
+    "a .py subprocess list running uv with --with",
+    {
+      "t.py":
+        'import subprocess\n\nsubprocess.run(["uv", "run", "--frozen", "--with", "x", "python"])\n',
+    },
+    /--with.*lock bypass/,
+  ],
 ];
 
 for (const [name, files, expected] of VIOLATIONS) {
@@ -1960,6 +1995,12 @@ const ARGS_ARRAY = [
     /--with.*lock bypass/,
   ],
   [
+    "uv args array carrying --with=, which a whole-literal lookup missed",
+    'const UV = ["run", "--frozen", "--with=sqlglot==1.0", "python"] as const;\n'
+    + 'execFileSync("uv", [...UV, "-c", src]);\n',
+    /--with.*lock bypass/,
+  ],
+  [
     "uv pip through an args array",
     'execFileSync("uv", ["pip", "install", "sqlglot"]);\n',
     /`uv pip`/,
@@ -1973,6 +2014,20 @@ for (const [name, source, expected] of ARGS_ARRAY) {
     assert.match(r.stderr, expected);
   });
 }
+
+test("check-python-uv passes the correct parsed forms", () => {
+  // Each of these is right, and each would be wrong under a careless parse:
+  // a flag that belongs to the launched program, the env spelling of the
+  // assertion, and --frozen beside a value-taking option.
+  const r = pythonUv({
+    "s.sh": "#!/bin/sh\nuv run --frozen pytest --with-foo\nUV_FROZEN=1 uv run python -V\n"
+      + "uv run --frozen --only-group sqlglot python -c x\nuv --version\n",
+    // Prose that mentions uv is not a call (a message in a .ts test file
+    // read as `uv ... run` when the parser skipped words to a subcommand).
+    "a.ts": 'const MSG = "Install uv to run them.";\n',
+  });
+  assert.equal(r.status, 0, r.stderr);
+});
 
 test("check-python-uv passes a compliant uv args array", () => {
   const r = pythonUv({

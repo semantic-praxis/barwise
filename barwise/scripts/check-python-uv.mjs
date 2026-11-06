@@ -54,7 +54,7 @@
 import { readFileSync } from "node:fs";
 import { extname, resolve } from "node:path";
 import {
-  BANNED_UV_FLAGS,
+  bannedFlag,
   bareInterpreter,
   blankQuoted,
   INTERPRETER,
@@ -106,6 +106,10 @@ const PY_SUBPROCESS = new RegExp(
   String
     .raw`(?:subprocess\.\w+|os\.system|os\.exec\w*|os\.spawn\w*)\s*\(\s*\[?\s*["'](${INTERPRETER})`,
 );
+
+/** `subprocess.run(["uv", ...])`: a uv call whose words are list literals. */
+const PY_UV_LIST =
+  /(?:subprocess\.\w+|os\.exec\w*|os\.spawn\w*)\s*\(\s*\[\s*((?:["']uv["'])[^\]]*)\]/;
 
 /** `execFileSync("python3", ...)` and friends. A quoted name alone is not enough:
  *  `".py": "python"` in a language table is a label, not an invocation. */
@@ -159,8 +163,11 @@ function uvArgsArray(file, text) {
     out.push({ file, line, what: "`uv pip` (args array)", raw });
     return out;
   }
-  for (const [flag, why] of BANNED_UV_FLAGS) {
-    if (lits.has(flag)) out.push({ file, line, what: `\`${flag}\` (${why})`, raw });
+  // A literal that IS a banned option, in any spelling: "--with=sqlglot"
+  // and "--with-editable" were whole literals the old set lookup missed.
+  for (const lit of lits) {
+    const banned = bannedFlag(lit);
+    if (banned) out.push({ file, line, what: `\`${lit.split("=")[0]}\` (${banned[1]})`, raw });
   }
   if (!lits.has("--frozen") && !lits.has("--locked")) {
     out.push({
@@ -219,6 +226,13 @@ for (const file of trackedFiles()) {
     if (ext === ".py") {
       const m = PY_SUBPROCESS.exec(raw);
       if (m) findings.push({ file, line, what: `bare \`${m[1]}\` subprocess`, raw });
+      // A uv call as a subprocess list: its words are the list's string
+      // literals, read as one command.
+      const list = PY_UV_LIST.exec(raw);
+      if (list) {
+        const words = [...list[1].matchAll(/["']([^"']*)["']/g)].map((w) => w[1]);
+        for (const what of uvFindings(words.join(" "))) findings.push({ file, line, what, raw });
+      }
     }
 
     for (const what of uvFindings(cmd)) findings.push({ file, line, what, raw });
