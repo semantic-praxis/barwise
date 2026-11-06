@@ -16,9 +16,12 @@ names a violation that passes today. All four are literal text in files
 the repository tracks: a second `[[rules]]` table, a CI step with an
 `if:`, a hook that stops passing `--staged`, a workflow that downloads
 gitleaks itself. So the enforcer is a test that reads those files, and
-it runs whether or not gitleaks is installed. The existing tagged tests
-in `gates.test.mjs` need gitleaks and skip without it, which
-`check:adr-tests` reads as a refusal; the tests here never skip.
+it runs whether or not gitleaks is installed. Of the existing tagged
+tests in `gates.test.mjs`, the `gitleaks-detects` probes, the
+missing-config test and the shallow-clone test need gitleaks and skip
+without it; two `wrapper-contract` tests use a stand-in and do not.
+`scan-index-and-history` and `pinned-gitleaks` have no tagged test at
+all. The tests here never skip.
 
 ## The reading this spec starts from (main at 79ed6513)
 
@@ -31,7 +34,9 @@ in `gates.test.mjs` need gitleaks and skip without it, which
   (barwise-ym8.kf3).
 - `check-secrets.mjs` refuses when `run.error` is set (gitleaks present
   but failing to spawn), and builds its argv with `--redact` and
-  `--verbose`. Neither is tested (barwise-ym8.gc7).
+  `--verbose`. Redaction is asserted by the staged-probe tests, and
+  `--verbose` only indirectly (the rule id appears in the output where
+  gitleaks runs); the spawn-error refusal has no test (barwise-ym8.gc7).
 - `install-gitleaks.sh` holds the version and digests and verifies with
   `sha256sum -c` before `tar`. `ci.yml` and the session hook call it.
   Nothing fails when either installs gitleaks another way, or when the
@@ -49,13 +54,23 @@ tagged with the decision it holds:
    TOML forms; an unrecognised line fails the test rather than being
    skipped.
 2. **`scan-index-and-history`**: the `ci.yml` step that runs `npm run
-   check:secrets` carries no `if:` and no `--staged`, and its job's
-   checkout sets `fetch-depth: 0`; `barwise/.husky/pre-commit` runs
-   `scripts/hooks/check-staged-secrets.sh`, and that script runs
-   `check:secrets -- --staged`.
-3. **`wrapper-contract`**, with a stand-in `gitleaks` first on `PATH` in
-   a throwaway repository:
-   - the stand-in answers `version`, then removes its own execute bit,
+   check:secrets` carries no `if:`, no `continue-on-error` and no
+   `--staged`, and its job's checkout sets `fetch-depth: 0`;
+   `barwise/.husky/pre-commit` has, as an uncommented line, exactly
+   `sh scripts/hooks/check-staged-secrets.sh || exit $?` (so `|| true`
+   or a commented-out call fails), and that script runs
+   `check:secrets -- --staged` and passes its status through.
+3. **`wrapper-contract`**, in a throwaway repository with
+   `.gitleaks.toml` committed (the wrapper refuses before scanning
+   without it), running the wrapper with `node` by absolute path and a
+   `PATH` of only the stand-in directory, `/usr/bin` and `/bin`. The
+   restricted `PATH` is required: Node's spawn skips a file it cannot
+   execute and keeps searching, so with the usual `PATH` the real
+   gitleaks in `/usr/local/bin` or CI's `~/.local/bin` would answer
+   instead (plan review, measured). Each test asserts its stand-in was
+   the one that ran.
+   - the stand-in answers `version`, then removes every execute bit
+     (`chmod a-x`, since root can execute a file any x bit remains on),
      so the scan's spawn fails: the wrapper exits 2 and says gitleaks
      could not be executed;
    - the stand-in records its argv and exits 0: the scan was called with
@@ -63,9 +78,12 @@ tagged with the decision it holds:
      repository's `.gitleaks.toml`, and `--staged` exactly when asked.
 4. **`pinned-gitleaks`**:
    - `ci.yml` and `.claude/hooks/session-start.sh` each call
-     `install-gitleaks.sh`, and neither names a gitleaks release URL, a
-     `gitleaks_<version>` tarball, or a package-manager install of
-     gitleaks;
+     `install-gitleaks.sh`, and in each, with comments stripped and
+     quoted strings blanked, every remaining mention of `gitleaks` is
+     the installer's own name or a YAML `name:`. An allowlist rather
+     than a list of banned forms: `uses: gitleaks/gitleaks-action`,
+     `go install`, a docker image and a package manager all fail
+     without being named (plan review);
    - the installer, run with stand-in `curl` (writing bytes that cannot
      match a digest) and `tar` (recording that it ran) first on a `PATH`
      with no gitleaks, exits 2 with "CHECKSUM MISMATCH" and `tar` never
