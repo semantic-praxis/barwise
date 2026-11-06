@@ -281,8 +281,12 @@ export function measureSuite({ evalsDir, core, learn, YAML }) {
         ...model.constraints,
       ];
       for (const c of constraints) {
-        if (c.type === "ring") types.add(c.ringType);
-        else if (SET_TYPES.includes(c.type)) types.add(c.type);
+        // A join form states the same type over a path of fact types, so a
+        // join_ring's ring type and a join_subset's subset count as theirs
+        // (code review: a rare-tier join_ring otherwise passed unseen).
+        const base = c.type.startsWith("join_") ? c.type.slice("join_".length) : c.type;
+        if (base === "ring") types.add(c.ringType);
+        else if (SET_TYPES.includes(base)) types.add(base);
       }
       for (const check of doc.checks ?? []) {
         if (check?.kind !== "forbids_population" || check.constraint !== "ring") continue;
