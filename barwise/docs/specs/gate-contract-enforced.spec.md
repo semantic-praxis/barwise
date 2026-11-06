@@ -10,7 +10,7 @@ Touches: barwise/scripts/fault-matrix.mjs, barwise/scripts/check-tracker-closes.
 barwise/scripts/test-adr-model.mjs, barwise/scripts/run-script-tests.mjs,
 barwise/scripts/check-depcruise-gate.mjs, barwise/scripts/audit-rubric.mjs,
 barwise/scripts/ci-local.mjs, barwise/scripts/lib/ci-gates.mjs,
-+barwise/scripts/lib/fault-preload.cjs, barwise/scripts/tests/,
+barwise/scripts/tests/,
 barwise/.husky/pre-commit, .github/workflows/ci.yml,
 barwise/docs/adr/gate-refusal-contract.md, barwise/docs/adr/probes.json,
 barwise/docs/ARCHITECTURE.md
@@ -76,15 +76,18 @@ live breaks, three found only by this reading. Options:
   outweighs the other shards about twenty to one. And the classifier's
   outputs are not visible outside the `ci` job except through `needs:`,
   which serializes the shards after it. Rejected.
-- **D. Every gate but `test:scripts`, as the last step of the `ci` job,
+- **D. Every gate but those on a short declared list (`test:scripts`
+  first), as the last step of the `ci` job,
   on every change that is not docs-only.** The step runs where the build,
   the test reports and the full-history checkout already exist, so every
   gate's unperturbed run can answer, and it costs about two minutes.
   `test:scripts` leaves the matrix: it is a runner of gate tests, not a
   gate. WS1 gives it the precondition refusal that the matrix's reading
-  shows it lacks, held by a test of its own. **Recommended.**
+  shows it lacks, held by a test of its own. The list and why each step
+  is on it are in Target architecture. **Recommended.**
 
-D's backstop is the matrix itself: every gate runs on every code change,
+D's backstop is the matrix itself: every listed-in gate runs on every
+code change,
 so nothing depends on routing, and a gate broken by a package it imports
 (`audit-rubric` reads promptlab's build) is read on the pull request that
 broke it.
@@ -97,14 +100,13 @@ In scope:
   green on main before it gates anything;
 - option D's CI step, the matrix's own exclusion from the gate list, and
   `ci:local` running it the same way;
-- the axes the contract names and the matrix lacks (a missing tool, a
-  missing manifest or lockfile), and a write instrument that sees a write
-  the gate undoes before it exits;
+- the constraints a design for the missing axes must meet (WS3), not the
+  design itself;
 - the `readers-keep-third` cases the gap issue lists: `ci:local` over a
   mixed failing and refusing run, the pre-commit hook over a
   `check:secrets` refusal, and the skip rule;
 - the partition of `ci.yml`'s npm steps into "in the matrix" and "a
-  declared exception, with its reason", pinned by a test.
+  declared exception, with its reason", pinned by a test (WS2).
 
 Out of scope:
 
@@ -116,39 +118,25 @@ Out of scope:
 
 ## Target architecture
 
-- **One preload, two axes.** The missing-tool and missing-manifest axes
-  need what the git shim gives the git axes: a log of whether the gate
-  reached for the thing that was broken. A PATH-based shim cannot log a
-  lookup of a name it does not hold, and an exported tree has no `.git`,
-  so every gate would refuse at load whatever was removed (plan review,
-  2026-11-06). Instead a preload, `scripts/lib/fault-preload.cjs`, loaded
-  through `NODE_OPTIONS` (appended, as CLAUDE.md requires, so the exit
-  recorder stays loaded), wraps `child_process` and `fs` inside the gate's
-  own process. It refuses a spawn of a named tool with ENOENT, or a read of
-  a named manifest with ENOENT, and logs each reach. The classifier reads
-  that log the way it reads the git shim's. The limit is stated, not
-  hidden: a manifest read by a child process (`npm ls` reading the
-  lockfile) is outside the preload; such a gate is listed in
-  `MATRIX_EXCEPTIONS` for that axis, with that reason.
-- **Writes are seen by the same preload.** A recursive `fs.watch` misses
-  a file created and deleted inside one run, which is barwise-w43's exact
-  shape (plan review, measured on Node v26.7.0). The preload wraps the
-  `fs` write, rename and unlink calls and logs any whose path is inside
-  the repository and outside `node_modules` and the OS temp directory. Any
-  such call is a `no-writes` finding, whether or not the gate removed the
-  file before exiting. `git status --porcelain` stays as the backstop for
-  writes made by a child process.
-- **The matrix does not measure itself.** `nodeGates()` excludes
-  `fault-matrix.mjs` by name, with a test, so the CI step that runs the
-  matrix is not one of its gates.
+- **The axes the matrix lacks are a design problem, not yet a design.**
+  A missing tool, a missing manifest and a write undone before exit each
+  need an instrument that logs whether the gate reached for the broken
+  thing, as the git shim does for git. Two drafts of this spec proposed
+  one and its plan review refuted each (2026-11-06); WS3 states what the
+  next design must meet.
+- **One list of what the matrix does not run.** `scripts/lib/ci-gates.mjs`
+  gains `MATRIX_EXCEPTIONS`, each npm step the matrix does not run with
+  its reason, and `nodeGates()` excludes every step on it. Three are
+  there from the start: `fault-matrix` itself, so the CI step is not one
+  of its gates; `test:scripts` (open decision 2); and `audit-gate`,
+  whose `npm audit` calls the registry, so seven runs per matrix pass
+  turn one registry error into READING MOVED on the cwd axis, a finding
+  on a change that did not cause it. A test fails on a `ci.yml` npm step
+  that is neither a matrix gate nor on the list.
 - **`ci.yml`** gains one step at the end of the `ci` job, `npm run
   fault-matrix`, guarded `if: steps.changes.outputs.docs_only != 'true'`,
   which `shouldRun` already understands, so `ci:local` runs it on the
   same changes.
-- **`scripts/lib/ci-gates.mjs`** gains `MATRIX_EXCEPTIONS`: each npm step
-  the matrix cannot reach, with its reason (the third-party runners,
-  `test:scripts`, the matrix itself). A test fails on a step in neither
-  the matrix nor the list.
 
 ## Alternatives considered
 
@@ -158,9 +146,6 @@ Out of scope:
   its author remembers.
 - **Sharding (option C).** Rejected above, on the plan review's
   findings.
-- **`fs.watch` or a read-only tree for `no-writes`.** The watch misses
-  short-lived files. A read-only tree is invisible to a root process, and
-  sessions here run as root. The preload sees the call itself.
 
 ## Workstreams (each independently shippable)
 
@@ -173,34 +158,63 @@ Each fix lands red first, under the matrix or a planted test:
 - `test-adr-model` and `run-script-tests` check their preconditions
   (git answers; the clone is not shallow) before running their cases, and
   refuse;
-- `check-depcruise-gate` writes its probe outside the tree (barwise-w43);
+- `check-depcruise-gate` probes a temporary mirror of the cruise root
+  rather than the tree (barwise-w43). A probe merely placed outside the
+  tree is never cruised: the rule it exists to trip is `from:
+  ^packages/core/src/` under `includeOnly: ^packages/[^/]+/src/`
+  (`.dependency-cruiser.cjs`), so the mirror holds the configs,
+  `intended.cjs` and `packages/*/src`, with a real `core/src`
+  directory for the probe. This fix is not a matrix finding today (the
+  write is undone before the porcelain check), so it is outside the exit
+  criterion below;
 - `audit-rubric` and `check-depcruise-gate` refuse a missing input
   (barwise-shq);
-- `ci:local` reads depcruise's count as a finding (barwise-vt2).
+- `npm run depcruise` maps any violation count to exit 1 through a
+  wrapper (barwise-vt2). The cause is the tool's exit code, its
+  violation count, which wraps at 8 bits, so 256 violations exit 0 and no
+  reader can recover them.
 
-Exit: the matrix, without `test:scripts`, exits 0 on main.
+Exit: the matrix, without the steps on `MATRIX_EXCEPTIONS`, exits 0 on
+main.
 
 ### 2. In CI (provisional: waits on open decision 1)
 
-The self-exclusion, the `ci.yml` step, `test:scripts` out of the matrix
-with its own precondition test, and `Enforced-by:` naming the matrix for
+`MATRIX_EXCEPTIONS` and `nodeGates()` reading it, the `ci.yml` step,
+`test:scripts` with its own precondition test, and `Enforced-by:` naming the matrix for
 `three-results`, `refuse-not-find` and `cwd-invariant`, with a probe per
 decision in `probes.json`.
 
-### 3. The preload axes (provisional: not yet grounded)
+### 3. The missing axes (needs its own design pass before it is planned)
 
-`fault-preload.cjs`, the missing-tool and manifest axes and the write
-log, each shown catching a planted gate and passing a conforming one;
-`no-writes` declared enforced once it runs in CI.
+The missing-tool and manifest axes and `no-writes` stay gaps until a
+design meets what this spec's two plan-review rounds found:
+
+- a PATH shim cannot log a lookup of a name it does not hold, and an
+  exported tree (`git archive`) has no `.git`, so every gate would
+  refuse at load whatever was removed;
+- a recursive `fs.watch` misses a file created and deleted in one run,
+  barwise-w43's shape (measured on Node v26.7.0);
+- a `NODE_OPTIONS` preload reaches every node descendant (npm, npx,
+  `node --test`), so inheritance must be designed for, not assumed
+  away; its path must survive a space in the checkout path, the failure
+  that made the exit recorder inline itself;
+- refusing reads alone simulates an inconsistent world: gates probe with
+  `existsSync` and `statSync` first, the ESM loader reads through
+  `file:` URLs, and `package.json` names hundreds of files, so targets
+  are resolved repository paths across the whole `fs` surface;
+- a write log must cover the whole `fs` write surface (mkdir, rm, copy,
+  append, symlink, truncate, open with a write flag, streams,
+  `fs/promises`), and exclude the temp directory minus the repository
+  root, since `ci:local --commit` builds its worktree under the temp
+  directory;
+- the porcelain backstop exits 2 today, so a write seen by it and a write
+  seen by a preload would answer with different codes; both must be a
+  `no-writes` finding.
 
 ### 4. Readers keep the third value (provisional: not yet grounded)
 
 The three `readers-keep-third` cases, tagged
 `[adr:gate-refusal-contract#readers-keep-third]`.
-
-### 5. Every step accounted for (provisional: not yet grounded)
-
-`MATRIX_EXCEPTIONS` and its test.
 
 ## Open decisions (for review)
 
@@ -211,11 +225,6 @@ The three `readers-keep-third` cases, tagged
    matrix's 746 seconds, and its reading is about the gates its cases
    spawn, which the matrix already reads directly. The alternative keeps
    it and accepts about twelve minutes.
-3. **Which tools and manifests the preload axes name.** Recommended: the
-   tools `ci.yml` installs (gitleaks, shellcheck, uv) plus `npm` and
-   `dprint`, and the manifests `package.json`, `package-lock.json` and
-   `uv.lock`, derived where they can be (the install steps) and listed
-   with a test where they cannot.
 
 ## Risks and testing
 
@@ -223,10 +232,11 @@ The three `readers-keep-third` cases, tagged
   applies `if:` conditions through `shouldRun`. Option D uses a condition
   `shouldRun` already reads, so pre-push and CI agree on when the matrix
   runs. A test covers the step's routing.
-- The preload sees only the gate's own process. That limit is stated
-  per axis in `MATRIX_EXCEPTIONS`, never folded into a clean reading.
-- Every fix in WS1 lands with the matrix reading it red first, and every
-  new axis with a planted gate it catches and a conforming one it passes.
+- Every fix in WS1 lands with the matrix or a planted test reading it red
+  first.
+- The `audit-gate` exception moves a network-bound gate out of the
+  matrix in CI; it stays in the on-demand run, and the exception names
+  why.
 
 ## Non-goals
 
