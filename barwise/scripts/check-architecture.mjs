@@ -90,7 +90,9 @@ const ADR_REF =
  * leave the citation pointing at another decision, which a citation by
  * number would (docs/specs/adr-refactor.spec.md, Scope). A bare
  * `<name>.md#<fragment>` whose name is no ADR is some other document's
- * anchor and is not read.
+ * anchor and is not read, nor is a bare name after a `/` (a same-named file
+ * in another directory), nor a fragment that is one of the ADR's heading
+ * anchors (a link into its Context or Consequences).
  */
 const DECISION_REF = /(docs\/adr\/)?\b([a-z0-9][a-z0-9-]*)\.md#([a-z0-9]+(?:-[a-z0-9]+)*)/g;
 const SCOPES = ["architecture", "process"];
@@ -213,7 +215,7 @@ function graphLines(claudeMd) {
   return out;
 }
 
-let intended, drawnLines, manifests, adrs, citing, root, section;
+let intended, drawnLines, manifests, adrs, citing, scriptFiles, root, section;
 try {
   // Inside the refusal: a bare `--root` throws, and that is "could not
   // answer", not the exit 1 a real disagreement uses.
@@ -258,6 +260,12 @@ try {
   // Zero ADRs is a listing that went wrong, not a tree with nothing to check.
   if (adrs.length === 0) throw new Error(`no ADR under ${join(root, ADR_DIR)}`);
   citing = readFiles(root, tracked.filter(citesAdrs));
+  // Scripts cite ADR decisions in comments too; they are read for decision
+  // citations only (adr-refactor review, 2026-11-06).
+  scriptFiles = readFiles(
+    root,
+    tracked.filter((p) => p.startsWith("barwise/scripts/") && /\.(mjs|cjs|js|sh)$/.test(p)),
+  );
   // The generated first section of ARCHITECTURE.md (WS3): its markers must
   // be there to compare, so their absence is "could not answer".
   const doc = readFileSync(join(root, "barwise", "docs", "ARCHITECTURE.md"), "utf8");
@@ -393,14 +401,24 @@ const idsOf = new Map(
     new Set(decisionIds(a.text).decisions.map((d) => d.id).filter((id) => id !== null)),
   ]),
 );
-for (const { f, text } of citing) {
+// GitHub's heading anchors: lower-cased, punctuation dropped, spaces to
+// hyphens. A fragment that is one is a link into the ADR, not a citation.
+const slug = (h) => h.trim().toLowerCase().replace(/[^a-z0-9 -]/g, "").replace(/ /g, "-");
+const headingsOf = new Map(
+  adrs.map((a) => [
+    a.f.slice(ADR_DIR.length, -".md".length),
+    new Set([...a.text.matchAll(/^#{1,6} (.+)$/gm)].map((m) => slug(m[1]))),
+  ]),
+);
+for (const { f, text } of [...citing, ...scriptFiles]) {
   let line = 1;
   let at = 0;
   for (const m of text.matchAll(DECISION_REF)) {
     for (; at < m.index; at++) if (text[at] === "\n") line++;
     const [, path, name, id] = m;
     const ids = idsOf.get(name);
-    if (ids === undefined) continue;
+    if (ids === undefined || headingsOf.get(name).has(id)) continue;
+    if (path === undefined && text[m.index - 1] === "/") continue;
     if (!ids.has(id)) {
       adrProblems.push(
         `${f}:${line}: cites ${path ?? ""}${name}.md#${id}, and ${name} has no decision {#${id}}`,

@@ -7202,13 +7202,15 @@ test("check:architecture resolves each decision citation to a decision id its AD
       dir,
       "barwise/docs/guide.md",
       "Held by docs/adr/a-concern.md#the-rule, and a-concern.md#the-rule.\n"
-        + "See README.md#install for setup.\n",
+        + "See README.md#install for setup, docs/adr/a-concern.md#consequences\n"
+        + "for what follows, and notes/a-concern.md#intro, another file.\n",
     );
     stage(
       dir,
       "barwise/docs/specs/p.spec.md",
       "# P\n\nStatus: Draft\nTouches: +barwise/docs/adr/planned.md\n\n## Body\n\nplanned.md#new-rule\n",
     );
+    stage(dir, "barwise/scripts/s.mjs", "// Held by docs/adr/a-concern.md#the-rule.\n");
     execFileSync("git", ["commit", "-qm", "cites"], { cwd: dir });
     const ok = runArch(dir);
     assert.equal(ok.status, 0, ok.stdout + ok.stderr);
@@ -7226,12 +7228,17 @@ test("check:architecture resolves each decision citation to a decision id its AD
           (s) => s.replace(", and a-concern.md#the-rule", ", and a-concern.md#gone-rule"),
           /guide\.md:1: cites a-concern\.md#gone-rule, and a-concern has no decision/,
         ],
-        // Without its Touches: entry, a citation of a planned ADR's decision
-        // is the reference loop's finding (no such ADR), not a crash here.
+        // An ADR citing a decision of its own by an id it does not have.
         [
           "barwise/docs/adr/a-concern.md",
           (s) => s.replace("It holds.", "It holds; see a-concern.md#no-such."),
           /a-concern\.md:\d+: cites a-concern\.md#no-such/,
+        ],
+        // A script comment is read too.
+        [
+          "barwise/scripts/s.mjs",
+          (s) => s.replace("#the-rule", "#gone-rule"),
+          /scripts\/s\.mjs:1: cites docs\/adr\/a-concern\.md#gone-rule/,
         ],
       ]
     ) {
