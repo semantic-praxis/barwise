@@ -22,6 +22,7 @@ barwise/parity.manifest.json, CLAUDE.md,
 barwise/docs/adr/connector-packages.md, barwise/docs/adr/package-graph-authority.md,
 barwise/docs/adr/must-agree-copies.md, barwise/docs/adr/probes.json,
 barwise/docs/ARCHITECTURE.md, .beads/issues.jsonl
+Plan-reviewed: c4003177 (code-review, pr-review)
 
 ## Principle
 
