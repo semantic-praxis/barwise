@@ -59,6 +59,15 @@ test("orm-version-writers finds each form that sets orm_version, by enclosing fu
   ]);
 });
 
+test("orm-version-writers finds a quoted key in text and a class field initializer (code review)", () => {
+  assert.deepEqual(sites('function j() { return `{"orm_version":${"4.0"}}`; }'), ["j text 1"]);
+  assert.deepEqual(sites('function q() { return "{\\"orm_version\\": \\"3.0\\"}"; }'), [
+    "q text 1",
+  ]);
+  assert.deepEqual(sites('class K {\n  orm_version = "3.0";\n}'), ["(module) key 2"]);
+  assert.deepEqual(sites("class T { orm_version: string; }"), [], "a declared type is not a write");
+});
+
 test("orm-version-writers ignores types, reads, comments, regexes and a bare key name", () => {
   const text = [
     "type D = { orm_version: string };",

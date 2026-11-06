@@ -136,7 +136,9 @@ export const ORM_VERSION_WRITERS = [
 export const OSSIE_HOME = "formats/src/ossie/";
 /** The vendored schema's directory, alone or with a path under it. */
 const OSSIE_SCHEMA = /schemas\/ossie(?:\/|$)/;
-const VERSION_TEXT = /orm_version\s*:/;
+// An optional quote: a JSON or quoted-YAML key ("orm_version": ...) is a
+// write too (code review, batch 9 WS3).
+const VERSION_TEXT = /orm_version["']?\s*:/;
 
 function scriptKindOf(fileName) {
   if (fileName.endsWith(".tsx")) return ts.ScriptKind.TSX;
@@ -237,6 +239,14 @@ export function ormVersionSites(fileText, fileName) {
     if (
       (ts.isPropertyAssignment(node) || ts.isShorthandPropertyAssignment(node))
       && ts.isObjectLiteralExpression(node.parent)
+      && staticName(node.name) === "orm_version"
+    ) {
+      add("key", node);
+    } else if (
+      // A class field with an initializer (`orm_version = "3.0"`) writes the
+      // version on every instance, as an object key does.
+      ts.isPropertyDeclaration(node)
+      && node.initializer !== undefined
       && staticName(node.name) === "orm_version"
     ) {
       add("key", node);
