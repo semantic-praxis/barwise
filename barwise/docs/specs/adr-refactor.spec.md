@@ -111,6 +111,12 @@ In scope:
   the enforcer exit 1, add the `npm` or `tests` entry, add a
   `probes.json` row for a gate, and narrow or close the gap issue.
 
+- A citation of an ADR decision shall name it by id
+  (`<adr>.md#<id>`), and `check:architecture` shall fail on an id that
+  does not resolve, so a retirement or restatement cannot leave a stale
+  citation in another spec or ADR (owner, 2026-11-06). Citations by
+  number are rewritten to ids as each ADR is edited.
+
 Out of scope: changing what a decision decides. A restatement says the
 same rule so a check can see it; a decision the owner wants changed is
 its own ADR edit, outside this spec. Fixing the known violations gap
@@ -169,6 +175,15 @@ Restatements (the rule stays; `Date:` stays):
    (batch 8): a depcruise rule forbidding `@anthropic-ai/sdk` and
    `openai` outside `@barwise/llm`, with a probe; a plain `fetch` to a
    provider host stays a gap.
+   Also (owner, 2026-11-06): the dependency-weight reason the old
+   decision 2 carried, which `schema-satisfiability.spec.md` cites for
+   its reasoner lane, becomes a new decision in
+   `package-graph-authority`: core's runtime dependencies are only those
+   listed beside `INTENDED` (today `ajv`, `effect`, `yaml`). Enforcer:
+   `check:architecture` extends `runtime-deps-within` to external
+   packages, with a probe planting `z3-solver` in core's `package.json`;
+   a depcruise rule that every import is declared in the importing
+   package's `package.json` closes the hoisted-import gap.
 4. `findings-close-by-mechanism#mechanism-closes`: **owner,
    2026-11-06: restate**, strictly enforced through a common finding
    shape: "A finding an audit ratchet records is held by its baseline
@@ -183,9 +198,20 @@ Restatements (the rule stays; `Date:` stays):
    optional on-demand report, never a gate. The same reader holds rows 5
    and 11. Batch 4 builds it and moves up to run right after row 1's
    spec.
-5. `findings-close-by-mechanism#person-classifies`: "A baseline writer
-   never sets a verdict: a new row gets the placeholder, and a row
-   already classified keeps its verdict."
+5. `findings-close-by-mechanism#person-classifies`: **owner,
+   2026-11-06: restate, made mechanical.** "A detector never invents a
+   verdict: a new row gets the placeholder unless a declared rule or
+   the duplication spec's verdict table decides it, `--check` fails while
+   a placeholder remains, and every verdict comes from its audit's
+   declared list with a note." The placeholder, `--check` and
+   vocabulary parts are held by row 4's common reader (batch 4). The
+   derived verdicts come from the mechanical-duplication spec: sameness
+   by normalized syntax-tree equality (proof), differential property
+   tests (strong evidence) and, for small pure functions, SMT
+   equivalence through the reasoner lane of
+   `schema-satisfiability.spec.md`; whether two copies may share an
+   owner by `INTENDED`; and a declared divergence as the one human
+   input, checked for presence and form.
 6. `keyless-model-access#measurement-key`: keep the first sentence;
    move "That key must be a workspace-scoped key with a spend limit,
    never a personal one" to Consequences as operator guidance, since the
