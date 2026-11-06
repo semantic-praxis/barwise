@@ -16,7 +16,7 @@ barwise/scripts/ci-local.mjs, barwise/scripts/lib/ci-gates.mjs,
 barwise/scripts/tests/,
 barwise/.husky/pre-commit, .github/workflows/ci.yml,
 barwise/docs/adr/gate-refusal-contract.md, barwise/docs/adr/probes.json,
-barwise/docs/ARCHITECTURE.md
+barwise/docs/ARCHITECTURE.md, CLAUDE.md, REVIEW.md
 
 ## Principle
 
