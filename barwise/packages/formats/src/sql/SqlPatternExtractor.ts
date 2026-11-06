@@ -17,7 +17,7 @@
  * - GROUP BY columns (potential uniqueness patterns)
  */
 
-import type { ParseLevel, SqlPatternContext } from "./types.js";
+import type { ParseLevel, SqlPatternContext } from "@barwise/core/sql";
 
 /**
  * Extract ORM-relevant patterns from a SQL statement.

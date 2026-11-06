@@ -15,7 +15,8 @@
  */
 
 import type { ImportFormat, ImportOptions, ImportResult, OrmModel } from "@barwise/core";
-import { parseSqlFile, type SqlDialect } from "@barwise/core/sql";
+import type { SqlDialect } from "@barwise/core/sql";
+import { parseSqlFile } from "@barwise/formats";
 import { readFileSync, statSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
 import { type DbtDialectOptions, detectDbtDialect } from "./DbtDialectDetector.js";

@@ -71,8 +71,8 @@ Each package and the internal packages it may import:
 - `diagram-ui`: diagram
 - `llm`: core
 - `code-analysis`: core
-- `dbt`: core
 - `formats`: core
+- `dbt`: core, formats
 - `learn`: core
 - `promptlab`: core, llm, learn
 - `cli`: core, diagram, diagram-ui, llm, code-analysis, dbt, formats, learn, promptlab

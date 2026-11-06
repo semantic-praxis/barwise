@@ -41,7 +41,8 @@ import {
   type ValueConstraintDef,
 } from "@barwise/core";
 import { objectificationGivesKey } from "@barwise/core/mapping";
-import { parseSqlDataType, parseValuePredicate } from "@barwise/core/sql";
+import { parseValuePredicate } from "@barwise/core/sql";
+import { parseSqlDataType } from "../sql/typeMapping.js";
 import {
   type ColumnAnnotation,
   columnKey,

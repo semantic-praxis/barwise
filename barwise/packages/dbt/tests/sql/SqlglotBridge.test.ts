@@ -3,7 +3,7 @@
  * assertions run only when python3 + sqlglot are present (the sidecar
  * is optional by design); the degradation path is always tested.
  */
-import { parseSqlFile } from "@barwise/core/sql";
+import { parseSqlFile } from "@barwise/formats";
 import { describe, expect, it } from "vitest";
 import {
   normalizeCascadeResult,

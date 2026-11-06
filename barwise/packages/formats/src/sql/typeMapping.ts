@@ -13,7 +13,7 @@
  * dbt omits the data type), not this mapping's.
  */
 
-import type { ConceptualDataTypeName, DataTypeDef } from "../model/ObjectType.js";
+import type { ConceptualDataTypeName, DataTypeDef } from "@barwise/core";
 
 // Each keyword is guarded with (?![a-z]) so a keyword prefix does not
 // swallow an unrelated type ("interval" is not an integer, "time" does
