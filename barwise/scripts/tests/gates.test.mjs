@@ -2207,6 +2207,60 @@ test("ci-local reports a REFUSED gate apart from a failure, and exits 2 [adr:gat
   }
 });
 
+test("ci-local keeps a refusal apart from a failure in the same run [adr:gate-refusal-contract#readers-keep-third]", () => {
+  // The test above plants only a refusing gate, so a ci:local that counted
+  // a refusal among the failures would pass it. With one of each, the run
+  // is a finding (exit 1), the failure count leaves the refusal out, and
+  // the refusal is still named (barwise-ym8.aep).
+  const repo = tempCiRepo();
+  try {
+    const ci = join(repo.dir, ".github", "workflows", "ci.yml");
+    writeFileSync(ci, readFileSync(ci, "utf8") + "      - run: npm run nope\n");
+    const pkg = join(repo.root, "package.json");
+    const json = JSON.parse(readFileSync(pkg, "utf8"));
+    json.scripts.nope = "node scripts/nope.mjs";
+    writeFileSync(pkg, JSON.stringify(json));
+    writeFileSync(
+      join(repo.root, "scripts", "nope.mjs"),
+      'console.error("cannot answer: the tool is absent");\nprocess.exitCode = 2;\n',
+    );
+    const r = runCiLocal(repo);
+    assert.equal(r.status, 1, `a failure beside a refusal is a finding:\n${r.all}`);
+    assert.match(r.all, /1 of 3 gates failed/);
+    assert.match(r.all, /1 could not answer: run nope/);
+  } finally {
+    rmSync(repo.dir, { recursive: true, force: true });
+  }
+});
+
+test("the pre-commit secrets step tells a refusal from a found credential (barwise-jha) [adr:gate-refusal-contract#readers-keep-third]", () => {
+  // npm stubbed to answer as check:secrets would: 0 clean, 1 a finding,
+  // 2 could not answer. The hook used to print "ROTATE it" for all three
+  // non-zero outcomes alike.
+  const dir = mkdtempSync(join(tmpdir(), "barwise-hooksecrets-"));
+  try {
+    const run = (status) => {
+      writeFileSync(join(dir, "npm"), `#!/bin/sh\nexit ${status}\n`);
+      chmodSync(join(dir, "npm"), 0o755);
+      return spawnSync("sh", [join(SCRIPTS, "hooks", "check-staged-secrets.sh")], {
+        cwd: join(REPO, "barwise"),
+        encoding: "utf8",
+        env: { ...process.env, PATH: `${dir}:${process.env.PATH ?? ""}` },
+      });
+    };
+    assert.equal(run(0).status, 0);
+    const found = run(1);
+    assert.equal(found.status, 1, found.stderr);
+    assert.match(found.stderr, /ROTATE/);
+    const refused = run(2);
+    assert.equal(refused.status, 2, refused.stderr);
+    assert.match(refused.stderr, /could not answer/);
+    assert.doesNotMatch(refused.stderr, /ROTATE|credential-shaped/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 /**
  * The log of ONE named gate, selected by name rather than by being the
  * first `full output:` line in the summary. Written that way after a

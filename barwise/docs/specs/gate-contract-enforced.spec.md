@@ -1,6 +1,6 @@
 # The gate refusal contract, enforced: the fault matrix green and in CI
 
-Status: WS1 under way 2026-11-06 (barwise-ydl fixed: check-tracker-closes refuses an empty merge-base and an empty tracker read; check-tracker-closes refuses a close whose diff omits the tracker; test-adr-model refuses when git cannot answer; the shallow-clone cases of test:scripts skip, and the matrix shim answers only for the repository under test; audit-rubric and check-depcruise-gate refuse a missing input, barwise-shq; npm run depcruise exits by its violation count, barwise-vt2; check-depcruise-gate probes a mirror of the cruise root, barwise-w43; WS1 complete); WS2 waits on open decision 1; WS3 and WS4 not started
+Status: WS1 implemented 2026-11-06 (#962, #963, #964: barwise-ydl, barwise-shq, barwise-vt2 and barwise-w43 fixed, test-adr-model refuses a broken git, the matrix's shallow shim answers only for the repository under test, and test:scripts' history-reading cases skip on a shallow clone); WS4 implemented 2026-11-06 (ci:local over a mixed run, the pre-commit secrets step, barwise-jha; the skip rule stays a gap); WS2 waits on open decision 1; WS3 needs its own design pass
 Created: 2026-11-06
 Last-updated: 2026-11-06
 Tracking: barwise-ym8.gc9 (adr-refactor batch 2), barwise-ym8.j31,
@@ -12,6 +12,7 @@ barwise/scripts/test-adr-model.mjs, barwise/scripts/run-script-tests.mjs,
 barwise/scripts/check-depcruise-gate.mjs, barwise/scripts/audit-rubric.mjs,
 barwise/scripts/ci-local.mjs, barwise/scripts/lib/ci-gates.mjs,
 +barwise/scripts/run-depcruise.mjs, barwise/package.json,
++barwise/scripts/hooks/check-staged-secrets.sh, barwise/docs/adr/credential-handling.md,
 barwise/scripts/tests/,
 barwise/.husky/pre-commit, .github/workflows/ci.yml,
 barwise/docs/adr/gate-refusal-contract.md, barwise/docs/adr/probes.json,
@@ -224,10 +225,26 @@ design meets what this spec's two plan-review rounds found:
   seen by a preload would answer with different codes; both must be a
   `no-writes` finding.
 
-### 4. Readers keep the third value (provisional: not yet grounded)
+### 4. Readers keep the third value
 
-The three `readers-keep-third` cases, tagged
-`[adr:gate-refusal-contract#readers-keep-third]`.
+Two of the gap issue's three cases, tagged
+`[adr:gate-refusal-contract#readers-keep-third]`, each mutation-checked:
+
+- `ci:local` over one failing and one refusing gate exits 1, counts only
+  the failure, and names the refusal apart; the existing case planted a
+  refusal alone, so a `ci:local` that counted refusals as failures passed
+  it;
+- the pre-commit hook's secrets step moves to
+  `scripts/hooks/check-staged-secrets.sh`, as the tracker step already
+  did, and branches on the status: 1 prints the rotate advice, a refusal
+  says nothing was scanned (barwise-jha). Both still block the commit. A
+  stub `npm` answering 0, 1 and 2 tests it without running the hook's
+  build and test steps.
+
+The third, "a test skips only when every run refuses", has no mechanism
+here: a rule about how tests are written is not something a test of a
+gate can check. It stays the gap issue's, and the `audit-gate` cwd test
+remains the one worked instance of it.
 
 ## Open decisions (for review)
 

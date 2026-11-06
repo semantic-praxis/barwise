@@ -90,9 +90,10 @@ and the exit contract `credential-handling.md#wrapper-contract` applies is
     steps.changes.outputs.docs_only != 'true'`). The
     unresolvable-root refusal is covered by the git-failure cases
     (`ROOT_DEPENDENT_GATES`); the exec-error refusal (gitleaks present
-    but failing to spawn) has no test (barwise-i23). The pre-commit hook reads every non-zero
-    status as a finding and prints "credential-shaped content in the tree"
-    and "ROTATE it" after a refusal too (barwise-jha). `ci:local` names a refusal
+    but failing to spawn) has no test (barwise-i23). The pre-commit hook's
+    secrets step (`scripts/hooks/check-staged-secrets.sh`) tells a refusal
+    from a finding: only exit 1 prints "ROTATE it", and a refusal says
+    nothing was scanned (barwise-jha, fixed in gate-contract-enforced WS4). `ci:local` names a refusal
     as "could not answer" separately from failures in every run.
   - 4: the version is assigned only in the install script today (it also
     appears in a `.gitleaks.toml` comment and a test stub), but nothing
