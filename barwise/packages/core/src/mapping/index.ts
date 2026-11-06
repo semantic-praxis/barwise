@@ -1,4 +1,5 @@
-// Mapping: relational mapper, schema, and format renderers.
+// Mapping: relational mapper, schema, and constraint routing. Format
+// renderers live in their connectors (connector-packages.md#format-in-its-connector).
 export {
   type ConstraintPlacement,
   type ConstraintRouting,
@@ -27,14 +28,6 @@ export type {
   RoutedUnique,
   Table,
 } from "./RelationalSchema.js";
-export {
-  DBT_KEY_TEST,
-  type DbtModelFile,
-  type DbtProject,
-  type DbtRenderOptions,
-  renderDbt,
-} from "./renderers/dbt.js";
-export { annotateDbtExport, type ExportAnnotationResult } from "./renderers/DbtExportAnnotator.js";
 export {
   hasGeneratedKeys,
   SURROGATE_KEY_TYPE,

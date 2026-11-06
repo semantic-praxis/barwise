@@ -14,8 +14,8 @@
  * cannot.
  */
 import { OrmModel, OrmYamlSerializer } from "@barwise/core";
-import { RelationalMapper, renderDbt } from "@barwise/core/mapping";
-import { importDbtProject } from "@barwise/dbt";
+import { RelationalMapper } from "@barwise/core/mapping";
+import { importDbtProject, renderDbt } from "@barwise/dbt";
 import { DdlExportFormat, DdlImportFormat } from "@barwise/formats";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";

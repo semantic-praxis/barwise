@@ -6,16 +6,16 @@ Created: 2026-10-27
 Last-updated: 2026-10-27
 Tracking: barwise-lqj
 Plan-reviewed: cc43bfdc (code-review, pr-review)
-Touches: barwise/packages/core/src/mapping/renderers/dbt.ts,
-barwise/packages/core/src/mapping/renderers/DbtExportAnnotator.ts,
+Touches: barwise/packages/dbt/src/render/renderDbt.ts,
+barwise/packages/dbt/src/render/DbtExportAnnotator.ts,
 barwise/packages/core/src/mapping/index.ts,
 barwise/packages/core/src/annotation/ExportAnnotationCollector.ts,
 barwise/packages/dbt/src/dbtMapping/compositeKeys.ts,
 barwise/packages/dbt/src/dbtMapping/analyze.ts,
 barwise/packages/dbt/src/DbtSchemaParser.ts,
 barwise/examples/transcripts/,
-barwise/packages/core/tests/mapping/dbt.test.ts,
-barwise/packages/core/tests/mapping/DbtExportAnnotator.test.ts,
+barwise/packages/dbt/tests/render/renderDbt.test.ts,
+barwise/packages/dbt/tests/render/DbtExportAnnotator.test.ts,
 +barwise/packages/dbt/tests/compositeKeyExport.test.ts,
 barwise/packages/dbt/tests/compositeKeys.test.ts,
 barwise/packages/cli/tests/characterization/golden/,

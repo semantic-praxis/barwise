@@ -191,14 +191,11 @@
     "upgradeManifest"
   ],
   "./mapping": [
-    "DBT_KEY_TEST",
     "RelationalMapper",
     "SURROGATE_KEY_TYPE",
     "SURROGATE_POPULATION_NOTE",
-    "annotateDbtExport",
     "hasGeneratedKeys",
     "objectificationGivesKey",
-    "renderDbt",
     "resolveDialectProfile",
     "routeConstraints",
     "routeUniqueOnly",
