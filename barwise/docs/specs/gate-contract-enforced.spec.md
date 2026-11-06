@@ -1,6 +1,6 @@
 # The gate refusal contract, enforced: the fault matrix green and in CI
 
-Status: WS1 under way 2026-11-06 (barwise-ydl fixed: check-tracker-closes refuses an empty merge-base and an empty tracker read; test-adr-model and run-script-tests refuse when git cannot answer or the clone is shallow); WS2 waits on open decision 1; WS3 and WS4 not started
+Status: WS1 under way 2026-11-06 (barwise-ydl fixed: check-tracker-closes refuses an empty merge-base and an empty tracker read; check-tracker-closes refuses a close whose diff omits the tracker; test-adr-model refuses when git cannot answer; the shallow-clone cases of test:scripts skip, and the matrix shim answers only for the repository under test); WS2 waits on open decision 1; WS3 and WS4 not started
 Created: 2026-11-06
 Last-updated: 2026-11-06
 Tracking: barwise-ym8.gc9 (adr-refactor batch 2), barwise-ym8.j31,
@@ -154,11 +154,22 @@ Out of scope:
 
 Each fix lands red first, under the matrix or a planted test:
 
-- `check-tracker-closes` refuses an empty base and an empty tracker read
-  (barwise-ydl);
-- `test-adr-model` and `run-script-tests` check their preconditions
-  (git answers; the clone is not shallow) before running their cases, and
-  refuse;
+- `check-tracker-closes` refuses an empty base, an empty tracker read, and
+  a close whose diff does not name the tracker (barwise-ydl);
+- `test-adr-model` refuses when git cannot name the repository root;
+- `run-script-tests`' shallow reading is two things, found by its code
+  review. The matrix's shim answered "shallow" for the sandbox
+  repositories gate tests build as well, so most of the crash came from the
+  instrument; the shim now answers only for the repository under test.
+  What remained was real: six cases ran `audit-spec-status` against the
+  repository and failed where the gate correctly refuses a shallow clone.
+  They now skip (`skipIfShallow`), so on a shallow clone the runner exits 0
+  with its skips printed, which the ADR's skip rule allows and
+  `check:adr-tests` guards downstream. The matrix reads that as FALSE
+  GREEN, because it cannot tell a runner's loud skip from a gate's silent
+  pass; that is why `test:scripts` is on `MATRIX_EXCEPTIONS` (open
+  decision 2). A runner-wide refusal was tried and reverted: it blocked
+  the whole suite on any shallow clone;
 - `check-depcruise-gate` probes a temporary mirror of the cruise root
   rather than the tree (barwise-w43). A probe merely placed outside the
   tree is never cruised: the rule it exists to trip is `from:
