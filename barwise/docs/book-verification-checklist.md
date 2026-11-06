@@ -8,7 +8,7 @@ docs/adr/metamodel-evolution-policy.md, docs/NORMA_VS_ORM_YAML.md
 
 ## Why this exists
 
-ADR `metamodel-evolution-policy` filter 4 says design the metamodel _against the book_ (Halpin &
+ADR `metamodel-evolution-policy` (Context) says design the metamodel _against the book_ (Halpin &
 Morgan, _Information Modeling and Relational Databases_, 3rd ed., 2024 --
 ISBN 9780443237904 -- and Halpin's ORM 2 papers), not against NORMA's
 tooling. Across Tiers 1-3 we mostly held that line, but several constructs
@@ -83,7 +83,7 @@ authoritative; a NORMA mapping is a separate, lossy interop concern that
 never dictates the native shape. Audit each "deferred NORMA mapping" note
 (cardinality, derivation, value-comparison, the Tier-1 fields, join import)
 to confirm no native shape was bent toward NORMA's encoding "to make import
-easier". Source: ADR `metamodel-evolution-policy` filter 4.
+easier". Source: ADR `metamodel-evolution-policy`, Context.
 
 ### CC4. Validation semantics as tooling, not concept -- _priority: low_
 

@@ -18,7 +18,7 @@ disagree, and the book is the authority over the transcript.
 ## Why this book, and why this order
 
 Barwise's metamodel is designed against this edition rather than against NORMA's
-tooling (`docs/adr/metamodel-evolution-policy.md`, filter 4), and
+tooling (`docs/adr/metamodel-evolution-policy.md`, Context), and
 `docs/book-verification-checklist.md` verifies barwise's constructs against it.
 So the book is not background reading for the tool. It is the specification the
 tool's validation rules and verbalization forms are trying to be faithful to,
