@@ -62,6 +62,17 @@ test("classify: the vendored Ossie schema README is not docs-only, so the pin te
   );
 });
 
+test("classify: the coverage inventory is not docs-only, so the build and check:eval-coverage run", () => {
+  // It is one of check:eval-coverage's three inputs and the gate needs the
+  // build, so an inventory-only change must not be classed docs-only; a
+  // neighbouring spec still is (adr-batch9-enforcers WS5).
+  assert.equal(
+    classify(["barwise/docs/specs/constraint-extraction-coverage.spec.md"]).docsOnly,
+    false,
+  );
+  assert.equal(classify(["barwise/docs/specs/eval-transcript-realism.spec.md"]).docsOnly, true);
+});
+
 test("classify: optimizer fires on the lane or the CLI it shells out to, and nothing else", () => {
   assert.equal(classify(["barwise/optimizer/CLAUDE.md"]).optimizer, true);
   assert.equal(classify(["barwise/packages/cli/src/index.ts"]).optimizer, true);

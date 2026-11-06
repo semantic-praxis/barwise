@@ -3,6 +3,7 @@ import {
   type ConstraintInView,
   evaluateConstraintEnforcement,
   type FactType,
+  type InternalConstraint,
   isDisjunctiveMandatory,
   isExternalUniqueness,
   isFrequency,
@@ -31,6 +32,22 @@ const GUARDS: Record<ConstraintKind, (c: Constraint) => boolean> = {
   frequency: isFrequency,
   ring: isRing,
 };
+
+/**
+ * The reference constraint a `forbids_population` check names: the first
+ * constraint of the named kind in the reference fact type. Exported so a
+ * gate that must know which constraint a rubric resolves to (for a ring,
+ * its ring type) asks this function rather than restating the selection,
+ * which would be a must-agree copy (docs/adr/constraint-coverage-policy.md,
+ * docs/specs/adr-batch9-enforcers.spec.md WS5). Only the first is tested, so
+ * a fact type carrying two rings is rubric-tested on whichever comes first.
+ */
+export function referenceConstraint(
+  factType: FactType,
+  kind: ConstraintKind,
+): InternalConstraint | undefined {
+  return factType.internalConstraints.find(GUARDS[kind]);
+}
 
 const fail = (message: string, hint?: string): CheckResult => ({
   kind: "forbids_population",
@@ -205,7 +222,7 @@ export function forbidsPopulation(
   }
 
   // Every kind GUARDS names lives in its fact type.
-  const constraint = refFt.internalConstraints.find(GUARDS[constraintKind]);
+  const constraint = referenceConstraint(refFt, constraintKind);
   if (!constraint) {
     return fail(
       `The reference fact type "${factTypeName}" has no ${constraintKind} constraint (exercise error).`,

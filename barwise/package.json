@@ -18,6 +18,7 @@
     "depcruise": "node scripts/run-depcruise.mjs",
     "check:depcruise-gate": "node scripts/check-depcruise-gate.mjs",
     "check:source-sites": "node scripts/check-source-sites.mjs",
+    "check:eval-coverage": "node scripts/check-eval-coverage.mjs",
     "check:parity": "node scripts/check-parity.mjs",
     "check:pins": "node scripts/check-pins.mjs",
     "check:review-tiers": "node scripts/check-review-tiers.mjs",

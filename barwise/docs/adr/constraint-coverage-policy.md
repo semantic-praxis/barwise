@@ -7,8 +7,8 @@ lives in `docs/specs/constraint-extraction-coverage.spec.md`, the
 living companion to this record), barwise-845, barwise-846. Prompted
 by barwise-863, which restored the Ring/Subset/Equality instruction
 blocks to the default extraction prompt.
-Enforced-by: none (barwise-ym8.5yl: two-instances),
-none (barwise-ym8.vq8: tiered-types), none (barwise-ym8.k6g: inventory-outside)
+Enforced-by: npm run check:eval-coverage (two-instances, tiered-types, inventory-outside),
+none (barwise-ym8.vq8: tiered-types)
 
 ## Context
 
@@ -59,8 +59,8 @@ check can hold: `adr-refactor.spec.md`, row 19.)
 
 2. **Types are tiered by natural occurrence, and the rare tier never
    enters an eval transcript.**{#tiered-types} Common tier (each owed two instances):
-   `irreflexive`, `acyclic`, `symmetric`, `subset`, set-comparison
-   `exclusion` -- rules real facilitated sessions state ("cannot
+   `irreflexive`, `asymmetric`, `acyclic`, `symmetric`, `subset`,
+   set-comparison `exclusion` -- rules real facilitated sessions state ("cannot
    approve their own request", "no circular reporting", "is paired
    with", "every approver must also be an employee"). Rare tier:
    `antisymmetric`, `intransitive`, `transitive`, `purely_reflexive`,
@@ -98,6 +98,23 @@ check can hold: `adr-refactor.spec.md`, row 19.)
 - A future constraint family added to the prompt or schema starts
   inside this policy: instructed-but-unvalidated until its instances
   land, with the spec's inventory saying so from day one.
+- The decisions are held by `npm run check:eval-coverage`
+  (`scripts/check-eval-coverage.mjs`), an uncached script gate that runs
+  in CI after the build, because its three inputs (the eval suite, this
+  record and the inventory) are outside a promptlab test's cache key. It
+  reads each `forbids_population` ring check's ring type through
+  `referenceConstraint`, the function `@barwise/learn`'s evaluator
+  selects with, and counts each eval case as its own domain, a case
+  being in one split. Held: a type is `covered: yes` in the inventory
+  exactly when a train case and a dev case each rubric-test it
+  (two-instances); the inventory's tier, reference and rubric-tested
+  columns equal the suite and these tiers (inventory-outside); no
+  reference carries a rare-tier constraint, so no rubric can resolve to
+  one (tiered-types). Not held, and review's: that two instances are
+  phrased differently, and the decision's object, a transcript, which
+  names no type a check can read. The `none` entry stays for that
+  residue (barwise-ym8.vq8): transcript prose that settles a rare-tier
+  rule its reference leaves out.
 - Closing subset coverage requires a rubric capability
   (`forbids_population` has no set-comparison kind), so data alone
   cannot close it; that design waits until a transcript settles a

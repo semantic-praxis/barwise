@@ -9,8 +9,8 @@ barwise-846 (open). WS3 and WS4 are provisional and unscheduled
 respectively, so neither has an issue. barwise-878 (closed) is the
 reference audit this file's inventory came from. Verified 2026-08-30.
 Created: 2026-08-27
-Last-updated: 2026-08-28 (workstream 1 done: the irreflexive check is
-live at suite 2.5.0)
+Last-updated: 2026-11-06 (inventory rewritten one row per type and held
+by check:eval-coverage; workstream 1 done at suite 2.5.0)
 Tracking: barwise-878 (the reference audit; the inventory below is its
 first pass); barwise-845 (the irreflexive instance arrives with the
 dev references); barwise-846 (the authoring budget rides split-spec
@@ -30,17 +30,37 @@ work closes each gap. **Update the inventory in the same commit that
 adds a type's first or second tested instance** -- a coverage table
 nobody is obliged to update is the stale capability matrix again.
 
-## Inventory (2026-08-27, the barwise-878 first pass)
+## Inventory (one row per type; counts derived from the suite)
 
-Swept: ten transcripts, seven references, seven recorded payloads, one
-gym exercise.
+The barwise-878 first pass swept ten transcripts, seven references,
+seven recorded payloads and one gym exercise (2026-08-27); the counts
+below are the suite's today.
 
-| Type                                                                                   | Settled in a transcript             | In a reference | Rubric-tested          | Verdict                                                                              |
-| -------------------------------------------------------------------------------------- | ----------------------------------- | -------------- | ---------------------- | ------------------------------------------------------------------------------------ |
-| ring: acyclic                                                                          | project-staffing, incident-response | yes (both)     | one (project-staffing) | second reference instance landed with 2.5.0; untested there (see below)              |
-| ring: irreflexive                                                                      | incident-response                   | yes            | yes (2.5.0)            | first instance live; needs a second domain                                           |
-| ring: asymmetric, antisymmetric, intransitive, symmetric, transitive, purely_reflexive | none                                | none           | no                     | zero evidence anywhere                                                               |
-| subset, equality, exclusion (set-comparison)                                           | subset: vendor-onboarding (weakly)  | subset: yes    | cannot be              | no check kind (see below); the vendor reference carries a redundant PO-vendor subset |
+| Type               | Tier   | Reference cases | Rubric-tested train cases | Rubric-tested dev cases | Covered | Settled in a transcript             |
+| ------------------ | ------ | --------------- | ------------------------- | ----------------------- | ------- | ----------------------------------- |
+| `acyclic`          | common | 2               | 1                         | 0                       | no      | project-staffing, incident-response |
+| `irreflexive`      | common | 1               | 0                         | 1                       | no      | incident-response                   |
+| `symmetric`        | common | 0               | 0                         | 0                       | no      | none                                |
+| `asymmetric`       | common | 0               | 0                         | 0                       | no      | none                                |
+| `antisymmetric`    | rare   | 0               | 0                         | 0                       | no      | none                                |
+| `intransitive`     | rare   | 0               | 0                         | 0                       | no      | none                                |
+| `transitive`       | rare   | 0               | 0                         | 0                       | no      | none                                |
+| `purely_reflexive` | rare   | 0               | 0                         | 0                       | no      | none                                |
+| `subset`           | common | 1               | 0                         | 0                       | no      | vendor-onboarding (weakly)          |
+| `exclusion`        | common | 0               | 0                         | 0                       | no      | none                                |
+| `equality`         | rare   | 0               | 0                         | 0                       | no      | none                                |
+
+One row per type: the eight ring types, then the three set-comparison
+kinds. `check:eval-coverage` derives every column but the last from the
+suite and the ADR's tiers and fails when a row disagrees
+(`docs/adr/constraint-coverage-policy.md`). Tier is the ADR's.
+Reference cases and the two rubric-tested columns count cases, not
+constraints: a case is its own domain, so two checks of one type in one
+case are one instance. A ring check is credited to the ring type its
+fact type's first ring carries, the selection the evaluator itself
+makes. Covered is `yes` when both rubric-tested columns are at least one.
+Set-comparison has no check kind, so those three rows read 0 and 0 until
+workstream 3 lands. The last column is prose the gate does not read.
 
 The incident-response reference carries acyclic as well as irreflexive
 on "Incident is duplicate of Incident" (the sweep payload extracted

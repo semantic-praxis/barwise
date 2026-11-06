@@ -189,5 +189,23 @@
     "file": "barwise/packages/formats/src/index.ts",
     "old": "export { OssieExportFormat } from \"./ossie/OssieExportFormat.js\";",
     "new": "export { OssieExportFormat } from \"./ossie/OssieExportFormat.js\";\nexport { parseOssie as parse } from \"./ossie/parseOssie.js\";\nexport const OSSIE_SCHEMA = \"../schemas/ossie/ontology.json\";"
+  },
+  {
+    "decision": "constraint-coverage-policy#two-instances",
+    "file": "barwise/docs/specs/constraint-extraction-coverage.spec.md",
+    "old": "| 0                       | no      | project-staffing, incident-response |",
+    "new": "| 0                       | yes     | project-staffing, incident-response |"
+  },
+  {
+    "decision": "constraint-coverage-policy#tiered-types",
+    "file": "barwise/packages/promptlab/evals/project-staffing.reference.orm.yaml",
+    "old": "ring_type: acyclic\n          id: No_Employee_mentors",
+    "new": "ring_type: transitive\n          id: No_Employee_mentors"
+  },
+  {
+    "decision": "constraint-coverage-policy#inventory-outside",
+    "file": "barwise/docs/specs/constraint-extraction-coverage.spec.md",
+    "old": "| 2               | 1                         |",
+    "new": "| 2               | 2                         |"
   }
 ]
