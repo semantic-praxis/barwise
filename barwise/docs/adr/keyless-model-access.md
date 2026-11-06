@@ -4,11 +4,11 @@ Scope: architecture
 Date: 2026-09-12
 Tracking: barwise-ubc, barwise-1029, barwise-1030, barwise-1031, barwise-ybi, barwise-xsg,
 barwise-ppb, barwise-2n1,
-docs/specs/keyless-model-access.spec.md
-Enforced-by: tests (no-key-in-argv, no-key-in-setting, keyless-defaults, library-takes-key),
-none (barwise-ym8.4gl: no-key-in-argv), none (barwise-ym8.nw4: no-key-in-setting),
-none (barwise-ym8.52o: keyless-defaults), none (barwise-ym8.esi: measurement-key),
-none (barwise-ym8.dxy: library-takes-key)
+docs/specs/keyless-model-access.spec.md,
+docs/specs/model-access-held.spec.md
+Enforced-by: tests (no-key-in-argv, no-key-in-setting, keyless-defaults, library-takes-key,
+measurement-key), none (barwise-ym8.nw4: no-key-in-setting),
+none (barwise-ym8.52o: keyless-defaults), none (barwise-ym8.esi: measurement-key)
 
 ## Context
 
@@ -39,11 +39,15 @@ in `keyless-model-access.spec.md`; detecting a key that leaks anyway is
    `CopilotLlmClient` over `vscode.lm`. The MCP server uses MCP sampling
    when the client advertises `sampling.tools`, falls back to
    `createLlmClient()` otherwise, and appends the route to the tool result.
-4. **The measurement lane is the one lane that must hold a key.**{#measurement-key}
-   promptlab, `prompt run` and the optimizer keep direct API access,
-   because a host-mediated call has no attributable model and a score
-   through one measures nothing. That key must be a workspace-scoped key
-   with a spend limit, never a personal one.
+4. **Only `@barwise/llm` reads a model key (the Python optimizer lane is
+   the one declared exception). Every call records the provider, the
+   model and a non-reversible identifier of the credential, and a change
+   in any of them between compared runs is reported beside the
+   scores.**{#measurement-key} The measurement lane (promptlab, `prompt
+   run`, the optimizer) keeps direct API access because a host-mediated
+   call has no attributable model, and a score through one measures
+   nothing. The credential identifier is a one-way fingerprint or the
+   provider's workspace id, never the key.
 5. **The library may take a key from its caller.**{#library-takes-key} `@barwise/llm` keeps its
    `apiKey` option; the hazard removed is a value in `process.argv` or a
    committable file, not a credential passed in code.
@@ -66,10 +70,14 @@ in `keyless-model-access.spec.md`; detecting a key that leaks anyway is
   pull request and, like any step, once an earlier step fails), or by
   nothing:
   - 1: `cli/tests/commands/apiKeyFlag.test.ts`. The hook matches the
-    spelling `--api-key` only, so a new command declaring a differently
-    named key option is not refused (barwise-xsg).
-  - 2: `vscode/tests/unit/anthropicKey.test.ts` covers the migration.
-    Nothing asserts the setting's `application` scope. The migration runs
+    spelling `--api-key` only, and a tagged test walks every command
+    and subcommand of `createProgram()` and fails on any other option
+    with a word `key`, `secret`, `password` or `credential`, or ending
+    in `-token` (barwise-xsg's rule; `model-access-held.spec.md`).
+  - 2: `vscode/tests/unit/anthropicKey.test.ts` covers the migration,
+    that no file under `vscode/src` but `llm/anthropicKey.ts` names the
+    setting outside a comment, and the setting's `application` scope.
+    The migration runs
     only when the Anthropic path reads a key and secret storage is empty,
     so a legacy workspace key is never moved or cleared for a user on the
     default Copilot path, or for one who already stored a key with the
@@ -77,17 +85,34 @@ in `keyless-model-access.spec.md`; detecting a key that leaks anyway is
   - 3: `mcp/tests/llm/samplingClient.test.ts` covers the `sampling.tools`
     check both ways and the fallback; two of its tests also pin, as
     correct, the provider bypass and the route note below, and would
-    change with barwise-2n1. Nothing tests that
-    `barwise.llmProvider` defaults to `copilot` (barwise-ybi). An
+    change with barwise-2n1. `vscode/tests/unit/modelAccessDefaults.test.ts`
+    pins `barwise.llmProvider`'s `copilot` default, and
+    `mcp/tests/tools/modelAccessHeld.test.ts` shows `import_transcript`
+    and `review_model`, with no key and no provider, reaching a sampling
+    client's handler and naming the sampling route. An
     explicit `provider` input to the MCP tools, which the calling model
     can supply, skips sampling, and the route note says "this server's own
     API key" even when the fallback reached keyless Ollama (barwise-2n1).
   - 4: the measurement lane cannot reach a host-backed client:
     `npm run depcruise` (CI, under the same docs-only guard) holds promptlab to core, llm and learn, and both host-backed
-    clients live in `mcp` and `vscode`. That the key is workspace-scoped
-    with a spend limit is "not assertable from this tree" (spec, Open
-    decisions); it rests on the operator.
-  - 5: nothing to check; it permits rather than forbids.
+    clients live in `mcp` and `vscode`. Decision 4 was restated on
+    2026-11-06 (`adr-refactor.spec.md`, row 6) from "the measurement
+    lane is the one lane that must hold a key", which also asked for a
+    workspace-scoped key with a spend limit. That is now guidance, not a
+    rule: it lives in the provider console, not in this tree. Its checks
+    (a pattern check that only `@barwise/llm` reads
+    `ANTHROPIC_API_KEY` or `OPENAI_API_KEY`, matching reads rather
+    than mentions, and a schema test that each call-log and
+    score-history entry carries all three fields) are batch 7 of that
+    spec. The first holds: `llm/tests/keyFromEnvironment.test.ts` fails
+    when a package's `src` outside `llm` reads a `KEY`, `TOKEN` or
+    `SECRET` variable (dotted, indexed, destructured, or through
+    `node:process`'s `env`) or indexes `process.env` by a computed
+    name. The credential fingerprint is `model-access-held.spec.md` WS3,
+    and the gap issue in the header stands for it.
+  - 5: `llm/tests/providers/factory.test.ts` pins `PROVIDER_NAMES` to
+    exactly anthropic, openai and ollama, and shows each keyed provider
+    handing a caller's `apiKey` to its SDK constructor.
 - The spec requires that no eval or extraction artifact contains a
   provider key, shown by a sentinel test over written files. Only the
   call log has a related test, over one record

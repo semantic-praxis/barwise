@@ -21,7 +21,10 @@ rejected alternatives are in the two specs above.
 
 ## Decision
 
-1. **A change starts from a spec.**{#spec-first} Development begins with a spec in
+1. **A pull request that changes package source names the spec it
+   implements, in its body or a commit message, or carries a `No spec:
+   <reason>` line.**{#spec-first} A check reads the presence and form of
+   one or the other, never the reason. The spec lives in
    `barwise/docs/specs/`, written to the `spec-writer` skill's format.
 2. **The plan is reviewed before it is implemented.**{#plan-reviewed} `/code-review`
    and `/pr-review` run on the spec, and its header records the commit
@@ -34,11 +37,20 @@ rejected alternatives are in the two specs above.
    `+` for files it creates, `-` for files it deletes. A new spec must
    carry at least one unmarked or `-` entry that resolves to a path
    outside `barwise/docs/specs/`; `+` entries alone do not count.
-4. **Open decisions are the reviewer's to settle.**{#open-decisions-reviewer} A spec states each
-   one with its options, the trade-off and a recommended default, and
-   does not decide it silently (`template.spec.md`, Open decisions).
+4. **Every spec has an Open decisions section, and each entry gives its
+   options, the trade-off and a recommended default.**{#open-decisions-reviewer}
+   The reviewer settles them; a spec does not decide one silently
+   (`template.spec.md`, Open decisions).
 
 ## Consequences
+
+- Decisions 1 and 4 were restated on 2026-11-06 (`adr-refactor.spec.md`,
+  rows 14 and 15) to what a check can read. Decision 1 was "a change
+  starts from a spec"; its `No spec:` escape makes the exception
+  explicit, which the owner chose over strict enforcement and over
+  retirement. Its check is batch 10 of that spec, beside
+  `check:plan-review`; until it lands, the gap issue in the header
+  stands.
 
 - `npm run check:plan-review` (a CI gate on pull requests to main) fails a
   PR that changes a `Touches:` path of a spec it names, while the spec is

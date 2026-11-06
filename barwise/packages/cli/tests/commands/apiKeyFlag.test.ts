@@ -11,7 +11,9 @@
  * Run through `runCli` in process, like every other command test -- a
  * subprocess is not instrumented by the parent's coverage collector.
  */
+import type { Command } from "commander";
 import { describe, expect, it } from "vitest";
+import { createProgram } from "../../src/cli.js";
 import { runCli, warmPromptCommand } from "../workspace/run.js";
 
 // Assembled, not a literal: `check:secrets` scans this repository's history
@@ -90,5 +92,88 @@ describe("--api-key is refused", () => {
     // whose failure mode is its own: a missing file, not a refused flag.
     const r = await runCli(["review", "/definitely/not/a/model.orm.yaml"]);
     expect(r.stderr).not.toMatch(/--api-key was removed/);
+  });
+});
+
+describe("no option takes a credential", () => {
+  /**
+   * Names that look like a credential and are not one, each with the reason.
+   * An entry here is a reviewed decision; a new option is not exempt until
+   * someone adds it.
+   */
+  const NOT_CREDENTIALS: Readonly<Record<string, string>> = {
+    "--api-key": "the declared refusal: declared so the root hook can refuse it by name",
+    "--max-tokens": "a token count, not a token",
+    "--surrogate-keys": "generated database keys on export, not a credential",
+  };
+
+  /**
+   * A long name's words: split on hyphens and camelCase, lowercased, a
+   * trailing plural "s" dropped -- so --api-keys, --apiKey and --authToken
+   * read as the same words as their hyphenated singulars.
+   */
+  function words(long: string): string[] {
+    return long
+      .replace(/^--/, "")
+      .replace(/([a-z0-9])([A-Z])/g, "$1-$2")
+      .split("-")
+      .filter((w) => w !== "")
+      .map((w) => w.toLowerCase().replace(/s$/, ""));
+  }
+
+  /**
+   * barwise-xsg's rule, widened: a word that is key, secret, password,
+   * credential or token, or that ends in key or token (apikey, authtoken).
+   */
+  function looksLikeCredential(long: string): boolean {
+    return words(long).some((w) =>
+      ["key", "secret", "password", "credential", "token"].includes(w)
+      || w.endsWith("key")
+      || w.endsWith("token")
+    );
+  }
+
+  function credentialOptions(command: Command, path: string[] = []): string[] {
+    const found: string[] = [];
+    for (const o of command.options) {
+      const long = o.long;
+      if (long === undefined || long in NOT_CREDENTIALS) continue;
+      if (looksLikeCredential(long)) found.push(`${path.join(" ") || "(root)"} ${long}`);
+    }
+    for (const sub of command.commands) {
+      found.push(...credentialOptions(sub, [...path, sub.name()]));
+    }
+    return found;
+  }
+
+  it("the matcher reads every spelling of a credential (self-check)", () => {
+    for (
+      const long of [
+        "--token",
+        "--api-keys",
+        "--apiKey",
+        "--authToken",
+        "--db-password",
+        "--client-secret",
+      ]
+    ) {
+      expect(looksLikeCredential(long), long).toBe(true);
+    }
+    for (const long of ["--model", "--focus", "--base-url", "--output-dir"]) {
+      expect(looksLikeCredential(long), long).toBe(false);
+    }
+    // The reviewed exceptions do read as credentials, so each entry in
+    // NOT_CREDENTIALS is load-bearing rather than decoration.
+    for (const long of Object.keys(NOT_CREDENTIALS)) {
+      expect(looksLikeCredential(long), long).toBe(true);
+    }
+  });
+
+  it("no command or subcommand declares a key, secret, password, credential or token option besides the reviewed exceptions [adr:keyless-model-access#no-key-in-argv]", async () => {
+    const program = await createProgram();
+    // The walk must reach the nested commands, or it passes on nothing.
+    const names = program.commands.flatMap((c) => [c.name(), ...c.commands.map((s) => s.name())]);
+    expect(names).toEqual(expect.arrayContaining(["review", "transcript", "batch", "run"]));
+    expect(credentialOptions(program)).toEqual([]);
   });
 });

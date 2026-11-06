@@ -39,28 +39,28 @@ gates skip a docs-only change.
 Architecture:
 
 - [Connector packages](adr/connector-packages.md) -- 2026-11-06 -- declared: purity (connector-owns-io), tests (core-no-interop, format-in-its-connector, explicit-registration); gap: barwise-ym8.iyw (connector-owns-io); gap: barwise-ym8.x9w (format-in-its-connector); gap: barwise-ym8.2n3 (explicit-registration)
-- [Determinism in core](adr/determinism-in-core.md) -- 2026-11-05 -- declared: purity (pure-ops); gap: barwise-ym8.lxl (pure-ops); gap: barwise-ym8.kys (one-layer-out)
-- [Keyless model access](adr/keyless-model-access.md) -- 2026-09-12 -- declared: tests (no-key-in-argv, no-key-in-setting, keyless-defaults, library-takes-key); gap: barwise-ym8.4gl (no-key-in-argv); gap: barwise-ym8.nw4 (no-key-in-setting); gap: barwise-ym8.52o (keyless-defaults); gap: barwise-ym8.esi (measurement-key); gap: barwise-ym8.dxy (library-takes-key)
-- [Metamodel evolution policy](adr/metamodel-evolution-policy.md) -- 2026-10-17 -- gap: barwise-ym8.qpz (deliberately-lossy); gap: barwise-ym8.gfk (four-filters); gap: barwise-ym8.26v (tiering); gap: barwise-ym8.e05 (design-against-book); gap: barwise-ym8.3ai (recompute-derived)
+- [Determinism in core](adr/determinism-in-core.md) -- 2026-11-05 -- declared: purity (pure-ops), tests (one-layer-out); gap: barwise-ym8.lxl (pure-ops)
+- [Keyless model access](adr/keyless-model-access.md) -- 2026-09-12 -- declared: tests (no-key-in-argv, no-key-in-setting, keyless-defaults, library-takes-key, measurement-key); gap: barwise-ym8.nw4 (no-key-in-setting); gap: barwise-ym8.52o (keyless-defaults); gap: barwise-ym8.esi (measurement-key)
+- [Metamodel evolution policy](adr/metamodel-evolution-policy.md) -- 2026-10-17 -- gap: barwise-ym8.3ai (recompute-derived)
 - [Ossie interchange](adr/ossie-interchange.md) -- 2026-10-28 -- declared: tests (ontology-layer-only, pinned-version, nothing-lost-silently); gap: barwise-ym8.zec (peer-standard); gap: barwise-ym8.k74 (ontology-layer-only); gap: barwise-ym8.oor (pinned-version); gap: barwise-ym8.zkd (nothing-lost-silently); gap: barwise-ym8.m1l (readable-iri); gap: barwise-ym8.yc6 (own-vocabulary)
-- [Package graph authority](adr/package-graph-authority.md) -- 2026-10-23 -- declared: depcruise (intended-is-graph), check:architecture (claude-md-rendering, runtime-deps-within); gap: barwise-ym8.d3m (intended-is-graph)
-- [Production prompt resolution](adr/production-prompt-resolution.md) -- 2026-08-26 -- declared: tests (shipped-only, candidates-in-prompt-lane, recovered-not-recorded, library-seam); gap: barwise-ym8.mdg (shipped-only); gap: barwise-ym8.w0p (candidates-in-prompt-lane); gap: barwise-ym8.x2g (recovered-not-recorded); gap: barwise-ym8.29c (library-seam)
+- [Package graph authority](adr/package-graph-authority.md) -- 2026-11-06 -- declared: depcruise (intended-is-graph), check:architecture (claude-md-rendering, runtime-deps-within, core-external-deps); gap: barwise-ym8.d3m (intended-is-graph); gap: barwise-ym8.xyn (core-external-deps)
+- [Production prompt resolution](adr/production-prompt-resolution.md) -- 2026-08-26 -- declared: tests (shipped-only, candidates-in-prompt-lane, recovered-not-recorded, library-seam); gap: barwise-ym8.x2g (recovered-not-recorded)
 - [Schema versioning](adr/schema-versioning.md) -- 2026-10-28 -- declared: tests (version-signal, minor-and-major, load-forward); gap: barwise-ym8.4i2 (version-signal); gap: barwise-ym8.31z (minor-and-major); gap: barwise-ym8.8l3 (shared-minor); gap: barwise-ym8.yfi (load-forward)
-- [Surface capability parity](adr/surface-capability-parity.md) -- 2026-11-04 -- declared: tests (pinned-tool-lists); gap: barwise-ym8.0pq (pinned-tool-lists); gap: barwise-ym8.wfy (matrix-records-reach); gap: barwise-ym8.3nm (matrix-same-commit); gap: barwise-ym8.0hi (vscode-yes-means)
+- [Surface capability parity](adr/surface-capability-parity.md) -- 2026-11-04 -- declared: check:capability-matrix (matrix-records-reach, matrix-same-commit, vscode-yes-means), tests (pinned-tool-lists); gap: barwise-ym8.0pq (pinned-tool-lists); gap: barwise-ym8.wfy (matrix-records-reach)
 
 Process:
 
-- [Baseline writers merge verdicts](adr/baselines-merge-on-write.md) -- 2026-10-23 -- declared: tests (merge-not-regenerate, specs-write-on-ask, findings-order, duplication-no-writer); gap: barwise-ym8.fi5 (merge-not-regenerate); gap: barwise-ym8.3yv (one-merge-owner); gap: barwise-ym8.6jy (specs-write-on-ask); gap: barwise-ym8.nhy (findings-order); gap: barwise-ym8.79m (duplication-no-writer)
-- [Constraint-extraction coverage policy](adr/constraint-coverage-policy.md) -- 2026-08-27 -- gap: barwise-ym8.fmt (trust-statement); gap: barwise-ym8.nzv (compares-not-certifies); gap: barwise-ym8.5yl (two-instances); gap: barwise-ym8.vq8 (tiered-types); gap: barwise-ym8.k6g (inventory-outside)
-- [Credential handling](adr/credential-handling.md) -- 2026-09-12 -- declared: tests (gitleaks-detects, wrapper-contract); gap: barwise-ym8.yhs (rotate-not-revert); gap: barwise-ym8.7zs (gitleaks-detects); gap: barwise-ym8.kf3 (scan-index-and-history); gap: barwise-ym8.gc7 (wrapper-contract); gap: barwise-ym8.nxs (pinned-gitleaks)
-- [Findings close by mechanism](adr/findings-close-by-mechanism.md) -- 2026-08-29 -- declared: audit:specs -- --check (person-classifies), tests (ratchet-both-ways); gap: barwise-ym8.1b2 (mechanism-closes); gap: barwise-ym8.k4d (ratchet-both-ways); gap: barwise-ym8.h0l (person-classifies); gap: barwise-ym8.ld2 (ratchet-in-ci)
+- [Baseline writers merge verdicts](adr/baselines-merge-on-write.md) -- 2026-11-06 -- declared: tests (merge-not-regenerate, one-merge-owner, specs-write-on-ask, findings-order, duplication-no-writer); gap: barwise-ym8.fi5 (merge-not-regenerate); gap: barwise-ym8.nhy (findings-order)
+- [Constraint-extraction coverage policy](adr/constraint-coverage-policy.md) -- 2026-08-27 -- gap: barwise-ym8.5yl (two-instances); gap: barwise-ym8.vq8 (tiered-types); gap: barwise-ym8.k6g (inventory-outside)
+- [Credential handling](adr/credential-handling.md) -- 2026-09-12 -- declared: tests (gitleaks-detects, scan-index-and-history, wrapper-contract, pinned-gitleaks)
+- [Findings close by mechanism](adr/findings-close-by-mechanism.md) -- 2026-11-06 -- declared: audit:specs -- --check (person-classifies), check:findings (mechanism-closes, person-classifies), tests (ratchet-both-ways, ratchet-in-ci); gap: barwise-ym8.k4d (ratchet-both-ways); gap: barwise-ym8.h0l (person-classifies); gap: barwise-ym8.ld2 (ratchet-in-ci)
 - [Gate refusal contract](adr/gate-refusal-contract.md) -- 2026-09-17 -- declared: tests (three-results, refuse-not-find, cwd-invariant, readers-keep-third); gap: barwise-ym8.j31 (three-results); gap: barwise-ym8.rl7 (refuse-not-find); gap: barwise-ym8.c42 (cwd-invariant); gap: barwise-ym8.aep (readers-keep-third); gap: barwise-ym8.if3 (no-writes)
 - [Merge delegation](adr/merge-delegation.md) -- 2026-10-18 -- gap: barwise-ym8.2ds (review-before-merge); gap: barwise-ym8.vl9 (pinned-merge); gap: barwise-ym8.2vy (no-size-exemption); gap: barwise-ym8.oof (ask-owner); gap: barwise-ym8.n0m (owner-overrides)
-- [Must-agree copies carry a check](adr/must-agree-copies.md) -- 2026-08-30 -- declared: audit:duplication -- --check (every-candidate-verdict), check:parity (registered-sets-identical); gap: barwise-ym8.edf (check-on-copy); gap: barwise-ym8.3tg (check-first); gap: barwise-ym8.8nq (registered-sets-identical); gap: barwise-ym8.onf (every-candidate-verdict)
-- [Pinned runtimes](adr/pinned-runtimes.md) -- 2026-08-30 -- gap: barwise-ym8.q89 (node-from-nvmrc); gap: barwise-ym8.52y (python-minor); gap: barwise-ym8.eq3 (verify-running)
+- [Must-agree copies carry a check](adr/must-agree-copies.md) -- 2026-11-06 -- declared: audit:duplication -- --check (every-candidate-verdict), check:parity (registered-sets-identical), check:findings (every-candidate-verdict), tests (registered-sets-identical); gap: barwise-ym8.edf (check-on-copy); gap: barwise-ym8.3tg (share-by-composition); gap: barwise-ym8.8nq (registered-sets-identical)
+- [Pinned runtimes](adr/pinned-runtimes.md) -- 2026-08-30 -- declared: check:pins (node-from-nvmrc, python-minor, verify-running); gap: barwise-ym8.q89 (node-from-nvmrc)
 - [Plan before code](adr/plan-before-code.md) -- 2026-10-25 -- declared: check:plan-review (plan-reviewed), check:spec-touches (touches-named); gap: barwise-ym8.yg7 (spec-first); gap: barwise-ym8.ogi (plan-reviewed); gap: barwise-ym8.8hq (touches-named); gap: barwise-ym8.l7d (open-decisions-reviewer)
-- [Python from the lockfile](adr/python-from-the-lockfile.md) -- 2026-09-26 -- declared: check:python-uv (lockfile-only, no-outside-forms, uv-bootstrap), tests (project-ancestor); gap: barwise-ym8.fq7 (lockfile-only); gap: barwise-ym8.l69 (no-outside-forms); gap: barwise-ym8.q07 (project-ancestor); gap: barwise-ym8.usv (groups-and-one-offs); gap: barwise-ym8.suc (uv-bootstrap)
-- [Review policy](adr/review-policy.md) -- 2026-10-24 -- declared: tests (copilot-requested, tier-informs); gap: barwise-ym8.7y6 (copilot-requested); gap: barwise-ym8.8ya (copilot-never-blocks); gap: barwise-ym8.f9u (review-md-owns-lanes); gap: barwise-ym8.ehz (tier-informs); gap: barwise-ym8.gwj (prevent-upstream)
+- [Python from the lockfile](adr/python-from-the-lockfile.md) -- 2026-09-26 -- declared: check:python-uv (lockfile-only, no-outside-forms, project-ancestor, groups-and-one-offs, uv-bootstrap), tests (project-ancestor); gap: barwise-ym8.fq7 (lockfile-only); gap: barwise-ym8.l69 (no-outside-forms); gap: barwise-ym8.q07 (project-ancestor); gap: barwise-ym8.suc (uv-bootstrap)
+- [Review policy](adr/review-policy.md) -- 2026-10-24 -- declared: tests (copilot-requested, tier-informs); gap: barwise-ym8.7y6 (copilot-requested); gap: barwise-ym8.8ya (copilot-never-blocks); gap: barwise-ym8.f9u (review-md-owns-lanes); gap: barwise-ym8.ehz (tier-informs)
 
 ### Package graph
 
@@ -71,8 +71,8 @@ Each package and the internal packages it may import:
 - `diagram-ui`: diagram
 - `llm`: core
 - `code-analysis`: core
-- `dbt`: core
 - `formats`: core
+- `dbt`: core, formats
 - `learn`: core
 - `promptlab`: core, llm, learn
 - `cli`: core, diagram, diagram-ui, llm, code-analysis, dbt, formats, learn, promptlab

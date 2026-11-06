@@ -6,7 +6,7 @@
  * UNIQUE, NOT NULL, FOREIGN KEY, DEFAULT, and GROUP BY.
  */
 import { describe, expect, it } from "vitest";
-import { extractSqlPatterns, splitSqlStatements } from "../../src/sql/SqlPatternExtractor.js";
+import { extractSqlPatterns, splitSqlStatements } from "../src/sql/SqlPatternExtractor.js";
 
 describe("extractSqlPatterns", () => {
   describe("JOIN extraction", () => {

@@ -26,6 +26,17 @@ export { OssieExportFormat } from "./ossie/OssieExportFormat.js";
 export { OssieImportFormat } from "./ossie/OssieImportFormat.js";
 export { OSSIE_VERSION, OssieImportError } from "./ossie/OssieTypes.js";
 export { SqlImportFormat } from "./sql/SqlImportFormat.js";
+// The SQL cascade, composed by @barwise/dbt (format-renderers-to-connectors.spec.md,
+// WS3): one entry point, so no caller can skip the sqlglot tier or its
+// normalization, plus the type reader dbt's schema import shares.
+export { parseSqlPatterns } from "./sql/parseSqlPatterns.js";
+export { parseSqlDataType } from "./sql/typeMapping.js";
+export type {
+  CascadeFileResult,
+  CascadeStatementResult,
+  ParseLevel,
+  SqlPatternContext,
+} from "./sql/types.js";
 
 // Renderers: each format's text writer, beside its descriptor
 // (format-renderers-to-connectors.spec.md, WS1).

@@ -31,7 +31,7 @@
  */
 
 import type { FactType, InternalConstraint, OrmModel } from "@barwise/core";
-import type { SqlPatternContext } from "@barwise/core/sql";
+import type { SqlPatternContext } from "@barwise/formats";
 import type { ReportBuilder } from "../DbtImportReport.js";
 import { toPascalCase } from "./naming.js";
 

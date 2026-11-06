@@ -5,11 +5,12 @@ Date: 2026-09-26
 Tracking: barwise-ubc, barwise-921, barwise-1060, barwise-cpu, barwise-alv,
 barwise-c81, barwise-6ef, barwise-en2,
 docs/specs/python-lockfile-execution.spec.md,
-docs/specs/agent-python-uv-hook.spec.md
-Enforced-by: npm run check:python-uv (lockfile-only, no-outside-forms, uv-bootstrap),
-tests (project-ancestor), none (barwise-ym8.fq7: lockfile-only),
-none (barwise-ym8.l69: no-outside-forms), none (barwise-ym8.q07: project-ancestor),
-none (barwise-ym8.usv: groups-and-one-offs), none (barwise-ym8.suc: uv-bootstrap)
+docs/specs/agent-python-uv-hook.spec.md,
+docs/specs/python-uv-widened.spec.md
+Enforced-by: npm run check:python-uv (lockfile-only, no-outside-forms, project-ancestor,
+groups-and-one-offs, uv-bootstrap), tests (project-ancestor),
+none (barwise-ym8.fq7: lockfile-only), none (barwise-ym8.l69: no-outside-forms),
+none (barwise-ym8.q07: project-ancestor), none (barwise-ym8.suc: uv-bootstrap)
 
 ## Context
 
@@ -54,12 +55,21 @@ project, and the rejected alternatives are in the two specs above.
 - `npm run check:python-uv` is a `ci.yml` step with no `if:` guard: it
   runs in every CI run (pushes to main, pull requests into main) that
   reaches it, and like any step is skipped once an earlier step fails.
-  It reads tracked `.sh`, `.yml`, `.yaml`, JS/TS and `.py` files and
-  fails on the forms in decisions 1 and 2 it can read (gaps below), on a
-  `uv run` or `uv sync` with neither `--frozen` nor `--locked`, and on a
-  JS/TS file whose uv call has neither flag as a string literal -- a
-  check made per file, not per call (barwise-c81). Its one-row allowlist
-  (decision 5) fails when stale. The pre-push hook runs it through
+  It reads tracked `.sh`, `.yml`, `.yaml`, JS/TS and `.py` files, every
+  `package.json`'s scripts, `barwise/Makefile` recipes and the git hooks
+  under `barwise/.husky/`, and fails on the forms in decisions 1 and 2
+  it can read (gaps below) and on a `uv run` or `uv sync` with neither
+  `--frozen` nor `--locked`. A uv call is parsed, not matched
+  (`parseUv`): its subcommand is found past uv's global options, a
+  banned flag matches by prefix and in its `-w` and `=` spellings,
+  `UV_NO_PROJECT` and `UV_ISOLATED` count as the flags they name, and
+  `UV_FROZEN` or `UV_LOCKED` meets the assertion. A JS/TS uv argument
+  array and a one-line `.py` `subprocess` list are read by the same
+  rules. For decisions 3 and 4 it fails when `barwise/pyproject.toml` or
+  `barwise/uv.lock` is not tracked, and on any other tracked
+  `pyproject.toml`, `requirements*.txt`, `setup.py`, `setup.cfg`,
+  `Pipfile`, `uv.toml`, `pylock.toml` or `uv.lock`. Its one-row
+  allowlist (decision 5) fails when stale. The pre-push hook runs it through
   `ci:local` where the git hooks are wired; the session-start hook
   warns when they are not, and nothing gates on it (barwise-1016).
 - A `PreToolUse` hook on the Bash tool (`scripts/hooks/python-uv-guard.mjs`)
@@ -78,25 +88,27 @@ project, and the rejected alternatives are in the two specs above.
   project to `barwise/`? (resolved: yes)"). A foreign project that
   defines a group named `sqlglot` would be used (barwise-en2).
 - What each decision lacks:
-  - 1: files that execute and are not scanned -- `package.json` scripts,
-    `barwise/Makefile` and the `.husky` git hooks (barwise-cpu).
-    Nothing checks that CI keeps `--locked`, because the gate accepts
-    `--frozen` in a workflow (barwise-alv);
-  - 2: the gate's uv argument check matches exact literals, so
-    `"--with=..."` passes, and quoted text in `.py` is blanked, so a
-    Python `subprocess` call to uv is not read (barwise-c81);
-  - 3: checked by the hook for agents and by review (`pr-review`
-    checklist, "When Python was touched": "from a cwd under
-    `barwise/`"). A tracked script is not checked, by decision: "a
-    tracked script's working directory is set by whoever calls it"
-    (hook spec, R6);
-  - 4: no gate beyond the PEP 723 rule, and the checklist does not
-    mention it (barwise-6ef);
+  - 1: nothing checks that CI keeps `--locked`, because the gate
+    accepts `--frozen` in a workflow (barwise-alv); a JS/TS file passes
+    when either flag appears anywhere in it as a string literal, a check
+    made per file, not per call (barwise-c81); and `.beads/hooks/`,
+    vendored by the tracker, is not read, which the gate's OK line says;
+  - 2: a `.py` `subprocess` list split over several lines is not read;
+  - 3: the gate holds the project at `barwise/`. A call's working
+    directory is checked by the hook for agents and by review
+    (`pr-review` checklist, "When Python was touched"). A tracked script
+    is not checked, by decision: "a tracked script's working directory
+    is set by whoever calls it" (hook spec, R6), and the text cannot
+    show it (`python-uv-widened.spec.md`, Scope 3);
+  - 4: a one-off kept outside the repository is outside anything a
+    check of the tracked tree can see; the checklist names the rule for
+    review;
   - 5: the allowlist matches any `ci.yml` line containing its text, so a
-    second line with the bootstrap prefix would pass (barwise-c81); and
-    the session-start hook installs uv unpinned, so the pinned
-    bootstrap holds only in CI (barwise-921, its open uv-version
-    question).
+    second line with the bootstrap prefix, or a command chained onto it,
+    would pass (barwise-c81); and the session-start hook installs uv
+    unpinned, so the pinned bootstrap holds only in CI (barwise-921).
+    One installer for uv is `python-uv-widened.spec.md` WS4, which waits
+    on that spec's open decision 1 because it rewords decision 5.
 - A sqlglot test that skips locally, or is disabled with `.skip`, is
   not caught. barwise-921's `audit:skips` (workstream 4) would have
   caught it, and the owner deferred that workstream on 2026-09-06.

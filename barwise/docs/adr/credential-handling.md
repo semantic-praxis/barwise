@@ -4,11 +4,10 @@ Scope: process
 Date: 2026-09-12
 Tracking: barwise-ubc, barwise-1021, barwise-1022, barwise-1028, barwise-3wu, barwise-i23,
 barwise-jha, barwise-8fc, barwise-flw, barwise-sma,
-docs/specs/credential-scanning.spec.md
-Enforced-by: tests (gitleaks-detects, wrapper-contract),
-none (barwise-ym8.yhs: rotate-not-revert), none (barwise-ym8.7zs: gitleaks-detects),
-none (barwise-ym8.kf3: scan-index-and-history), none (barwise-ym8.gc7: wrapper-contract),
-none (barwise-ym8.nxs: pinned-gitleaks)
+docs/specs/credential-scanning.spec.md,
+docs/specs/credential-handling-held.spec.md
+Enforced-by: tests (gitleaks-detects, scan-index-and-history, wrapper-contract,
+pinned-gitleaks)
 
 ## Context
 
@@ -18,39 +17,42 @@ rewriting history all leave the key valid and already disclosed.
 `.gitignore` covering `.env` stood in for a gate and could not see the
 three paths a secret actually arrives by here -- machine-written tracked
 files under `eval-payloads/` and `eval-runs/`, commands pasted into
-documentation, and fixtures imitating real payloads. The rule is stated in
-the root `CLAUDE.md` conventions ("A leaked credential is rotated, never
-reverted"). Why detection is delegated, why the wrapper exists, and the
-rejected alternatives are in `credential-scanning.spec.md`; removing the
+documentation, and fixtures imitating real payloads. Why detection is
+delegated, why the wrapper exists, and the rejected alternatives are in `credential-scanning.spec.md`; removing the
 places a key can be written down is `docs/adr/keyless-model-access.md`,
 and the exit contract `credential-handling.md#wrapper-contract` applies is
 `docs/adr/gate-refusal-contract.md`.
 
 ## Decision
 
-1. **A leaked credential is rotated, never reverted.**{#rotate-not-revert} The remedy for a
-   real finding is rotation by a person in the provider console; history
-   surgery is not a remedy and is never presented as one.
-2. **Detection is gitleaks', not ours.**{#gitleaks-detects} No rules are added here:
+1. **Detection is gitleaks', not ours.**{#gitleaks-detects} No rules are added here:
    `.gitleaks.toml` is `[extend] useDefault = true` plus exactly one rule,
    for Anthropic keys, which gitleaks 8.28.0 does not detect.
-3. **Scan the index at the commit and all reachable history in CI.**{#scan-index-and-history}
+2. **Scan the index at the commit and all reachable history in CI.**{#scan-index-and-history}
    `npm run check:secrets -- --staged` runs at the pre-commit hook;
    `npm run check:secrets` scans all reachable commits in CI with no
    docs-only skip.
-4. **The wrapper supplies the gate contract, not detection.**{#wrapper-contract}
+3. **The wrapper supplies the gate contract, not detection.**{#wrapper-contract}
    `scripts/check-secrets.mjs` exits `2`, never reporting a clean scan,
    when gitleaks is absent or cannot be executed, when `.gitleaks.toml` is
    absent, when a history scan is asked of a shallow clone, when the
    repository root cannot be resolved, or when gitleaks exits anything but
    0 or 1. It always passes `--redact` and `--verbose`, and on a finding
    exits `1` and says to rotate first.
-5. **One pinned version, verified.**{#pinned-gitleaks} `scripts/install-gitleaks.sh` is the
+4. **One pinned version, verified.**{#pinned-gitleaks} `scripts/install-gitleaks.sh` is the
    single home of the version and per-platform SHA-256, verified before
    unpacking, and is what both `ci.yml` and the session hook call.
 
 ## Consequences
 
+- A real finding is remedied by rotating the key, which a person does in
+  the provider console; this record prescribes nothing there. Reverting
+  the commit, deleting the branch or rewriting history does not undo a
+  leak -- the key stays valid and already disclosed -- though a revert may
+  still be wanted to get the key out of the tree. The wrapper's finding
+  message and the pre-commit hook's own line both say to rotate. This was
+  decision 1 until 2026-11-06, retired as guidance no check can hold
+  (`adr-refactor.spec.md`, row 2).
 - CI runs on push and pull request to main. Its install step and its
   `npm run check:secrets` step carry no `if:`, so they run on docs-only
   changes too, but under GitHub's implicit `success()` they are skipped in
@@ -66,15 +68,18 @@ and the exit contract `credential-handling.md#wrapper-contract` applies is
   under `set -euo pipefail`, so a failed build skips both, and the
   session's `check:secrets` then refuses. If the install fails while
   another gitleaks is on PATH, the gate runs with that one.
-- What holds each decision:
-  - 1: no check is possible. The wrapper's finding message and the
-    pre-commit hook's own line both say to rotate.
-  - 2: the `gates.test.mjs` probes stage the real `.gitleaks.toml`, so
-    dropping `useDefault` (two default-set probes stop being detected)
-    or the Anthropic rule (its probe) fails a test. Nothing checks that
-    there is exactly one local rule (barwise-3wu). barwise-1028
-    (open) tracks sending the Anthropic rule upstream.
-  - 3: the pre-commit hook and the CI step. The git hooks exist only
+- What holds each decision. `scripts/tests/credential-handling.test.mjs`
+  (`credential-handling-held.spec.md`) holds all four from tracked text
+  and stand-ins, so it never skips for a missing gitleaks:
+  - 1: it reads `.gitleaks.toml` as `[extend] useDefault = true` plus
+    exactly one rule, `anthropic-api-key`. The `gates.test.mjs` probes,
+    where gitleaks is installed, also show `useDefault` and the Anthropic
+    rule detecting. barwise-1028 (open) tracks sending the rule upstream.
+  - 2: it requires the one CI step running `check:secrets` to carry no
+    `if:`, no `continue-on-error` and no `--staged`, after a
+    `fetch-depth: 0` checkout, and the pre-commit hook to run
+    `check-staged-secrets.sh || exit $?`, which scans `--staged` and
+    passes its status through. The git hooks exist only
     after `npm run prepare` (`.npmrc` sets `ignore-scripts`), and not
     in a `git worktree` checkout (barwise-mdp); a clone without them
     commits and pushes with no local scan, and CI scans after the push. The `--staged` scan does not
@@ -82,20 +87,25 @@ and the exit contract `credential-handling.md#wrapper-contract` applies is
     `pre-merge-commit`, which validates only the tracker; neither scan
     inspects unreachable objects (spec, Out of scope, for untracked files
     and unreachable objects).
-  - 4: `scripts/tests/gates.test.mjs` shows the gate red on staged probes,
+  - 3: `scripts/tests/gates.test.mjs` shows the gate red on staged probes,
     asserts redaction on the secret itself, and covers gitleaks absent, an
     odd gitleaks status, a missing config and a shallow clone; it runs in
     CI under `npm run test:scripts` (`if:
     steps.changes.outputs.docs_only != 'true'`). The
     unresolvable-root refusal is covered by the git-failure cases
-    (`ROOT_DEPENDENT_GATES`); the exec-error refusal (gitleaks present
-    but failing to spawn) has no test (barwise-i23). The pre-commit hook reads every non-zero
-    status as a finding and prints "credential-shaped content in the tree"
-    and "ROTATE it" after a refusal too (barwise-jha). `ci:local` names a refusal
-    as "could not answer" separately from failures in every run.
-  - 5: the version is assigned only in the install script today (it also
-    appears in a `.gitleaks.toml` comment and a test stub), but nothing
-    keeps `ci.yml` or the session hook from assigning another (barwise-3wu).
+    (`ROOT_DEPENDENT_GATES`). The pre-commit hook's
+    secrets step (`scripts/hooks/check-staged-secrets.sh`) tells a refusal
+    from a finding: only exit 1 prints "ROTATE it", and a refusal says
+    nothing was scanned (barwise-jha, fixed in gate-contract-enforced WS4). `ci:local` names a refusal
+    as "could not answer" separately from failures in every run. The
+    exec-error refusal (gitleaks present but failing to spawn) and the
+    argv (`--redact`, `--verbose`, `--no-banner`, `--config`) are
+    tested against a stand-in in `credential-handling.test.mjs`.
+  - 4: `credential-handling.test.mjs` fails when `ci.yml` or the session
+    hook mentions gitleaks other than as the installer's name or a step
+    name (so a `uses:` action, `go install` or a package manager fails
+    unnamed), and runs the installer against a download no digest
+    matches to show it stops before `tar`. Other workflows are not read.
 - Left open in the spec, not decided here (its Open decisions carry
   recommendations, none marked resolved; the first, keeping the local
   Anthropic rule, is settled by CLAUDE.md, which `credential-handling.md#gitleaks-detects` follows):

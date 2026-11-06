@@ -364,6 +364,10 @@ test("every hook sees the worktree's root when run from a linked worktree", () =
     const log = join(dir, "top.log");
     const tracker = join("scripts", "hooks", "check-staged-tracker.sh");
     copyFileSync(join(SCRIPTS, "hooks", "check-staged-tracker.sh"), join(main, "barwise", tracker));
+    // pre-commit's secrets step is a script beside it too; npm is stubbed
+    // below, so it runs and passes.
+    const secrets = join("scripts", "hooks", "check-staged-secrets.sh");
+    copyFileSync(join(SCRIPTS, "hooks", "check-staged-secrets.sh"), join(main, "barwise", secrets));
     writeFileSync(
       join(main, "barwise", "scripts", "check-beads.sh"),
       `#!/bin/sh\ngit rev-parse --show-toplevel >> "${log}"\nexit 0\n`,

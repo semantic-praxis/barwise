@@ -3,8 +3,8 @@
  * when python3 + sqlglot are present (the sidecar is optional by
  * design); the degradation path is always tested.
  */
-import { parseSqlFile } from "@barwise/core/sql";
 import { describe, expect, it } from "vitest";
+import { parseSqlFile } from "../src/sql/SqlCascadeParser.js";
 import {
   normalizeCascadeResult,
   normalizeSqlTexts,
@@ -48,6 +48,10 @@ WHERE o.status = 'open';
     expect(kinds).toContain("join");
     expect(kinds).toContain("where");
     expect(kinds).toContain("case");
+    // Every pattern, not just the join: a tier that tagged a WHERE or CASE
+    // "regex" would pass the join check alone (kept from dbt's copy of
+    // this test, deleted in format-renderers-to-connectors WS3).
+    expect(result!.patterns.every((p) => p.parseLevel === "sqlglot")).toBe(true);
 
     const join = result!.patterns.find((p) => p.kind === "join")!;
     expect(join.parseLevel).toBe("sqlglot");

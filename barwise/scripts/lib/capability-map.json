@@ -1,0 +1,381 @@
+{
+  "_comment": "Each row of the capability matrix in the root CLAUDE.md, keyed by its first cell, names what would carry its reach on each surface (docs/specs/capability-matrix-check.spec.md). CLI: a command path, optionally with one option ('import transcript --samples'). MCP: a tool, or a tool input as tool.property[.property]. VS Code: a palette command (barwise.x) or a language-model tool or its input (barwise_x[.property]). A surface is reached when every name is registered; null is a surface where no single name would carry it, and the unnamed-registration rule covers it. 'unlisted' holds the registrations no row is about, each with its reason. 'cells' repeats the row's three matrix cells (CLI, MCP, VS Code), so a docs-only edit that flips one disagrees with this file. check:capability-matrix holds this file and the matrix together.",
+  "rows": {
+    "validate, verbalize, diagram, export, import, analyze": {
+      "cells": [
+        "yes",
+        "yes",
+        "yes"
+      ],
+      "cli": [
+        "validate",
+        "verbalize",
+        "diagram",
+        "export",
+        "import",
+        "analyze"
+      ],
+      "mcp": [
+        "validate_model",
+        "verbalize_model",
+        "generate_diagram",
+        "export_model",
+        "import_model",
+        "import_transcript",
+        "analyze_repository"
+      ],
+      "vscode": [
+        "barwise.validateModel",
+        "barwise.verbalize",
+        "barwise.showDiagram",
+        "barwise.export",
+        "barwise.import",
+        "barwise.analyzeRepository",
+        "barwise_validate_model",
+        "barwise_verbalize_model",
+        "barwise_generate_diagram",
+        "barwise_export_model",
+        "barwise_import_model",
+        "barwise_import_transcript"
+      ]
+    },
+    "`review`": {
+      "cells": [
+        "yes",
+        "yes",
+        "yes"
+      ],
+      "cli": [
+        "review"
+      ],
+      "mcp": [
+        "review_model"
+      ],
+      "vscode": [
+        "barwise_review_model"
+      ]
+    },
+    "schema, diff, query, describe, lineage, impact": {
+      "cells": [
+        "yes",
+        "yes",
+        "yes"
+      ],
+      "cli": [
+        "schema",
+        "diff",
+        "query",
+        "describe",
+        "lineage",
+        "lineage impact"
+      ],
+      "mcp": [
+        "generate_schema",
+        "diff_models",
+        "query_model",
+        "describe_domain",
+        "lineage_status",
+        "impact_analysis"
+      ],
+      "vscode": [
+        "barwise_generate_schema",
+        "barwise_diff_models",
+        "barwise_query_model",
+        "barwise_describe_domain",
+        "barwise_lineage_status",
+        "barwise_impact_analysis"
+      ]
+    },
+    "`merge`": {
+      "cells": [
+        "yes",
+        "yes",
+        "yes"
+      ],
+      "cli": [
+        "merge"
+      ],
+      "mcp": [
+        "merge_models"
+      ],
+      "vscode": [
+        "barwise_merge_models"
+      ]
+    },
+    "`migrate`": {
+      "cells": [
+        "yes",
+        "no",
+        "no"
+      ],
+      "cli": [
+        "migrate"
+      ],
+      "mcp": null,
+      "vscode": null
+    },
+    "`rename`": {
+      "cells": [
+        "yes",
+        "yes",
+        "yes"
+      ],
+      "cli": [
+        "rename"
+      ],
+      "mcp": [
+        "rename_element"
+      ],
+      "vscode": [
+        "barwise_rename_element"
+      ]
+    },
+    "`gym`": {
+      "cells": [
+        "yes",
+        "yes",
+        "no"
+      ],
+      "cli": [
+        "gym"
+      ],
+      "mcp": [
+        "gym_list",
+        "gym_check"
+      ],
+      "vscode": null
+    },
+    "gym session log (`--no-state`)": {
+      "cells": [
+        "yes",
+        "no",
+        "no"
+      ],
+      "cli": [
+        "gym check --no-state"
+      ],
+      "mcp": [
+        "gym_check.state"
+      ],
+      "vscode": null
+    },
+    "`project split`": {
+      "cells": [
+        "yes",
+        "yes",
+        "yes"
+      ],
+      "cli": [
+        "project split"
+      ],
+      "mcp": [
+        "split_model"
+      ],
+      "vscode": [
+        "barwise_split_model"
+      ]
+    },
+    "`project init`": {
+      "cells": [
+        "yes",
+        "no",
+        "no"
+      ],
+      "cli": [
+        "project init"
+      ],
+      "mcp": null,
+      "vscode": null
+    },
+    "`history`": {
+      "cells": [
+        "yes",
+        "no",
+        "no"
+      ],
+      "cli": [
+        "history"
+      ],
+      "mcp": null,
+      "vscode": null
+    },
+    "`prompt eval`, `prompt run`": {
+      "cells": [
+        "yes",
+        "no",
+        "no"
+      ],
+      "cli": [
+        "prompt eval",
+        "prompt run"
+      ],
+      "mcp": null,
+      "vscode": null
+    },
+    "`prompt schema`, `prompt artifact`": {
+      "cells": [
+        "yes",
+        "no",
+        "no"
+      ],
+      "cli": [
+        "prompt schema",
+        "prompt artifact"
+      ],
+      "mcp": null,
+      "vscode": null
+    },
+    "`prompt score`, `rescore`, `history`, `compare`": {
+      "cells": [
+        "yes",
+        "no",
+        "no"
+      ],
+      "cli": [
+        "prompt score",
+        "prompt rescore",
+        "prompt history",
+        "prompt compare"
+      ],
+      "mcp": null,
+      "vscode": null
+    },
+    "`import batch`": {
+      "cells": [
+        "yes",
+        "no",
+        "no"
+      ],
+      "cli": [
+        "import batch"
+      ],
+      "mcp": null,
+      "vscode": null
+    },
+    "`llm-usage`": {
+      "cells": [
+        "yes",
+        "no",
+        "no"
+      ],
+      "cli": [
+        "llm-usage"
+      ],
+      "mcp": null,
+      "vscode": null
+    },
+    "prompt-artifact override (`--artifacts`)": {
+      "cells": [
+        "yes",
+        "no",
+        "no"
+      ],
+      "cli": [
+        "prompt eval --artifacts",
+        "prompt artifact --artifacts",
+        "prompt run --artifacts"
+      ],
+      "mcp": [
+        "import_transcript.artifacts"
+      ],
+      "vscode": [
+        "barwise_import_transcript.artifacts"
+      ]
+    },
+    "multi-sample import (`--samples`)": {
+      "cells": [
+        "yes",
+        "yes",
+        "no"
+      ],
+      "cli": [
+        "import transcript --samples"
+      ],
+      "mcp": [
+        "import_transcript.samples"
+      ],
+      "vscode": [
+        "barwise_import_transcript.samples"
+      ]
+    },
+    "thinking-budget override (`--thinking-budget`)": {
+      "cells": [
+        "yes",
+        "no",
+        "no"
+      ],
+      "cli": [
+        "prompt eval --thinking-budget",
+        "prompt run --thinking-budget"
+      ],
+      "mcp": [
+        "import_transcript.thinkingBudget"
+      ],
+      "vscode": [
+        "barwise_import_transcript.thinkingBudget"
+      ]
+    },
+    "reference inference (`--infer-references`)": {
+      "cells": [
+        "yes",
+        "no",
+        "no"
+      ],
+      "cli": [
+        "import model --infer-references",
+        "import sql --infer-references"
+      ],
+      "mcp": [
+        "import_model.inferReferences"
+      ],
+      "vscode": [
+        "barwise_import_model.inferReferences"
+      ]
+    },
+    "generated keys on export (`--surrogate-keys`)": {
+      "cells": [
+        "yes",
+        "yes",
+        "no"
+      ],
+      "cli": [
+        "export --surrogate-keys"
+      ],
+      "mcp": [
+        "export_model.options.surrogateKeys"
+      ],
+      "vscode": [
+        "barwise_export_model.options.surrogateKeys"
+      ]
+    },
+    "content-only matching on diff (`--matching content`)": {
+      "cells": [
+        "yes",
+        "yes",
+        "yes"
+      ],
+      "cli": [
+        "diff --matching"
+      ],
+      "mcp": [
+        "diff_models.matching"
+      ],
+      "vscode": [
+        "barwise_diff_models.matching"
+      ]
+    }
+  },
+  "unlisted": {
+    "vscode": {
+      "barwise.newProject": "scaffolds a .orm.yaml model; not the CLI's `project` command, which manages .orm-project.yaml (root CLAUDE.md, the name collision note)",
+      "barwise.highlightInDiagram": "an editor helper on the open diagram, not a capability of the toolkit",
+      "barwise.copyElementName": "an editor helper on the open diagram, not a capability of the toolkit",
+      "barwise.addToView": "an editor helper for diagram views, not a capability of the toolkit",
+      "barwise.createView": "an editor helper for diagram views, not a capability of the toolkit",
+      "barwise.loadView": "registered for the diagram webview's own use and not contributed to the palette, so no user reaches it as a command",
+      "barwise.setAnthropicApiKey": "stores the measurement-lane key in secret storage (docs/adr/keyless-model-access.md), not a modeling capability",
+      "chat:barwise.chatParticipant": "the chat participant's slash commands; not VS Code reach, per decision 3 of docs/adr/surface-capability-parity.md (owner, 2026-11-06)",
+      "mcp-provider:barwise.mcpServer": "hands the bundled MCP server to the editor's chat, so MCP's column is reachable there too; not VS Code reach, per decision 3 of docs/adr/surface-capability-parity.md (owner, 2026-11-06)"
+    }
+  }
+}

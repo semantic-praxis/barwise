@@ -23,31 +23,44 @@ run on which changes is a separate decision, owned by the root
 
 ## Decision
 
-1. **The agent driving a pull request may merge it only after the
-   `pr-review` skill has recommended `merge` on the exact head being
-   merged.**{#review-before-merge} `pr-review` runs `/code-review` as its correctness engine.
-   "Merge after", "do not merge" and "cannot tell" do not license a
-   merge, and neither does a review run where `/code-review` was
-   unavailable.
-2. **The merge is pinned to the reviewed commit.**{#pinned-merge} The agent merges
-   with that SHA as the expected head (`expectedHeadSha`, or `gh pr
-   merge --match-head-commit`), so a later push is refused rather than
-   merged, and then posts one comment naming the SHA and the
-   recommendation. Any push after the review needs a new review.
-3. **No pull request is exempt by size.**{#no-size-exemption} Tracker-only and docs-only
-   pull requests, including the closure follow-up after a merge, get the
-   same review before merging.
-4. **The agent asks the owner instead of merging**{#ask-owner} when the review
-   cannot tell, when `/code-review` could not run, when the pull
+1. **Before the agent driving a pull request merges it, a comment on the
+   pull request names the head being merged and the `pr-review` verdict
+   on that head.**{#review-before-merge} Only `merge` licenses the
+   merge, and the merge commit carries `Reviewed-head: <sha>` and
+   `Review: merge` trailers. `pr-review` runs `/code-review` as its
+   correctness engine; its verdicts are `merge`, `merge after`, `do not
+   merge`, `cannot tell` and `code-review unavailable`, so every
+   condition decision 4 names is in the record.
+2. **The merge is pinned to the reviewed commit.**{#pinned-merge} The
+   agent merges with that SHA as the expected head (`expectedHeadSha`,
+   or `gh pr merge --match-head-commit`), so a later push is refused
+   rather than merged. Any push after the review needs a new review.
+3. **Decision 1's verdict comment and trailers are required on every
+   pull request, tracker-only and docs-only included.**{#no-size-exemption}
+4. **The agent asks the owner instead of merging**{#ask-owner} when the
+   verdict is `cannot tell` or `code-review unavailable`, when the pull
    request's body leaves the owner a decision not yet answered, or after
-   two reviews of the pull request that did not recommend `merge`. The
-   owner's answer decides and resets the count.
-5. **The owner's instruction overrides the condition.**{#owner-overrides} When the owner
-   says to merge a pull request, the agent merges it. A reviewer who is
-   not the driving agent recommends and never approves or merges.
+   two verdicts on the pull request other than `merge`. The agent posts
+   the owner's answer as an `Owner-answer:` comment quoting it; the
+   answer decides, and only the verdicts after the last such comment
+   count.
+5. **When the owner says to merge a pull request, the agent merges it
+   with an `Owner-directed:` trailer in place of the review
+   trailers.**{#owner-overrides} A reviewer who is not the driving agent
+   recommends, and never approves or merges.
 
 ## Consequences
 
+- The decisions were restated on 2026-11-06 (`adr-refactor.spec.md`,
+  rows 7, 8, 9 and 20) so each names a record a check can read: the
+  verdict comment, the merge commit's trailers, and the
+  `Owner-answer:` comment. Before that, decision 1 asked for the
+  review in the session and decision 2 for a comment after the merge,
+  so whether the review ran could not be read from the record. The gate
+  that reads it, on every push to `main`, is batch 10 of that spec; an
+  independent re-run of `pr-review` on sampled merged heads is its
+  audit, reported and never gated. Until the gate lands, the gap issues
+  in the header stand.
 - Nothing mechanical enforces decisions 1, 3 or 4 (barwise-zdd). No
   hook inspects a merge: the GitHub MCP merge tool matches no hook in
   `.claude/settings.json`, and `gh pr merge` passes through the Bash
@@ -55,12 +68,14 @@ run on which changes is a separate decision, owned by the root
   `steward` can merge without the review, as #679 did before section 4b
   existed.
 - Decision 2's pin holds only when the agent passes the SHA; GitHub then
-  refuses a merge whose head has moved. Nothing requires the pin or the
-  comment (barwise-zdd).
+  refuses a merge whose head has moved. Nothing requires the pin
+  (barwise-zdd).
 - An agent's merge cannot be told from the owner's: a session acts as
   the owner, so every merge shows the owner's login, and the owner may
-  merge without the comment decision 2 asks of the agent. Whether this
-  rule is followed cannot be measured from the record (barwise-4q0).
+  merge without the comment decision 1 asks of the agent. The trailers
+  mark the merges the agent claims, so the record shows whether those
+  followed the rule; an agent's merge with no trailer at all still reads
+  as the owner's, and nothing can tell the two apart (barwise-4q0).
 - Whether `main` requires the `ci` check is unsettled: `steward`
   section 4a says it does, and the rulesets a session can read show only
   deletion and non-fast-forward rules (barwise-raw). This ADR's

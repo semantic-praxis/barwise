@@ -39,6 +39,7 @@ import {
   readdirSync,
   readFileSync,
   rmSync,
+  statSync,
   symlinkSync,
   writeFileSync,
 } from "node:fs";
@@ -49,6 +50,14 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { decisionIds, parseEnforcedBy } from "../lib/adr-enforcement.mjs";
 import { isAdr } from "../lib/architecture-section.mjs";
 import { ciLocalLibs } from "./ci-local-files.mjs";
+// The real list, imported statically (as dependency-cruiser requires
+// intended.cjs) so the plants below are written against what core declares.
+import EXTERNAL from "../lib/external-deps.cjs";
+import {
+  RATCHETS,
+  SOURCE_FILES as FINDING_SOURCE_FILES,
+  SOURCE_KEYS as FINDING_SOURCE_KEYS,
+} from "../lib/findings.mjs";
 
 const SCRIPTS = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const REPO = execFileSync("git", ["rev-parse", "--show-toplevel"], {
@@ -94,6 +103,25 @@ function gateWithStubGit(script, mode, ...args) {
   }
 }
 
+/**
+ * Skip a case that runs a history-reading gate (audit-spec-status) against
+ * this repository when the clone is shallow: the gate refuses there, by
+ * design, so the case cannot ask its question. Six such cases failed
+ * instead of skipping under the fault matrix's git-shallow axis, which a
+ * real shallow clone would reproduce (gate-contract-enforced WS1). Read
+ * lazily, so a broken git fails the case that asked, not the module.
+ * Returns true when it skipped.
+ */
+let shallowClone;
+function skipIfShallow(t) {
+  shallowClone ??= execFileSync("git", ["rev-parse", "--is-shallow-repository"], {
+    cwd: REPO,
+    encoding: "utf8",
+  }).trim() === "true";
+  if (shallowClone) t.skip("shallow clone: run `git fetch --unshallow` to exercise this gate");
+  return shallowClone;
+}
+
 // --- barwise-989: a gate that cannot see its input must not print PASS ---
 
 /**
@@ -117,6 +145,9 @@ const ROOT_DEPENDENT_GATES = [
   "check-lockfile-agrees.mjs",
   "check-git-listing.mjs",
   "check-plan-review.mjs",
+  // A test runner whose cases need git: it refused nothing and reported
+  // failed cases as a finding until gate-contract-enforced WS1.
+  "test-adr-model.mjs",
 ];
 
 for (const script of ROOT_DEPENDENT_GATES) {
@@ -1576,7 +1607,8 @@ test("check-root-scripts fails on drift in either direction", () => {
  * way passes, which is the barwise-906 shape -- so the red reading has
  * to come from the commit where the defect actually was.
  */
-test("audit-spec-status fires on the header that went stale at 7fbbba7", () => {
+test("audit-spec-status fires on the header that went stale at 7fbbba7", (t) => {
+  if (skipIfShallow(t)) return;
   const r = gate("audit-spec-status.mjs", REPO, "--at", "7fbbba7");
   assert.equal(r.status, 0, `--at failed:\n${r.stdout}${r.stderr}`);
   assert.match(
@@ -1592,14 +1624,7 @@ test("audit-spec-status --check is green on the current tree, from every cwd", (
   // says so instead of printing OK -- which is how it shipped red once:
   // 309 commits locally against CI's full history. Skipping loudly here
   // is not the silent hole; reporting the smaller question's answer was.
-  const shallow = execFileSync("git", ["rev-parse", "--is-shallow-repository"], {
-    cwd: REPO,
-    encoding: "utf8",
-  }).trim() === "true";
-  if (shallow) {
-    t.skip("shallow clone: run `git fetch --unshallow` to exercise this gate");
-    return;
-  }
+  if (skipIfShallow(t)) return;
   for (const cwd of CWDS) {
     const r = gate("audit-spec-status.mjs", cwd, "--check");
     assert.equal(r.status, 0, `--check failed in ${cwd}:\n${r.stdout}${r.stderr}`);
@@ -1685,6 +1710,79 @@ const { parseFieldPath, fieldValue } = await import(
   pathToFileURL(join(SCRIPTS, "check-parity.mjs")).href
 );
 
+test("check-parity finds a set it cannot mean without hiding the others, and refuses a manifest it cannot read [adr:must-agree-copies#registered-sets-identical]", () => {
+  // The escapes barwise-tdu and barwise-ym8.8nq named: an unknown ignore
+  // was silently not applied, an ignore on a symbol or field set was
+  // silently ignored, and a set of one (or of one member twice) compared a
+  // copy with nothing and passed. Each is now a finding naming its set;
+  // the other sets are still compared, so drift elsewhere is not hidden.
+  // Members resolve from the repository; only the manifest is a fixture.
+  const dir = mkdtempSync(join(tmpdir(), "barwise-parity-"));
+  const runWith = (manifest) => {
+    const path = join(dir, "manifest.json");
+    writeFileSync(path, typeof manifest === "string" ? manifest : JSON.stringify(manifest));
+    return gate("check-parity.mjs", REPO, "--manifest", path);
+  };
+  const same = ["scripts/check-parity.mjs", "scripts/check-parity.mjs"];
+  const pair = {
+    name: "pair",
+    why: "x",
+    members: [{ file: "package.json", field: "version" }, {
+      file: "packages/core/package.json",
+      field: "version",
+    }],
+  };
+  try {
+    assert.equal(runWith({ sets: [pair] }).status, 0);
+    const r = runWith({
+      sets: [
+        {
+          name: "typo",
+          why: "x",
+          ignore: "leading-docblok",
+          members: ["package.json", "package-lock.json"],
+        },
+        {
+          name: "on-symbol",
+          why: "x",
+          ignore: "leading-docblock",
+          members: [{ file: "a.ts", symbol: "f" }, "b.ts"],
+        },
+        { name: "thin", why: "x", members: ["package.json"] },
+        { name: "twice", why: "x", members: same },
+        { name: "drift", why: "x", members: ["package.json", "package-lock.json"] },
+      ],
+    });
+    assert.equal(r.status, 1, r.stdout + r.stderr);
+    for (
+      const pattern of [
+        /set "typo": ignore "leading-docblok" is not one this check applies/,
+        /set "on-symbol": ignore applies to whole-file members only/,
+        /set "thin": has 1 distinct member\(s\), so it checks nothing/,
+        /set "twice": has 1 distinct member\(s\)/,
+        /set "drift": package-lock\.json differs from package\.json/,
+      ]
+    ) {
+      assert.match(r.stderr, pattern);
+    }
+    // An empty sets array names nothing to compare; "0 set(s) ... OK"
+    // would be a pass over no input.
+    for (
+      const unreadable of [
+        "{ not json",
+        JSON.stringify({ groups: [] }),
+        JSON.stringify({ sets: [] }),
+      ]
+    ) {
+      const u = runWith(unreadable);
+      assert.equal(u.status, 2, u.stdout + u.stderr);
+      assert.match(u.stderr, /cannot answer -- parity\.manifest\.json: /);
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test("parseFieldPath splits dotted keys and bracketed non-identifiers", () => {
   assert.deepEqual(parseFieldPath("version"), ["version"]);
   assert.deepEqual(parseFieldPath("engines.node"), ["engines", "node"]);
@@ -1736,6 +1834,9 @@ const UV_BOOTSTRAP = "          python3 -m pip install --quiet uv==0.12.7\n";
 function pythonUvRepo(files = {}) {
   const dir = tempRepo();
   stage(dir, ".github/workflows/ci.yml", `jobs:\n  ci:\n    steps:\n${UV_BOOTSTRAP}`);
+  // The one project every Python run resolves from (python-uv-widened WS3).
+  stage(dir, "barwise/pyproject.toml", '[project]\nname = "x"\n');
+  stage(dir, "barwise/uv.lock", "version = 1\n");
   for (const [name, contents] of Object.entries(files)) stage(dir, name, contents);
   return dir;
 }
@@ -1810,6 +1911,77 @@ const VIOLATIONS = [
   ],
   ["uvx, which resolves from the index", { "s.sh": "#!/bin/sh\nuvx sqlglot --version\n" }, /uvx/],
   ["uv tool run", { "s.sh": "#!/bin/sh\nuv tool run sqlglot\n" }, /uv tool run/],
+  // python-uv-widened WS1: a uv call is parsed, not matched.
+  [
+    "a global option before run, which hid the whole call",
+    { "s.sh": "#!/bin/sh\nuv --quiet run python -V\n" },
+    /neither --frozen nor --locked/,
+  ],
+  [
+    "--with behind a global option that takes a value",
+    { "s.sh": "#!/bin/sh\nuv --allow-insecure-host h run --frozen --with x python\n" },
+    /--with.*lock bypass/,
+  ],
+  ["-w, --with's short form", { "s.sh": "#!/bin/sh\nuv run --frozen -w x python\n" }, /-w/],
+  [
+    "--with-editable, caught by prefix",
+    { "s.sh": "#!/bin/sh\nuv run --frozen --with-editable ./p python\n" },
+    /--with-editable/,
+  ],
+  [
+    "--frozen after the launched command, which uv hands to the script",
+    { "s.sh": "#!/bin/sh\nuv run python x.py --frozen\n" },
+    /neither --frozen nor --locked/,
+  ],
+  [
+    "UV_NO_PROJECT, --no-project by another name",
+    { "s.sh": "#!/bin/sh\nUV_NO_PROJECT=1 uv run --frozen python\n" },
+    /UV_NO_PROJECT/,
+  ],
+  [
+    "a .py subprocess list running uv with --with",
+    {
+      "t.py":
+        'import subprocess\n\nsubprocess.run(["uv", "run", "--frozen", "--with", "x", "python"])\n',
+    },
+    /--with.*lock bypass/,
+  ],
+  // WS1 code review: forms the first parse missed and the substring check caught.
+  [
+    "uv in a subshell",
+    { "s.sh": "#!/bin/sh\nout=$(uv run --frozen --with x python -V)\n" },
+    /--with.*lock bypass/,
+  ],
+  [
+    "--with after a run option the value list does not know",
+    { "s.sh": "#!/bin/sh\nuv run --frozen --cache-dir /tmp/c --with x python\n" },
+    /--with.*lock bypass/,
+  ],
+  [
+    "a banned flag in global position",
+    { "s.sh": "#!/bin/sh\nuv --isolated run --frozen python\n" },
+    /--isolated/,
+  ],
+  [
+    "-w with its value attached",
+    { "s.sh": "#!/bin/sh\nuv run --frozen -wsqlglot python\n" },
+    /-wsqlglot/,
+  ],
+  [
+    "UV_FROZEN=0, which asserts nothing",
+    { "s.sh": "#!/bin/sh\nUV_FROZEN=0 uv run python -V\n" },
+    /neither --frozen nor --locked/,
+  ],
+  [
+    "uv tool run behind a global option",
+    { "s.sh": "#!/bin/sh\nuv -q tool run ruff\n" },
+    /uv tool run/,
+  ],
+  [
+    "a uv call inside a JS string",
+    { "a.ts": 'execSync("uv run --with sqlglot python x.py");\n' },
+    /--with.*lock bypass/,
+  ],
 ];
 
 for (const [name, files, expected] of VIOLATIONS) {
@@ -1862,6 +2034,12 @@ const ARGS_ARRAY = [
     /--with.*lock bypass/,
   ],
   [
+    "uv args array carrying --with=, which a whole-literal lookup missed",
+    'const UV = ["run", "--frozen", "--with=sqlglot==1.0", "python"] as const;\n'
+    + 'execFileSync("uv", [...UV, "-c", src]);\n',
+    /--with.*lock bypass/,
+  ],
+  [
     "uv pip through an args array",
     'execFileSync("uv", ["pip", "install", "sqlglot"]);\n',
     /`uv pip`/,
@@ -1875,6 +2053,151 @@ for (const [name, source, expected] of ARGS_ARRAY) {
     assert.match(r.stderr, expected);
   });
 }
+
+// python-uv-widened WS2: files the extension rules did not reach.
+const COMMAND_FILES = [
+  [
+    "a package.json script",
+    {
+      "package.json": JSON.stringify({ scripts: { opt: "uv run --with x pytest" } }, null, 2)
+        + "\n",
+    },
+    /package\.json:3 .*--with.*lock bypass/,
+  ],
+  [
+    "a Makefile recipe",
+    { "Makefile": "test:\n\tpython3 -m pytest\n" },
+    /Makefile:2 .*bare `python3`/,
+  ],
+  [
+    "a Makefile recipe behind make's @ prefix",
+    { "Makefile": "test:\n\t@python3 -m pytest\n" },
+    /Makefile:2 .*bare `python3`/,
+  ],
+  [
+    "a script whose name also keys an earlier object, reported at its own line",
+    {
+      "package.json": JSON.stringify(
+        { contributes: { check: "x" }, scripts: { check: "uv run python -V" } },
+        null,
+        2,
+      ) + "\n",
+    },
+    /package\.json:6 /,
+  ],
+  [
+    "a git hook, which has no extension",
+    { "barwise/.husky/pre-commit": "uv run python -V\n" },
+    /barwise\/\.husky\/pre-commit:1 .*neither --frozen nor --locked/,
+  ],
+];
+
+// python-uv-widened WS3: one project, and nothing else that changes what resolves.
+const MANIFESTS = [
+  ["a second pyproject.toml", "tools/pyproject.toml"],
+  ["a requirements file", "requirements-dev.txt"],
+  ["a setup.py", "pkg/setup.py"],
+  ["a uv.toml", "barwise/uv.toml"],
+  ["a pylock.toml", "pylock.toml"],
+  ["a second uv.lock", "tools/uv.lock"],
+];
+
+for (const [name, file] of MANIFESTS) {
+  test(`check-python-uv fails on ${name}`, () => {
+    const r = pythonUv({ [file]: "x\n" });
+    assert.equal(r.status, 1, `expected failure, got:\n${r.stdout}`);
+    assert.match(r.stderr, new RegExp(`${file.replace(/\./g, "\\.")}:1 .*Python manifest outside`));
+  });
+}
+
+test("check-python-uv fails when the project file is not tracked", () => {
+  const dir = tempRepo();
+  try {
+    stage(dir, ".github/workflows/ci.yml", `jobs:\n  ci:\n    steps:\n${UV_BOOTSTRAP}`);
+    stage(dir, "barwise/uv.lock", "version = 1\n");
+    const r = gate("check-python-uv.mjs", dir);
+    assert.equal(r.status, 1, r.stdout);
+    assert.match(r.stderr, /barwise\/pyproject\.toml:0 .*not tracked/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("check-python-uv cannot answer for a package.json it cannot parse, never a clean pass", () => {
+  const r = pythonUv({ "package.json": '{ "scripts": { "a": "python3 x.py", } ' });
+  assert.equal(r.status, 2, r.stdout + r.stderr);
+  assert.match(r.stderr, /cannot answer[\s\S]*package\.json/);
+  assert.doesNotMatch(r.stdout, /OK/);
+});
+
+for (const [name, files, expected] of COMMAND_FILES) {
+  test(`check-python-uv reads ${name}`, () => {
+    const r = pythonUv(files);
+    assert.equal(r.status, 1, `expected failure, got:\n${r.stdout}`);
+    assert.match(r.stderr, expected);
+  });
+}
+
+test("check-python-uv passes compliant command files, and names what it does not read", () => {
+  const r = pythonUv({
+    "package.json": JSON.stringify({ scripts: { opt: "uv run --frozen --extra dev pytest -q" } })
+      + "\n",
+    "Makefile": "test:\n\tnpm test\n",
+    "barwise/.husky/pre-push": "npm run ci:local\n",
+  });
+  assert.equal(r.status, 0, r.stderr);
+  assert.match(r.stdout, /\.beads\/hooks\/ not read, vendored/);
+});
+
+test("UV_SUBCOMMANDS holds every subcommand the installed uv lists", async (t) => {
+  // The parser finds a uv call's subcommand by name, so a missing name
+  // reads that call as no uv call at all: the list is a copy of uv's CLI
+  // that fails open, and it was wrong once when written from memory.
+  const help = spawnSync("uv", ["help"], { encoding: "utf8" });
+  if (help.error || help.status !== 0) {
+    t.skip("uv is not installed here; CI installs it before this suite");
+    return;
+  }
+  const { UV_SUBCOMMANDS } = await import(
+    pathToFileURL(join(SCRIPTS, "lib", "python-uv-rules.mjs")).href
+  );
+  const section = help.stdout.split(/^Commands:$/m)[1]?.split(/^\S/m)[0] ?? "";
+  const listed = [...section.matchAll(/^\s{2}([a-z][\w-]*)\s/gm)].map((m) => m[1]);
+  assert.ok(listed.length > 10, `could not read uv help:\n${help.stdout}`);
+  assert.deepEqual(listed.filter((c) => !UV_SUBCOMMANDS.has(c)), []);
+});
+
+test("check-python-uv passes the correct parsed forms", () => {
+  // Each of these is right, and each would be wrong under a careless parse:
+  // a flag that belongs to the launched program, the env spelling of the
+  // assertion, and --frozen beside a value-taking option.
+  const r = pythonUv({
+    "s.sh": "#!/bin/sh\nUV_FROZEN=1 uv run python -V\n"
+      + "uv run --frozen --only-group sqlglot python -c x\nuv --version\n",
+    // Prose that mentions uv is not a call (a message in a .ts test file
+    // read as `uv ... run` when the parser skipped words to a subcommand).
+    "a.ts": 'const MSG = "Install uv to run them.";\n',
+  });
+  assert.equal(r.status, 0, r.stderr);
+});
+
+test("check-python-uv needs no lock flag on a uv call that resolves nothing, and still needs one beside a run", () => {
+  const find = pythonUv({
+    "a.mjs": 'spawnSync("uv", ["python", "find", "--show-version", "--project", dir]);\n',
+  });
+  assert.equal(find.status, 0, find.stderr);
+  const both = pythonUv({
+    "a.mjs": 'spawnSync("uv", ["python", "find", "--show-version"]);\n'
+      + 'spawnSync("uv", ["run", "python", "x.py"]);\n',
+  });
+  assert.equal(both.status, 1, both.stderr);
+  assert.match(both.stderr, /neither --frozen nor --locked/);
+  // Named by what is safe: a uv subcommand that resolves, such as lock,
+  // still needs the flag even with no run or sync beside it.
+  const lock = pythonUv({ "a.mjs": 'spawnSync("uv", ["lock"]);\n' });
+  assert.equal(lock.status, 1, lock.stderr);
+  assert.match(lock.stderr, /neither --frozen nor --locked/);
+});
 
 test("check-python-uv passes a compliant uv args array", () => {
   const r = pythonUv({
@@ -2106,6 +2429,60 @@ test("ci-local reports a REFUSED gate apart from a failure, and exits 2 [adr:gat
     assert.doesNotMatch(r.all, /All \d+ gates passed/);
   } finally {
     rmSync(repo.dir, { recursive: true, force: true });
+  }
+});
+
+test("ci-local keeps a refusal apart from a failure in the same run [adr:gate-refusal-contract#readers-keep-third]", () => {
+  // The test above plants only a refusing gate, so a ci:local that counted
+  // a refusal among the failures would pass it. With one of each, the run
+  // is a finding (exit 1), the failure count leaves the refusal out, and
+  // the refusal is still named (barwise-ym8.aep).
+  const repo = tempCiRepo();
+  try {
+    const ci = join(repo.dir, ".github", "workflows", "ci.yml");
+    writeFileSync(ci, readFileSync(ci, "utf8") + "      - run: npm run nope\n");
+    const pkg = join(repo.root, "package.json");
+    const json = JSON.parse(readFileSync(pkg, "utf8"));
+    json.scripts.nope = "node scripts/nope.mjs";
+    writeFileSync(pkg, JSON.stringify(json));
+    writeFileSync(
+      join(repo.root, "scripts", "nope.mjs"),
+      'console.error("cannot answer: the tool is absent");\nprocess.exitCode = 2;\n',
+    );
+    const r = runCiLocal(repo);
+    assert.equal(r.status, 1, `a failure beside a refusal is a finding:\n${r.all}`);
+    assert.match(r.all, /1 of 3 gates failed/);
+    assert.match(r.all, /1 could not answer: run nope/);
+  } finally {
+    rmSync(repo.dir, { recursive: true, force: true });
+  }
+});
+
+test("the pre-commit secrets step tells a refusal from a found credential (barwise-jha) [adr:gate-refusal-contract#readers-keep-third]", () => {
+  // npm stubbed to answer as check:secrets would: 0 clean, 1 a finding,
+  // 2 could not answer. The hook used to print "ROTATE it" for all three
+  // non-zero outcomes alike.
+  const dir = mkdtempSync(join(tmpdir(), "barwise-hooksecrets-"));
+  try {
+    const run = (status) => {
+      writeFileSync(join(dir, "npm"), `#!/bin/sh\nexit ${status}\n`);
+      chmodSync(join(dir, "npm"), 0o755);
+      return spawnSync("sh", [join(SCRIPTS, "hooks", "check-staged-secrets.sh")], {
+        cwd: join(REPO, "barwise"),
+        encoding: "utf8",
+        env: { ...process.env, PATH: `${dir}:${process.env.PATH ?? ""}` },
+      });
+    };
+    assert.equal(run(0).status, 0);
+    const found = run(1);
+    assert.equal(found.status, 1, found.stderr);
+    assert.match(found.stderr, /ROTATE/);
+    const refused = run(2);
+    assert.equal(refused.status, 2, refused.stderr);
+    assert.match(refused.stderr, /could not answer/);
+    assert.doesNotMatch(refused.stderr, /ROTATE|credential-shaped/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
   }
 });
 
@@ -2580,6 +2957,131 @@ const A_CORRECTION =
   "# Probe\n\nThe draft said the loader was pure, and implementing it showed the\n"
   + "loader reads the environment, so the claim was wrong in kind.\n";
 
+/**
+ * The stale half of findings-close-by-mechanism decision 2, per ratchet:
+ * a row planted in the real baseline that its detector does not produce
+ * (restored in `finally`), or the name of a test that already plants one
+ * in a sandbox. Keyed by RATCHETS' sources, which a test below holds to
+ * cover them all.
+ */
+const STALE_CASES = {
+  duplication: {
+    row: { status: "accepted-benign", note: "a planted stale row", detail: "none" },
+    output: /^\s*STALE baseline entry no longer detected: zz-planted-stale-row\b/m,
+  },
+  rubric: {
+    row: {
+      case: "none",
+      kind: "must_validate",
+      message: "x",
+      verdict: "accepted-benign: a planted stale row",
+    },
+    output: /Baseline entry no longer detected: zz-planted-stale-row\b/,
+    // Scores through the built promptlab, as its writer test does.
+    needsDist: "packages/promptlab/dist/index.js",
+  },
+  specs: {
+    row: { status: "Draft", commits: ["00000000"], note: "a planted stale row" },
+    needsHistory: true,
+    output: /STALE baseline row: zz-planted-stale-row\b/,
+  },
+  corrections: {
+    testedBy: [
+      "barwise/scripts/tests/gates.test.mjs",
+      "audit-corrections fails on a baseline entry no longer detected",
+    ],
+  },
+  trial: {
+    testedBy: [
+      "barwise/trial/tests/oracles.test.mjs",
+      "evaluateGate: a new failure, a stale row and an unclassified row each fail the gate",
+    ],
+  },
+};
+
+for (const [source, c] of Object.entries(STALE_CASES).filter(([, x]) => x.row)) {
+  const rt = RATCHETS.find((x) => x.source === source);
+  test(`${rt.script} --check fails on a stale baseline row${c.needsDist === undefined ? " [adr:findings-close-by-mechanism#ratchet-both-ways]" : ""}`, (t) => {
+    if (c.needsDist !== undefined && !existsSync(join(REPO, "barwise", c.needsDist))) {
+      t.skip(`${c.needsDist} not built; run npm run build first`);
+      return;
+    }
+    if (c.needsHistory && skipIfShallow(t)) return;
+    const path = join(REPO, "barwise", FINDING_SOURCE_FILES[source]);
+    const before = readFileSync(path, "utf8");
+    try {
+      const json = JSON.parse(before);
+      json[FINDING_SOURCE_KEYS[source]]["zz-planted-stale-row"] = c.row;
+      writeFileSync(path, JSON.stringify(json, null, 2) + "\n");
+      const r = spawnSync(process.execPath, [join(REPO, "barwise", rt.script), "--check"], {
+        cwd: REPO,
+        encoding: "utf8",
+      });
+      const out = `${r.stdout}${r.stderr}`;
+      // A build that exists but will not load is not the ratchet's verdict.
+      if (c.needsDist !== undefined && /dist not found|Cannot find module/.test(out)) {
+        t.skip("the promptlab build does not load; run npm run build first");
+        return;
+      }
+      assert.equal(r.status, 1, `expected a finding (1), got ${r.status}:\n${out}`);
+      // The stale message names the planted row itself, on one line.
+      assert.match(out, c.output);
+    } finally {
+      writeFileSync(path, before);
+    }
+  });
+}
+
+test("every baseline has a registered ratchet, wired into CI with a stale-row case, or a stated reason [adr:findings-close-by-mechanism#ratchet-in-ci]", async () => {
+  // RATCHETS (scripts/lib/findings.mjs) must cover every baseline the
+  // findings reader reads, so a new audit cannot land with neither check.
+  // A ci line must be a step that can fail CI (the judgement adr-judge
+  // makes for a declared gate), and the npm script it runs must be the
+  // script the stale case runs. An exemption says why, in words.
+  assert.deepEqual(
+    RATCHETS.map((rt) => rt.source).sort(),
+    Object.keys(FINDING_SOURCE_FILES).sort(),
+    "a baseline has no ratchet in RATCHETS, or a ratchet names no baseline",
+  );
+  assert.deepEqual(
+    Object.keys(STALE_CASES).sort(),
+    RATCHETS.map((rt) => rt.source).sort(),
+    "a ratchet has no stale-row case",
+  );
+  const { ciStepOccurrences } = await import("../lib/ci-occurrences.mjs");
+  const { stepGates } = await import("../lib/adr-judge.mjs");
+  const steps = ciStepOccurrences(join(REPO, ".github", "workflows", "ci.yml"));
+  const scripts = JSON.parse(readFileSync(join(REPO, "barwise", "package.json"), "utf8")).scripts;
+  for (const rt of RATCHETS) {
+    assert.ok(
+      (rt.ci === undefined) !== (rt.noCi === undefined),
+      `${rt.source}: a ratchet has a ci line or a noCi reason, exactly one`,
+    );
+    if (rt.noCi !== undefined) {
+      assert.ok(rt.noCi.length > 20, `${rt.source}: an exemption needs its reason`);
+      continue;
+    }
+    assert.ok(
+      steps.some((st) => st.run === rt.ci && stepGates(st)),
+      `${rt.source}: no ci.yml step running "${rt.ci}" can fail CI`,
+    );
+    const name = /^npm run (\S+)/.exec(rt.ci)[1];
+    assert.equal(
+      scripts[name],
+      `node ${rt.script}`,
+      `${rt.source}: ${name} does not run ${rt.script}, the script the stale case runs`,
+    );
+  }
+  for (const [source, c] of Object.entries(STALE_CASES)) {
+    if (!c.testedBy) continue;
+    const [file, title] = c.testedBy;
+    assert.ok(
+      readFileSync(join(REPO, file), "utf8").includes(title),
+      `${source}: its stale-row test "${title}" is not in ${file}`,
+    );
+  }
+});
+
 test("audit-corrections fails on a correction record missing from the baseline [adr:findings-close-by-mechanism#ratchet-both-ways]", () => {
   const dir = correctionRepo({ "probe.spec.md": A_CORRECTION }, {});
   try {
@@ -2817,6 +3319,8 @@ const BASELINE_WRITERS = [
     args: ["--write"],
     file: "barwise/spec-status-baseline.json",
     key: "specs",
+    // It reads history, and refuses a shallow clone (skipIfShallow).
+    needsHistory: true,
     human: ["note"],
     placeholder: "TODO: classify",
     // The one change a rewrite may make to a verdict: reopening it, with the
@@ -2836,6 +3340,7 @@ for (const w of BASELINE_WRITERS) {
       t.skip(`${w.needsDist} not built; run npm run build first`);
       return;
     }
+    if (w.needsHistory && skipIfShallow(t)) return;
 
     const path = join(REPO, w.file);
     const before = readFileSync(path, "utf8");
@@ -2881,6 +3386,33 @@ for (const w of BASELINE_WRITERS) {
     } finally {
       // Restored unconditionally: a failing assertion must not leave the
       // repository's own baseline rewritten.
+      writeFileSync(path, before);
+    }
+  });
+
+  test(`${w.script} writes rows sorted by id and prints the merge summary${w.needsDist === undefined ? " [adr:baselines-merge-on-write#findings-order]" : ""}`, (t) => {
+    if (w.needsDist !== undefined && !existsSync(join(REPO, "barwise", w.needsDist))) {
+      t.skip(`${w.needsDist} not built; run npm run build first`);
+      return;
+    }
+    if (w.needsHistory && skipIfShallow(t)) return;
+    // The order a writer writes, whatever order its baseline held: the
+    // committed rows are reversed first so the input is never already the
+    // answer. The sort itself is the helper's (and, for audit-spec-status,
+    // its detector's too), so removing it fails the corrections and rubric
+    // cases here and the helper's own test.
+    const path = join(REPO, w.file);
+    const before = readFileSync(path, "utf8");
+    try {
+      const json = JSON.parse(before);
+      json[w.key] = Object.fromEntries(Object.entries(json[w.key]).reverse());
+      writeFileSync(path, JSON.stringify(json, null, 2) + "\n");
+      const r = gate(w.script, REPO, ...w.args);
+      assert.equal(r.status, 0, `writer failed:\n${r.stdout}${r.stderr}`);
+      const ids = Object.keys(JSON.parse(readFileSync(path, "utf8"))[w.key]);
+      assert.deepEqual(ids, [...ids].sort(), `${w.file}: the writer left its rows out of id order`);
+      assert.match(r.stdout, /\d+ verdict\(s\) kept/, `${w.script}: no merge summary printed`);
+    } finally {
       writeFileSync(path, before);
     }
   });
@@ -3028,7 +3560,8 @@ test("audit-corrections --write reports a row it dropped rather than dropping it
   }
 });
 
-test("audit-spec-status writes nothing without --write [adr:baselines-merge-on-write#specs-write-on-ask]", () => {
+test("audit-spec-status writes nothing without --write [adr:baselines-merge-on-write#specs-write-on-ask]", (t) => {
+  if (skipIfShallow(t)) return;
   // The write path used to be the `else` of `--check`, so bare
   // `npm run audit:specs` -- the spelling a reader tries first to see what the
   // gate says -- rewrote the baseline and blanked every note. The operator
@@ -3043,6 +3576,150 @@ test("audit-spec-status writes nothing without --write [adr:baselines-merge-on-w
   } finally {
     writeFileSync(path, before);
   }
+});
+
+test("audit-spec-status leaves a stale, unsorted baseline alone unless asked, and rewrites it with --write [adr:baselines-merge-on-write#specs-write-on-ask]", (t) => {
+  if (skipIfShallow(t)) return;
+  // The committed baseline already equals what --write would produce, so a
+  // bare run that wrote identical bytes would pass the test above. Reversing
+  // the rows makes a write visible: a bare run must leave them reversed, and
+  // --write must change them.
+  const path = join(REPO, "barwise/spec-status-baseline.json");
+  const before = readFileSync(path, "utf8");
+  try {
+    const json = JSON.parse(before);
+    json.specs = Object.fromEntries(Object.entries(json.specs).reverse());
+    const scrambled = JSON.stringify(json, null, 2) + "\n";
+    assert.notEqual(scrambled, before, "the fixture must differ from what --write produces");
+    writeFileSync(path, scrambled);
+    const bare = gate("audit-spec-status.mjs", REPO);
+    assert.equal(bare.status, 0, `survey failed:\n${bare.stdout}${bare.stderr}`);
+    assert.equal(readFileSync(path, "utf8"), scrambled, "a bare invocation wrote the baseline");
+    const written = gate("audit-spec-status.mjs", REPO, "--write");
+    assert.equal(written.status, 0, `--write failed:\n${written.stdout}${written.stderr}`);
+    assert.notEqual(readFileSync(path, "utf8"), scrambled, "--write did not write");
+  } finally {
+    writeFileSync(path, before);
+  }
+});
+
+test("audit-duplication --check changes neither its baseline nor the tree [adr:baselines-merge-on-write#duplication-no-writer]", () => {
+  // The text check below sees writeFileSync only; a write through
+  // fs.promises, a stream or a helper module would pass it. Running the gate
+  // shows any write it makes on the run CI makes: the baseline's bytes and
+  // its modification time (a write of identical bytes still moves it), and
+  // the whole tree's git status.
+  const path = join(REPO, "barwise/audit-baseline.json");
+  const status = () =>
+    execFileSync("git", ["status", "--porcelain"], { cwd: REPO, encoding: "utf8" });
+  const bytes = readFileSync(path, "utf8");
+  const mtime = statSync(path).mtimeMs;
+  const statusBefore = status();
+  const r = gate("audit-duplication.mjs", REPO, "--check");
+  // A finding (exit 1) is the gate's business, not this test's; a refusal or
+  // a crash is not a run whose writes mean anything.
+  assert.ok(
+    r.status === 0 || r.status === 1,
+    `audit:duplication --check did not run:\n${r.stdout}${r.stderr}`,
+  );
+  assert.equal(readFileSync(path, "utf8"), bytes, "audit-duplication rewrote its baseline");
+  assert.equal(statSync(path).mtimeMs, mtime, "audit-duplication wrote its baseline (same bytes)");
+  assert.equal(status(), statusBefore, "audit-duplication changed the working tree");
+});
+
+/**
+ * Source without its comments: whole-line `//` comments and block comments
+ * that open a line. A `/*` or `//` inside a string (a glob, a URL) is
+ * left alone, so code after it is never mistaken for a comment.
+ */
+const codeOnly = (src) =>
+  src.replace(/^[ \t]*\/\*[\s\S]*?\*\//gm, "").replace(/^[ \t]*\/\/.*$/gm, "");
+
+/** Every script file under `dir` (relative to the repo root), recursively, tests and fixtures aside. */
+function scriptFiles(dir) {
+  return readdirSync(join(REPO, dir), { withFileTypes: true }).flatMap((e) => {
+    const rel = `${dir}/${e.name}`;
+    if (e.isDirectory()) {
+      return ["tests", "fixtures", "node_modules"].includes(e.name)
+        ? []
+        : scriptFiles(rel);
+    }
+    return /\.(mjs|cjs|js)$/.test(e.name) ? [rel] : [];
+  });
+}
+
+test("every baseline has one registered writer, and each merges through baseline-merge.mjs [adr:baselines-merge-on-write#one-merge-owner]", () => {
+  // The five baselines are the ones scripts/lib/findings.mjs reads, so a new
+  // baseline that lands with a reader but no row here fails. Each writer
+  // reads and merges through the helper, or is declared an exception with
+  // its reason; each helper-using writer is also one BASELINE_WRITERS runs;
+  // and no other script writes a baseline at all.
+  const WRITERS = {
+    "audit-baseline.json": { none: "decision 5: edited by hand" },
+    "correction-baseline.json": { script: "barwise/scripts/audit-corrections.mjs" },
+    "rubric-baseline.json": { script: "barwise/scripts/audit-rubric.mjs" },
+    "spec-status-baseline.json": { script: "barwise/scripts/audit-spec-status.mjs" },
+    "trial-baseline.json": {
+      script: "barwise/trial/lib/gate.mjs",
+      exception: "additive: a run covers some scopes or one tier, and mergeBaselineRows "
+        + "writes only the ids it is given (audit-finding-reader.spec.md, Open decision 4)",
+    },
+  };
+  assert.deepEqual(
+    Object.keys(WRITERS).sort(),
+    Object.values(FINDING_SOURCE_FILES).sort(),
+    "a baseline the findings reader reads has no row in WRITERS, or a row names no baseline",
+  );
+  // The runtime tests above run BASELINE_WRITERS; a writer listed here and
+  // not there would be held to its import and never run.
+  assert.deepEqual(
+    Object.values(WRITERS).filter((w) => w.script && !w.exception).map((w) =>
+      w.script.split("/").pop()
+    ).sort(),
+    BASELINE_WRITERS.map((w) => w.script).sort(),
+    "WRITERS and BASELINE_WRITERS disagree about which writers merge through the helper",
+  );
+  for (const w of Object.values(WRITERS)) {
+    if (w.none) continue;
+    const src = codeOnly(readFileSync(join(REPO, w.script), "utf8"));
+    if (w.exception) {
+      assert.ok(
+        !/baseline-merge\.mjs/.test(src),
+        `${w.script} now imports the helper; drop its exception`,
+      );
+      continue;
+    }
+    // The helper's read and merge, imported by name and called, with no
+    // local stand-in: importing the module for its summary while reading or
+    // merging some other way would pass a check on the import line alone.
+    for (const fn of ["readExistingRows", "mergeBaselineRows"]) {
+      assert.match(
+        src,
+        new RegExp(`import\\s*\\{[^}]*\\b${fn}\\b[^}]*\\}\\s*from "\\./lib/baseline-merge\\.mjs"`),
+        `${w.script} does not import ${fn} from the helper`,
+      );
+      assert.match(src, new RegExp(`\\b${fn}\\(`), `${w.script} never calls ${fn}`);
+      assert.doesNotMatch(
+        src,
+        new RegExp(`\\b(const|let|var|function)\\s+${fn}\\b`),
+        `${w.script} defines its own ${fn}`,
+      );
+    }
+  }
+  // Any other script that names a baseline and writes or moves a file is a
+  // second writer the registry does not know.
+  const registered = new Set(Object.values(WRITERS).flatMap((w) => (w.script ? [w.script] : [])));
+  const WRITE =
+    /\b(writeFileSync|writeFile|writeSync|createWriteStream|appendFileSync|appendFile|renameSync|rename|copyFileSync|copyFile|cpSync)\b/;
+  const strays = [...scriptFiles("barwise/scripts"), ...scriptFiles("barwise/trial/lib")].filter(
+    (rel) => {
+      if (registered.has(rel)) return false;
+      const src = codeOnly(readFileSync(join(REPO, rel), "utf8"));
+      return WRITE.test(src)
+        && (Object.keys(WRITERS).some((b) => src.includes(b)) || /\bBASELINE_PATH\b/.test(src));
+    },
+  );
+  assert.deepEqual(strays, [], "these scripts write a baseline outside the registry");
 });
 
 test("audit-duplication.mjs still has no baseline writer [adr:baselines-merge-on-write#duplication-no-writer]", () => {
@@ -5159,6 +5836,149 @@ test("check-tracker-closes, run as ci:local --commit runs it, fails a close besi
   }
 });
 
+test("audit-rubric refuses when promptlab is not built, never its finding code (barwise-shq) [adr:gate-refusal-contract#refuse-not-find]", () => {
+  // The script finds packages/promptlab/dist relative to itself, so a copy
+  // of scripts/ in an empty root is an unbuilt checkout.
+  const dir = mkdtempSync(join(tmpdir(), "barwise-unbuilt-"));
+  try {
+    for (const f of ["audit-rubric.mjs", join("lib", "baseline-merge.mjs")]) {
+      mkdirSync(dirname(join(dir, "scripts", f)), { recursive: true });
+      writeFileSync(join(dir, "scripts", f), readFileSync(join(SCRIPTS, f)));
+    }
+    const r = spawnSync(process.execPath, [join(dir, "scripts", "audit-rubric.mjs"), "--check"], {
+      cwd: dir,
+      encoding: "utf8",
+    });
+    assert.equal(r.status, 2, r.stdout + r.stderr);
+    assert.match(r.stderr, /dist not found/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("check-depcruise-gate refuses when dependency-cruiser cannot run, never a stack trace (barwise-shq) [adr:gate-refusal-contract#refuse-not-find]", () => {
+  // A PATH with no npx: the probe's depcruise call cannot start, and the
+  // gate used to hand the missing output to JSON.parse and exit 1.
+  const dir = mkdtempSync(join(tmpdir(), "barwise-nonpx-"));
+  try {
+    const r = spawnSync(process.execPath, [join(SCRIPTS, "check-depcruise-gate.mjs")], {
+      cwd: REPO,
+      encoding: "utf8",
+      env: { ...process.env, PATH: dir },
+    });
+    assert.equal(r.status, 2, r.stdout + r.stderr);
+    assert.match(r.stderr, /cannot answer/);
+    assert.doesNotMatch(r.stderr, /at .*\.mjs:\d+/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("depcruise exits by its violation count, never by the 8-bit exit code (barwise-vt2) [adr:gate-refusal-contract#three-results]", async () => {
+  // dependency-cruiser exits with its violation count, which the OS keeps
+  // mod 256: two violations read as a refusal, 256 as a pass.
+  const { exitFor } = await import(pathToFileURL(join(SCRIPTS, "run-depcruise.mjs")).href);
+  assert.equal(exitFor({ summary: { error: 0, warn: 3 } }), 0);
+  assert.equal(exitFor({ summary: { error: 1 } }), 1);
+  assert.equal(exitFor({ summary: { error: 2 } }), 1);
+  assert.equal(exitFor({ summary: { error: 256 } }), 1);
+  assert.equal(exitFor({ summary: {} }), 2);
+  assert.equal(exitFor(undefined), 2);
+  // The real tree is CI's own depcruise step, not this unit test's.
+});
+
+test("check-depcruise-gate never writes its probe into the tree (barwise-w43) [adr:gate-refusal-contract#no-writes]", async () => {
+  // The probe used to live in packages/core/src for the length of a
+  // depcruise run, removed in a finally: a killed run left it there, and
+  // git status after the run could not see it. Polled while the gate
+  // runs, so a write undone before exit is still seen.
+  const probe = join(REPO, "barwise", "packages", "core", "src", "__depcruise-gate-probe__.ts");
+  const child = spawn(process.execPath, [join(SCRIPTS, "check-depcruise-gate.mjs")], {
+    cwd: REPO,
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  let out = "";
+  child.stdout.on("data", (d) => (out += d));
+  child.stderr.on("data", (d) => (out += d));
+  let seen = false;
+  const poll = setInterval(() => {
+    if (existsSync(probe)) seen = true;
+  }, 10);
+  const code = await new Promise((res) => child.on("close", res));
+  clearInterval(poll);
+  assert.equal(seen, false, "the probe appeared in packages/core/src during the run");
+  assert.equal(code, 0, out);
+  assert.match(out, /probe violation reported/);
+});
+
+test("check-tracker-closes refuses when git answers emptily, with and without BASE_SHA (barwise-ydl) [adr:gate-refusal-contract#refuse-not-find]", () => {
+  // The fault matrix's git-empty axis read a FALSE GREEN here: an empty
+  // merge-base became base "", and an empty `git show` of the tracker a
+  // tracker with no issues, so nothing could be closed and the gate said
+  // OK. With BASE_SHA set, as CI sets it, the empty tracker read alone
+  // gave the same answer.
+  const dir = mkdtempSync(join(tmpdir(), "barwise-nogit-"));
+  try {
+    const stub = join(dir, "git");
+    writeFileSync(stub, "#!/bin/sh\nexit 0\n");
+    chmodSync(stub, 0o755);
+    for (const baseSha of ["", "0123456789abcdef0123456789abcdef01234567"]) {
+      const r = spawnSync(process.execPath, [join(SCRIPTS, "check-tracker-closes.mjs")], {
+        cwd: REPO,
+        encoding: "utf8",
+        env: { ...process.env, BASE_SHA: baseSha, PATH: `${dir}:${process.env.PATH ?? ""}` },
+      });
+      assert.equal(r.status, 2, `BASE_SHA=${JSON.stringify(baseSha)}: ${r.stdout}${r.stderr}`);
+      assert.doesNotMatch(r.stdout, /OK/);
+      // Which refusal fired: the empty merge-base without BASE_SHA, the
+      // empty tracker read with it.
+      assert.match(
+        r.stderr,
+        baseSha ? /git show of .* printed nothing/ : /merge-base printed nothing/,
+      );
+    }
+    // Only merge-base empty, every other call real: the base "" would make
+    // `git show :<tracker>` read the index, which is not empty, so the
+    // empty-tracker refusal cannot stand in for the empty-base one.
+    const realGit = execFileSync("sh", ["-c", "command -v git"], { encoding: "utf8" }).trim();
+    writeFileSync(
+      stub,
+      `#!/bin/sh\nif [ "$1" = merge-base ]; then exit 0; fi\nexec "${realGit}" "$@"\n`,
+    );
+    const r = spawnSync(process.execPath, [join(SCRIPTS, "check-tracker-closes.mjs")], {
+      cwd: REPO,
+      encoding: "utf8",
+      env: { ...process.env, BASE_SHA: "", PATH: `${dir}:${process.env.PATH ?? ""}` },
+    });
+    assert.equal(r.status, 2, `merge-base empty only: ${r.stdout}${r.stderr}`);
+    assert.match(r.stderr, /merge-base printed nothing/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("check-tracker-closes refuses a close when git diff answers emptily (barwise-ydl) [adr:gate-refusal-contract#refuse-not-find]", () => {
+  const r = trackerRepo();
+  const shim = mkdtempSync(join(tmpdir(), "barwise-nodiff-"));
+  try {
+    r.issues([["a", "closed"], ["b", "open"]]);
+    writeFileSync(join(r.dir, "src.ts"), "export const x = 2;\n");
+    r.commit("close a beside code");
+    const realGit = execFileSync("sh", ["-c", "command -v git"], { encoding: "utf8" }).trim();
+    writeFileSync(
+      join(shim, "git"),
+      `#!/bin/sh\nif [ "$1" = diff ]; then exit 0; fi\nexec "${realGit}" "$@"\n`,
+    );
+    chmodSync(join(shim, "git"), 0o755);
+    const out = r.run({ BASE_SHA: r.base, PATH: `${shim}:${process.env.PATH ?? ""}` });
+    assert.equal(out.status, 2, out.stdout + out.stderr);
+    assert.match(out.stderr, /does not name/);
+  } finally {
+    rmSync(r.dir, { recursive: true, force: true });
+    rmSync(shim, { recursive: true, force: true });
+  }
+});
+
 test("check-tracker-closes refuses with no base rather than reporting clean", () => {
   const r = trackerRepo();
   try {
@@ -6540,6 +7360,7 @@ function architectureRepo() {
   const copy = (rel) => stage(dir, rel, readFileSync(join(REPO, rel), "utf8"));
   copy("CLAUDE.md");
   copy("barwise/scripts/lib/intended.cjs");
+  copy(EXTERNAL_CJS);
   copy("barwise/docs/ARCHITECTURE.md");
   // The tracked ADRs only: the copied ARCHITECTURE.md indexes those, and
   // an untracked draft in this checkout would otherwise read as "stale".
@@ -6633,6 +7454,7 @@ const MCP_ROW =
   "  |--- @barwise/mcp             (core, diagram, diagram-ui, llm, code-analysis, dbt, formats, learn)";
 const CORE_PKG = "barwise/packages/core/package.json";
 const INTENDED_CJS = "barwise/scripts/lib/intended.cjs";
+const EXTERNAL_CJS = "barwise/scripts/lib/external-deps.cjs";
 
 /** Each planted disagreement: file, anchor, replacement, the line it must report. */
 const ARCH_DISAGREEMENTS = [
@@ -6640,8 +7462,8 @@ const ARCH_DISAGREEMENTS = [
   // as its comment, so the new edge is compared, not refused.
   [
     "CLAUDE.md",
-    "@barwise/dbt             (core)",
-    "@barwise/dbt             (core, llm)",
+    "@barwise/dbt             (core, formats)",
+    "@barwise/dbt             (core, formats, llm)",
     /CLAUDE\.md draws dbt -> llm, INTENDED does not/,
   ],
   // Both directions of an edge disagreement.
@@ -6741,6 +7563,40 @@ const ARCH_DISAGREEMENTS = [
     `"dependencies": {`,
     `"optionalDependencies": { "barwise-vscode": "*" },\n  "dependencies": {`,
     /packages\/core: optionalDependencies has barwise-vscode/,
+  ],
+  // Core's external runtime dependencies are its list, both ways
+  // (package-graph-authority#core-external-deps): an unlisted one, in a
+  // field other than dependencies too, and a listed one core dropped.
+  [
+    CORE_PKG,
+    `"dependencies": {`,
+    `"dependencies": {\n    "z3-solver": "^4.13.0",`,
+    /packages\/core: dependencies has z3-solver, external-deps\.cjs does not list it/,
+  ],
+  [
+    CORE_PKG,
+    `"dependencies": {`,
+    `"optionalDependencies": { "z3-solver": "^4.13.0" },\n  "dependencies": {`,
+    /packages\/core: optionalDependencies has z3-solver/,
+  ],
+  [
+    EXTERNAL_CJS,
+    `[${EXTERNAL.core.map((d) => JSON.stringify(d)).join(", ")}]`,
+    `[${[...EXTERNAL.core, "lodash"].map((d) => JSON.stringify(d)).join(", ")}]`,
+    /external-deps\.cjs lists lodash for core, which its manifest does not declare/,
+  ],
+  [
+    EXTERNAL_CJS,
+    `"core":`,
+    `"ghost": [],\n  "core":`,
+    /external-deps\.cjs lists ghost, which is not a package under packages\//,
+  ],
+  // A listed name that installs something else.
+  [
+    CORE_PKG,
+    `"yaml": "^`,
+    `"yaml": "npm:z3-solver@^`,
+    /packages\/core: dependencies has yaml as "npm:z3-solver@\^/,
   ],
 ];
 
@@ -6867,6 +7723,22 @@ test("check:architecture cannot answer when an input is unreadable or misshapen"
     // Valid JSON of the wrong shape: read on, each would crash with exit 1
     // or skip a field whose keys are array indices.
     refused(archPlanted(dir, CORE_PKG, () => "null\n"), core);
+    // The external-deps list, misshapen, is a refusal too.
+    // An empty list, one without core, or a name listed twice would check
+    // less than it says, so each is refused rather than read as clean.
+    for (
+      const body of [
+        'module.exports = { core: "ajv" };\n',
+        "module.exports = {};\n",
+        "module.exports = { learn: [] };\n",
+        'module.exports = { core: ["ajv", "ajv"] };\n',
+      ]
+    ) {
+      refused(
+        archPlanted(dir, EXTERNAL_CJS, () => body),
+        /external-deps\.cjs does not export a map of package to dependency list/,
+      );
+    }
     refused(
       archPlanted(dir, CORE_PKG, (s) => s.replace(`"name": "@barwise/core"`, `"name": 5`)),
       core,
@@ -6988,11 +7860,11 @@ test("check:architecture cannot answer when an input is unreadable or misshapen"
       "CLAUDE.md",
       (s) =>
         s.replace(
-          "(core)  -- connector package: registers\n  |                                        the dbt",
-          "(core)  \u2014 connector package: registers\n  |                                        the dbt",
+          "(core, formats)  -- connector package:\n  |                                        registers the dbt",
+          "(core, formats)  \u2014 connector package:\n  |                                        registers the dbt",
         ),
     );
-    refused(dash, /\(core\)  \u2014 connector package/);
+    refused(dash, /\(core, formats\)  \u2014 connector package/);
     assert.doesNotMatch(dash.stderr, /must start right of column/);
     // Nor is a misdrawn or nested connector there.
     for (

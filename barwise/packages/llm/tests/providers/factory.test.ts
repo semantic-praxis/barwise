@@ -1,11 +1,61 @@
 /**
  * Tests for the provider factory and auto-detection logic.
  */
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AnthropicLlmClient } from "../../src/providers/anthropic.js";
-import { createLlmClient, detectProvider } from "../../src/providers/factory.js";
+import { createLlmClient, detectProvider, PROVIDER_NAMES } from "../../src/providers/factory.js";
 import { OllamaLlmClient } from "../../src/providers/ollama.js";
 import { OpenAILlmClient } from "../../src/providers/openai.js";
+
+/**
+ * The key each SDK constructor received, by SDK. Both providers load their
+ * SDK lazily, on the first completion, so the mocks record the constructor
+ * argument and then refuse the request: construction is the observation, and
+ * no network call is ever made. The other tests here only construct clients,
+ * which never reaches either SDK, so the mocks change nothing for them.
+ */
+const sdkKeys = vi.hoisted(() => new Map<string, string | undefined>());
+const SDK_REACHED = "sdk constructed; request refused by the test";
+
+vi.mock("@anthropic-ai/sdk", () => ({
+  default: class MockAnthropic {
+    messages = {
+      stream: () => ({ finalMessage: () => Promise.reject(new Error(SDK_REACHED)) }),
+      create: () => Promise.reject(new Error(SDK_REACHED)),
+    };
+    constructor(options?: { apiKey?: string; }) {
+      sdkKeys.set("anthropic", options?.apiKey);
+    }
+  },
+}));
+
+vi.mock("openai", () => ({
+  default: class MockOpenAI {
+    chat = { completions: { create: () => Promise.reject(new Error(SDK_REACHED)) } };
+    constructor(options?: { apiKey?: string; }) {
+      sdkKeys.set("openai", options?.apiKey);
+    }
+  },
+}));
+
+describe("the library takes its key from the caller", () => {
+  it("names exactly anthropic, openai and ollama as providers [adr:keyless-model-access#library-takes-key]", () => {
+    // A new provider fails here until the key-handing check below covers it
+    // (or it is shown to take no key, as ollama does).
+    expect([...PROVIDER_NAMES]).toEqual(["anthropic", "openai", "ollama"]);
+  });
+
+  for (const provider of ["anthropic", "openai"] as const) {
+    it(`hands apiKey to the ${provider} SDK constructor [adr:keyless-model-access#library-takes-key]`, async () => {
+      sdkKeys.clear();
+      const client = createLlmClient({ provider, apiKey: "test-key-123" });
+      await expect(client.complete({ systemPrompt: "S", userMessage: "U" }))
+        .rejects.toThrow(SDK_REACHED);
+      expect(sdkKeys.has(provider)).toBe(true);
+      expect(sdkKeys.get(provider)).toBe("test-key-123");
+    });
+  }
+});
 
 describe("createLlmClient", () => {
   it("creates AnthropicLlmClient when provider is 'anthropic'", () => {

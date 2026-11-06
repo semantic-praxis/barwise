@@ -15,7 +15,8 @@
  */
 
 import type { ImportFormat, ImportOptions, ImportResult, OrmModel } from "@barwise/core";
-import { parseSqlFile, type SqlDialect } from "@barwise/core/sql";
+import type { SqlDialect } from "@barwise/core/sql";
+import { parseSqlPatterns } from "@barwise/formats";
 import { readFileSync, statSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
 import { type DbtDialectOptions, detectDbtDialect } from "./DbtDialectDetector.js";
@@ -24,7 +25,6 @@ import { mergeSqlPatterns, type MinedSqlFile } from "./dbtMapping/sqlPatterns.js
 import { importDbtProject } from "./DbtProjectImporter.js";
 import { compileDbtSql } from "./DbtSqlCompiler.js";
 import { findProjectFiles } from "./projectWalk.js";
-import { normalizeCascadeResult, parseSqlWithSqlglot } from "./sql/SqlglotBridge.js";
 
 function findYamlFiles(dir: string): string[] {
   return findProjectFiles(dir, (name) => /\.ya?ml$/i.test(name));
@@ -168,8 +168,7 @@ export class DbtImportFormat implements ImportFormat {
       let totalPatterns = 0;
       let sqlglotFiles = 0;
       for (const file of compiledFiles) {
-        const result = parseSqlWithSqlglot(file.sql, file.sourcePath, dialect)
-          ?? normalizeCascadeResult(parseSqlFile(file.sql, file.sourcePath, dialect));
+        const result = parseSqlPatterns(file.sql, file.sourcePath, dialect);
         if (result.statements.some((s) => s.parseLevel === "sqlglot")) {
           sqlglotFiles += 1;
         }

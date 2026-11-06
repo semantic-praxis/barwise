@@ -8,8 +8,7 @@ docs/specs/tiered-pr-review.spec.md, docs/specs/review-md.spec.md,
 docs/specs/review-routing.spec.md
 Enforced-by: tests (copilot-requested, tier-informs),
 none (barwise-ym8.7y6: copilot-requested), none (barwise-ym8.8ya: copilot-never-blocks),
-none (barwise-ym8.f9u: review-md-owns-lanes), none (barwise-ym8.ehz: tier-informs),
-none (barwise-ym8.gwj: prevent-upstream)
+none (barwise-ym8.f9u: review-md-owns-lanes), none (barwise-ym8.ehz: tier-informs)
 
 ## Context
 
@@ -38,26 +37,31 @@ condition, is a separate decision (`steward` section 4b).
 2. **Nothing blocks a merge on Copilot.**{#copilot-never-blocks} A refusal from an exhausted
    quota is not a review and not a blocker: work carries on without it,
    and the workflow asks again on the next push.
-3. **`REVIEW.md` owns which review lane runs when.**{#review-md-owns-lanes} CI on every push
-   to `main` and every pull request into it;
-   `/code-review` by the author before opening; `/security-review`
-   before opening when the diff meets a trigger REVIEW.md lists;
-   `/pr-review`, which runs `/code-review` itself, on the head being
-   merged; the Claude Code Review service on every pull request once an
-   Owner enables it. A review does not report what CI enforces.
+3. **`REVIEW.md`'s lane table names every review lane and its trigger,
+   and the CI lane's triggers match `ci.yml`.**{#review-md-owns-lanes}
+   The merge lane's timing is
+   `merge-delegation.md#review-before-merge`.
 4. **The tier is information, and routing orders rather than filters.**{#tier-informs}
    `npm run pr:risk` prints the tier, the checklist groups and the
    REVIEW.md failure modes a diff triggers, with the files. Author and
    reviewer run every group it lists, every group no path can detect,
    and every failure mode, and the reviewer says which ran. Nothing
    fails on the tier or the routing.
-5. **What reviews keep finding is prevented upstream.**{#prevent-upstream} Copilot's
-   findings are classified by failure mode and the most common one gets
-   a mechanism in front of review; REVIEW.md's "Always check" list,
-   drawn from a month of all reviews' findings, ranks the modes every
-   review runs.
 
 ## Consequences
+
+- Decision 3 was restated on 2026-11-06 (`adr-refactor.spec.md`, row
+  16) to what a check can read. What it listed stays true as practice:
+  CI runs on every push to `main` and every pull request into it;
+  `/code-review` by the author before opening; `/security-review`
+  before opening when the diff meets a trigger REVIEW.md lists;
+  `/pr-review`, which runs `/code-review` itself, on the head being
+  merged; the Claude Code Review service on every pull request once an
+  Owner enables it. A review does not report what CI enforces, which is
+  judgment and audit material, not a gate. `REVIEW.md`'s CI row says
+  "Every push", which the restated decision makes a violation; the
+  pull request that lands its gate corrects the row, so the gate's
+  first run is seen to find it.
 
 - `npm run check:review-tiers` (a `ci.yml` step with no `if:` guard)
   keeps the routing table in step. It fails on a checklist heading or
@@ -94,9 +98,13 @@ condition, is a separate decision (`steward` section 4b).
   that its groups were run (barwise-953). Printing the routing in CI was
   deferred by the owner on 2026-10-24 until reviewers are shown to use
   it (`review-routing.spec.md`, WS3; barwise-6mf).
-- `review-policy.md#prevent-upstream` has no gate. The classification
-  has had its seed pass and
-  first mechanism; the pass that measures that mechanism is open
+- What reviews keep finding is prevented upstream: Copilot's findings
+  are classified by failure mode and the most common one gets a mechanism
+  in front of review; REVIEW.md's "Always check" list, drawn from a month
+  of all reviews' findings, ranks the modes every review runs. This is a
+  practice, not a rule a check can hold; it was decision 5 until
+  2026-11-06 (`adr-refactor.spec.md`, row 25). The classification has had
+  its seed pass and first mechanism; the pass that measures that mechanism is open
   (barwise-1050) and has no new Copilot findings to read while the
   request is paused (barwise-ilb). No reviewer is scored against real
   defects (barwise-nm8).

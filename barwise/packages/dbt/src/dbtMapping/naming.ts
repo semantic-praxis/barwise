@@ -3,7 +3,7 @@
  */
 
 import type { DataTypeDef } from "@barwise/core";
-import { parseSqlDataType } from "@barwise/core/sql";
+import { parseSqlDataType } from "@barwise/formats";
 
 // ---------------------------------------------------------------------------
 // Data type resolution

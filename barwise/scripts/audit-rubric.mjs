@@ -30,7 +30,7 @@
  * constraint class deleted; a subtler wrong-reason pass would not be.
  */
 import { createHash } from "node:crypto";
-import { readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { mergeBaselineRows, mergeSummary, readExistingRows } from "./lib/baseline-merge.mjs";
@@ -44,9 +44,19 @@ const ROOT = resolve(here, "..");
 let promptlab;
 try {
   promptlab = await import(resolve(ROOT, "packages/promptlab/dist/index.js"));
-} catch {
-  console.error("error: packages/promptlab/dist not found; run 'npm run build' first");
-  process.exit(1);
+} catch (err) {
+  // Could not answer, not a finding: exit 2 (gate-refusal-contract,
+  // barwise-shq). "not found" only when it is missing; a build that is
+  // there and will not load says why. The stale-row test skips on either.
+  const dist = resolve(ROOT, "packages/promptlab/dist/index.js");
+  console.error(
+    existsSync(dist)
+      ? `audit-rubric: cannot answer -- ${dist} will not load: ${
+        err instanceof Error ? err.message : err
+      }`
+      : "audit-rubric: cannot answer -- packages/promptlab/dist not found; run 'npm run build' first",
+  );
+  process.exit(2);
 }
 const { defaultSuitePath, loadSuite, scoreExtraction } = promptlab;
 const KEYS = resolve(ROOT, "packages/promptlab/tests/fixtures/responses");

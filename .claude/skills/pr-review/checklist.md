@@ -135,9 +135,9 @@ here, and none of them fails a build today.
 - **A result whose fields depend on a flag is a union, not a record
   with optionals.** `{ success: boolean; ast?: ...; error?: string }`
   makes every reader test the flag and then the field, and lets a
-  success carry no `ast`. `CalciteParseResponse` (`sql/types.ts`) has
-  that shape, and `MergeValidationResult` (`diff/ModelMerge.ts`) pairs
-  `isValid: boolean` with `model: OrmModel | null`, so
+  success carry no `ast`. `MergeValidationResult` (`diff/ModelMerge.ts`)
+  has that shape: it pairs `isValid: boolean` with
+  `model: OrmModel | null`, so
   `cli/src/commands/merge.ts` checks both for one fact. `MigrationPlan` (`schemaVersion.ts`) is
   the shape to copy: `ok: true` carries `steps`, `ok: false` carries
   `reason`, and neither arm is optional. Authority: root `CLAUDE.md`,
@@ -397,7 +397,12 @@ now holds, guards, or learns that they did not have to.
 
 - Every execution is `uv run --frozen [--only-group <g>]` from a cwd
   under `barwise/`; no bare `python3`, `pip`, `--with`, `--isolated`,
-  or PEP 723 metadata. Authority: root `CLAUDE.md` conventions.
+  or PEP 723 metadata. An optional tier is a dependency group in
+  `barwise/pyproject.toml`, and a one-off is a script in the repo run
+  `--frozen`, not one kept elsewhere or given its own requirements. A
+  second manifest is refused by `check:python-uv`; a version pinned by
+  another route (a script that reads its own requirements) is not.
+  Authority: root `CLAUDE.md` conventions.
 
 ## When a skill, agent brief, CLAUDE.md, AGENTS.md, or prompt artifact changed
 

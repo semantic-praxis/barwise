@@ -12,15 +12,19 @@ This package depends on `@barwise/core` for model types, the
 `ImportFormat` / `ExportFormatAdapter` interfaces, the format registry,
 the relational mapping (`RelationalMapper`), the export annotation
 collector and comment helpers (`@barwise/core/annotation`), and the SQL
-cascade parser (`parseSqlFile`). It owns the dbt renderer (`render/`). It does NOT
-depend on any editor or tool package.
+dialect types (`@barwise/core/sql`). It depends on `@barwise/formats` for
+the SQL pattern cascade (`parseSqlPatterns`) and `parseSqlDataType`: dbt
+composes the SQL format rather than keeping its own copy of the parser
+or the sqlglot bridge (docs/adr/must-agree-copies.md#share-by-composition).
+It owns the dbt renderer (`render/`). It does NOT depend on any editor or
+tool package.
 
-Allowed runtime dependencies: `@barwise/core`, `yaml`. No others without
-discussion. The package uses `node:fs` for project discovery and
-`node:child_process` for `dbt compile` (via `DbtSqlCompiler`) and for
-the optional sqlglot sidecar (via `sql/SqlglotBridge`; SQL mining
-degrades to core's pure regex tier when python3 or sqlglot is absent --
-the same optional-python posture as `@barwise/formats`).
+Allowed runtime dependencies: `@barwise/core`, `@barwise/formats`, `yaml`.
+No others without discussion. The package uses `node:fs` for project
+discovery and `node:child_process` for `dbt compile` (via
+`DbtSqlCompiler`). The optional sqlglot sidecar runs inside formats'
+`parseSqlPatterns`, which falls back to the regex tier when uv or sqlglot
+is absent.
 
 ## Package Layout
 
@@ -47,9 +51,6 @@ src/
                          importer so neither depends on the other
   render/DbtExportAnnotator.ts  Writes the export's barwise notes into
                          the rendered schema.yml
-  sql/SqlglotBridge.ts   Optional sqlglot sidecar for SQL mining (parallel
-                         to formats' bridge by design; connectors own
-                         their subprocess I/O)
   dbtMapping/columnTypes.ts  Column decisions shared by the key and non-key
                          paths: data type, description, and which value
                          type a column plays (claimValueType); callers
@@ -88,6 +89,7 @@ Lint is run from the repo root: `npm run lint`.
 
 ## Dependencies
 
-| Direction | Package         | What is used                                                                 |
-| --------- | --------------- | ---------------------------------------------------------------------------- |
-| Upstream  | `@barwise/core` | Model types, ImportFormat/ExportFormatAdapter, registry, mapping, annotation |
+| Direction | Package            | What is used                                                                 |
+| --------- | ------------------ | ---------------------------------------------------------------------------- |
+| Upstream  | `@barwise/core`    | Model types, ImportFormat/ExportFormatAdapter, registry, mapping, annotation |
+| Upstream  | `@barwise/formats` | `parseSqlPatterns`, `parseSqlDataType`                                       |

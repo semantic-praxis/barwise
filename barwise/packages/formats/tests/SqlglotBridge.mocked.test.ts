@@ -12,12 +12,13 @@
  * `execFileSync` call with a fixed 10s timeout (SqlglotBridge.ts), and
  * a full monorepo `turbo run test:coverage` competes for CPU with 11
  * other packages' builds/tests -- enough contention pushes that probe
- * past 10s, `sqlglotAvailable()` caches `false`, and seven functions in
- * this file (the sidecar's parse/normalize/rewrite paths) go uncovered
- * for the rest of the process. That is precisely the 89.39% (warm,
- * idle machine) vs. 84.09% (contended, full-monorepo run) function
- * coverage split this file exists to close: every branch here runs the
- * same way regardless of machine load or what is installed on PATH.
+ * past 10s, `sqlglotAvailable()` caches `false`, and the sidecar's
+ * parse/normalize/rewrite paths go uncovered for the rest of the
+ * process. That gap was measured on @barwise/dbt's copy of the bridge
+ * (89.39% functions on an idle machine, 84.09% under the full-monorepo
+ * run); the copy is gone and this file moved here with the one bridge
+ * (format-renderers-to-connectors.spec.md, WS3). Every branch here runs
+ * the same way regardless of machine load or what is installed on PATH.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -30,7 +31,7 @@ vi.mock("node:child_process", () => ({
 /** Re-import the module fresh so its `availability` cache starts empty. */
 async function freshBridge() {
   vi.resetModules();
-  return import("../../src/sql/SqlglotBridge.js");
+  return import("../src/sql/SqlglotBridge.js");
 }
 
 /** The `-c <code>` argument of an execFileSync(uv, argv, ...) invocation. */

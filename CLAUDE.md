@@ -162,12 +162,12 @@ working in a package:
   |--- @barwise/code-analysis   (core)  -- connector package: registers
   |                                        code importers into the
   |                                        FormatDescriptor registry
-  |--- @barwise/dbt             (core)  -- connector package: registers
-  |                                        the dbt importer/exporter; owns
-  |                                        its fs + subprocess I/O
   |--- @barwise/formats         (core)  -- connector package: registers
   |                                        the standard DDL/OpenAPI/Avro/
   |                                        NORMA/SQL/Ossie descriptors
+  |--- @barwise/dbt             (core, formats)  -- connector package:
+  |                                        registers the dbt importer/exporter;
+  |                                        composes formats' SQL parser
   |--- @barwise/learn           (core)  -- learning artifacts: the modeling
   |                                        gym (exercise format, deterministic
   |                                        evaluator, miss-card emission) and
@@ -217,7 +217,7 @@ across all 12 packages.
 The surfaces do **not** all expose the same capabilities. Consult this
 before assuming one is reachable from the surface you are working on.
 An unmarked gap is a bug, and a change to a surface's reach updates this
-table in the same commit. A VS Code "yes" means a palette command or a
+table in the same pull request. A VS Code "yes" means a palette command or a
 language-model tool (the latter gated by `barwise.enableMcpServer`,
 default on). The rules, what is pinned and what is not checked are in
 `docs/adr/surface-capability-parity.md`.
@@ -255,9 +255,12 @@ added since, and the owner chose on 2026-11-05 to mirror it.
 
 The MCP and VS Code tool lists are pinned by `toEqual` tests
 (`mcp/tests/serverSpawn.test.ts`, `vscode/tests/unit/toolRegistration.test.ts`),
-so adding a tool means updating that list and this table; the table
-itself is maintained by hand, and nothing compares it with the code
-(barwise-1005, barwise-xpt).
+so adding a tool means updating that list and this table.
+`npm run check:capability-matrix` compares each row with what the CLI,
+the MCP server and the extension register, through
+`barwise/scripts/lib/capability-map.json`, which names what carries each
+row on each surface; a new row or a new registration goes in both
+(`docs/specs/capability-matrix-check.spec.md`).
 
 The `--artifacts` row hides a boundary within the CLI: `prompt eval`,
 `prompt artifact` and `prompt run` accept unshipped prompt candidates;
@@ -440,16 +443,16 @@ skill (`.claude/skills/release/`).
   pass, 1 a finding, 2 could not answer; a refusal never uses the
   finding code (`docs/adr/gate-refusal-contract.md`).
   `npm run fault-matrix` measures it, on demand.
-- **A leaked credential is rotated, never reverted.** Detection is
-  gitleaks' -- `npm run check:secrets -- --staged` at pre-commit, the
-  full history in CI -- and `.gitleaks.toml` takes no rule beyond the
-  one for Anthropic keys (`docs/adr/credential-handling.md`).
+- **Credential detection is gitleaks'.** `npm run check:secrets --
+  --staged` at pre-commit, the full history in CI, and `.gitleaks.toml`
+  takes no rule beyond the one for Anthropic keys; a real finding is
+  remedied by rotating the key, since a revert does not undo a leak
+  (`docs/adr/credential-handling.md`).
 - **A key has nowhere to be written down.** `--api-key` is refused on
   every command and the VS Code key lives in secret storage; VS Code's
   default path needs no key, nor does the MCP server's where the client
-  advertises sampling; the measurement lane is the one lane that holds
-  one, workspace-scoped with a spend limit
-  (`docs/adr/keyless-model-access.md`).
+  advertises sampling; only `@barwise/llm` reads a model key, for the
+  measurement lane (`docs/adr/keyless-model-access.md`).
 - ESLint config is shared at the repo root (`barwise/eslint.config.mjs`).
 - Turborepo (`barwise/turbo.json`) orchestrates build/test/lint with
   correct dependency ordering.

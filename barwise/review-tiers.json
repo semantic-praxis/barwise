@@ -127,7 +127,8 @@
         "barwise/optimizer/",
         "barwise/pyproject.toml",
         "barwise/uv.lock",
-        ".python-version"
+        ".python-version",
+        "barwise/.python-version"
       ],
       "why": "dev-time only and never a runtime dependency (root CLAUDE.md); check:python-uv holds the lockfile discipline"
     },
@@ -241,8 +242,7 @@
       "globs": [
         "barwise/packages/core/src/sql/",
         "barwise/packages/formats/src/sql/",
-        "barwise/packages/formats/src/ddl/",
-        "barwise/packages/dbt/src/sql/"
+        "barwise/packages/formats/src/ddl/"
       ],
       "why": "SQL and identifier handling (REVIEW.md failure mode 6)"
     },

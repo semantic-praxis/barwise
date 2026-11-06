@@ -17,8 +17,8 @@ module.exports = {
   "diagram-ui": ["diagram"],
   "llm": ["core"],
   "code-analysis": ["core"],
-  "dbt": ["core"],
   "formats": ["core"],
+  "dbt": ["core", "formats"],
   "learn": ["core"],
   "promptlab": ["core", "llm", "learn"],
   "cli": [

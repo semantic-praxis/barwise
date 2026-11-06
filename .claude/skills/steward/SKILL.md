@@ -146,25 +146,33 @@ correctness engine, has recommended `merge` on the exact head being
 merged. This is the one permission rule in this file, because it is a
 delegation the owner made for this repo, which no generic rule can know.
 
-- **Review the current head, then merge that SHA.** Run the `pr-review`
-  skill, delivered in the session. On `merge`, merge with the reviewed
-  SHA pinned (the GitHub MCP merge's `expectedHeadSha`, or `gh pr
-  merge --match-head-commit`), so a commit pushed after the review is
-  refused rather than merged; once merged, post one PR comment naming
-  the SHA and the recommendation. On anything else, fix what it lists,
+- **Review the current head, post the verdict, then merge that SHA.**
+  Run the `pr-review` skill, and before merging post its verdict as a PR
+  comment whose first line names the head SHA and the verdict
+  (`pr-review` section 6). On `merge`, merge with the reviewed SHA
+  pinned (the GitHub MCP merge's `expectedHeadSha`, or `gh pr merge
+  --match-head-commit`), so a commit pushed after the review is refused
+  rather than merged, and put `Reviewed-head: <sha>` and `Review: merge`
+  in the merge commit's message. On anything else, fix what it lists,
   push, and review the new head. Any push needs a new review.
-- **Ask the owner instead** when the review cannot tell, when
-  `/code-review` could not run, when the PR body leaves the owner a
-  decision they have not answered, or after two reviews of this PR that
-  did not recommend `merge` -- a fresh review always finds something to
-  say, and chasing it ran 28 rounds on one PR (barwise-q93). The owner's
-  answer decides, and resets the count.
+- **Ask the owner instead** when the verdict is `cannot tell` or
+  `code-review unavailable`, when the PR body leaves the owner a
+  decision they have not answered, or after two verdicts on this PR
+  other than `merge` -- a fresh review always finds something to say,
+  and chasing it ran 28 rounds on one PR (barwise-q93). Post the owner's
+  answer as a PR comment starting `Owner-answer:` and quoting it; the
+  answer decides, and only verdicts after it count.
 - **The owner's instruction overrides this.** The rule is a condition
-  on a delegation; when the owner says to merge a PR, merge it.
+  on a delegation; when the owner says to merge a PR, merge it, with
+  `Owner-directed: <the instruction, quoted>` in the merge commit's
+  message in place of the review trailers.
 - **No exemption by size.** Tracker-only and docs-only PRs, including
-  section 5's follow-up, get the review too; PR #679 only closed two
-  issues and merged without it, which is how this rule came to be
-  written down. Nothing mechanical enforces it yet (barwise-zdd).
+  section 5's follow-up, get the verdict comment and the trailers too;
+  PR #679 only closed two issues and merged without a review, which is
+  how this rule came to be written down. Nothing mechanical enforces it
+  yet: the gate that reads the trailers is `adr-refactor.spec.md`'s
+  batch 10 (barwise-zdd). The rule is
+  `docs/adr/merge-delegation.md`.
 
 ## 5. After the PR merges
 

@@ -4,9 +4,7 @@ Scope: architecture
 Date: 2026-10-17
 Tracking: barwise-5t9 (+ children), docs/NORMA_VS_ORM_YAML.md,
 docs/specs/norma-export.spec.md
-Enforced-by: none (barwise-ym8.qpz: deliberately-lossy),
-none (barwise-ym8.gfk: four-filters), none (barwise-ym8.26v: tiering),
-none (barwise-ym8.e05: design-against-book), none (barwise-ym8.3ai: recompute-derived)
+Enforced-by: none (barwise-ym8.3ai: recompute-derived)
 
 ## Context
 
@@ -22,53 +20,65 @@ a lean, local, verbalizable format that humans read in review and LLMs
 generate and edit reliably. Every construct added spends that edge --
 more token density, more ways for a generated model to be inconsistent,
 more JSON Schema surface to constrain. "Lossy by design" is therefore a
-feature, and the gap list is a menu, not a TODO. This ADR records how we
-decide what comes off the menu.
+feature, and the gap list is a menu, not a TODO.
+
+The metamodel stays deliberately lossy: barwise-5t9 is a menu, and
+constructs earn their place by serving data engineers and AI workflows,
+not by existing in NORMA or the book.
+
+A candidate construct is weighed against four filters:
+
+- _Verbalizable._ It must read as a natural FORML business rule.
+  Verbalization is the differentiator and the AI grounding; a construct
+  we cannot verbalize cleanly does not serve the mission.
+- _Inline and local._ It lives on the element it constrains, as a
+  discriminated-union value -- not in a separate referenced graph the
+  author (human or LLM) must keep consistent. An internal constraint
+  lives inline on its fact type. An external constraint, which spans
+  fact types or subtype facts and so has no single element to be local
+  to, lives in the model's constraint list and refers to the roles and
+  subtype facts it constrains by id (decided 2026-10-17;
+  `docs/specs/orm-format-3.spec.md`).
+- _Deterministic._ Rules are stored as _data_, never executed by core.
+  This admits derivation rules as structure; it argues against
+  constructs that are inherently about state change over time.
+- _Bounded cost._ Each field is model + serializer + JSON Schema +
+  validation + verbalization + round-trip test, under a shared minor
+  `orm_version` bump (one per release cycle, not one per field -- see
+  `docs/adr/schema-versioning.md`). Batch related fields; resist
+  one-offs.
+
+The hard constructs are designed against the book, not NORMA's tooling.
+The cited research found NORMA's _schema_ is a faithful near-superset of
+the book, but its _tooling_ lags in two spots. So model the full
+alethic/deontic modality theory (not NORMA's single-main-operator
+limit), and use the correct derivation taxonomy (`*` derived, `+`
+semiderived/partial, `**` derived-and-stored as a separate eager/lazy
+axis) rather than mirroring NORMA's partial formal-rule support.
+
+Until 2026-11-06 the lossy menu, the filters, the tiering and designing
+against the book were decisions 1 to 4. They are judgment no check can
+hold, so they moved here and beside the tiers (`adr-refactor.spec.md`,
+rows 18, 21, 22 and 23); the decision below is the one a check can.
 
 ## Decision
 
-1. **The metamodel stays deliberately lossy.**{#deliberately-lossy} barwise-5t9 is a menu.
-   Constructs earn their place by serving data engineers and AI
-   workflows, not by existing in NORMA or the book.
-
-2. **Four filters gate every candidate construct.**{#four-filters}
-   - _Verbalizable._ It must read as a natural FORML business rule.
-     Verbalization is the differentiator and the AI grounding; a
-     construct we cannot verbalize cleanly does not serve the mission.
-   - _Inline and local._ It lives on the element it constrains, as a
-     discriminated-union value -- not in a separate referenced graph the
-     author (human or LLM) must keep consistent. An internal constraint
-     lives inline on its fact type. An external constraint, which spans
-     fact types or subtype facts and so has no single element to be local
-     to, lives in the model's constraint list and refers to the roles and
-     subtype facts it constrains by id (decided 2026-10-17;
-     `docs/specs/orm-format-3.spec.md`).
-   - _Deterministic._ Rules are stored as _data_, never executed by core.
-     This admits derivation rules as structure; it argues against
-     constructs that are inherently about state change over time.
-   - _Bounded cost._ Each field is model + serializer + JSON Schema +
-     validation + verbalization + round-trip test, under a shared minor
-     `orm_version` bump (one per release cycle, not one per field -- see
-     `docs/adr/schema-versioning.md`). Batch related fields; resist one-offs.
-
-3. **Tiering (below) sequences the menu.**{#tiering} Tier 1 ships soon; Tier 3 is a
-   single deliberate architectural fork we may never fully take; Tier 4
-   is declared a non-goal so the omission is intentional.
-
-4. **Design the hard constructs against the book, not NORMA's tooling.**{#design-against-book}
-   The cited research found NORMA's _schema_ is a faithful near-superset
-   of the book, but its _tooling_ lags in two spots. So model the full
-   alethic/deontic modality theory (not NORMA's single-main-operator
-   limit), and use the correct derivation taxonomy (`*` derived, `+`
-   semiderived/partial, `**` derived-and-stored as a separate eager/lazy
-   axis) rather than mirroring NORMA's partial formal-rule support.
-
-5. **Keep recomputing derived artifacts; never persist them.**{#recompute-derived} Relational
-   mapping, DDL, and any OIAL-style layer stay _recomputed_ from the
-   conceptual model. Persisting them (as NORMA does) is what keeps core
-   deterministic and the file lean; not adding them is itself a decision.
+1. **The `.orm.yaml` schema defines no property for relational mapping,
+   DDL or other rendered output, and the serializer writes none; each is
+   recomputed from the conceptual model.**{#recompute-derived} Persisting
+   them (as NORMA does) would cost the determinism of core and the
+   leanness of the file; not adding them is itself a decision. Restated
+   on 2026-11-06 (`adr-refactor.spec.md`, row 10) from "keep
+   recomputing derived artifacts; never persist them". Its check, an
+   allowlist of the schema's properties classified as conceptual, is
+   batch 9 of that spec. Whether a format's `x-` value may hold output
+   barwise can recompute is barwise-83g's.
 
 ## Tiering
+
+Tiering sequences the menu. Tier 1 ships soon; Tier 3 is a single
+deliberate architectural fork we may never fully take; Tier 4 is
+declared a non-goal so the omission is intentional.
 
 | Tier           | Constructs (issues)                                                                                                                       | Rationale                                                                                                                   |
 | -------------- | ----------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
@@ -97,4 +107,4 @@ The versioning rule is its own ADR: `docs/adr/schema-versioning.md`.
   asymmetry the export spec already accepts (RT-B fidelity is bounded by
   what the metamodel represents).
 - This ADR is the standing answer to "should we add X from NORMA/the
-  book?": run X through the four filters and place it in a tier.
+  book?": run X through the four filters (Context) and place it in a tier.

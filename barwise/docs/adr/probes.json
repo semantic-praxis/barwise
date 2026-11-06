@@ -24,6 +24,12 @@
     "new": "  |--- @barwise/diagram         (core, llm)"
   },
   {
+    "decision": "package-graph-authority#core-external-deps",
+    "file": "barwise/packages/core/package.json",
+    "old": "\"dependencies\": {\n    \"ajv\"",
+    "new": "\"dependencies\": {\n    \"z3-solver\": \"^4.13.0\",\n    \"ajv\""
+  },
+  {
     "decision": "package-graph-authority#runtime-deps-within",
     "file": "barwise/packages/diagram/package.json",
     "old": "\"dependencies\": {\n    \"@barwise/core\"",
@@ -31,15 +37,21 @@
   },
   {
     "decision": "must-agree-copies#registered-sets-identical",
-    "file": "barwise/packages/dbt/src/sql/SqlglotBridge.ts",
-    "old": "const DIALECT_MAP: Record<SqlDialect, string> = {",
-    "new": "const DIALECT_MAP: Record<SqlDialect, string> = {\n  // drifted\n"
+    "file": "barwise/parity.manifest.json",
+    "old": "\"packages/cli/src/workspace/stagedWrite.ts\",\n        \"packages/mcp/src/workspace/stagedWrite.ts\"",
+    "new": "\"packages/cli/src/workspace/stagedWrite.ts\""
+  },
+  {
+    "decision": "must-agree-copies#registered-sets-identical",
+    "file": "barwise/packages/cli/src/commands/import/shared.ts",
+    "old": "function summarizeDiff(diff: ModelDiffResult): string {\n  let added = 0;",
+    "new": "function summarizeDiff(diff: ModelDiffResult): string {\n  let added = 1;"
   },
   {
     "decision": "must-agree-copies#every-candidate-verdict",
     "file": "barwise/audit-baseline.json",
-    "old": "\"generated:45f4fbb82790\": {",
-    "new": "\"generated:000000000000\": {"
+    "old": "\"generated:45f4fbb82790\": {\n      \"status\": \"accepted-benign\"",
+    "new": "\"generated:000000000000\": {\n      \"status\": \"bogus\""
   },
   {
     "decision": "plan-before-code#plan-reviewed",
@@ -50,6 +62,12 @@
     "file": "barwise/docs/specs/plan-scope-check.spec.md",
     "old": "Touches: -plan.md, .gitattributes, barwise/review-tiers.json,",
     "new": "Touches: -plan.md, .gitattributes, barwise/review-tierz.json,"
+  },
+  {
+    "decision": "findings-close-by-mechanism#mechanism-closes",
+    "file": "barwise/audit-baseline.json",
+    "old": "\"literal:04dabcc31485\": {\n      \"status\": \"tracked:barwise-875\"",
+    "new": "\"literal:04dabcc31485\": {\n      \"status\": \"tracked:barwise-rkm\""
   },
   {
     "decision": "findings-close-by-mechanism#person-classifies",
@@ -70,9 +88,51 @@
     "new": "uv pip install sqlglot"
   },
   {
+    "decision": "python-from-the-lockfile#project-ancestor",
+    "unprobed": "check:python-uv reads which files git tracks for this decision (barwise/pyproject.toml and barwise/uv.lock present, no other manifest), and a probe edits one file's content, so it cannot plant a violation here; the gate's tests stage one instead"
+  },
+  {
+    "decision": "python-from-the-lockfile#groups-and-one-offs",
+    "unprobed": "check:python-uv reads which files git tracks for this decision (barwise/pyproject.toml and barwise/uv.lock present, no other manifest), and a probe edits one file's content, so it cannot plant a violation here; the gate's tests stage one instead"
+  },
+  {
     "decision": "python-from-the-lockfile#uv-bootstrap",
     "file": ".github/workflows/ci.yml",
     "old": "python3 -m pip install --quiet uv==",
     "new": "python3 -m pip install --quiet uv>="
+  },
+  {
+    "decision": "surface-capability-parity#matrix-records-reach",
+    "file": "CLAUDE.md",
+    "old": "| `migrate`                                             | yes | no  | no      ",
+    "new": "| `migrate`                                             | yes | yes | no      "
+  },
+  {
+    "decision": "surface-capability-parity#matrix-same-commit",
+    "file": "barwise/packages/vscode/package.json",
+    "old": "\"languageModelTools\": [",
+    "new": "\"languageModelTools\": [\n      { \"name\": \"barwise_history\", \"displayName\": \"History\", \"modelDescription\": \"probe\" },"
+  },
+  {
+    "decision": "surface-capability-parity#vscode-yes-means",
+    "file": "barwise/packages/vscode/package.json",
+    "old": "\"command\": \"barwise.export\",",
+    "new": "\"command\": \"barwise.exportAll\","
+  },
+  {
+    "decision": "pinned-runtimes#node-from-nvmrc",
+    "file": ".github/workflows/release.yml",
+    "old": "node-version-file: .nvmrc",
+    "new": "node-version: 26"
+  },
+  {
+    "decision": "pinned-runtimes#python-minor",
+    "file": "barwise/.python-version",
+    "old": "3.13",
+    "new": "3.13.12"
+  },
+  {
+    "decision": "pinned-runtimes#verify-running",
+    "unprobed": "check:pins reads back the Node running it and the Python uv resolves; a probe edits one file's content, which cannot change the runtime that runs, and the gate's tests plant both refusals with a stand-in uv"
   }
 ]

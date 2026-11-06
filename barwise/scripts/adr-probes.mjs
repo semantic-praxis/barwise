@@ -135,8 +135,8 @@ export function argv(args) {
 /**
  * mutate.mjs's verdict, from its exit status and its last `mutate:` line.
  * An exit 1 that names another code is a gate that went red off the
- * refusal contract (depcruise's violation count, barwise-vt2): not a
- * proxy, and not reported as one.
+ * refusal contract (a tool exiting with its own count, as depcruise did
+ * before barwise-vt2): not a proxy, and not reported as one.
  */
 export function verdict(status, last) {
   if (status === 0) return "CAUGHT";

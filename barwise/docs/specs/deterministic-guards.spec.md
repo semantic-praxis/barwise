@@ -235,7 +235,7 @@ Acceptance: when a test file's skip count differs from its baseline
 entry in either direction, the system shall fail
 `npm run audit:skips -- --check`, naming the file and both counts.
 
-### 4. `check:pins` (provisional: not yet grounded)
+### 4. `check:pins` (implemented for Node and Python by `runtime-pins-check.spec.md`; the runner-image clause waits on that spec's open decision 1)
 
 Consumes barwise-915's `.python-version`, so it lands after that pin
 exists. Asserts that each language runtime has exactly one declared
