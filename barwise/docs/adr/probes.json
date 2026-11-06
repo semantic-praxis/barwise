@@ -150,5 +150,23 @@
     "file": "barwise/scripts/check-no-nul.mjs",
     "old": "const tracked = trackedFiles();",
     "new": "const tracked = trackedFiles();\nreadFileSync(\"turbo.json\");"
+  },
+  {
+    "decision": "schema-versioning#version-signal",
+    "file": "barwise/packages/cli/src/commands/verbalize.ts",
+    "old": "import type { OrmModel } from \"@barwise/core\";",
+    "new": "import type { OrmModel } from \"@barwise/core\";\nexport const doc = { orm_version: \"3.0\", model: {} };"
+  },
+  {
+    "decision": "ossie-interchange#peer-standard",
+    "file": "barwise/packages/formats/src/avro/AvroExportFormat.ts",
+    "old": "\nimport {\n  type ExportFormatAdapter,",
+    "new": "\nimport \"../ossie/mapOssieToOrm.js\";\nimport \"../../schemas/ossie/ontology.json\";\nimport {\n  type ExportFormatAdapter,"
+  },
+  {
+    "decision": "ossie-interchange#own-vocabulary",
+    "file": "barwise/packages/formats/src/index.ts",
+    "old": "export { OssieExportFormat } from \"./ossie/OssieExportFormat.js\";",
+    "new": "export { OssieExportFormat } from \"./ossie/OssieExportFormat.js\";\nexport { parseOssie as parse } from \"./ossie/parseOssie.js\";\nexport const OSSIE_SCHEMA = \"../schemas/ossie/ontology.json\";"
   }
 ]

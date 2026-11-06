@@ -206,6 +206,15 @@ jobs:
       - run: npm run check:depcruise-gate
         if: steps.changes.outputs.docs_only != 'true'
 
+      # Rules over package source that cross package boundaries, which a
+      # package's vitest cannot hold because turbo caches it against that
+      # package alone: who sets orm_version (schema-versioning#version-signal)
+      # and who names the vendored Ossie schema, which depcruise's includeOnly
+      # cannot see (ossie-interchange#peer-standard, #own-vocabulary).
+      # Source only, so it runs before the build (adr-batch9-enforcers WS3).
+      - run: npm run check:source-sites
+        if: steps.changes.outputs.docs_only != 'true'
+
       # Declared must-agree copies (parity.manifest.json) stay
       # byte-identical; editing one copy without its partners fails
       # here instead of drifting silently (barwise-868).

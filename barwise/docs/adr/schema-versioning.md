@@ -8,7 +8,7 @@ docs/specs/archive/schema-versioning.spec.md,
 docs/specs/diagram-references-by-id.spec.md,
 docs/specs/orm-format-3.spec.md
 Enforced-by: tests (version-signal, minor-and-major, load-forward),
-none (barwise-ym8.4i2: version-signal), none (barwise-ym8.8l3: shared-minor),
+npm run check:source-sites (version-signal), none (barwise-ym8.8l3: shared-minor),
 none (barwise-ym8.yfi: load-forward)
 
 ## Context
@@ -81,13 +81,26 @@ which a check can hold (`docs/specs/adr-batch9-enforcers.spec.md`).
   source) and the editor's new-model scaffold (vscode's
   `projectScaffold.test.ts`) both state `CURRENT_ORM_VERSION`;
   `tested-in.json` names all three files, so each must carry a passing
-  tagged test. Any other
-  writer that bypasses the serializer is unchecked until
-  `check:source-sites` lands (barwise-ym8.4i2;
-  `adr-batch9-enforcers.spec.md` WS3). It runs in CI through
+  tagged test. These run in CI through
   `npm run test:coverage` (`if: steps.changes.outputs.docs_only !=
   'true'`, so skipped on a docs-only pull request and, like any step,
-  once an earlier step fails). A file at the same version that uses a
+  once an earlier step fails). Any other writer is held by `npm run
+  check:source-sites`, rule `orm-version-writers`
+  (`scripts/check-source-sites.mjs`, `adr-batch9-enforcers.spec.md`
+  WS3), uncached and run in CI before the build on the same guard. It
+  parses every tracked `packages/*/src` file and counts each site that
+  sets `orm_version` (an object key, an assignment to `.orm_version` or
+  `["orm_version"]`, or string or template text holding `orm_version:`)
+  per file, enclosing function and form, against `ORM_VERSION_WRITERS`:
+  the decoders' literals, two in-memory 3.0 documents never written
+  (`document40Configs`, `verifyOssie`'s `document30`), the two
+  migration restamps, the serializer, and the two writers above. An
+  unlisted site, an extra one in a listed group, and a row with fewer sites
+  than listed are each a finding. Review-only, because a parse cannot see
+  them: a computed key built by concatenation, an `Object.assign` or
+  `defineProperty` from a variable key, a document copied by spread from a
+  source other than the serializer, and YAML assembled from fragments that
+  never hold `orm_version:` whole. A file at the same version that uses a
   construct the reader lacks still fails at the decoder; decision 1 does
   not cover that.
 - Decision 2 is held by tagged tests in core's `schemaVersion.test.ts`.

@@ -212,6 +212,20 @@ describe("Ossie export: a native model", () => {
     expect(() => importer.parse(result.text)).not.toThrow();
   });
 
+  it("writes only ontology-layer keys at the top level, and no ontology_mappings [adr:ossie-interchange#ontology-layer-only]", () => {
+    // The pinned schema already refuses core-layer keys at the top level,
+    // but it allows ontology_mappings, the one place a semantic model fits:
+    // schema validation would pass an export that wrote one.
+    const allowed = ["version", "name", "description", "requires", "ontology", "prefixes"];
+    const flights = importer.parse(fixture("flights.ontology.yaml")).model;
+    for (const model of [flights, shop().m]) {
+      const { document } = exported(model);
+      const keys = Object.keys(document);
+      expect(keys.filter((k) => !allowed.includes(k)), model.name).toEqual([]);
+      expect("ontology_mappings" in document, model.name).toBe(false);
+    }
+  });
+
   it("declares an identifier under the identified entity, as identify_by (precedence rule 2)", () => {
     const { document } = exported(shop().m);
     const c = concept(document, "Customer");
