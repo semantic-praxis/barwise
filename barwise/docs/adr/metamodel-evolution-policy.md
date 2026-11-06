@@ -4,7 +4,7 @@ Scope: architecture
 Date: 2026-10-17
 Tracking: barwise-5t9 (+ children), docs/NORMA_VS_ORM_YAML.md,
 docs/specs/norma-export.spec.md
-Enforced-by: none (barwise-ym8.3ai: recompute-derived)
+Enforced-by: tests (recompute-derived)
 
 ## Context
 
@@ -69,9 +69,12 @@ rows 18, 21, 22 and 23); the decision below is the one a check can.
    them (as NORMA does) would cost the determinism of core and the
    leanness of the file; not adding them is itself a decision. Restated
    on 2026-11-06 (`adr-refactor.spec.md`, row 10) from "keep
-   recomputing derived artifacts; never persist them". Its check, an
-   allowlist of the schema's properties classified as conceptual, is
-   batch 9 of that spec. Whether a format's `x-` value may hold output
+   recomputing derived artifacts; never persist them". Its check is an
+   allowlist, `schemas/orm-model.property-classes.json` in core: every
+   property slot the schema defines, keyed by its full JSON pointer, is
+   classified `conceptual`, `identity` or `presentation` (authored
+   diagram layout), and a slot with no row fails until review classifies
+   it (`adr-batch9-enforcers.spec.md`, WS1). Whether a format's `x-` value may hold output
    barwise can recompute is barwise-83g's.
 
 ## Tiering
@@ -106,5 +109,17 @@ The versioning rule is its own ADR: `docs/adr/schema-versioning.md`.
   that uses Tier 3/4 constructs without loss. That is the same superset
   asymmetry the export spec already accepts (RT-B fidelity is bounded by
   what the metamodel represents).
+- `recompute-derived` is held by a core test
+  (`tests/serialization/propertyClasses.test.ts`) that walks every
+  `properties` map in `orm-model.schema.json`, at any depth, and fails
+  on a slot `orm-model.property-classes.json` lacks or a row with no
+  slot. Keying by
+  pointer means a familiar name in a new place still needs a row. What
+  it cannot see is a slot classified wrongly: a derived property
+  labelled `conceptual` passes, so the classification itself is held by
+  review of the table's diff. The serializer side rests on the schema
+  being closed: every map the writer's output passes through has
+  `additionalProperties: false`, and `writer40.test.ts` validates that
+  output against the schema.
 - This ADR is the standing answer to "should we add X from NORMA/the
   book?": run X through the four filters (Context) and place it in a tier.

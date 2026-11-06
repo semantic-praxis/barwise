@@ -1,6 +1,6 @@
 # Batch 9: schema, Ossie, eval-coverage and package-graph decisions enforced
 
-Status: Planned; plan reviewed 2026-11-06 (one code-review round, ten findings, all addressed in the revision); no workstream implemented
+Status: Planned; plan reviewed 2026-11-06 (one code-review round, ten findings, all addressed in the revision); WS1 (`recompute-derived`) implemented; WS2-WS8 not started
 
 Created: 2026-11-06
 Last-updated: 2026-11-06
