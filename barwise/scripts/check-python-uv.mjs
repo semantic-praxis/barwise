@@ -313,6 +313,40 @@ for (const file of trackedFiles()) {
   }
 }
 
+/**
+ * One project, and nothing else that changes what resolves
+ * (python-from-the-lockfile decisions 3 and 4; python-uv-widened WS3).
+ * uv finds the project by walking up from the working directory, so a
+ * second pyproject.toml would be the project for everything below it,
+ * with its own lock; and requirements files, setup.py, uv.toml or a
+ * pylock.toml change what resolves without uv.lock saying so.
+ */
+const PROJECT_FILES = new Set(["barwise/pyproject.toml", "barwise/uv.lock"]);
+const MANIFEST =
+  /(^|\/)(pyproject\.toml|requirements[^/]*\.txt|setup\.py|setup\.cfg|Pipfile(\.lock)?|uv\.toml|pylock[^/]*\.toml|uv\.lock)$/;
+const tracked = trackedFiles();
+for (const file of tracked) {
+  if (MANIFEST.test(file) && !PROJECT_FILES.has(file)) {
+    findings.push({
+      file,
+      line: 1,
+      what: "a Python manifest outside barwise/pyproject.toml and barwise/uv.lock",
+      raw:
+        "the project is barwise/pyproject.toml, locked by barwise/uv.lock; add a dependency group there",
+    });
+  }
+}
+for (const file of PROJECT_FILES) {
+  if (!tracked.includes(file)) {
+    findings.push({
+      file,
+      line: 0,
+      what: "the project file is not tracked",
+      raw: "every Python run resolves from barwise/pyproject.toml and barwise/uv.lock",
+    });
+  }
+}
+
 // A stale exemption is a failure in its own right: it means a violation
 // was fixed and its licence outlived it. Without this, an allowlist only
 // ever grows, and stops describing the code.
