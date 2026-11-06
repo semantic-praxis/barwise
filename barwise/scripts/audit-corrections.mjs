@@ -37,6 +37,7 @@ import { createHash } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { mergeBaselineRows, mergeSummary, readExistingRows } from "./lib/baseline-merge.mjs";
+import { CAUGHT_BY } from "./lib/findings.mjs";
 import {
   noteUntrackedInput,
   refuseUntrackedInput,
@@ -84,20 +85,9 @@ const MARKERS = [
 
 const NOT_A_MARKER = [/\bstandard deviations?\b/i];
 
-/** The permitted verdicts. A row outside this set fails the check. */
-const CAUGHT_BY = new Set([
-  // Implementing it, writing the test, re-running a count, probing a
-  // tool, mutation, replaying recorded eval data.
-  "execution",
-  // An objection raised, a question asked, a reviewer's request --
-  // before or without running anything.
-  "reasoning",
-  // Writing the claim down with the command that produced it, which is
-  // what exposed the claim.
-  "provenance",
-  // The detector surfaced a paragraph that records no correction.
-  "not-a-correction",
-]);
+// The permitted verdicts, a row outside which fails the check, live with
+// the other audits' vocabularies (scripts/lib/findings.mjs), where
+// check:findings reads them too.
 
 /**
  * Paragraphs shorter than this carry a marker and no correction: a

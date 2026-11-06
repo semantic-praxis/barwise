@@ -49,6 +49,7 @@ import { execFileSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { mergeBaselineRows, mergeSummary, readExistingRows } from "./lib/baseline-merge.mjs";
+import { isSpecNotePlaceholder } from "./lib/findings.mjs";
 import {
   CLAIMS_NOTHING_BUILT,
   CODE,
@@ -420,7 +421,7 @@ for (const f of found) {
         + `     Update the Status to say what shipped, or add a row to `
         + `spec-status-baseline.json saying why it is still right.`,
     );
-  } else if (!row.note || row.note.startsWith("TODO")) {
+  } else if (isSpecNotePlaceholder(row.note)) {
     failures.push(
       row.note?.startsWith("TODO: re-read")
         ? `UNCLASSIFIED: ${f.id} -- reopened: ${row.note.split(" Previous note:")[0]}`

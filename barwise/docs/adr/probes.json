@@ -44,8 +44,8 @@
   {
     "decision": "must-agree-copies#every-candidate-verdict",
     "file": "barwise/audit-baseline.json",
-    "old": "\"generated:45f4fbb82790\": {",
-    "new": "\"generated:000000000000\": {"
+    "old": "\"generated:45f4fbb82790\": {\n      \"status\": \"accepted-benign\"",
+    "new": "\"generated:000000000000\": {\n      \"status\": \"bogus\""
   },
   {
     "decision": "plan-before-code#plan-reviewed",
@@ -56,6 +56,12 @@
     "file": "barwise/docs/specs/plan-scope-check.spec.md",
     "old": "Touches: -plan.md, .gitattributes, barwise/review-tiers.json,",
     "new": "Touches: -plan.md, .gitattributes, barwise/review-tierz.json,"
+  },
+  {
+    "decision": "findings-close-by-mechanism#mechanism-closes",
+    "file": "barwise/audit-baseline.json",
+    "old": "\"literal:04dabcc31485\": {\n      \"status\": \"tracked:barwise-875\"",
+    "new": "\"literal:04dabcc31485\": {\n      \"status\": \"tracked:barwise-rkm\""
   },
   {
     "decision": "findings-close-by-mechanism#person-classifies",

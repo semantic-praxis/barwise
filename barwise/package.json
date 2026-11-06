@@ -50,6 +50,7 @@
     "test:mcp-checks": "node test-plan/mcp-checks.mjs",
     "audit:specs": "node scripts/audit-spec-status.mjs",
     "audit:corrections": "node scripts/audit-corrections.mjs",
+    "check:findings": "node scripts/check-findings.mjs",
     "survey:specs": "node scripts/audit-spec-status.mjs --survey",
     "audit:rubric": "node scripts/audit-rubric.mjs",
     "ci:local": "node scripts/ci-local.mjs",
