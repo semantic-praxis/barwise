@@ -9,6 +9,7 @@ Touches: barwise/docs/adr/, barwise/docs/ARCHITECTURE.md, .beads/issues.jsonl,
 barwise/docs/adr/probes.json, .claude/skills/pr-review/SKILL.md,
 barwise/scripts/check-architecture.mjs, CLAUDE.md, REVIEW.md,
 barwise/docs/specs/
+Plan-reviewed: cd51c498 (code-review, pr-review)
 
 ## Principle
 
