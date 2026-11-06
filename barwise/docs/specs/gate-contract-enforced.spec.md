@@ -248,10 +248,12 @@ remains the one worked instance of it.
 
 ## Open decisions (for review)
 
-1. **Option D.** Recommended; the owner decides, because it adds a CI
+1. **Option D.** **Resolved (owner, 2026-11-06): option D;** WS2 builds it.
+   Recommended; the owner decides, because it adds a CI
    step, and WS2 waits for the answer. The cost is about two minutes on
    every change that is not docs-only, and on every pre-push `ci:local`.
-2. **`test:scripts` out of the matrix.** Recommended. It costs 640 of the
+2. **`test:scripts` out of the matrix.** **Resolved (owner, 2026-11-06): yes, it
+   stays out.** Recommended. It costs 640 of the
    matrix's 746 seconds, and its reading is about the gates its cases
    spawn, which the matrix already reads directly. The alternative keeps
    it and accepts about twelve minutes.

@@ -195,21 +195,27 @@ The `toEqual` half waits on open decision 2.
 
 ## Open decisions (for review)
 
-1. **"Same commit" or "same pull request"** (decision 2). CI checks a
+1. **"Same commit" or "same pull request"** (decision 2). **Resolved
+   (owner, 2026-11-06): same pull request;** decision 2 is restated, and
+   barwise-ym8.3nm closes. CI checks a
    pull request's head and every push to main, so a pull request whose
    first commit adds a tool and whose last updates the matrix passes.
    Recommended: restate decision 2 as "a change to a surface's reach is
    not merged without the matrix agreeing", which is what the check
    holds. It rewords a decision, so it is the owner's call; until then
    barwise-ym8.3nm stays open for the per-commit half.
-2. **The pinned lists once the matrix is checked.** The check reads the
+2. **The pinned lists once the matrix is checked.** **Resolved
+   (owner, 2026-11-06): option A, "for now";** WS2 builds the one-per-file rule.
+   The check reads the
    registrations directly, so the pinned lists stop being the matrix's
    "executable form". Option A (recommended): keep them as change
    detectors, with WS2's one-per-file rule, and leave the `toEqual` form
    to review. Option B: retire decision 4 to prose. Option C: have the
    check also read each pinned list from its test source and require the
    `toEqual` form.
-3. **What VS Code reach counts.** Decision 3 counts a palette command or
+3. **What VS Code reach counts.** **Resolved (owner, 2026-11-06): the provider
+   and the chat participant do not count;** decision 3 stands, and the
+   ADR's Consequences say so. Decision 3 counts a palette command or
    a language-model tool. The bundled MCP server provider also puts every
    MCP tool in the editor's chat, gym and `--samples` included, while
    the matrix reads `no` for them; and the chat participant offers 14

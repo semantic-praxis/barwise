@@ -8,7 +8,7 @@ docs/specs/getting-started-guides.spec.md,
 docs/specs/capability-matrix-check.spec.md
 Enforced-by: npm run check:capability-matrix (matrix-records-reach, matrix-same-commit,
 vscode-yes-means), tests (pinned-tool-lists), none (barwise-ym8.0pq: pinned-tool-lists),
-none (barwise-ym8.wfy: matrix-records-reach), none (barwise-ym8.3nm: matrix-same-commit)
+none (barwise-ym8.wfy: matrix-records-reach)
 
 ## Context
 
@@ -33,9 +33,11 @@ Consequences below).
    surface reaches which capability, and an unmarked gap is a bug.** {#matrix-records-reach} A
    gap that stays is marked `deliberate` with its reason; a gap being
    closed is marked `not yet` with the workstream that closes it.
-2. **A change to a surface's reach updates the matrix in the same
-   commit.** {#matrix-same-commit} The surface change is incomplete until the table agrees
-   with it.
+2. **A change to a surface's reach is not merged without the matrix
+   agreeing.** {#matrix-same-commit} The surface change is incomplete until the table agrees
+   with it, in the same pull request. (Restated by the owner on
+   2026-11-06 from "in the same commit", which no check could hold:
+   `capability-matrix-check.spec.md`, open decision 1.)
 3. **"Yes" for VS Code means reachable from the editor** {#vscode-yes-means}, by a
    `contributes.commands` palette entry or a language-model tool
    registered by `ToolRegistration.ts`. A "yes" that rests on the tool
@@ -62,10 +64,11 @@ Consequences below).
   the full run follows the build. A command path is covered by a row
   naming it or an ancestor, the matrix's own granularity, so `lineage
   show` and `gym show` still sit under rows that read `none` or `yes`
-  (below). Decision 2 is held per pull request head and push to main, not
-  per commit (that spec's open decision 1). The bundled MCP server
-  provider and the chat participant are not counted as VS Code reach,
-  per decision 3; whether they should be is that spec's open decision 3.
+  (below). Decision 2 is held on each pull request's head and each push
+  to main. The bundled MCP server provider puts MCP's column in the
+  editor's chat too, and the chat participant offers slash commands;
+  neither is counted as VS Code reach, so the VS Code column means what
+  an extension user reaches without the MCP route (owner, 2026-11-06).
 - Decision 4 has its own tests: `mcp/tests/serverSpawn.test.ts`
   and `vscode/tests/unit/toolRegistration.test.ts` fail when a tool is
   added or removed without updating their list. They run in CI through
@@ -74,8 +77,7 @@ Consequences below).
   once an earlier step fails).
 - What remains open: decision 1 at a finer grain than a row (a
   subcommand or option gap under a row that reads `none`; below, and
-  `surface-mirroring.spec.md` workstream 1); decision 2 per commit
-  (barwise-ym8.3nm); and decision 4's tests, where `check:adr-tests`
+  `surface-mirroring.spec.md` workstream 1); and decision 4's tests, where `check:adr-tests`
   passes on either one of the two and nothing checks the `toEqual`
   form (barwise-ym8.0pq). Decisions 1 and 2 are also on the `pr-review`
   checklist ("When a surface changed").
