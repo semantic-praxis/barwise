@@ -39,6 +39,9 @@ criteria for a choice, and retires to prose.
 | judgment  | 0         | 0       | 7      | 7     |
 | total     | 60        | 18      | 7      | 85    |
 
+The table is the sort before WS1; the owner's WS1 answers move rows
+between columns, and the counts are recomputed when WS1 closes.
+
 The sort was made on 2026-11-05 from each decision's text and its gap
 issue's "Unguarded" clause, reading the gate a clause names where the
 call depended on it, then corrected in plan review (readable-iri,
@@ -235,11 +238,13 @@ Restatements (the rule stays; `Date:` stays):
     schema defines no property for relational mapping, DDL or any other
     rendered output, and the serializer writes none; each is recomputed
     from the conceptual model."
-11. `must-agree-copies#check-on-copy`: "Every `audit:duplication`
-    candidate's verdict names its check (a shared owner, a derivation, a
-    `parity.manifest.json` entry, or a drift test) or a benign reason."
-    Low confidence: this restates through the audit, which sees only
-    the copies its detectors find.
+11. `must-agree-copies#check-on-copy`: restate, revised after rows 4,
+    5 and 24: "Every `audit:duplication` candidate carries a verdict
+    from the duplication spec's table (shared, guarded by a named check,
+    or declared divergent), read through row 4's common reader." With
+    row 24's share-by-default, a guarded copy is the exception that
+    `INTENDED` forces. Low confidence until the mechanical-duplication
+    spec (barwise-ym8.gc9.7fb) shows which copies its detectors see.
 12. `ossie-interchange#peer-standard` (changes, first proposal dropped a
     clause): keep the checkable part as the decision ("core names
     nothing specific to Ossie, and Ossie documents enter and leave only
@@ -305,6 +310,21 @@ inventory tags every buildable row with its batch; the counts sum to the
 60 buildable rows. Order, most decisions per enforcer and high
 confidence first:
 
+Two pieces of work come before the batches, from the owner's WS1
+answers (2026-11-06):
+
+- **Decision citations by id** (Scope): `check:architecture` resolves
+  `<adr>.md#<id>`, and citations by number are rewritten, before the
+  first retirement lands.
+- **Row 1's spec**: the four renderers move to their connectors,
+  `@barwise/dbt` depends on `@barwise/formats` for one composed SQL
+  parser, and `core-no-interop` gets its enforcer there (core exports no
+  format adapter and no renderer for a connector's format), together
+  with row 3's new `package-graph-authority` decision on core's external
+  dependencies. It takes `core-no-interop` out of batch 8.
+
+Then the batches, with batch 4 moved up to run first (row 4):
+
 2. Gate contract (`gate-refusal-contract`, 5): fault-matrix with more
    axes (missing tool, manifest, shallow clone, a file-hash watch for
    writes) and the `ci:local` mixed-result test; check-depcruise-gate's
@@ -313,8 +333,11 @@ confidence first:
 3. `check:python-uv` widening (`python-from-the-lockfile`, 5).
 4. Baseline and ratchet writers (`baselines-merge-on-write`, and the
    buildable rows of `findings-close-by-mechanism` and
-   `must-agree-copies`, 9): through `baseline-merge.mjs`, a verdict
-   vocabulary (barwise-u5d), a ratchet registry.
+   `must-agree-copies`, 9), **run first among the batches**: the common
+   finding reader (row 4) over the five baselines, then through it the
+   open-issue cross-check, the verdict vocabulary (barwise-u5d), the
+   placeholder rule (row 5) and a ratchet registry; writers go through
+   `baseline-merge.mjs`.
 5. Capability matrix (`surface-capability-parity`, 4).
 6. Credential and runtime pins (`credential-handling`,
    `pinned-runtimes`, 7): `.gitleaks.toml` and wrapper tests, a pins
@@ -323,9 +346,10 @@ confidence first:
    `production-prompt-resolution`, 8): the CLI option inventory
    (barwise-xsg, barwise-qxt), the VS Code key setting (barwise-ybi).
 8. Purity and connector boundaries (`connector-packages`,
-   `determinism-in-core#pure-ops`, 4): purity's patterns
-   (barwise-fzd), a core-no-interop check, per-surface registration
-   tests.
+   `determinism-in-core#pure-ops`, 3 after row 1's spec takes
+   `core-no-interop`): purity's patterns (barwise-fzd), per-surface
+   registration tests, and row 3's depcruise rule that only
+   `@barwise/llm` imports a model SDK.
 9. Schema, Ossie, eval suite and package graph (`schema-versioning`,
    `ossie-interchange`, `constraint-coverage-policy`,
    `package-graph-authority`, 12).
@@ -374,7 +398,7 @@ with its proposed enforcer), the restatement, or why it is judgment.
 
 **connector-packages**
 
-- `core-no-interop` (barwise-ym8.paz) -- invariant, **buildable**, batch 8: core/src defines a format adapter for a connector to register; enforcer: new check (in check-core-purity or a core test) listing core/src values typed, implementing or satisfying ImportFormat/ExportFormatAdapter and failing on any.
+- `core-no-interop` (barwise-ym8.paz) -- invariant, **buildable**, batch 8, **moves to row 1's spec**, widened to renderers: core/src defines a format adapter for a connector to register; enforcer: new check (in check-core-purity or a core test) listing core/src values typed, implementing or satisfying ImportFormat/ExportFormatAdapter and failing on any.
 - `connector-owns-io` (barwise-ym8.iyw) -- invariant, **buildable**, batch 8: an I/O import purity's regexes miss, or a surface calling a connector's I/O function directly; enforcer: extend purity's patterns (named node:process, createRequire, worker_threads, readline, dns, comment-led imports, dynamic import, require, cwd, fetch) and add a depcruise rule forbidding surfaces from importing connector I/O entry points such as importDbtProject.
 - `descriptor-wraps-core` (barwise-ym8.y5z) -- invariant, **restate** (low), WS1: each descriptor for a format core can render or parse imports and calls that named core function (table: ddl->renderDdl, openapi->renderOpenApi, ...).
 - `explicit-registration` (barwise-ym8.2n3) -- invariant, **buildable**, batch 8: a surface's entry point that omits a register*Formats() call; enforcer: per-surface test booting the real registration path (CLI main, MCP server, extension activate) with no test-side registration and pinning the registry's format ids with toEqual.
@@ -403,9 +427,9 @@ with its proposed enforcer), the restatement, or why it is judgment.
 **findings-close-by-mechanism**
 
 - `mechanism-closes` (barwise-ym8.1b2) -- procedure, **restate** (low), WS1: a closed finding issue's close reason names a check file or baseline row that exists in the tree.
-- `ratchet-both-ways` (barwise-ym8.k4d) -- invariant, **buildable**, batch 4: a ratchet that silently keeps a stale baseline row; enforcer: stale-row tests for audit:duplication, audit:specs and audit:rubric, plus a ratchet registry test requiring both directions for each listed ratchet.
+- `ratchet-both-ways` (barwise-ym8.k4d) -- invariant, **buildable**, batch 4, through row 4's common reader: a ratchet that silently keeps a stale baseline row; enforcer: stale-row tests for audit:duplication, audit:specs and audit:rubric, plus a ratchet registry test requiring both directions for each listed ratchet.
 - `person-classifies` (barwise-ym8.h0l) -- procedure, **restate** (low), WS1: a writer fills only the placeholder for new ids, and every ratchet validates verdicts against one vocabulary with tracked:<issue> resolved.
-- `ratchet-in-ci` (barwise-ym8.ld2) -- invariant, **buildable**, batch 4: an audit with a --check ratchet and no ci.yml step; enforcer: check:architecture-style test pairing every ratchet in a registry with a ci.yml step (trial:gate included).
+- `ratchet-in-ci` (barwise-ym8.ld2) -- invariant, **buildable**, batch 4, through row 4's common reader: an audit with a --check ratchet and no ci.yml step; enforcer: check:architecture-style test pairing every ratchet in a registry with a ci.yml step (trial:gate included).
 
 **gate-refusal-contract**
 
@@ -443,8 +467,8 @@ with its proposed enforcer), the restatement, or why it is judgment.
 
 - `check-on-copy` (barwise-ym8.edf) -- invariant, **restate** (low), WS1: every audit:duplication verdict names a parity entry or drift test, or a benign reason from a fixed list.
 - `check-first` (barwise-ym8.3tg) -- judgment, **retire**, WS1: no artifact records the choice between sharing and checking.
-- `registered-sets-identical` (barwise-ym8.8nq) -- invariant, **buildable**, batch 4: an unknown ignore value, a set of one, or a manifest entry deleted while both copies remain; enforcer: extend check:parity to validate ignore values and set size, and ratchet manifest entries against a baseline.
-- `every-candidate-verdict` (barwise-ym8.onf) -- invariant, **buildable**, batch 4: a verdict outside the vocabulary, or tracked:<issue> naming no open issue; enforcer: audit:duplication --check validating verdicts against an enum and resolving tracked ids in .beads/issues.jsonl (barwise-u5d).
+- `registered-sets-identical` (barwise-ym8.8nq) -- invariant, **buildable**, batch 4, through row 4's common reader; the sets shrink with barwise-ym8.gc9.e76: an unknown ignore value, a set of one, or a manifest entry deleted while both copies remain; enforcer: extend check:parity to validate ignore values and set size, and ratchet manifest entries against a baseline.
+- `every-candidate-verdict` (barwise-ym8.onf) -- invariant, **buildable**, batch 4, through row 4's common reader: a verdict outside the vocabulary, or tracked:<issue> naming no open issue; enforcer: audit:duplication --check validating verdicts against an enum and resolving tracked ids in .beads/issues.jsonl (barwise-u5d).
 
 **ossie-interchange**
 
