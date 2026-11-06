@@ -401,6 +401,15 @@ jobs:
       - run: npm run build
         if: steps.changes.outputs.docs_only != 'true'
 
+      # constraint-coverage-policy: the inventory's rows against the eval
+      # suite and the ADR's tiers. Uncached, because its inputs (promptlab's
+      # evals/, the ADR, the inventory spec) are outside any package's turbo
+      # key; after the build, because it imports core and learn and refuses
+      # without them. The inventory spec is in GATE_INPUT, so a change to it
+      # alone is not docs-only (adr-batch9-enforcers WS5).
+      - run: npm run check:eval-coverage
+        if: steps.changes.outputs.docs_only != 'true'
+
       # Each matrix row against what the CLI, the MCP server and the VS Code
       # extension register, read from the build (surface-capability-parity,
       # decisions 1 to 3).

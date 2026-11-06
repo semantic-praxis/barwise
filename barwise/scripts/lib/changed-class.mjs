@@ -37,6 +37,10 @@ const GATE_INPUT = new RegExp(
     // formats test holds it to `schemas/ossie/pin.json`; docs-only would
     // skip that test on a README-only change (adr-batch9-enforcers WS3).
     /^barwise\/packages\/formats\/schemas\/ossie\/README\.md$/.source,
+    // The coverage inventory is a gate input of check:eval-coverage, which
+    // needs the build (it imports core and learn); docs-only would skip
+    // both on an inventory-only change (adr-batch9-enforcers WS5).
+    /^barwise\/docs\/specs\/constraint-extraction-coverage\.spec\.md$/.source,
   ].join("|"),
 );
 
