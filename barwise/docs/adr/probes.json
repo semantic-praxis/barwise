@@ -88,6 +88,14 @@
     "new": "uv pip install sqlglot"
   },
   {
+    "decision": "python-from-the-lockfile#project-ancestor",
+    "unprobed": "check:python-uv reads which files git tracks for this decision (barwise/pyproject.toml and barwise/uv.lock present, no other manifest), and a probe edits one file's content, so it cannot plant a violation here; the gate's tests stage one instead"
+  },
+  {
+    "decision": "python-from-the-lockfile#groups-and-one-offs",
+    "unprobed": "check:python-uv reads which files git tracks for this decision (barwise/pyproject.toml and barwise/uv.lock present, no other manifest), and a probe edits one file's content, so it cannot plant a violation here; the gate's tests stage one instead"
+  },
+  {
     "decision": "python-from-the-lockfile#uv-bootstrap",
     "file": ".github/workflows/ci.yml",
     "old": "python3 -m pip install --quiet uv==",
