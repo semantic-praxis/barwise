@@ -1,7 +1,7 @@
 /**
  * The reads behind the ADR governance gates: the root scripts, ci.yml and
  * the tracker for check:architecture's declaration pass, and the test
- * reports for check:adr-tests (docs/specs/adr-gate-reader-split.spec.md).
+ * reports and docs/adr/tested-in.json for check:adr-tests (docs/specs/adr-gate-reader-split.spec.md).
  *
  * Reading only; what an answer means is scripts/lib/adr-judge.mjs's. The
  * split exists so the ADR conformance model can judge the same answers
@@ -17,7 +17,7 @@
  */
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { isMap } from "./architecture-section.mjs";
+import { isMap, TESTED_IN } from "./architecture-section.mjs";
 import { parseTracker } from "./beads-merge.mjs";
 import { scriptReport, TRIAL_REPORT, vitestReport } from "./test-reports.mjs";
 
@@ -89,8 +89,33 @@ export async function createGovernanceReader(
   };
 }
 
-/** Each test or suite a report says ran: `{ title, ancestors, type, status, from }`. */
-function readVitest(path, rel) {
+/**
+ * A runner's absolute source path as a repository path: `base` is the
+ * report's own directory from the root (`barwise/packages/mcp/`), and the
+ * part after the last occurrence of `/<base>` is kept: `/barwise/` is the
+ * fixed inner folder, so a test path that repeats `packages/core/` inside
+ * its own fixtures still maps from the right one. Turbo's shared
+ * cache restores a report written in another checkout (a pre-push worktree
+ * under /tmp beside the main one), so the prefix before it is not this
+ * root's and is never compared. `null` when the path is absent or does not
+ * pass through that directory: the entry then counts for every rule but the
+ * per-file one.
+ */
+export function repoFile(abs, base) {
+  if (typeof abs !== "string" || abs === "") return null;
+  const anchor = `/${base}`;
+  const p = `/${abs.replaceAll("\\", "/")}`;
+  const i = p.lastIndexOf(anchor);
+  if (i < 0) return null;
+  const rest = p.slice(i + anchor.length);
+  return rest === "" ? null : base + rest;
+}
+
+/**
+ * Each test or suite a report says ran:
+ * `{ title, ancestors, type, status, from, file }`, `file` as repoFile() reads it.
+ */
+function readVitest(path, rel, base) {
   const json = JSON.parse(readFileSync(path, "utf8"));
   if (!Array.isArray(json?.testResults)) throw new Error("no testResults array");
   const out = [];
@@ -111,13 +136,14 @@ function readVitest(path, rel) {
         type: "test",
         status: a.status,
         from: rel,
+        file: repoFile(file.name, base),
       });
     }
   }
   return out;
 }
 
-function readNodeTest(path, rel) {
+function readNodeTest(path, rel, base) {
   const out = [];
   for (const line of readFileSync(path, "utf8").split("\n")) {
     if (line.trim() === "") continue;
@@ -127,7 +153,14 @@ function readNodeTest(path, rel) {
     ) {
       throw new Error("a line has no name, status or type");
     }
-    out.push({ title: r.name, ancestors: [], type: r.type, status: r.status, from: rel });
+    out.push({
+      title: r.name,
+      ancestors: [],
+      type: r.type,
+      status: r.status,
+      from: rel,
+      file: repoFile(r.file, base),
+    });
   }
   return out;
 }
@@ -137,7 +170,7 @@ function readNodeTest(path, rel) {
  * derived (one per package with a `test:coverage` script, one per file in
  * scripts/tests/expected-counts.json, and the `test:trial` report), and
  * the tests each says ran. A report missing or not of the shape read is a
- * refusal; `unreadable` counts them here, before any decision is judged, so
+ * refusal; `unread` holds their paths and `unreadable` counts them here, before any decision is judged, so
  * the judge's own refusals cannot change it. Throws when the list itself
  * cannot be built, which the gate reports as it always has.
  */
@@ -150,30 +183,86 @@ export function readTestReports(root) {
     if (!existsSync(manifest)) continue;
     const scripts = JSON.parse(readFileSync(manifest, "utf8")).scripts ?? {};
     if (Object.hasOwn(scripts, "test:coverage")) {
-      expected.push({ rel: vitestReport(dir.name), read: readVitest });
+      expected.push({
+        rel: vitestReport(dir.name),
+        read: readVitest,
+        base: `barwise/packages/${dir.name}/`,
+      });
     }
   }
   const counts = JSON.parse(
     readFileSync(join(root, "barwise", "scripts", "tests", "expected-counts.json"), "utf8"),
   );
   for (const file of Object.keys(counts.counts ?? {})) {
-    expected.push({ rel: scriptReport(file), read: readNodeTest });
+    expected.push({ rel: scriptReport(file), read: readNodeTest, base: "barwise/scripts/tests/" });
   }
-  expected.push({ rel: TRIAL_REPORT, read: readNodeTest });
+  expected.push({ rel: TRIAL_REPORT, read: readNodeTest, base: "barwise/trial/tests/" });
 
   const ran = [];
   const refusals = [];
-  for (const { rel, read } of expected) {
+  const unread = new Set();
+  for (const { rel, read, base } of expected) {
     const path = join(root, rel);
     if (!existsSync(path)) {
       refusals.push(`${rel}: missing; did its test step run in this checkout?`);
+      unread.add(rel);
       continue;
     }
     try {
-      ran.push(...read(path, rel));
+      ran.push(...read(path, rel, base));
     } catch (err) {
       refusals.push(`${rel}: not a report this check reads (${err.message})`);
+      unread.add(rel);
     }
   }
-  return { expected, ran, refusals, unreadable: refusals.length };
+  return { expected, ran, refusals, unreadable: refusals.length, unread };
+}
+
+const isText = (v) => typeof v === "string" && v !== "";
+
+/**
+ * check:adr-tests' per-file rows (docs/specs/capability-matrix-check.spec.md,
+ * WS2): `{ rows, tracked }`, the `{ decision, files, why }` rows of
+ * docs/adr/tested-in.json and the set of the paths they name that are in
+ * `trackedPaths` (the gate's own `git ls-files`, listed once). `null`,
+ * with one refusal pushed onto `refusals`, when the file is missing, is not
+ * JSON, is not a list of such rows, or names one decision and file twice:
+ * zero rows would read as "nothing to check", which is the answer it could
+ * not give, and a repeated pair is a row edited in one place and not the other.
+ */
+export function readTestedIn(root, trackedPaths, refusals) {
+  const refuse = (why) => {
+    refusals.push(`${TESTED_IN}: ${why}`);
+    return null;
+  };
+  let rows;
+  try {
+    rows = JSON.parse(readFileSync(join(root, TESTED_IN), "utf8"));
+  } catch (err) {
+    return refuse(err.code === "ENOENT" ? "missing" : `not read (${err.message})`);
+  }
+  if (!Array.isArray(rows)) return refuse("not a list of rows");
+  for (const [i, r] of rows.entries()) {
+    const ok = r !== null && typeof r === "object" && isText(r.decision)
+      && /^[^#\s]+#[^#\s]+$/.test(r.decision) && Array.isArray(r.files) && r.files.length > 0
+      && r.files.every(isText) && isText(r.why);
+    if (!ok) {
+      return refuse(
+        `row ${i + 1} is not { decision: "<adr>#<id>", files: [<path>, ...], why }`,
+      );
+    }
+  }
+  const seen = new Map();
+  for (const [i, r] of rows.entries()) {
+    for (const f of r.files) {
+      const pair = `${r.decision} ${f}`;
+      if (seen.has(pair)) {
+        return refuse(`row ${i + 1} names ${f} for ${r.decision} again (row ${seen.get(pair)})`);
+      }
+      seen.set(pair, i + 1);
+    }
+  }
+  const all = new Set(trackedPaths);
+  const tracked = new Set(rows.flatMap((r) => r.files).filter((f) => all.has(f)));
+  return { rows, tracked };
 }

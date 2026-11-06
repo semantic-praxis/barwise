@@ -1,15 +1,17 @@
 # The capability matrix, checked against what each surface registers
 
-Status: WS1 implemented 2026-11-06 (check:capability-matrix, full run and --static, with capability-map.json for all 22 rows and their cells; probes for matrix-records-reach, matrix-same-commit and vscode-yes-means CAUGHT; the gate agreed with main on its first run; code review dropped the stale-build refusal and made --static compare cells); WS2 provisional
+Status: WS1 implemented 2026-11-06 (check:capability-matrix, full run and --static, with capability-map.json for all 22 rows and their cells; probes for matrix-records-reach, matrix-same-commit and vscode-yes-means CAUGHT; the gate agreed with main on its first run; code review dropped the stale-build refusal and made --static compare cells); WS2 implemented 2026-11-06 (docs/adr/tested-in.json names decision 4's two tests, and check:adr-tests requires a passed tagged test in each named file, reading report paths from the report's own directory so a turbo-restored report still matches)
 Created: 2026-11-06
 Last-updated: 2026-11-06
-Plan-reviewed: 8d9588bb (code-review, pr-review)
+Plan-reviewed: 8d9588bb (code-review, pr-review; WS2 re-reviewed at 0dc20f07)
 Tracking: barwise-ym8.gc9 (adr-refactor batch 5), barwise-ym8.wfy,
 barwise-ym8.3nm, barwise-ym8.0hi, barwise-ym8.0pq, barwise-1005, barwise-xpt
 Touches: CLAUDE.md, package.json, +barwise/scripts/check-capability-matrix.mjs,
 +barwise/scripts/lib/capability-map.json, barwise/scripts/tests/,
 +barwise/scripts/tests/check-capability-matrix.test.mjs,
-barwise/package.json, .github/workflows/ci.yml,
+barwise/package.json, .github/workflows/ci.yml, +barwise/docs/adr/tested-in.json, barwise/scripts/check-adr-tests.mjs,
+barwise/scripts/lib/adr-facts.mjs, barwise/scripts/lib/adr-judge.mjs,
+barwise/scripts/lib/test-reports.mjs, barwise/scripts/lib/architecture-section.mjs,
 barwise/docs/adr/surface-capability-parity.md, barwise/docs/adr/probes.json,
 barwise/docs/ARCHITECTURE.md, barwise/scripts/check-adr-tests.mjs
 
@@ -188,10 +190,55 @@ same PR and named.
 
 ### 2. One pinned test per surface
 
-`check:adr-tests` reads, for a decision whose Consequences or
-`Enforced-by` names its test files, a passing tagged test in each.
-Small; it closes the "any one tagged test" half of barwise-ym8.0pq.
-The `toEqual` half waits on open decision 2.
+Grounding (main at dd5af687): both report formats `check:adr-tests`
+reads carry each test's source file, vitest as `testResults[].name` and
+`test-tag-reporter.mjs` as `file`, both absolute; `readTestReports`
+drops it today. The two tests decision 4 rests on are
+`mcp/tests/serverSpawn.test.ts` and
+`vscode/tests/unit/toolRegistration.test.ts`; the ADR names them only in
+Consequences prose.
+
+- **Where a decision names its files: `docs/adr/tested-in.json`**, a list
+  of `{ decision, files, why }` rows beside `probes.json`, `files` as
+  repository paths. Reading paths out of Consequences prose was the
+  first form, and was dropped: prose names files for other reasons too,
+  and a rule a reader cannot see from the text is the unknown unknown
+  the header exists to remove. A header grammar change was the second,
+  and was dropped as wider than one decision needs.
+- **The rule**: for each row, every named file has a passing test that
+  carries the decision's tag in its own title, read from the reports
+  this run wrote. A file whose tagged tests all skipped is a refusal, as
+  for a decision today; so is a file with no tagged test when any report
+  was unreadable (the decision rule's branch, reused). With every report
+  read, a file with no passed tagged test and at least one failed, or
+  none at all, is a finding naming the file. A row whose decision is not
+  a `tests` entry of its ADR, or whose file is not tracked, is a finding
+  (a row that outlived its decision).
+- **The readers** stay in `adr-facts.mjs` (the reader/judge split):
+  `readTestedIn(root)` returns the rows and the tracked paths they name,
+  or null when `tested-in.json` is missing, unparsable or not a list of
+  `{ decision, files, why }` rows, which the gate turns into a refusal,
+  never zero rows. The report readers keep each entry's file as a path
+  relative to the **report's own directory** (`packages/<pkg>/` for a
+  vitest report, `scripts/tests/` for a script report, `trial/tests/`
+  for the trial report), taken from the
+  part of the absolute path after that directory's last occurrence:
+  plan review found turbo's shared cache restores a report written in
+  another checkout, so its absolute prefix is not this root's. A null
+  `file` (the tag reporter writes `d.file ?? null`) leaves the entry
+  out of the per-file rule only.
+- **The judge** returns per-file skips as their own count, and the gate's
+  summary arithmetic reads it, so a per-file refusal is neither counted
+  as an unproven decision nor counted twice with the decision rule.
+- **One copy of the list**: CLAUDE.md's sentence naming the two pinned
+  tests points at `tested-in.json` instead of restating the paths.
+- **Planted red** in the gate's own tests (a temp tree with reports): one
+  of two named files passing, a named file untagged, a stale row, an
+  untracked path. No probe: probes plant a source edit and run a gate
+  named in `Enforced-by`, and decision 4 is a `tests` entry.
+- **Consequences** of surface-capability-parity name `tested-in.json`
+  for decision 4, and barwise-ym8.0pq narrows to the `toEqual` form,
+  which stays to review (open decision 2, option A).
 
 ## Open decisions (for review)
 

@@ -21,6 +21,8 @@ export const BEGIN =
 export const END = "<!-- END regen:architecture -->";
 
 export const ADR_DIR = "barwise/docs/adr/";
+/** The manifest naming the files a tested decision rests on (check:adr-tests). */
+export const TESTED_IN = `${ADR_DIR}tested-in.json`;
 /** An ADR, by repo-relative path: at any depth under ADR_DIR, its README aside. */
 export const isAdr = (f) => f.startsWith(ADR_DIR) && f.endsWith(".md") && !f.endsWith("/README.md");
 

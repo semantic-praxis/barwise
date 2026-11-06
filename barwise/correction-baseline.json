@@ -79,6 +79,12 @@
       "caught_by": "execution",
       "note": "The plan sent a reading with text before its subject to the reverse frame; the high implementation review ran such a reading through the verbalizer and got \"the that Order\", so the forward builder lets Each replace that text instead."
     },
+    "capability-matrix-check::8fc3dcde55b8": {
+      "spec": "capability-matrix-check.spec.md",
+      "excerpt": "- where a decision names its files: docs/adr/tested-in.json, a list of { decision, files, why } rows beside pr",
+      "caught_by": "reasoning",
+      "note": "WS2 design: reading test paths from Consequences prose and a header grammar change were weighed and set aside before any code, as alternatives considered."
+    },
     "ci-local-condition-parity::0bc9b629f788": {
       "spec": "ci-local-condition-parity.spec.md",
       "excerpt": "- ws1. scripts/lib/changed-class.mjs owns classify, and ci.yml's detect step is one line that runs it. it was checked against the last 40 merges to main, runnin",

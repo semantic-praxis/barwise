@@ -21,3 +21,17 @@ export const vitestReport = (pkgDir) =>
 
 /** The report for one script-test file, e.g. `gates.test.mjs`. */
 export const scriptReport = (file) => join(SCRIPT_REPORTS_DIR, file.replace(/\.mjs$/, ".jsonl"));
+
+/**
+ * The report that would hold a test file, by repository path, or `null`
+ * for a path no runner reports: so a named file's verdict waits only on
+ * its own report being read, not on every report.
+ */
+export function reportFor(file) {
+  const pkg = /^barwise\/packages\/([^/]+)\//.exec(file);
+  if (pkg) return vitestReport(pkg[1]);
+  const script = /^barwise\/scripts\/tests\/(.+)$/.exec(file);
+  if (script) return scriptReport(script[1]);
+  if (file.startsWith("barwise/trial/tests/")) return TRIAL_REPORT;
+  return null;
+}

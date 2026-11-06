@@ -1,0 +1,10 @@
+[
+  {
+    "decision": "surface-capability-parity#pinned-tool-lists",
+    "files": [
+      "barwise/packages/mcp/tests/serverSpawn.test.ts",
+      "barwise/packages/vscode/tests/unit/toolRegistration.test.ts"
+    ],
+    "why": "Each surface pins its own tool list; one passing test proves only its own surface's list."
+  }
+]
