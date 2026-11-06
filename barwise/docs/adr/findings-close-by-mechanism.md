@@ -9,7 +9,7 @@ docs/specs/correction-record-ratchet.spec.md,
 docs/specs/audit-finding-reader.spec.md
 Enforced-by: npm run audit:specs -- --check (person-classifies),
 npm run check:findings (mechanism-closes, person-classifies),
-tests (ratchet-both-ways),
+tests (ratchet-both-ways, ratchet-in-ci),
 none (barwise-ym8.k4d: ratchet-both-ways), none (barwise-ym8.h0l: person-classifies),
 none (barwise-ym8.ld2: ratchet-in-ci)
 
@@ -64,10 +64,19 @@ verdict on every row is safe to gate on, when raw detection is not.
     a baseline: `check:instruction-refs` (from the 2026-10-04 prompt
     audit) and `check:python-uv` each fail on a stale allowlist row, so
     a fixed site forces its row out.
-- Decision 2: each of the four audit ratchets implements both
-  directions. A test covers the stale-row direction only for
-  `audit:corrections` (barwise-2af).
-- Decision 4 has no gate.
+- `RATCHETS` in `scripts/lib/findings.mjs` lists one ratchet per
+  baseline the findings reader reads, with the `ci.yml` line that runs
+  it and a row its detector does not produce. A test fails when a
+  baseline has no ratchet, when a ratchet's line is not a `ci.yml`
+  step, and, per ratchet, when `--check` passes over the planted stale
+  row. An exemption is stated, not omitted:
+  - `trial:gate` is exempt from both, because a run needs
+    `trial:offline` results, which no CI job produces (barwise-ym8.ld2
+    for decision 4).
+  - The `audit:rubric` stale-row case needs the built promptlab, so it
+    skips in CI, which runs `test:scripts` before the build
+    (barwise-ym8.k4d for decision 2, with barwise-ym8.fi5).
+- Decision 4 beyond the registry:
   - `trial:gate` ratchets `trial-baseline.json`, but only the trial's
     unit tests run in CI. The enterprise-trial spec plans the small
     tier for CI in its WS6, and defers that wiring "not in this PR"

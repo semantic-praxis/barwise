@@ -53,7 +53,7 @@ import { ciLocalLibs } from "./ci-local-files.mjs";
 // The real list, imported statically (as dependency-cruiser requires
 // intended.cjs) so the plants below are written against what core declares.
 import EXTERNAL from "../lib/external-deps.cjs";
-import { SOURCE_FILES as FINDING_SOURCE_FILES } from "../lib/findings.mjs";
+import { RATCHETS, SOURCE_FILES as FINDING_SOURCE_FILES } from "../lib/findings.mjs";
 
 const SCRIPTS = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const REPO = execFileSync("git", ["rev-parse", "--show-toplevel"], {
@@ -2584,6 +2584,67 @@ function idOf(dir, excerptFragment) {
 const A_CORRECTION =
   "# Probe\n\nThe draft said the loader was pure, and implementing it showed the\n"
   + "loader reads the environment, so the claim was wrong in kind.\n";
+
+// Every ratchet in the registry fails --check on a baseline row its
+// detector does not produce: the stale half of decision 2, for each ratchet
+// rather than for the one that happened to get a test (barwise-2af).
+for (const rt of RATCHETS.filter((x) => x.staleRow)) {
+  test(`${rt.script} --check fails on a stale baseline row${rt.needsDist === undefined ? " [adr:findings-close-by-mechanism#ratchet-both-ways]" : ""}`, (t) => {
+    if (rt.needsDist !== undefined && !existsSync(join(REPO, "barwise", rt.needsDist))) {
+      t.skip(`${rt.needsDist} not built; run npm run build first`);
+      return;
+    }
+    const path = join(REPO, "barwise", FINDING_SOURCE_FILES[rt.source]);
+    const before = readFileSync(path, "utf8");
+    try {
+      const json = JSON.parse(before);
+      const key = Object.keys(json).find((k) => k !== "$comment");
+      json[key]["zz-planted-stale-row"] = rt.staleRow;
+      writeFileSync(path, JSON.stringify(json, null, 2) + "\n");
+      const r = gate(rt.script, REPO, "--check");
+      assert.equal(r.status, 1, `expected a finding (1), got ${r.status}:\n${r.stdout}${r.stderr}`);
+      assert.match(`${r.stdout}${r.stderr}`, rt.staleOutput);
+      assert.match(`${r.stdout}${r.stderr}`, /zz-planted-stale-row/);
+    } finally {
+      writeFileSync(path, before);
+    }
+  });
+}
+
+test("every baseline has a registered ratchet, wired into CI with a stale-row case, or a stated reason [adr:findings-close-by-mechanism#ratchet-in-ci]", async () => {
+  // RATCHETS (scripts/lib/findings.mjs) must cover every baseline the
+  // findings reader reads, so a new audit cannot land with neither check.
+  // Each ratchet's ci line must be a run: step ci.yml actually carries; an
+  // exemption must say why, in words, rather than be an omission.
+  assert.deepEqual(
+    RATCHETS.map((rt) => rt.source).sort(),
+    Object.keys(FINDING_SOURCE_FILES).sort(),
+    "a baseline has no ratchet in RATCHETS, or a ratchet names no baseline",
+  );
+  const { ciStepOccurrences } = await import("../lib/ci-occurrences.mjs");
+  const steps = ciStepOccurrences(join(REPO, ".github", "workflows", "ci.yml"));
+  for (const rt of RATCHETS) {
+    assert.ok(
+      (rt.ci === undefined) !== (rt.noCi === undefined),
+      `${rt.source}: a ratchet has a ci line or a noCi reason, exactly one`,
+    );
+    assert.ok(
+      (rt.staleRow === undefined) !== (rt.noStale === undefined),
+      `${rt.source}: a ratchet has a staleRow case or a noStale reason, exactly one`,
+    );
+    for (const why of [rt.noCi, rt.noStale]) {
+      if (why !== undefined) {
+        assert.ok(why.length > 20, `${rt.source}: an exemption needs its reason`);
+      }
+    }
+    if (rt.ci !== undefined) {
+      assert.ok(
+        steps.some((st) => st.run === rt.ci),
+        `${rt.source}: ci.yml has no step running "${rt.ci}"`,
+      );
+    }
+  }
+});
 
 test("audit-corrections fails on a correction record missing from the baseline [adr:findings-close-by-mechanism#ratchet-both-ways]", () => {
   const dir = correctionRepo({ "probe.spec.md": A_CORRECTION }, {});

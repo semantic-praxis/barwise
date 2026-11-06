@@ -221,3 +221,63 @@ export function readFindings(root) {
 
 /** The baseline file each source reads, for messages and tests. */
 export const SOURCE_FILES = Object.fromEntries(SOURCES.map((s) => [s.source, s.file]));
+
+/**
+ * The audit ratchets, one per baseline (findings-close-by-mechanism
+ * decisions 2 and 4). Each is wired into CI as `ci`, the exact `run:` line
+ * ci.yml must carry, or names why it is not (`noCi`); and each has a
+ * stale-row case, a row added to its baseline that its detector does not
+ * produce, which its `--check` must fail on, or names why it has none
+ * (`noStale`). Tests in gates.test.mjs read this list, so a ratchet added
+ * here gets both checks, and the list must cover every baseline above.
+ */
+export const RATCHETS = [
+  {
+    source: "duplication",
+    script: "audit-duplication.mjs",
+    ci: "npm run audit:duplication -- --check",
+    staleRow: { status: "accepted-benign", note: "a planted stale row", detail: "none" },
+    staleOutput: /STALE baseline entry no longer detected/,
+  },
+  {
+    source: "rubric",
+    script: "audit-rubric.mjs",
+    ci: "npm run audit:rubric -- --check",
+    staleRow: {
+      case: "none",
+      kind: "must_validate",
+      message: "x",
+      verdict: "accepted-benign: a planted stale row",
+    },
+    staleOutput: /Baseline entry no longer detected/,
+    // Scores through the built promptlab, as its writer test does.
+    needsDist: "packages/promptlab/dist/index.js",
+  },
+  {
+    source: "specs",
+    script: "audit-spec-status.mjs",
+    ci: "npm run audit:specs -- --check",
+    staleRow: { status: "Draft", commits: ["00000000"], note: "a planted stale row" },
+    staleOutput: /STALE baseline row/,
+  },
+  {
+    source: "corrections",
+    script: "audit-corrections.mjs",
+    ci: "npm run audit:corrections -- --check",
+    staleRow: {
+      spec: "none.spec.md",
+      excerpt: "x",
+      caught_by: "execution",
+      note: "a planted stale row",
+    },
+    staleOutput: /no longer detected|STALE/,
+  },
+  {
+    source: "trial",
+    script: "../trial/lib/gate.mjs",
+    noCi:
+      "needs trial:offline results, which no CI job produces; the trial spec's WS6 wires that lane (barwise-uuy)",
+    noStale:
+      "its stale check covers only rows whose step ran, so a case needs trial:offline results",
+  },
+];
