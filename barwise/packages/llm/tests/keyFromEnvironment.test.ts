@@ -20,54 +20,52 @@ const packagesDir = resolve(here, "../..");
 /** A variable name that looks like a credential. */
 const CREDENTIAL = /KEY|TOKEN|SECRET/i;
 
-/** Each finding as `file: form`, so a failure names what to look at. */
+/**
+ * The one shape a read may take: `process.env` followed directly by a
+ * literal name -- `.NAME`, `?.NAME`, `["NAME"]` or `?.["NAME"]`.
+ */
+const LITERAL_READ = /^(?:\??\.\s*([A-Za-z_$][\w$]*)|(?:\?\.)?\[\s*(["'])([^"'\\]*)\2\s*\])/;
+
+/**
+ * Each finding, so a failure names what to look at.
+ *
+ * An allowlist rather than a list of bad forms: every occurrence of
+ * `process.env` must be a read of a literal name that is not a credential,
+ * and anything else -- an alias, a destructure, a computed index, the object
+ * handed to a function -- fails, because each one is a way to read a key
+ * this scan could not name. `env` imported from `node:process`, and a
+ * namespace import of it, fail outright for the same reason.
+ */
 function keyReads(code: string): string[] {
   const found: string[] = [];
 
-  // process.env.X
-  for (const m of code.matchAll(/process\.env\.([A-Za-z_$][\w$]*)/g)) {
-    if (CREDENTIAL.test(m[1]!)) found.push(`process.env.${m[1]}`);
-  }
-
-  // process.env["X"], and any index that is not a plain string literal
-  for (const m of code.matchAll(/process\.env\s*\[\s*([^\]]*)\]/g)) {
-    const index = m[1]!.trim();
-    const literal = /^(["'])([^"'`]*)\1$/.exec(index) ?? /^`([^`$]*)`$/.exec(index);
-    if (literal === null) {
-      found.push(`process.env[${index}] (computed)`);
+  for (const m of code.matchAll(/\bprocess\s*(?:\?\.|\.)\s*env\b/g)) {
+    const rest = code.slice(m.index! + m[0].length);
+    const read = LITERAL_READ.exec(rest);
+    const context = (m[0] + rest.slice(0, 30)).split("\n")[0]!.trim();
+    if (read === null) {
+      found.push(`${context} (not a read of a literal name)`);
       continue;
     }
-    const name = literal[2] ?? literal[1]!;
-    if (CREDENTIAL.test(name)) found.push(`process.env[${index}]`);
+    const name = read[1] ?? read[3]!;
+    if (CREDENTIAL.test(name)) found.push(`${context} (credential name)`);
   }
 
-  // const { X } = process.env
-  for (const m of code.matchAll(/\{([^{}]*)\}\s*=\s*process\.env\b/g)) {
-    for (const part of m[1]!.split(",")) {
-      const name = part.trim().replace(/^\.\.\./, "").split(/[:=]/)[0]!.trim();
-      if (name !== "" && CREDENTIAL.test(name)) found.push(`{ ${name} } = process.env`);
-    }
+  // process["env"], or the object reached any other computed way
+  for (const m of code.matchAll(/\bprocess\s*(?:\?\.)?\[[^\]]*\]/g)) {
+    found.push(`${m[0]} (computed access to process)`);
   }
 
-  // env.X after `import { env } from "node:process"` (or `env as e`)
-  for (const m of code.matchAll(/import\s*\{([^}]*)\}\s*from\s*["'](?:node:)?process["']/g)) {
-    for (const part of m[1]!.split(",")) {
-      const spec = /^\s*env(?:\s+as\s+([A-Za-z_$][\w$]*))?\s*$/.exec(part);
-      if (spec === null) continue;
-      const local = spec[1] ?? "env";
-      const dotted = new RegExp(`(?<![\\w$.])${local}\\.([A-Za-z_$][\\w$]*)`, "g");
-      for (const r of code.matchAll(dotted)) {
-        if (CREDENTIAL.test(r[1]!)) found.push(`${local}.${r[1]} (from node:process)`);
-      }
-      const indexed = new RegExp(`(?<![\\w$.])${local}\\s*\\[\\s*([^\\]]*)\\]`, "g");
-      for (const r of code.matchAll(indexed)) {
-        const index = r[1]!.trim();
-        const literal = /^(["'])([^"'`]*)\1$/.exec(index);
-        if (literal === null || CREDENTIAL.test(literal[2]!)) {
-          found.push(`${local}[${index}] (from node:process)`);
-        }
-      }
+  for (const m of code.matchAll(/\bimport\s+([^;]*?)\s*from\s*["'](?:node:)?process["']/g)) {
+    const clause = m[1]!;
+    if (/\*\s*as\b/.test(clause)) found.push(`${m[0]} (namespace import)`);
+    const named = /\{([^}]*)\}/.exec(clause);
+    if (named !== null && named[1]!.split(",").some((p) => /^\s*env\b/.test(p))) {
+      found.push(`${m[0]} (env imported)`);
     }
+  }
+  for (const m of code.matchAll(/\brequire\s*\(\s*["'](?:node:)?process["']\s*\)/g)) {
+    found.push(`${m[0]} (process required)`);
   }
 
   return found;
@@ -77,18 +75,36 @@ describe("model keys are read from the environment only inside @barwise/llm", ()
   it("the detector sees every form it is meant to (self-check)", () => {
     // Without this, a regex that matched nothing would pass the tree scan
     // below for the wrong reason.
-    expect(keyReads(`const k = process.env.ANTHROPIC_API_KEY;`)).toHaveLength(1);
-    expect(keyReads(`const k = process.env["OPENAI_API_KEY"];`)).toHaveLength(1);
-    expect(keyReads(`const k = process.env[name];`)).toHaveLength(1);
-    expect(keyReads(`const { GH_TOKEN, HOME } = process.env;`)).toEqual([
-      "{ GH_TOKEN } = process.env",
-    ]);
-    expect(keyReads(`import { env } from "node:process";\nenv.MY_SECRET;`)).toHaveLength(1);
-    expect(keyReads(`const h = process.env["HOME"]; const x = process.env.XDG_STATE_HOME;`))
-      .toEqual([]);
+    const positives = [
+      `const k = process.env.ANTHROPIC_API_KEY;`,
+      `const k = process.env["OPENAI_API_KEY"];`,
+      `const k = process.env?.GH_TOKEN;`,
+      `const k = process.env?.["MY_SECRET"];`,
+      `const k = process.env[name];`,
+      `const { HOME } = process.env;`,
+      `const { HOME }: NodeJS.ProcessEnv = process.env;`,
+      `const e = process.env;`,
+      `spawn("x", { env: process.env });`,
+      `const k = process["env"].HOME;`,
+      `import { env } from "node:process";`,
+      `import { env as e } from "process";`,
+      `import * as p from "node:process";`,
+    ];
+    for (const code of positives) {
+      expect(keyReads(code), code).not.toEqual([]);
+    }
+    const negatives = [
+      `const h = process.env["HOME"];`,
+      `const x = process.env.XDG_STATE_HOME;`,
+      `const h = process.env?.["HOME"] ?? process.env?.USERPROFILE;`,
+      `import { argv } from "node:process";`,
+    ];
+    for (const code of negatives) {
+      expect(keyReads(code), code).toEqual([]);
+    }
   });
 
-  it("no package's src outside packages/llm reads a KEY, TOKEN or SECRET variable or indexes process.env by a computed name [adr:keyless-model-access#measurement-key]", () => {
+  it("no package's src outside packages/llm touches process.env except to read a literal, non-credential name, or imports env from node:process [adr:keyless-model-access#measurement-key]", () => {
     const packages = readdirSync(packagesDir).filter((p) => p !== "llm");
     // The scan must have something to scan, or an empty glob passes.
     expect(packages).toContain("cli");

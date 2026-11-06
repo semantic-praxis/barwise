@@ -97,24 +97,48 @@ describe("--api-key is refused", () => {
 
 describe("no option takes a credential", () => {
   /**
-   * barwise-xsg's rule, over every command the program registers: a long
-   * name with a hyphen-separated word key, secret, password or credential,
-   * or ending in -token. Words, not substrings, so --max-tokens and
-   * --surrogate-keys pass. --api-key is the one declared exception: it is
-   * declared so the root hook can refuse it by name.
+   * Names that look like a credential and are not one, each with the reason.
+   * An entry here is a reviewed decision; a new option is not exempt until
+   * someone adds it.
    */
+  const NOT_CREDENTIALS: Readonly<Record<string, string>> = {
+    "--api-key": "the declared refusal: declared so the root hook can refuse it by name",
+    "--max-tokens": "a token count, not a token",
+    "--surrogate-keys": "generated database keys on export, not a credential",
+  };
+
+  /**
+   * A long name's words: split on hyphens and camelCase, lowercased, a
+   * trailing plural "s" dropped -- so --api-keys, --apiKey and --authToken
+   * read as the same words as their hyphenated singulars.
+   */
+  function words(long: string): string[] {
+    return long
+      .replace(/^--/, "")
+      .replace(/([a-z0-9])([A-Z])/g, "$1-$2")
+      .split("-")
+      .filter((w) => w !== "")
+      .map((w) => w.toLowerCase().replace(/s$/, ""));
+  }
+
+  /**
+   * barwise-xsg's rule, widened: a word that is key, secret, password,
+   * credential or token, or that ends in key or token (apikey, authtoken).
+   */
+  function looksLikeCredential(long: string): boolean {
+    return words(long).some((w) =>
+      ["key", "secret", "password", "credential", "token"].includes(w)
+      || w.endsWith("key")
+      || w.endsWith("token")
+    );
+  }
+
   function credentialOptions(command: Command, path: string[] = []): string[] {
     const found: string[] = [];
     for (const o of command.options) {
       const long = o.long;
-      if (long === undefined || long === "--api-key") continue;
-      const words = long.replace(/^--/, "").split("-");
-      if (
-        words.some((w) => ["key", "secret", "password", "credential"].includes(w))
-        || long.endsWith("-token")
-      ) {
-        found.push(`${path.join(" ") || "(root)"} ${long}`);
-      }
+      if (long === undefined || long in NOT_CREDENTIALS) continue;
+      if (looksLikeCredential(long)) found.push(`${path.join(" ") || "(root)"} ${long}`);
     }
     for (const sub of command.commands) {
       found.push(...credentialOptions(sub, [...path, sub.name()]));
@@ -122,7 +146,30 @@ describe("no option takes a credential", () => {
     return found;
   }
 
-  it("no command or subcommand declares a key, secret, password, credential or token option besides --api-key [adr:keyless-model-access#no-key-in-argv]", async () => {
+  it("the matcher reads every spelling of a credential (self-check)", () => {
+    for (
+      const long of [
+        "--token",
+        "--api-keys",
+        "--apiKey",
+        "--authToken",
+        "--db-password",
+        "--client-secret",
+      ]
+    ) {
+      expect(looksLikeCredential(long), long).toBe(true);
+    }
+    for (const long of ["--model", "--focus", "--base-url", "--output-dir"]) {
+      expect(looksLikeCredential(long), long).toBe(false);
+    }
+    // The reviewed exceptions do read as credentials, so each entry in
+    // NOT_CREDENTIALS is load-bearing rather than decoration.
+    for (const long of Object.keys(NOT_CREDENTIALS)) {
+      expect(looksLikeCredential(long), long).toBe(true);
+    }
+  });
+
+  it("no command or subcommand declares a key, secret, password, credential or token option besides the reviewed exceptions [adr:keyless-model-access#no-key-in-argv]", async () => {
     const program = await createProgram();
     // The walk must reach the nested commands, or it passes on nothing.
     const names = program.commands.flatMap((c) => [c.name(), ...c.commands.map((s) => s.name())]);

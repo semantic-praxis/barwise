@@ -13,7 +13,7 @@
  * `vscode` is mocked at the boundary, the way `toolRegistration.test.ts` and
  * `ChatParticipant.test.ts` do, so the real module runs.
  */
-import { readdirSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import {
   dirname,
   join as joinPath,
@@ -22,6 +22,9 @@ import {
 } from "node:path";
 import { fileURLToPath } from "node:url";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+// One copy of the comment stripper, shared across packages by a relative
+// path: a second copy here would be a must-agree pair with no check.
+import { readCode, sourceFiles } from "../../../llm/tests/helpers/sourceText.js";
 
 interface Inspected {
   globalValue?: string;
@@ -224,43 +227,10 @@ describe("setAnthropicApiKey", () => {
  * Its constant there is not exported, so any other reader has to spell the
  * literal; finding the literal is finding the reader. Comments are stripped
  * first, because `ImportTranscriptCommand.ts` explains in one that it used to
- * read the setting. A minimal stripper rather than a shared helper: the llm
- * package's copy lives in another package's tests, and importing across
- * test trees would couple two packages that share nothing else here.
+ * read the setting. The stripper is llm's test helper, imported by path.
  */
 describe("the key's setting has one reader", () => {
   const vscodeDir = resolvePath(dirname(fileURLToPath(import.meta.url)), "../..");
-
-  function stripComments(source: string): string {
-    let out = "";
-    let i = 0;
-    while (i < source.length) {
-      const c = source[i]!;
-      if (c === "/" && source[i + 1] === "/") {
-        while (i < source.length && source[i] !== "\n") i++;
-      } else if (c === "/" && source[i + 1] === "*") {
-        const end = source.indexOf("*/", i + 2);
-        i = end === -1 ? source.length : end + 2;
-      } else if (c === '"' || c === "'" || c === "`") {
-        let j = i + 1;
-        while (j < source.length && source[j] !== c) j += source[j] === "\\" ? 2 : 1;
-        out += source.slice(i, j + 1);
-        i = j + 1;
-      } else {
-        out += c;
-        i++;
-      }
-    }
-    return out;
-  }
-
-  function sourceFiles(dir: string): string[] {
-    return readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
-      const path = joinPath(dir, e.name);
-      if (e.isDirectory()) return sourceFiles(path);
-      return /\.tsx?$/.test(e.name) ? [path] : [];
-    });
-  }
 
   it("no file under src other than llm/anthropicKey.ts contains anthropicApiKey outside a comment [adr:keyless-model-access#no-key-in-setting]", () => {
     const src = joinPath(vscodeDir, "src");
@@ -269,11 +239,11 @@ describe("the key's setting has one reader", () => {
     const owner = joinPath(src, "llm/anthropicKey.ts");
     expect(files).toContain(owner);
     // The owner itself must still hold it, or the scan proves nothing.
-    expect(stripComments(readFileSync(owner, "utf8"))).toContain("anthropicApiKey");
+    expect(readCode(owner)).toContain("anthropicApiKey");
 
     const readers = files
       .filter((f) => f !== owner)
-      .filter((f) => stripComments(readFileSync(f, "utf8")).includes("anthropicApiKey"))
+      .filter((f) => readCode(f).includes("anthropicApiKey"))
       .map((f) => relativePath(vscodeDir, f));
     expect(readers).toEqual([]);
   });

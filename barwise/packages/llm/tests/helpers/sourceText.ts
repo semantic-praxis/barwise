@@ -12,9 +12,17 @@ import { join } from "node:path";
  * import specifier); comments are blanked because the decisions these tests
  * hold are about code, and the files explaining them name the very things
  * they forbid. Newlines survive, so a line number still points somewhere
- * real. Not a full lexer: a regex literal containing a quote can hide the
- * rest of its line, which can only make a check miss, never report a false
- * finding.
+ * real.
+ *
+ * Not a full lexer, and the failure runs both ways. A quote inside a regex
+ * literal (`/["']/`) opens a fake string that runs to the next matching
+ * quote, keeping any comment in between in view -- so a check can report a
+ * false finding on a comment's text -- and from there the real strings and
+ * code are out of phase, so a `//` inside a real string can blank code a
+ * check should have seen. When a finding points at a comment, or a planted
+ * violation is not found, rewrite the regex without the bare quote
+ * (`/[\x22\x27]/`, or `new RegExp(...)`) or put a comment containing the
+ * matching quote after it to close the fake string on the same line.
  */
 export function stripComments(source: string): string {
   let out = "";

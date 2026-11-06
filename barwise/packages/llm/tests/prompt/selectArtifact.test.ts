@@ -9,9 +9,9 @@
  * barwise-850 survived for months. So this pins the candidate set and
  * the per-surface default directly, not through a surface.
  */
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
+import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { builtinArtifacts } from "../../src/prompt/artifacts/builtins.generated.js";
@@ -19,7 +19,7 @@ import type { PromptArtifact } from "../../src/prompt/artifacts/PromptArtifact.j
 import { defaultReviewArtifact } from "../../src/prompt/reviewPrompt.js";
 import { assertArtifactSurface, selectArtifact } from "../../src/prompt/selectArtifact.js";
 import { defaultExtractionArtifact } from "../../src/prompt/systemPrompt.js";
-import { readCode } from "../helpers/sourceText.js";
+import { readCode, sourceFiles } from "../helpers/sourceText.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const packagesDir = resolve(here, "../../..");
@@ -131,6 +131,13 @@ describe("shipped-only", () => {
     // A new import -- a directory loader, node:fs, node:os -- fails here
     // until someone reviews whether it widens the candidate set.
     const code = readCode(join(packagesDir, "llm/src/prompt/selectArtifact.ts"));
+    // Other ways to reach a module or the environment than a static import:
+    // `process` (process.env, process.getBuiltinModule), require(),
+    // import(), and a re-export, which importsOf does not read.
+    const otherReaches = code.split("\n").filter((line) =>
+      /\bprocess\b|\brequire\s*\(|\bimport\s*\(|\bexport\b[^;]*\bfrom\b/.test(line)
+    );
+    expect(otherReaches).toEqual([]);
     expect(importsOf(code)).toEqual([
       "./artifacts/PromptArtifact.js",
       "./artifacts/builtins.generated.js",
@@ -212,25 +219,74 @@ describe("shipped-only", () => {
     });
   });
 
-  it("no production call site passes an artifact property [adr:production-prompt-resolution#shipped-only]", () => {
-    // Read with comments stripped: several of these files explain, in a
-    // comment, the very property they must not pass.
-    const callSites = [
-      "cli/src/commands/import/transcript.ts",
-      "cli/src/commands/import/batch.ts",
-      "cli/src/commands/review.ts",
-      "mcp/src/tools/import.ts",
-      "mcp/src/tools/review.ts",
-      "vscode/src/mcp/ToolRegistration.ts",
-      "vscode/src/commands/ImportTranscriptCommand.ts",
-    ];
+  /**
+   * The prompt lane: the only files outside llm and promptlab that may name
+   * an artifact, because choosing one is their job.
+   */
+  const PROMPT_LANE: Readonly<Record<string, string>> = {
+    "cli/src/commands/prompt.ts":
+      "barwise prompt eval/artifact/run: the dev lane that sends candidates",
+    "cli/src/workspace/promptArtifacts.ts":
+      "artifactCandidates(dir): the dev lane's candidate loader",
+  };
+
+  /**
+   * Files using "artifact" in the lineage sense -- an exported file such as
+   * a DDL script -- which is not a prompt artifact. Exempt only while the
+   * file does not import @barwise/llm (asserted below): a file that cannot
+   * reach processTranscript or reviewModel cannot hand either one an
+   * artifact. One that starts importing llm loses the exemption.
+   */
+  const LINEAGE_SENSE: Readonly<Record<string, string>> = {
+    "cli/src/commands/export.ts": "records the exported file in the lineage manifest",
+    "cli/src/commands/lineage.ts": "reports stale and affected exported files",
+    "core/src/export/types.ts": "the lineage export entry type",
+    "core/src/lineage/generate.ts": "lineage manifest generation",
+    "core/src/lineage/impact.ts": "impact analysis over exported files",
+    "core/src/lineage/manifest.ts": "lineage manifest merge",
+    "core/src/lineage/resolveArtifact.ts": "resolves an exported file to its source",
+    "core/src/lineage/staleness.ts": "staleness over exported files",
+    "core/src/lineage/types.ts": "lineage manifest types",
+    "mcp/src/tools/describeDomain.ts": "resolves an exported file back to its model",
+    "mcp/src/tools/exportModel.ts": "the exported file a call produces",
+  };
+
+  it("no src file outside llm, promptlab and the prompt lane names an artifact in code [adr:production-prompt-resolution#shipped-only]", () => {
+    // Any use of the identifier, not only `artifact:` -- the shorthand
+    // `{ artifact }` and a call site nobody listed both count. Comments are
+    // stripped: several production files explain, in one, the very property
+    // they must not pass.
     const offenders: string[] = [];
-    for (const site of callSites) {
-      const lines = readCode(join(packagesDir, site)).split("\n");
-      lines.forEach((line, i) => {
-        if (/\bartifact\s*:/.test(line)) offenders.push(`${site}:${i + 1}: ${line.trim()}`);
-      });
+    const exemptions: string[] = [];
+    let scanned = 0;
+    for (const pkg of readdirSync(packagesDir)) {
+      if (pkg === "llm" || pkg === "promptlab") continue;
+      let files: string[];
+      try {
+        files = sourceFiles(join(packagesDir, pkg, "src"));
+      } catch {
+        continue; // no src directory
+      }
+      for (const file of files) {
+        scanned++;
+        const rel = relative(packagesDir, file).split(sep).join("/");
+        if (rel in PROMPT_LANE) continue;
+        const code = readCode(file);
+        if (rel in LINEAGE_SENSE) {
+          if (/from\s*["']@barwise\/llm["']/.test(code)) {
+            exemptions.push(
+              `${rel} imports @barwise/llm, so its lineage exemption no longer holds`,
+            );
+          }
+          continue;
+        }
+        code.split("\n").forEach((line, i) => {
+          if (/\bartifact\b/.test(line)) offenders.push(`${rel}:${i + 1}: ${line.trim()}`);
+        });
+      }
     }
+    expect(scanned).toBeGreaterThan(100);
+    expect(exemptions).toEqual([]);
     expect(offenders).toEqual([]);
   });
 });

@@ -267,7 +267,21 @@ describe("the call-log record carries no artifact field", () => {
     expect(s.entries).toHaveLength(2);
     for (const entry of s.entries) {
       expect(Object.keys(entry).length).toBeGreaterThan(0);
-      expect(Object.keys(entry).filter((k) => /artifact/i.test(k))).toEqual([]);
+      // Every key at every depth: `prompt: { artifactVersion }` is the same
+      // second answer, one level down.
+      expect(keyPaths(entry).filter((p) => /artifact/i.test(p))).toEqual([]);
     }
   });
+
+  /** Every key path in a value, through nested objects and arrays. */
+  function keyPaths(value: unknown, prefix = ""): string[] {
+    if (Array.isArray(value)) {
+      return value.flatMap((v, i) => keyPaths(v, `${prefix}[${i}]`));
+    }
+    if (typeof value !== "object" || value === null) return [];
+    return Object.entries(value).flatMap(([k, v]) => {
+      const path = prefix === "" ? k : `${prefix}.${k}`;
+      return [path, ...keyPaths(v, path)];
+    });
+  }
 });

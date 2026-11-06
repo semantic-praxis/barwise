@@ -250,11 +250,9 @@ describe("the production surfaces stay narrow", () => {
       }
       const longs = command.options.map((o) => o.long ?? o.flags);
       expect(longs.length).toBeGreaterThan(0);
-      const forbidden = longs.filter((l) =>
-        l.replace(/^--/, "").split("-").some((w) =>
-          ["artifact", "artifacts", "prompt", "candidate"].includes(w)
-        )
-      );
+      // A substring match, the same one the MCP and VS Code checks use, so
+      // --candidates, --prompts-dir and --promptDir all count.
+      const forbidden = longs.filter((l) => /artifacts?|prompts?|candidates?/i.test(l));
       expect(forbidden).toEqual([]);
     });
   }
