@@ -23,7 +23,7 @@ the root `CLAUDE.md` conventions ("A leaked credential is rotated, never
 reverted"). Why detection is delegated, why the wrapper exists, and the
 rejected alternatives are in `credential-scanning.spec.md`; removing the
 places a key can be written down is `docs/adr/keyless-model-access.md`,
-and the exit contract Decision 4 applies is
+and the exit contract `credential-handling.md#wrapper-contract` applies is
 `docs/adr/gate-refusal-contract.md`.
 
 ## Decision
@@ -98,7 +98,7 @@ and the exit contract Decision 4 applies is
     keeps `ci.yml` or the session hook from assigning another (barwise-3wu).
 - Left open in the spec, not decided here (its Open decisions carry
   recommendations, none marked resolved; the first, keeping the local
-  Anthropic rule, is settled by CLAUDE.md, which Decision 2 follows):
+  Anthropic rule, is settled by CLAUDE.md, which `credential-handling.md#gitleaks-detects` follows):
   - whether the wrapper should refuse a gitleaks other than the pin; today
     it prints the version (barwise-8fc);
   - whether `.gitleaksignore` entries are checked for staleness; no such

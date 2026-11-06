@@ -11,7 +11,7 @@
     "beads-merge.test.mjs": 41,
     "check-adr-tests.test.mjs": 12,
     "ci-conditions.test.mjs": 19,
-    "gates.test.mjs": 283,
+    "gates.test.mjs": 284,
     "generated-marks.test.mjs": 4,
     "masked-exit.test.mjs": 28,
     "measure-comparison.test.mjs": 42,

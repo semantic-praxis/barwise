@@ -67,28 +67,29 @@ condition, is a separate decision (`steward` section 4b).
   `reachAcknowledged` entry; it exits 2 when an input cannot be read or
   is malformed. It does not check that anyone reads the
   routing.
-- Decision 1's mechanism is `.github/workflows/copilot-review.yml`,
+- `review-policy.md#copilot-requested`'s mechanism is `.github/workflows/copilot-review.yml`,
   whose shell runs against a stubbed `gh` in `gates.test.mjs` (the
   `test:scripts` step, `if: docs_only != 'true'`). Since 2026-10-19 the
-  request job runs only on a manual dispatch, so neither decision 1 nor
-  decision 2's re-ask on the next push is carried out until someone
-  restores its `if:` (barwise-ilb). Two exceptions to decision 1 have no
+  request job runs only on a manual dispatch, so neither
+  `review-policy.md#copilot-requested` nor
+  `review-policy.md#copilot-never-blocks`'s re-ask on the next push is carried out until someone
+  restores its `if:` (barwise-ilb). Two exceptions to `review-policy.md#copilot-requested` have no
   deciding source: drafts are skipped until marked ready, and a failed
   read of the reviews or the request events stops the job red without
   requesting (barwise-m9q). Copilot reads hand-written modelling guidance, not the
   checklist (barwise-1040).
-- Decision 2 has no gate, by design: nothing reads a Copilot verdict.
-- Decision 3 has no gate. `pr-creation` and `pr-review` hold it, and
+- `review-policy.md#copilot-never-blocks` has no gate, by design: nothing reads a Copilot verdict.
+- `review-policy.md#review-md-owns-lanes` has no gate. `pr-creation` and `pr-review` hold it, and
   nothing records that `/code-review` or `/security-review` ran
   (barwise-953). A stacked pull request gets no CI until `main` is
   merged into it after its parent merges (`steward` section 4a). `pr-risk` does not
   route the `/security-review` triggers (barwise-16u), and REVIEW.md's
   lane table omits the Copilot lane (barwise-j9d).
-- Decision 4: nothing records that `pr-risk` ran on the reviewed head or
+- `review-policy.md#tier-informs`: nothing records that `pr-risk` ran on the reviewed head or
   that its groups were run (barwise-953). Printing the routing in CI was
   deferred by the owner on 2026-10-24 until reviewers are shown to use
   it (`review-routing.spec.md`, WS3; barwise-6mf).
-- Decision 5 has no gate. The classification has had its seed pass and
+- `review-policy.md#prevent-upstream` has no gate. The classification has had its seed pass and
   first mechanism; the pass that measures that mechanism is open
   (barwise-1050) and has no new Copilot findings to read while the
   request is paused (barwise-ilb). No reviewer is scored against real

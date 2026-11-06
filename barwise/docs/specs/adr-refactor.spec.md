@@ -1,6 +1,6 @@
 # ADR refactor: each decision enforced, restated, or retired to prose
 
-Status: Draft -- no workstream implemented
+Status: WS1 decided 2026-11-06 (the owner's answers on all 25 rows); decision citations by id implemented 2026-11-06 (`check:architecture` resolves `<adr>.md#<id>`, and the numbered citations of the five ADRs WS1 renumbers are rewritten); row 1's spec and the batches not started
 
 Created: 2026-11-05
 Last-updated: 2026-11-06

@@ -62,8 +62,9 @@ format lives and how it reaches the surfaces.
 
 - `npm run purity` (ci.yml, `if: steps.changes.outputs.docs_only !=
   'true'`) refuses static file-system, subprocess and network imports
-  and environment access in core, so the I/O half of decision 2 and the
-  "no discovery" half of decision 4 have a backstop
+  and environment access in core, so the I/O half of `connector-packages.md#connector-owns-io` and the
+  "no discovery" half of `connector-packages.md#explicit-registration`
+  have a backstop
   (`architecture-scenarios.md` S-EXPL-5). It misses dynamic imports,
   `process.cwd()` and global `fetch` (barwise-fzd), and a `require`
   call, which no issue tracks yet (barwise-fzd's list is measured and
@@ -72,12 +73,12 @@ format lives and how it reaches the surfaces.
   'true'`) fails when core's source imports another internal package's
   source, so core cannot reach a connector; tests and external
   libraries are outside it.
-- Decision 1 has no gate of its own: a pure, text-in text-out
+- `connector-packages.md#core-no-interop` has no gate of its own: a pure, text-in text-out
   `ImportFormat` or `ExportFormatAdapter` under `core/src` -- a class, an
   object literal, or a `formatRegistry.register` call -- passes every
   gate. None exists
   today (barwise-2uz).
-- Decision 3 has no gate; whether code is domain logic or descriptor is
+- `connector-packages.md#descriptor-wraps-core` has no gate; whether code is domain logic or descriptor is
   a review judgment, and no check is proposed for it.
 - That each surface registers what it needs is review-only (S-EXPL-5).
   A missing registration fails loudly ("not registered", "Unknown
@@ -93,7 +94,7 @@ format lives and how it reaches the surfaces.
   `@barwise/dbt` directly. The connector-io-migration spec (workstream
   4) re-pointed that import to `@barwise/dbt` and named it "the only
   tool-layer code that imports a dbt symbol directly rather than through
-  the registry". Decision 4 says how formats get registered, not whether
+  the registry". `connector-packages.md#explicit-registration` says how formats get registered, not whether
   a surface may also call a connector's functions directly, which
   surfaces do in other places too; that is open (barwise-5zi).
 - Core cannot import or export on its own until a connector registers,

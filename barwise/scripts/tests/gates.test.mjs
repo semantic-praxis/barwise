@@ -7191,6 +7191,59 @@ test("check:architecture resolves each ADR reference in the files that act on it
   }
 });
 
+test("check:architecture resolves each decision citation to a decision id its ADR has", () => {
+  const { dir } = architectureRepo();
+  try {
+    stageAdr(dir, "a-concern", ADR_OK);
+    // Both citation forms, a bare name for some other document's anchor
+    // (not an ADR, so not read), and a spec citing a decision of an ADR its
+    // own Touches: creates, which the check leaves to that PR.
+    stage(
+      dir,
+      "barwise/docs/guide.md",
+      "Held by docs/adr/a-concern.md#the-rule, and a-concern.md#the-rule.\n"
+        + "See README.md#install for setup.\n",
+    );
+    stage(
+      dir,
+      "barwise/docs/specs/p.spec.md",
+      "# P\n\nStatus: Draft\nTouches: +barwise/docs/adr/planned.md\n\n## Body\n\nplanned.md#new-rule\n",
+    );
+    execFileSync("git", ["commit", "-qm", "cites"], { cwd: dir });
+    const ok = runArch(dir);
+    assert.equal(ok.status, 0, ok.stdout + ok.stderr);
+    for (
+      const [file, edit, why] of [
+        // A retirement renumbers; an id it removed is a dead citation, in
+        // either form.
+        [
+          "barwise/docs/guide.md",
+          (s) => s.replace("docs/adr/a-concern.md#the-rule", "docs/adr/a-concern.md#gone-rule"),
+          /guide\.md:1: cites docs\/adr\/a-concern\.md#gone-rule, and a-concern has no decision \{#gone-rule\}/,
+        ],
+        [
+          "barwise/docs/guide.md",
+          (s) => s.replace(", and a-concern.md#the-rule", ", and a-concern.md#gone-rule"),
+          /guide\.md:1: cites a-concern\.md#gone-rule, and a-concern has no decision/,
+        ],
+        // Without its Touches: entry, a citation of a planned ADR's decision
+        // is the reference loop's finding (no such ADR), not a crash here.
+        [
+          "barwise/docs/adr/a-concern.md",
+          (s) => s.replace("It holds.", "It holds; see a-concern.md#no-such."),
+          /a-concern\.md:\d+: cites a-concern\.md#no-such/,
+        ],
+      ]
+    ) {
+      const r = archPlanted(dir, file, edit);
+      assert.equal(r.status, 1, r.stdout + r.stderr);
+      assert.match(r.stderr, why);
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test("check:architecture reads wrapped, retiring and doc references, and skips a deleted file", () => {
   const { dir } = architectureRepo();
   try {

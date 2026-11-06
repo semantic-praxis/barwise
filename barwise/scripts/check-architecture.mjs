@@ -45,6 +45,7 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { decisionIds } from "./lib/adr-enforcement.mjs";
 import { createGovernanceReader } from "./lib/adr-facts.mjs";
 import { judgeDeclarations, needsWorkflow } from "./lib/adr-judge.mjs";
 import {
@@ -82,6 +83,16 @@ const RUNTIME = ["dependencies", "peerDependencies", "optionalDependencies"];
 // line; and `ADR` is a whole word (not the tail of `MADR`).
 const ADR_REF =
   /\bADR[ \t]*(?:\r?\n[ \t]*(?:[>*#]|\/\/)?[ \t]*)?`([a-z0-9][a-z0-9-]*)`|docs\/adr\/([a-z0-9][a-z0-9-]*)\.md/g;
+/**
+ * A citation of one decision: `<adr>.md#<id>`, with or without the
+ * `docs/adr/` path (an ADR cites another ADR by bare file name). The id is
+ * the decision's `{#id}`, so a retirement that renumbers an ADR cannot
+ * leave the citation pointing at another decision, which a citation by
+ * number would (docs/specs/adr-refactor.spec.md, Scope). A bare
+ * `<name>.md#<fragment>` whose name is no ADR is some other document's
+ * anchor and is not read.
+ */
+const DECISION_REF = /(docs\/adr\/)?\b([a-z0-9][a-z0-9-]*)\.md#([a-z0-9]+(?:-[a-z0-9]+)*)/g;
 const SCOPES = ["architecture", "process"];
 /**
  * The files whose ADR references are read: a named set, not "everything
@@ -369,6 +380,31 @@ for (const { f, text } of citing) {
     const name = m[1] ?? m[2];
     if (!adrNames.has(name) && !declared.has(name)) {
       adrProblems.push(`${f}:${line}: names ADR ${name}, and ${ADR_DIR}${name}.md does not exist`);
+    }
+  }
+}
+
+// Every decision citation names a decision its ADR has. A citation of an
+// ADR not in the tree (one a spec plans, or one being deleted) is left to
+// the reference loop above, which knows the Touches: exceptions.
+const idsOf = new Map(
+  adrs.map((a) => [
+    a.f.slice(ADR_DIR.length, -".md".length),
+    new Set(decisionIds(a.text).decisions.map((d) => d.id).filter((id) => id !== null)),
+  ]),
+);
+for (const { f, text } of citing) {
+  let line = 1;
+  let at = 0;
+  for (const m of text.matchAll(DECISION_REF)) {
+    for (; at < m.index; at++) if (text[at] === "\n") line++;
+    const [, path, name, id] = m;
+    const ids = idsOf.get(name);
+    if (ids === undefined) continue;
+    if (!ids.has(id)) {
+      adrProblems.push(
+        `${f}:${line}: cites ${path ?? ""}${name}.md#${id}, and ${name} has no decision {#${id}}`,
+      );
     }
   }
 }

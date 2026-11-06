@@ -46,7 +46,7 @@ assumes you bring from the book:
 - **The relational schema is derived.** Tables, keys and foreign keys
   fall out of the conceptual model by the Rmap procedure (section 11.3).
   Barwise recomputes them and never stores them
-  (`docs/adr/metamodel-evolution-policy.md`, decision 5).
+  (`docs/adr/metamodel-evolution-policy.md#recompute-derived`).
 
 Three things the book covers that barwise deliberately does not model, so you do
 not look for them: dynamic rules and process models (chapter 15), conceptual
