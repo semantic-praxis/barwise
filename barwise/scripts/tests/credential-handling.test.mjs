@@ -8,7 +8,15 @@
  */
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  chmodSync,
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { test } from "node:test";
@@ -24,6 +32,31 @@ function code(text) {
   return text.split("\n").map((line) =>
     line.replace(/"[^"]*"|'[^']*'/g, '""').replace(/(^|\s)#.*$/, "$1")
   );
+}
+
+/** The environment without git's location variables: a hook's GIT_DIR would
+ *  send a test's `git init/add/commit` to the repository running it. */
+function cleanEnv(extra = {}) {
+  const env = Object.fromEntries(
+    Object.entries(process.env).filter(([k]) => !k.startsWith("GIT_")),
+  );
+  return { ...env, ...extra };
+}
+
+/**
+ * A directory of links to exactly the tools named, found on the current
+ * PATH. A stand-in test's PATH is its own directory plus this one, never
+ * /usr/bin: a packaged gitleaks there would answer instead of the stand-in.
+ */
+function toolDir(t, tools) {
+  const dir = mkdtempSync(join(tmpdir(), "barwise-tools-"));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  for (const tool of tools) {
+    const found = spawnSync("sh", ["-c", `command -v ${tool}`], { encoding: "utf8" }).stdout.trim();
+    if (!found.startsWith("/")) throw new Error(`this test needs ${tool} on PATH`);
+    symlinkSync(found, join(dir, tool));
+  }
+  return dir;
 }
 
 /**
@@ -55,10 +88,21 @@ test("`.gitleaks.toml` extends the default rules and adds exactly one, for Anthr
   const tables = tomlTables(read(".gitleaks.toml"));
   const extend = tables.filter(([h]) => h === "[extend]");
   assert.equal(extend.length, 1, "one [extend] table");
-  assert.equal(extend[0][1].useDefault, "true", "[extend] useDefault = true");
+  // Only useDefault: `disabledRules` or a `path` would narrow the default set.
+  assert.deepEqual(
+    extend[0][1],
+    { useDefault: "true" },
+    "[extend] is useDefault = true and nothing else",
+  );
   const rules = tables.filter(([h]) => h === "[[rules]]");
   assert.equal(rules.length, 1, `exactly one local rule, found ${rules.length}`);
-  assert.equal(rules[0][1].id, '"anthropic-api-key"');
+  const rule = rules[0][1];
+  assert.equal(rule.id, '"anthropic-api-key"');
+  // No allowlist, entropy or path keys that could quietly narrow it, and a
+  // pattern and keyword that are still about Anthropic keys.
+  assert.deepEqual(Object.keys(rule).sort(), ["description", "id", "keywords", "regex"]);
+  assert.match(rule.regex, /^'''sk-ant-/, "the regex matches sk-ant- keys");
+  assert.equal(rule.keywords, '["sk-ant-"]');
   assert.deepEqual(tables.map(([h]) => h).sort(), ["[[rules]]", "[extend]"], "no other table");
 });
 
@@ -76,6 +120,9 @@ test("CI scans the full history with no skip, and pre-commit scans the index [ad
   }
   assert.equal(found.length, 1, "exactly one CI step runs check:secrets");
   const [{ job, step }] = found;
+  // The job too: a skip or a non-blocking flag one level up is the same skip.
+  assert.equal(job.if, undefined, "the job running check:secrets has no if:");
+  assert.equal(job["continue-on-error"], undefined, "the job running check:secrets is blocking");
   assert.equal(step.if, undefined, "the check:secrets step has no if: (no docs-only skip)");
   assert.equal(
     step["continue-on-error"],
@@ -87,10 +134,17 @@ test("CI scans the full history with no skip, and pre-commit scans the index [ad
   assert.equal(checkout?.with?.["fetch-depth"], 0, "the job checks out full history");
 
   const hook = code(read("barwise/.husky/pre-commit")).map((l) => l.trim());
-  assert.ok(
-    hook.includes("sh scripts/hooks/check-staged-secrets.sh || exit $?"),
-    "pre-commit runs the staged scan and stops on its status",
-  );
+  const at = hook.indexOf("sh scripts/hooks/check-staged-secrets.sh || exit $?");
+  assert.ok(at >= 0, "pre-commit runs the staged scan and stops on its status");
+  // Nothing before it ends the hook on success: an `exit 0` or a guard
+  // that exits would skip the scan with this line still present.
+  for (const line of hook.slice(0, at)) {
+    assert.doesNotMatch(
+      line,
+      /\bexit\s+0\b|(&&|;|^)\s*exit\b|\breturn\b/,
+      `a line before the scan can end the hook: ${line}`,
+    );
+  }
   const staged = code(read("barwise/scripts/hooks/check-staged-secrets.sh")).join("\n");
   assert.match(staged, /npm run --silent check:secrets -- --staged\n\s*status=\$\?/);
   assert.match(
@@ -103,7 +157,8 @@ test("CI scans the full history with no skip, and pre-commit scans the index [ad
 /** A throwaway repository with this repository's `.gitleaks.toml` committed. */
 function secretsRepo() {
   const dir = mkdtempSync(join(tmpdir(), "barwise-cred-"));
-  const git = (...args) => execFileSync("git", args, { cwd: dir, stdio: "ignore" });
+  const git = (...args) =>
+    execFileSync("git", args, { cwd: dir, stdio: "ignore", env: cleanEnv() });
   git("init", "-q");
   git("config", "user.email", "t@example.invalid");
   git("config", "user.name", "t");
@@ -114,10 +169,10 @@ function secretsRepo() {
 }
 
 /**
- * The wrapper against a stand-in gitleaks. PATH is the stand-in plus
- * /usr/bin and /bin only: Node's spawn skips a file it cannot execute and
- * keeps searching, so with the usual PATH a real gitleaks would answer
- * instead (spec, plan review).
+ * The wrapper against a stand-in gitleaks. PATH is the stand-in and a
+ * directory of links to the tools it needs, nothing else: Node's spawn
+ * skips a file it cannot execute and keeps searching, so any directory
+ * holding a real gitleaks would let it answer instead (spec, plan review).
  */
 function withStandIn(t, script, ...args) {
   const repo = secretsRepo();
@@ -131,7 +186,7 @@ function withStandIn(t, script, ...args) {
   const r = spawnSync(process.execPath, [join(SCRIPTS, "check-secrets.mjs"), ...args], {
     cwd: repo,
     encoding: "utf8",
-    env: { ...process.env, PATH: `${bin}:/usr/bin:/bin` },
+    env: cleanEnv({ PATH: `${bin}:${toolDir(t, ["git", "sh", "chmod"])}` }),
   });
   return { r, bin, repo };
 }
@@ -178,10 +233,19 @@ test("CI and the session hook get gitleaks only from install-gitleaks.sh [adr:cr
     assert.match(read(file), /install-gitleaks\.sh/, `${file} calls the installer`);
     // An allowlist, not a list of banned forms: a `uses:` action, `go
     // install`, a docker image or a package manager all fail unnamed.
-    for (const [i, line] of code(read(file)).entries()) {
-      if (!/gitleaks/i.test(line)) continue;
-      const allowed = /install-gitleaks\.sh/.test(line) || /^\s*-?\s*name:/.test(line);
-      assert.ok(allowed, `${file}:${i + 1} gets gitleaks some other way: ${line.trim()}`);
+    // Quoted text counts (`uses: "gitleaks/..."` is still an action), except
+    // a message an echo prints; and each mention is judged on its own, so a
+    // second install chained onto the installer's line fails.
+    for (const [i, raw] of read(file).split("\n").entries()) {
+      let line = raw.replace(/(^|\s)#.*$/, "$1");
+      if (/^\s*-?\s*name:/.test(line)) continue;
+      line = line.replace(/\b(echo|printf)\s+("[^"]*"|'[^']*')/g, '$1 ""');
+      const rest = line.replaceAll("install-gitleaks.sh", "");
+      assert.doesNotMatch(
+        rest,
+        /gitleaks/i,
+        `${file}:${i + 1} gets gitleaks some other way: ${raw.trim()}`,
+      );
     }
   }
 });
@@ -193,8 +257,7 @@ test("the installer checks the digest before it unpacks anything [adr:credential
     rmSync(bin, { recursive: true, force: true });
     rmSync(target, { recursive: true, force: true });
   });
-  // curl writes bytes no digest matches; tar records that it ran. PATH has
-  // no gitleaks, so the installer does not stop at "already present".
+  // curl writes bytes no digest matches; tar records that it ran.
   writeFileSync(
     join(bin, "curl"),
     `#!/bin/sh\nwhile [ $# -gt 0 ]; do if [ "$1" = -o ]; then shift; echo junk > "$1"; fi; shift; done\necho ran > "${bin}/curl-ran"\n`,
@@ -202,9 +265,12 @@ test("the installer checks the digest before it unpacks anything [adr:credential
   writeFileSync(join(bin, "tar"), `#!/bin/sh\necho ran > "${bin}/tar-ran"\n`);
   chmodSync(join(bin, "curl"), 0o755);
   chmodSync(join(bin, "tar"), 0o755);
+  // PATH is the stand-ins and links to the installer's own tools only, so a
+  // gitleaks installed anywhere cannot make it stop at "already present".
+  const tools = toolDir(t, ["mkdir", "uname", "mktemp", "sha256sum", "cut", "install", "rm"]);
   const r = spawnSync("/bin/bash", [join(SCRIPTS, "install-gitleaks.sh"), target], {
     encoding: "utf8",
-    env: { ...process.env, PATH: `${bin}:/usr/bin:/bin` },
+    env: cleanEnv({ PATH: `${bin}:${tools}` }),
   });
   assert.ok(
     existsSync(join(bin, "curl-ran")),
