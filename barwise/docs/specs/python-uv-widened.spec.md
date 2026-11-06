@@ -146,7 +146,9 @@ or allowlisted with a reason in the same PR.
 
 ## Open decisions (for review)
 
-1. **How uv is installed** (decision 5's wording). Recommended: one
+1. **How uv is installed** (decision 5's wording). **Resolved (owner, 2026-11-06):
+   the script, "simple and consistent".** WS4 builds it and restates
+   decision 5 in the same PR. Recommended was: one
    `scripts/install-uv.sh`, called by CI and the session hook, holding the
    version and checking the uv that runs, as `install-gitleaks.sh` does
    for gitleaks. Decision 5 says CI installs uv with `python3 -m pip
@@ -156,7 +158,8 @@ or allowlisted with a reason in the same PR.
    That is the owner's call because it changes a decision's text. Today
    the session hook installs an unpinned uv only when none is present:
    this container runs uv 0.11.32 against CI's 0.12.7.
-2. **`.beads/hooks/` stays unscanned.** Recommended: yes, as vendored
+2. **`.beads/hooks/` stays unscanned.** **Resolved (owner, 2026-11-06): yes.**
+   Recommended was: yes, as vendored
    code, with the exclusion printed by the gate so it is not silent.
 
 ## Risks and testing

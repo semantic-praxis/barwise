@@ -217,7 +217,7 @@ across all 12 packages.
 The surfaces do **not** all expose the same capabilities. Consult this
 before assuming one is reachable from the surface you are working on.
 An unmarked gap is a bug, and a change to a surface's reach updates this
-table in the same commit. A VS Code "yes" means a palette command or a
+table in the same pull request. A VS Code "yes" means a palette command or a
 language-model tool (the latter gated by `barwise.enableMcpServer`,
 default on). The rules, what is pinned and what is not checked are in
 `docs/adr/surface-capability-parity.md`.

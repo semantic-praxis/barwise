@@ -46,7 +46,7 @@ Architecture:
 - [Package graph authority](adr/package-graph-authority.md) -- 2026-11-06 -- declared: depcruise (intended-is-graph), check:architecture (claude-md-rendering, runtime-deps-within, core-external-deps); gap: barwise-ym8.d3m (intended-is-graph); gap: barwise-ym8.xyn (core-external-deps)
 - [Production prompt resolution](adr/production-prompt-resolution.md) -- 2026-08-26 -- declared: tests (shipped-only, candidates-in-prompt-lane, recovered-not-recorded, library-seam); gap: barwise-ym8.x2g (recovered-not-recorded)
 - [Schema versioning](adr/schema-versioning.md) -- 2026-10-28 -- declared: tests (version-signal, minor-and-major, load-forward); gap: barwise-ym8.4i2 (version-signal); gap: barwise-ym8.31z (minor-and-major); gap: barwise-ym8.8l3 (shared-minor); gap: barwise-ym8.yfi (load-forward)
-- [Surface capability parity](adr/surface-capability-parity.md) -- 2026-11-04 -- declared: check:capability-matrix (matrix-records-reach, matrix-same-commit, vscode-yes-means), tests (pinned-tool-lists); gap: barwise-ym8.0pq (pinned-tool-lists); gap: barwise-ym8.wfy (matrix-records-reach); gap: barwise-ym8.3nm (matrix-same-commit)
+- [Surface capability parity](adr/surface-capability-parity.md) -- 2026-11-04 -- declared: check:capability-matrix (matrix-records-reach, matrix-same-commit, vscode-yes-means), tests (pinned-tool-lists); gap: barwise-ym8.0pq (pinned-tool-lists); gap: barwise-ym8.wfy (matrix-records-reach)
 
 Process:
 

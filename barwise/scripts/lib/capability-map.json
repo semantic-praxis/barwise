@@ -374,8 +374,8 @@
       "barwise.createView": "an editor helper for diagram views, not a capability of the toolkit",
       "barwise.loadView": "registered for the diagram webview's own use and not contributed to the palette, so no user reaches it as a command",
       "barwise.setAnthropicApiKey": "stores the measurement-lane key in secret storage (docs/adr/keyless-model-access.md), not a modeling capability",
-      "chat:barwise.chatParticipant": "the chat participant's slash commands; whether they count as VS Code reach is open decision 3 of capability-matrix-check.spec.md, and decision 3 of the ADR names only palette commands and language-model tools",
-      "mcp-provider:barwise.mcpServer": "hands the bundled MCP server to the editor's chat, so MCP's column is reachable there too; open decision 3 of capability-matrix-check.spec.md, and decision 3 of the ADR does not count it"
+      "chat:barwise.chatParticipant": "the chat participant's slash commands; not VS Code reach, per decision 3 of docs/adr/surface-capability-parity.md (owner, 2026-11-06)",
+      "mcp-provider:barwise.mcpServer": "hands the bundled MCP server to the editor's chat, so MCP's column is reachable there too; not VS Code reach, per decision 3 of docs/adr/surface-capability-parity.md (owner, 2026-11-06)"
     }
   }
 }
