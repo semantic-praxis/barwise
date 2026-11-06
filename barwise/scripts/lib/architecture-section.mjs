@@ -73,6 +73,19 @@ export function loadIntended(root) {
 }
 
 /**
+ * The external runtime dependencies each listed package may declare
+ * (scripts/lib/external-deps.cjs; package-graph-authority#core-external-deps).
+ */
+export function loadExternalDeps(root) {
+  const path = join(root, "barwise", "scripts", "lib", "external-deps.cjs");
+  const deps = createRequire(import.meta.url)(path);
+  const shape = isMap(deps)
+    && Object.values(deps).every((v) => Array.isArray(v) && v.every((d) => typeof d === "string"));
+  if (!shape) throw new Error(`${path} does not export a map of package to dependency list`);
+  return deps;
+}
+
+/**
  * What an ADR's `Enforced-by:` header declares, as the index shows it, or
  * "" for an ADR without one (docs/specs/executable-adrs.spec.md, WS4). Read
  * from the ADR's own text through parseEnforcedBy(), the reader the check

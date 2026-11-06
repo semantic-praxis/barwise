@@ -13,7 +13,9 @@ pipelines, and test harnesses without launching an editor.
 Allowed runtime dependencies: `yaml`, `ajv`, and `effect`, pinned to an
 exact version (`tests/effectVersion.test.ts` fails a range, and any other
 workspace package that declares it at a different version). No others
-without discussion. `effect` arrived with the decoders in `src/decode/`
+without discussion: the list is `barwise/scripts/lib/external-deps.cjs`,
+and `check:architecture` fails a runtime dependency it does not name
+(`docs/adr/package-graph-authority.md#core-external-deps`). `effect` arrived with the decoders in `src/decode/`
 (`docs/specs/effect-adoption.spec.md`, 1r, R1), and since R4 the 3.0
 loader reads every file through them alone. The barrel exports the
 serializer, which imports them, so loading core loads Effect, whether or

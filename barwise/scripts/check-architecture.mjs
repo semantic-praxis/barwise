@@ -53,6 +53,7 @@ import {
   currentSection,
   isAdr,
   isMap,
+  loadExternalDeps,
   loadIntended,
   readFiles,
   renderSection,
@@ -215,7 +216,7 @@ function graphLines(claudeMd) {
   return out;
 }
 
-let intended, drawnLines, manifests, adrs, citing, scriptFiles, root, section;
+let intended, externalDeps, drawnLines, manifests, adrs, citing, scriptFiles, root, section;
 try {
   // Inside the refusal: a bare `--root` throws, and that is "could not
   // answer", not the exit 1 a real disagreement uses.
@@ -246,6 +247,7 @@ try {
       return { dir, json };
     });
   if (manifests.length === 0) throw new Error(`no package.json under ${pkgs}`);
+  externalDeps = loadExternalDeps(root);
   // Two manifests with one name would map it to whichever was read last,
   // and every message after that would blame the wrong directory.
   const names = manifests.map((m) => m.json.name);
@@ -347,6 +349,34 @@ for (const { dir, json } of manifests) {
       if (target !== undefined && !intended[dir].includes(target)) {
         problems.push(`packages/${dir}: ${field} has ${dep}, INTENDED does not allow it`);
       }
+    }
+  }
+}
+
+// A listed package's external runtime dependencies are exactly its list
+// (package-graph-authority#core-external-deps): one the list lacks is a
+// dependency nobody decided on, and a listed one the manifest dropped is a
+// list that no longer says what the package ships.
+const manifestOf = new Map(manifests.map((m) => [m.dir, m.json]));
+for (const [p, allowedExternal] of Object.entries(externalDeps)) {
+  const json = manifestOf.get(p);
+  if (json === undefined) {
+    problems.push(`external-deps.cjs lists ${p}, which is not a package under packages/`);
+    continue;
+  }
+  const declared = new Set();
+  for (const field of RUNTIME) {
+    for (const dep of Object.keys(json[field] ?? {})) {
+      if (dirOf.has(dep)) continue;
+      declared.add(dep);
+      if (!allowedExternal.includes(dep)) {
+        problems.push(`packages/${p}: ${field} has ${dep}, external-deps.cjs does not list it`);
+      }
+    }
+  }
+  for (const dep of allowedExternal) {
+    if (!declared.has(dep)) {
+      problems.push(`external-deps.cjs lists ${dep} for ${p}, which its manifest does not declare`);
     }
   }
 }
