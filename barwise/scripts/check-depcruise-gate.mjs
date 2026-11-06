@@ -107,6 +107,10 @@ try {
     refusal =
       "dependency-cruiser did not answer (npx depcruise printed no JSON; is it installed? npm ci)";
   }
+  if (parsed !== undefined && !Array.isArray(parsed?.summary?.violations)) {
+    refusal =
+      "dependency-cruiser's JSON has no summary.violations list (another depcruise on PATH?)";
+  }
   const violations = parsed?.summary?.violations ?? [];
   const hit = violations.some(
     (v) =>
@@ -123,10 +127,13 @@ try {
   unlinkSync(probePath);
 }
 
-if (refusal !== undefined) {
+// A finding outranks a refusal: coverage failures found before the probe
+// could not run are still reported, red.
+if (refusal !== undefined && failures.length === 0) {
   console.error(`check-depcruise-gate: cannot answer -- ${refusal}`);
   process.exit(2);
 }
+if (refusal !== undefined) failures.push(`probe: cannot answer -- ${refusal}`);
 if (failures.length > 0) {
   console.error(`check-depcruise-gate: ${failures.length} failure(s)`);
   for (const f of failures) console.error("  " + f);

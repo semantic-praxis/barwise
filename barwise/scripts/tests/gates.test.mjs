@@ -5605,13 +5605,7 @@ test("depcruise exits by its violation count, never by the 8-bit exit code (barw
   assert.equal(exitFor({ summary: { error: 256 } }), 1);
   assert.equal(exitFor({ summary: {} }), 2);
   assert.equal(exitFor(undefined), 2);
-  // The real tree answers 0 through the npm script CI runs.
-  const r = spawnSync("npm", ["run", "-s", "depcruise"], {
-    cwd: join(REPO, "barwise"),
-    encoding: "utf8",
-  });
-  assert.equal(r.status, 0, r.stdout + r.stderr);
-  assert.match(r.stdout, /no dependency violations found/);
+  // The real tree is CI's own depcruise step, not this unit test's.
 });
 
 test("check-tracker-closes refuses when git answers emptily, with and without BASE_SHA (barwise-ydl) [adr:gate-refusal-contract#refuse-not-find]", () => {

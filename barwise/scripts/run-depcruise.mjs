@@ -37,11 +37,17 @@ async function main() {
     console.error(`depcruise: cannot answer -- ${why}`);
     process.exit(2);
   };
+  // The package's own entry script, run by this node: no shell, no PATH,
+  // no .bin shim (which on Windows is a .cmd that spawnSync cannot run).
+  const bin = join(root, "node_modules", "dependency-cruiser", "bin", "dependency-cruiser.mjs");
   const run = spawnSync(
-    join(root, "node_modules", ".bin", "depcruise"),
-    ["packages", "--config", ".dependency-cruiser.cjs", "--output-type", "json"],
+    process.execPath,
+    [bin, "packages", "--config", ".dependency-cruiser.cjs", "--output-type", "json"],
     { cwd: root, encoding: "utf8", maxBuffer: 256 * 1024 * 1024 },
   );
+  if (run.error?.code === "ENOBUFS") {
+    refuse("its JSON output is larger than the 256 MiB buffer; raise maxBuffer here");
+  }
   if (run.error) refuse(`dependency-cruiser did not start (${run.error.message}); npm ci`);
   let result;
   try {
@@ -53,11 +59,17 @@ async function main() {
       }`,
     );
   }
-  const { format } = await import("dependency-cruiser");
-  const report = await format(result, { outputType: "err" });
-  process.stdout.write(report.output);
+  // The count decides; read it before anything else can throw.
   const code = exitFor(result);
   if (code === 2) refuse("its JSON summary has no error-severity count");
+  let report;
+  try {
+    const { format } = await import("dependency-cruiser");
+    report = await format(result, { outputType: "err" });
+  } catch (err) {
+    refuse(`its result could not be formatted (${err instanceof Error ? err.message : err})`);
+  }
+  process.stdout.write(report.output);
   process.exit(code);
 }
 

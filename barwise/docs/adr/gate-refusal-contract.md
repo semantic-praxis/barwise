@@ -87,12 +87,12 @@ corrections made during grounding are in the spec above.
   - `npm run depcruise` exited with its violation count, which the OS
     keeps mod 256; `scripts/run-depcruise.mjs` exits by the count in
     the JSON summary (barwise-vt2).
-    `run-script-tests` exits 0 with its shallow-clone skips printed, which
-    decision 4's skip rule allows and the matrix reads as FALSE GREEN; the
-    spec takes `test:scripts` out of the matrix for that reason. Still open
-    from code reading: `check-depcruise-gate` writes a probe file into
-    `packages/core/src` and deletes it in a `finally`, so a killed run
-    leaves it in the tree (barwise-w43).
+- `run-script-tests` exits 0 with its shallow-clone skips printed, which
+  decision 4's skip rule allows and the matrix reads as FALSE GREEN; the
+  spec takes `test:scripts` out of the matrix for that reason.
+- Still open from code reading: `check-depcruise-gate` writes a probe file
+  into `packages/core/src` and deletes it in a `finally`, so a killed run
+  leaves it in the tree (barwise-w43).
 - Other open gaps: the trial gate reports PASS over results older than
   its inputs (barwise-e0q); `ci:local` passes on a Node `.nvmrc` does
   not pin (barwise-1045); nothing reports unwired git hooks
