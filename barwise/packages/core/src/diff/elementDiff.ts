@@ -19,6 +19,7 @@ import type { OrmModel } from "../model/OrmModel.js";
 import type { FactInstance, Population } from "../model/Population.js";
 import type { Role } from "../model/Role.js";
 import type { SubtypeFact } from "../model/SubtypeFact.js";
+import { compareCodeUnits } from "../util/compareCodeUnits.js";
 import type { ChangeDescription, RoleSummary } from "./changeDescription.js";
 import { constraintKey, type RoleKeys, valueConstraintKey } from "./constraintKey.js";
 import {
@@ -792,7 +793,7 @@ function tupleKey(inst: FactInstance, roles: readonly Role[]): string {
   const index = new Map(roles.map((r, i) => [r.id, i]));
   return Object.entries(inst.roleValues)
     .map(([roleId, value]) => [index.get(roleId) ?? `?${roleId}`, value] as const)
-    .sort(([a], [b]) => String(a).localeCompare(String(b)))
+    .sort(([a], [b]) => compareCodeUnits(String(a), String(b)))
     .map(([slot, value]) => `${slot}=${value}`)
     .join(",");
 }

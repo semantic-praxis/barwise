@@ -4,8 +4,8 @@ Scope: architecture
 Date: 2026-11-05
 Tracking: barwise-ubc, barwise-wcg.vlv, docs/specs/iri-identity.spec.md,
 docs/specs/archive/architecture-analysis.spec.md
-Enforced-by: npm run purity (pure-ops), none (barwise-ym8.lxl: pure-ops),
-none (barwise-ym8.kys: one-layer-out)
+Enforced-by: npm run purity (pure-ops), tests (one-layer-out),
+none (barwise-ym8.lxl: pure-ops)
 
 ## Context
 
@@ -53,21 +53,32 @@ spec; the gate is from the archived architecture-analysis spec.
   I/O is `connector-packages.md#connector-owns-io`; core's external
   dependencies are `package-graph-authority.md#core-external-deps`.
   With the tool-layer clause gone, `learn` and `promptlab` need no
-  placement. Its check, a depcruise rule forbidding
-  `@anthropic-ai/sdk` and `openai` outside `@barwise/llm`, is batch 8
-  of that spec; a plain `fetch` to a provider host stays a gap.
+  placement. `llm/tests/modelSdkBoundary.test.ts` holds it
+  (`purity-and-model-boundary.spec.md`): it fails when TypeScript's
+  import list for any `packages/*/src` file outside `llm` names
+  `@anthropic-ai/sdk` or `openai` (subpaths, dynamic imports,
+  `require` and re-exports included), or a `package.json` outside `llm`
+  lists either. A depcruise rule, the form first planned, cannot see a
+  package in `node_modules` under the config's `includeOnly`. A plain
+  `fetch` to a provider host stays a gap.
 - `npm run purity` (`barwise/scripts/check-core-purity.mjs`, a CI gate)
-  fails on an `fs`, `child_process`, `os` or network import, on
-  `process.env`, `new Date()`, `Date.now()`, `Math.random()`, the
-  global `crypto`, and on the LLM SDKs, in core's source outside
-  tests. It matches static imports and exact call shapes only, so a
-  dynamic import, global `fetch`, `performance.now()`, `process.cwd()`
-  or a named randomness import from `node:crypto` passes it
-  (barwise-fzd).
-- Three places in core break the decision today, none visible to the
+  parses core's tracked source with TypeScript and walks the syntax
+  tree, so a comment, string or regex literal can neither hide nor raise
+  a finding, and a type position is told from a value
+  (`purity-and-model-boundary.spec.md`). It fails on an `fs`,
+  `child_process`, `os`, network, `dns`, `undici`, `process`,
+  `module`, `worker_threads`, `readline`, `vm` or `perf_hooks` import
+  in any form, a runtime `import()`, a model SDK, and the identifiers
+  `process`, `fetch`, `performance`, `localeCompare`, `Intl`,
+  `toLocale*` and the named randomness functions, beside `new Date`,
+  `Date.now`, `Math.random` and the global `crypto`; it refuses when it
+  can list no source. Core's four locale-dependent sorts use
+  `compareCodeUnits` (barwise-c3z, fixed; a test shows one order under
+  sv_SE and en_US for the comparator and query's entity and anchor
+  orderings; diff's and replay's sorts are held by the gate's
+  `localeCompare` rule, not by that test).
+- Two places in core break the decision today, neither visible to the
   gate:
-  - query and diff sort with `localeCompare` and no locale, so their
-    order follows the machine (barwise-c3z);
   - `resolveArtifactInManifest` resolves relative paths against the
     working directory rather than the manifest's (barwise-dko);
   - counterexample generation mints fresh population ids, so its
