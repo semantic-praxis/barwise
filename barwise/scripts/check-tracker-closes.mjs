@@ -43,11 +43,16 @@ function git(args) {
 function resolveBase() {
   const fromEnv = process.env.BASE_SHA?.trim();
   if (fromEnv) return fromEnv;
+  let base;
   try {
-    return git(["merge-base", "origin/main", "HEAD"]).trim();
+    base = git(["merge-base", "origin/main", "HEAD"]).trim();
   } catch {
     return refuse("no $BASE_SHA and no merge-base with origin/main.");
   }
+  // git can answer with nothing and exit 0 (barwise-ydl): an empty base
+  // would diff as "no changes" and read clean.
+  if (!base) return refuse("no $BASE_SHA, and git merge-base printed nothing.");
+  return base;
 }
 
 /** Issue id -> status, from the tracker as committed at `rev`. */
@@ -58,6 +63,10 @@ function statuses(rev) {
   } catch {
     return refuse(`cannot read ${TRACKER} at ${rev}.`);
   }
+  // An empty read is not a tracker with no issues: the tracker is never
+  // empty, so empty means git answered with nothing (barwise-ydl), and an
+  // empty tracker on either side would read as "nothing closed".
+  if (!text.trim()) return refuse(`git show of ${TRACKER} at ${rev} printed nothing.`);
   const out = new Map();
   for (const [i, line] of text.split("\n").entries()) {
     if (!line.trim()) continue;

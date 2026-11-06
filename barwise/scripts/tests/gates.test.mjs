@@ -5533,6 +5533,46 @@ test("check-tracker-closes, run as ci:local --commit runs it, fails a close besi
   }
 });
 
+test("check-tracker-closes refuses when git answers emptily, with and without BASE_SHA (barwise-ydl) [adr:gate-refusal-contract#refuse-not-find]", () => {
+  // The fault matrix's git-empty axis read a FALSE GREEN here: an empty
+  // merge-base became base "", and an empty `git show` of the tracker a
+  // tracker with no issues, so nothing could be closed and the gate said
+  // OK. With BASE_SHA set, as CI sets it, the empty tracker read alone
+  // gave the same answer.
+  const dir = mkdtempSync(join(tmpdir(), "barwise-nogit-"));
+  try {
+    const stub = join(dir, "git");
+    writeFileSync(stub, "#!/bin/sh\nexit 0\n");
+    chmodSync(stub, 0o755);
+    for (const baseSha of ["", "0123456789abcdef0123456789abcdef01234567"]) {
+      const r = spawnSync(process.execPath, [join(SCRIPTS, "check-tracker-closes.mjs")], {
+        cwd: REPO,
+        encoding: "utf8",
+        env: { ...process.env, BASE_SHA: baseSha, PATH: `${dir}:${process.env.PATH ?? ""}` },
+      });
+      assert.equal(r.status, 2, `BASE_SHA=${JSON.stringify(baseSha)}: ${r.stdout}${r.stderr}`);
+      assert.doesNotMatch(r.stdout, /OK/);
+    }
+    // Only merge-base empty, every other call real: the base "" would make
+    // `git show :<tracker>` read the index, which is not empty, so the
+    // empty-tracker refusal cannot stand in for the empty-base one.
+    const realGit = execFileSync("sh", ["-c", "command -v git"], { encoding: "utf8" }).trim();
+    writeFileSync(
+      stub,
+      `#!/bin/sh\nif [ "$1" = merge-base ]; then exit 0; fi\nexec "${realGit}" "$@"\n`,
+    );
+    const r = spawnSync(process.execPath, [join(SCRIPTS, "check-tracker-closes.mjs")], {
+      cwd: REPO,
+      encoding: "utf8",
+      env: { ...process.env, BASE_SHA: "", PATH: `${dir}:${process.env.PATH ?? ""}` },
+    });
+    assert.equal(r.status, 2, `merge-base empty only: ${r.stdout}${r.stderr}`);
+    assert.match(r.stderr, /merge-base printed nothing/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test("check-tracker-closes refuses with no base rather than reporting clean", () => {
   const r = trackerRepo();
   try {
