@@ -1,6 +1,6 @@
 # The capability matrix, checked against what each surface registers
 
-Status: WS1 implemented 2026-11-06 (check:capability-matrix, full run and --static, with capability-map.json for all 22 rows and their cells; probes for matrix-records-reach, matrix-same-commit and vscode-yes-means CAUGHT; the gate agreed with main on its first run; code review dropped the stale-build refusal and made --static compare cells); WS2 planned (re-grounded and plan-reviewed 2026-11-06)
+Status: WS1 implemented 2026-11-06 (check:capability-matrix, full run and --static, with capability-map.json for all 22 rows and their cells; probes for matrix-records-reach, matrix-same-commit and vscode-yes-means CAUGHT; the gate agreed with main on its first run; code review dropped the stale-build refusal and made --static compare cells); WS2 implemented 2026-11-06 (docs/adr/tested-in.json names decision 4's two tests, and check:adr-tests requires a passed tagged test in each named file, reading report paths from the report's own directory so a turbo-restored report still matches)
 Created: 2026-11-06
 Last-updated: 2026-11-06
 Plan-reviewed: 8d9588bb (code-review, pr-review; WS2 re-reviewed at 0dc20f07)

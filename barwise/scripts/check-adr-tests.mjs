@@ -36,6 +36,19 @@
  * scripts/tests/expected-counts.json, and the `test:trial` report.
  * Any finding is exit 1, with the refusals listed beside it.
  *
+ * One passing tagged test proves a decision, so a decision held by a test on
+ * each of two surfaces read as proven with one of them gone. A row of
+ * docs/adr/tested-in.json names the files a decision rests on, and each
+ * named file must hold a passed test carrying the tag, judged by the rule
+ * above per file (docs/specs/capability-matrix-check.spec.md, WS2). The
+ * reports name absolute paths, kept from the report's own directory on, so a
+ * report turbo restored from another checkout still matches. Findings: a
+ * named file with no passed tagged test (one failed, or none, every report
+ * read), a row whose decision is not a `tests` entry, a path git does not
+ * track. Refusals: a named file whose tagged tests all skipped, one with
+ * none while a report is unread, and a tested-in.json that is missing,
+ * not JSON, or not a list of `{ decision, files, why }` rows.
+ *
  * It runs in CI after the test steps, on the same guard; on a docs-only
  * change no test ran, and an ADR change is not docs-only
  * (scripts/lib/changed-class.mjs).
@@ -44,8 +57,8 @@
  */
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { readTestReports } from "./lib/adr-facts.mjs";
-import { judgeTestedDecisions } from "./lib/adr-judge.mjs";
+import { readTestedIn, readTestReports } from "./lib/adr-facts.mjs";
+import { judgeTestedDecisions, judgeTestedIn } from "./lib/adr-judge.mjs";
 import { ADR_DIR, isAdr, readFiles, trackedPaths } from "./lib/architecture-section.mjs";
 import { opt } from "./lib/args.mjs";
 
@@ -71,7 +84,19 @@ try {
 // The report refusals come first, and the judge appends its own after them.
 const refusals = [...reports.refusals];
 const unreadableReports = reports.unreadable;
-const { findings, declaring, tested, skipOnly } = judgeTestedDecisions(adrs, reports, refusals);
+const { findings, declaring, tested, skipOnly, unproven } = judgeTestedDecisions(
+  adrs,
+  reports,
+  refusals,
+);
+// The per-file rows, after the decisions; an unreadable manifest is one
+// refusal, and the decision rule above still answers.
+const testedIn = readTestedIn(root, refusals);
+const perFile = testedIn === null
+  ? { findings: [], skipOnly: 0, unproven: 0 }
+  : judgeTestedIn(adrs, reports, testedIn, refusals);
+findings.push(...perFile.findings);
+const files = testedIn === null ? 0 : testedIn.rows.reduce((n, row) => n + row.files.length, 0);
 
 if (findings.length > 0) {
   console.error(`check:adr-tests: FAIL -- ${findings.length} finding(s):`);
@@ -80,8 +105,11 @@ if (findings.length > 0) {
 if (refusals.length > 0) {
   console.error(
     `check:adr-tests: cannot answer -- ${unreadableReports} report(s) not read,`
-      + ` ${refusals.length - unreadableReports - skipOnly} decision(s) left unproven by them,`
-      + ` ${skipOnly} decision(s) whose tagged tests all skipped:`,
+      + ` ${unproven} decision(s) left unproven by them,`
+      + ` ${skipOnly} decision(s) whose tagged tests all skipped,`
+      + ` ${perFile.unproven} named file(s) left unproven by them,`
+      + ` ${perFile.skipOnly} named file(s) whose tagged tests all skipped`
+      + `${testedIn === null ? ", tested-in.json not read" : ""}:`,
   );
   for (const r of refusals) console.error(`  ${r}`);
 }
@@ -89,5 +117,6 @@ if (findings.length > 0) process.exit(1);
 if (refusals.length > 0) process.exit(2);
 console.log(
   `check:adr-tests: ${tested} tested decision(s) across ${declaring} ADR(s) each have a`
-    + ` passing tagged test, in ${reports.expected.length} report(s) of ${reports.ran.length} test(s). OK`,
+    + ` passing tagged test, and so do the ${files} file(s) named by ${testedIn.rows.length}`
+    + ` tested-in row(s), in ${reports.expected.length} report(s) of ${reports.ran.length} test(s). OK`,
 );

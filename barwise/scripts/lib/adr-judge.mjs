@@ -299,6 +299,7 @@ export function judgeTestedDecisions(adrs, reports, refusals) {
     }
   }
   let skipOnly = 0;
+  let unproven = 0;
   const quoted = (titles) => titles.map((s) => `"${s}"`).join(", ");
   const suiteOnly = new Set(
     ran.flatMap((t) => [...(t.type === "suite" ? [t.title] : []), ...t.ancestors])
@@ -311,7 +312,7 @@ export function judgeTestedDecisions(adrs, reports, refusals) {
       const hint = suiteOnly.has(key)
         ? "; the tag is on a describe, and must be on the test itself"
         : "";
-      const unproven =
+      const message =
         `${a.f}: tests (${id}): no test carrying [adr:${key}] passed in this run${hint}`;
       if (failed.has(key)) {
         findings.push(`${a.f}: tests (${id}): a test carrying [adr:${key}] failed in this run`);
@@ -324,10 +325,90 @@ export function judgeTestedDecisions(adrs, reports, refusals) {
       } else if (unreadableReports > 0) {
         // With a report missing or unreadable, its passing test may be the one
         // not read: the answer is "cannot tell", never the finding code.
-        refusals.push(`${unproven}, and ${unreadableReports} report(s) were not read`);
-      } else findings.push(unproven);
+        unproven++;
+        refusals.push(`${message}, and ${unreadableReports} report(s) were not read`);
+      } else findings.push(message);
     }
   }
   const tested = declaring.reduce((n, a) => n + testedIds(a).length, 0);
-  return { findings, declaring: declaring.length, tested, skipOnly };
+  return { findings, declaring: declaring.length, tested, skipOnly, unproven };
+}
+
+/**
+ * Each tested-in row, judged file by file (check:adr-tests;
+ * docs/specs/capability-matrix-check.spec.md, WS2). The decision rule above
+ * is satisfied by one passing tagged test anywhere, so a decision held by a
+ * test on each of two surfaces read as proven with one of them gone; a row
+ * names the files that must each carry one. `testedIn` is readTestedIn()'s,
+ * never null here. The verdicts per file are the decision rule's, in its
+ * order: a pass proves it, a failure is a finding, all skipped is a
+ * refusal, and none at all is a refusal while any report is unread and a
+ * finding once all were read. A row whose decision is no `tests` entry, or
+ * a path git does not track, is a finding: the row outlived what it named.
+ * Returns the findings and the two refusal counts, which the gate prints
+ * apart from the decision rule's.
+ */
+export function judgeTestedIn(adrs, reports, testedIn, refusals) {
+  const findings = [];
+  let skipOnly = 0;
+  let unproven = 0;
+  const { ran, unreadable } = reports;
+  const testsEntries = new Map(
+    adrs.map(({ f, text }) => [
+      f.slice(ADR_DIR.length, -".md".length),
+      new Set(
+        parseEnforcedBy(text).entries.filter((e) => e.kind === "tests").flatMap((e) => e.ids),
+      ),
+    ]),
+  );
+  const at = `${ADR_DIR}tested-in.json`;
+  for (const { decision, files } of testedIn.rows) {
+    const [adr, id] = decision.split("#");
+    if (!testsEntries.get(adr)?.has(id)) {
+      findings.push(
+        `${at}: "${decision}" is not a tests entry of ${adr}'s Enforced-by; a row that outlived its decision`,
+      );
+      continue;
+    }
+    const tag = `[adr:${decision}]`;
+    for (const file of files) {
+      if (!testedIn.tracked.has(file)) {
+        findings.push(`${at}: "${decision}" names ${file}, which git does not track`);
+        continue;
+      }
+      const statuses = new Set();
+      const skippedTitles = [];
+      let onSuite = false;
+      for (const t of ran) {
+        if (t.file !== file) continue;
+        const keys = (title) => tagsIn(title).map((x) => `${x.adr}#${x.id}`);
+        if (t.type !== "test") {
+          if (keys(t.title).includes(decision)) onSuite = true;
+          continue;
+        }
+        if (t.ancestors.some((a) => keys(a).includes(decision))) onSuite = true;
+        if (!keys(t.title).includes(decision)) continue;
+        const status = t.status === "pending" ? "skipped" : t.status;
+        statuses.add(status);
+        if (status === "skipped") skippedTitles.push(t.title);
+      }
+      if (statuses.has("passed")) continue;
+      const hint = onSuite ? "; the tag is on a describe, and must be on the test itself" : "";
+      const message =
+        `${at}: "${decision}": no test in ${file} carrying ${tag} passed in this run${hint}`;
+      if (statuses.has("failed")) {
+        findings.push(`${at}: "${decision}": a test in ${file} carrying ${tag} failed in this run`);
+      } else if (skippedTitles.length > 0) {
+        skipOnly++;
+        refusals.push(
+          `${at}: "${decision}": every test in ${file} carrying ${tag} skipped, so this run`
+            + ` cannot tell: ${skippedTitles.map((s) => `"${s}"`).join(", ")}`,
+        );
+      } else if (unreadable > 0) {
+        unproven++;
+        refusals.push(`${message}, and ${unreadable} report(s) were not read`);
+      } else findings.push(message);
+    }
+  }
+  return { findings, skipOnly, unproven };
 }

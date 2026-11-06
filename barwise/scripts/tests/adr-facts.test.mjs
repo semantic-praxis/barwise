@@ -14,7 +14,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
-import { createGovernanceReader, readTestReports } from "../lib/adr-facts.mjs";
+import { createGovernanceReader, readTestReports, repoFile } from "../lib/adr-facts.mjs";
 import { scriptVerdict } from "../lib/adr-judge.mjs";
 import { build, RULES } from "../lib/adr-population.mjs";
 
@@ -169,6 +169,25 @@ test("adr-facts: the reports' unread count is fixed when they are read", () => {
     assert.match(r.refusals[0], /vitest\.json: missing/);
   } finally {
     rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("adr-facts: a report's source path is kept from the report's own directory on", () => {
+  const core = "barwise/packages/core/";
+  // Another checkout's prefix, and one that itself passes through a
+  // packages/core/ directory: the last occurrence is the report's own.
+  assert.equal(
+    repoFile("/tmp/wt/packages/core/x/barwise/packages/core/tests/a.test.ts", core),
+    "barwise/packages/core/tests/a.test.ts",
+  );
+  assert.equal(
+    repoFile("C:\\src\\barwise\\scripts\\tests\\g.test.mjs", "barwise/scripts/tests/"),
+    "barwise/scripts/tests/g.test.mjs",
+  );
+  // A sibling package whose name ends the same is not this one.
+  assert.equal(repoFile("/r/barwise/packages/xcore/tests/a.test.ts", core), null);
+  for (const abs of [null, undefined, "", "f", "/r/barwise/packages/core/"]) {
+    assert.equal(repoFile(abs, core), null, String(abs));
   }
 });
 

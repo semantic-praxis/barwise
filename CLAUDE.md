@@ -253,9 +253,9 @@ The labels follow the ADR's decision 1, and each `not yet` names a
 workstream of `docs/specs/surface-mirroring.spec.md`. `migrate` was
 added since, and the owner chose on 2026-11-05 to mirror it.
 
-The MCP and VS Code tool lists are pinned by `toEqual` tests
-(`mcp/tests/serverSpawn.test.ts`, `vscode/tests/unit/toolRegistration.test.ts`),
-so adding a tool means updating that list and this table.
+The MCP and VS Code tool lists are pinned by `toEqual` tests, one per
+surface, named in `barwise/docs/adr/tested-in.json`, so adding a tool
+means updating that surface's list and this table.
 `npm run check:capability-matrix` compares each row with what the CLI,
 the MCP server and the extension register, through
 `barwise/scripts/lib/capability-map.json`, which names what carries each
