@@ -39,24 +39,32 @@ closely: barwise does not try to replace Ossie, takes ideas from it where
 they serve barwise, and leans on it for what Ossie owns. Their reasoning is
 recorded in barwise-wcg's spec, `docs/specs/iri-identity.spec.md`.
 
+What crosses from Ossie into barwise follows one line of reasoning,
+which was part of decision 1 until 2026-11-06 (`adr-refactor.spec.md`,
+row 12). An idea from Ossie enters barwise because it serves barwise,
+never only because Ossie has it, as a barwise capability in barwise's
+own terms that must pass the metamodel filters
+(`docs/adr/metamodel-evolution-policy.md`, Context), so core still holds
+nothing specific to Ossie; identity (`ossie-interchange.md#readable-iri`)
+is the first, and barwise-wcg's spec runs the filters for it. barwise
+leans on Ossie, rather than building its own, for what Ossie owns: its
+core layer (datasets, fields, metrics), the metric expression language
+`OSSIE_SQL_2026` while it is a pending standard (barwise-pf2.xil),
+`ai_context`, which is not used for anything until Ossie settles it, and
+its vendor converters. The spec's deferral of value-type subtyping and
+an `ExportResult` warnings field until a second format needs them stands
+(its Open decisions 1 and 5). Each side keeps its own vocabulary: neither
+renames its terms to match the other (row 13 moved that clause here).
+
 ## Decision
 
-1. **Ossie is a peer standard; barwise neither replaces nor absorbs it.**{#peer-standard}
-   barwise's model stays the ORM 2 metamodel stored as `.orm.yaml`, and
-   Ossie documents enter and leave only through the `ossie` descriptor in
-   `@barwise/formats` (`docs/adr/connector-packages.md`). An idea from
-   Ossie enters barwise because it serves barwise, never only because Ossie
-   has it, as a barwise capability in barwise's own terms that must pass
-   `docs/adr/metamodel-evolution-policy.md` and its filters, so core still
-   holds nothing specific to Ossie; identity (decision 5) is the first, and
-   barwise-wcg's spec runs the filters for it. barwise leans on Ossie,
-   rather than building its own, for what Ossie owns: its core layer
-   (datasets, fields, metrics), the metric expression language
-   `OSSIE_SQL_2026` while it is a pending standard (barwise-pf2.xil),
-   `ai_context`, which is not used for anything until Ossie settles it,
-   and its vendor converters. The spec's deferral of value-type subtyping
-   and an `ExportResult` warnings field until a second format needs them
-   stands (its Open decisions 1 and 5).
+1. **barwise's model stays the ORM 2 metamodel in `.orm.yaml`, and Ossie
+   documents enter and leave only through the `ossie` descriptor in
+   `@barwise/formats`.**{#peer-standard} Ossie is a peer standard;
+   barwise neither replaces nor absorbs it (`docs/adr/connector-packages.md`).
+   The reasoning that governs what crosses, restated on 2026-11-06 from
+   part of this decision (`adr-refactor.spec.md`, row 12), is in
+   Context.
 2. **Only the ontology layer.**{#ontology-layer-only} barwise does not read or write Ossie's core
    layer or its mapping documents. Reading a logical schema up into a
    model, which is what those mapping documents describe, is
@@ -92,12 +100,14 @@ recorded in barwise-wcg's spec, `docs/specs/iri-identity.spec.md`.
    barwise-wcg's spec (`docs/specs/iri-identity.spec.md`), and the local
    name of a fact type, which in barwise belongs to no concept, is its
    decision 2.
-6. **Each side keeps its own vocabulary, and the `ossie` format
-   translates.**{#own-vocabulary} barwise speaks ORM 2 and Ossie speaks Ossie: neither
-   renames its terms to match the other, and nothing outside the `ossie`
-   descriptor -- its importer, `mapOssieToOrm.ts`, and its exporter,
-   `writeOssie.ts` -- translates between them. The construct-by-construct
-   translation is the spec's Scope, which is where it is written down.
+6. **Translation between ORM 2 and Ossie happens only in the `ossie`
+   descriptor.**{#own-vocabulary} That is its importer,
+   `mapOssieToOrm.ts`, and its exporter, `writeOssie.ts`; the
+   construct-by-construct translation is the spec's Scope. Decisions 1
+   and 6 share one check, batch 9 of `adr-refactor.spec.md`: a depcruise
+   rule that only `formats/src/ossie/` imports Ossie's types, its
+   vendored schema, `mapOssieToOrm` or `writeOssie`. "Core names
+   nothing Ossie-specific" is a report, not a gate.
 
 ## Consequences
 

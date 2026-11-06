@@ -38,14 +38,24 @@ spec; the gate is from the archived architecture-analysis spec.
    content (`serialization/derivedId.ts`). A value core would need from a
    clock or a random source arrives as an argument from the surface that
    owns it.
-2. **Non-determinism lives one layer out.** {#one-layer-out} A capability that cannot be
-   deterministic goes in an outer package: `@barwise/llm` for model
-   calls, a connector package (`@barwise/formats`, `@barwise/dbt`,
-   `@barwise/code-analysis`) for a format that owns its own I/O, and
-   the tool layer (`cli`, `mcp`, `vscode`) for anything else.
+2. **Outside core, only `@barwise/llm` imports a model SDK; a package
+   that needs a model reaches it through `@barwise/llm`'s
+   `LlmClient`.** {#one-layer-out}
 
 ## Consequences
 
+- Decision 2 was restated on 2026-11-06 (`adr-refactor.spec.md`, row 3)
+  from "non-determinism lives one layer out" to its one checkable rule.
+  The rest is true by construction or held elsewhere: a host-mediated
+  client (VS Code's language-model API, MCP sampling) lives in the
+  surface that owns the host connection; "core calls no model" and
+  "non-determinism lives outside core" are decision 1; a format's own
+  I/O is `connector-packages.md#connector-owns-io`; core's external
+  dependencies are `package-graph-authority.md#core-external-deps`.
+  With the tool-layer clause gone, `learn` and `promptlab` need no
+  placement. Its check, a depcruise rule forbidding
+  `@anthropic-ai/sdk` and `openai` outside `@barwise/llm`, is batch 8
+  of that spec; a plain `fetch` to a provider host stays a gap.
 - `npm run purity` (`barwise/scripts/check-core-purity.mjs`, a CI gate)
   fails on an `fs`, `child_process`, `os` or network import, on
   `process.env`, `new Date()`, `Date.now()`, `Math.random()`, the

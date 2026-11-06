@@ -39,11 +39,15 @@ in `keyless-model-access.spec.md`; detecting a key that leaks anyway is
    `CopilotLlmClient` over `vscode.lm`. The MCP server uses MCP sampling
    when the client advertises `sampling.tools`, falls back to
    `createLlmClient()` otherwise, and appends the route to the tool result.
-4. **The measurement lane is the one lane that must hold a key.**{#measurement-key}
-   promptlab, `prompt run` and the optimizer keep direct API access,
-   because a host-mediated call has no attributable model and a score
-   through one measures nothing. That key must be a workspace-scoped key
-   with a spend limit, never a personal one.
+4. **Only `@barwise/llm` reads a model key (the Python optimizer lane is
+   the one declared exception). Every call records the provider, the
+   model and a non-reversible identifier of the credential, and a change
+   in any of them between compared runs is reported beside the
+   scores.**{#measurement-key} The measurement lane (promptlab, `prompt
+   run`, the optimizer) keeps direct API access because a host-mediated
+   call has no attributable model, and a score through one measures
+   nothing. The credential identifier is a one-way fingerprint or the
+   provider's workspace id, never the key.
 5. **The library may take a key from its caller.**{#library-takes-key} `@barwise/llm` keeps its
    `apiKey` option; the hazard removed is a value in `process.argv` or a
    committable file, not a credential passed in code.
@@ -84,9 +88,16 @@ in `keyless-model-access.spec.md`; detecting a key that leaks anyway is
     API key" even when the fallback reached keyless Ollama (barwise-2n1).
   - 4: the measurement lane cannot reach a host-backed client:
     `npm run depcruise` (CI, under the same docs-only guard) holds promptlab to core, llm and learn, and both host-backed
-    clients live in `mcp` and `vscode`. That the key is workspace-scoped
-    with a spend limit is "not assertable from this tree" (spec, Open
-    decisions); it rests on the operator.
+    clients live in `mcp` and `vscode`. Decision 4 was restated on
+    2026-11-06 (`adr-refactor.spec.md`, row 6) from "the measurement
+    lane is the one lane that must hold a key", which also asked for a
+    workspace-scoped key with a spend limit. That is now guidance, not a
+    rule: it lives in the provider console, not in this tree. Its checks
+    (a pattern check that only `@barwise/llm` reads
+    `ANTHROPIC_API_KEY` or `OPENAI_API_KEY`, matching reads rather
+    than mentions, and a schema test that each call-log and
+    score-history entry carries all three fields) are batch 7 of that
+    spec; until they land, the gap issue in the header stands.
   - 5: nothing to check; it permits rather than forbids.
 - The spec requires that no eval or extraction artifact contains a
   provider key, shown by a sentinel test over written files. Only the
