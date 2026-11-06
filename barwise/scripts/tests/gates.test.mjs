@@ -5608,6 +5608,30 @@ test("depcruise exits by its violation count, never by the 8-bit exit code (barw
   // The real tree is CI's own depcruise step, not this unit test's.
 });
 
+test("check-depcruise-gate never writes its probe into the tree (barwise-w43) [adr:gate-refusal-contract#no-writes]", async () => {
+  // The probe used to live in packages/core/src for the length of a
+  // depcruise run, removed in a finally: a killed run left it there, and
+  // git status after the run could not see it. Polled while the gate
+  // runs, so a write undone before exit is still seen.
+  const probe = join(REPO, "barwise", "packages", "core", "src", "__depcruise-gate-probe__.ts");
+  const child = spawn(process.execPath, [join(SCRIPTS, "check-depcruise-gate.mjs")], {
+    cwd: REPO,
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  let out = "";
+  child.stdout.on("data", (d) => (out += d));
+  child.stderr.on("data", (d) => (out += d));
+  let seen = false;
+  const poll = setInterval(() => {
+    if (existsSync(probe)) seen = true;
+  }, 10);
+  const code = await new Promise((res) => child.on("close", res));
+  clearInterval(poll);
+  assert.equal(seen, false, "the probe appeared in packages/core/src during the run");
+  assert.equal(code, 0, out);
+  assert.match(out, /probe violation reported/);
+});
+
 test("check-tracker-closes refuses when git answers emptily, with and without BASE_SHA (barwise-ydl) [adr:gate-refusal-contract#refuse-not-find]", () => {
   // The fault matrix's git-empty axis read a FALSE GREEN here: an empty
   // merge-base became base "", and an empty `git show` of the tracker a
