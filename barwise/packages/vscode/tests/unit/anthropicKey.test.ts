@@ -13,7 +13,18 @@
  * `vscode` is mocked at the boundary, the way `toolRegistration.test.ts` and
  * `ChatParticipant.test.ts` do, so the real module runs.
  */
+import { readFileSync } from "node:fs";
+import {
+  dirname,
+  join as joinPath,
+  relative as relativePath,
+  resolve as resolvePath,
+} from "node:path";
+import { fileURLToPath } from "node:url";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+// One copy of the comment stripper, shared across packages by a relative
+// path: a second copy here would be a must-agree pair with no check.
+import { readCode, sourceFiles } from "../../../llm/tests/helpers/sourceText.js";
 
 interface Inspected {
   globalValue?: string;
@@ -206,5 +217,43 @@ describe("setAnthropicApiKey", () => {
     state.secrets.set(SECRET_KEY, KEY);
     await setAnthropicApiKey(secrets, undefined);
     expect(state.secrets.has(SECRET_KEY)).toBe(false);
+  });
+});
+
+/**
+ * Only `llm/anthropicKey.ts` may name the deprecated setting
+ * (docs/adr/keyless-model-access.md, `no-key-in-setting`, in part).
+ *
+ * Its constant there is not exported, so any other reader has to spell the
+ * literal; finding the literal is finding the reader. Comments are stripped
+ * first, because `ImportTranscriptCommand.ts` explains in one that it used to
+ * read the setting. The stripper is llm's test helper, imported by path.
+ */
+describe("the key's setting has one reader", () => {
+  const vscodeDir = resolvePath(dirname(fileURLToPath(import.meta.url)), "../..");
+
+  it("no file under src other than llm/anthropicKey.ts contains anthropicApiKey outside a comment [adr:keyless-model-access#no-key-in-setting]", () => {
+    const src = joinPath(vscodeDir, "src");
+    const files = sourceFiles(src);
+    expect(files.length).toBeGreaterThan(10);
+    const owner = joinPath(src, "llm/anthropicKey.ts");
+    expect(files).toContain(owner);
+    // The owner itself must still hold it, or the scan proves nothing.
+    expect(readCode(owner)).toContain("anthropicApiKey");
+
+    const readers = files
+      .filter((f) => f !== owner)
+      .filter((f) => readCode(f).includes("anthropicApiKey"))
+      .map((f) => relativePath(vscodeDir, f));
+    expect(readers).toEqual([]);
+  });
+
+  it("declares barwise.anthropicApiKey application-scoped, so no workspace can hold it [adr:keyless-model-access#no-key-in-setting]", () => {
+    const pkg = JSON.parse(readFileSync(joinPath(vscodeDir, "package.json"), "utf8")) as {
+      contributes: { configuration: { properties: Record<string, { scope?: string; }>; }; };
+    };
+    const setting = pkg.contributes.configuration.properties["barwise.anthropicApiKey"];
+    expect(setting).toBeDefined();
+    expect(setting!.scope).toBe("application");
   });
 });
