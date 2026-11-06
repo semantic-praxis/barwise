@@ -11,6 +11,7 @@ import { ModelSplitError, splitFiles, splitModel } from "../../src/project/split
 import { OrmYamlSerializer } from "../../src/serialization/OrmYamlSerializer.js";
 import { assembleProject, type ProjectFiles } from "../../src/serialization/projectAssembly.js";
 import { ProjectSerializer } from "../../src/serialization/ProjectSerializer.js";
+import { CURRENT_ORM_VERSION } from "../../src/serialization/schemaVersion.js";
 import { projectRules } from "../../src/validation/rules/projectRules.js";
 import { ValidationEngine } from "../../src/validation/ValidationEngine.js";
 
@@ -157,6 +158,23 @@ describe("splitModel", () => {
     expect(result.warnings).toContainEqual(
       expect.stringContaining('namespace "https://data.acme.com/shop#" ends in "#"'),
     );
+  });
+
+  it("states CURRENT_ORM_VERSION in every domain file, whatever the source stated [adr:schema-versioning#version-signal]", () => {
+    // splitModel writes domain files itself rather than through the
+    // serializer, so the serializer's own stamp test does not reach them.
+    // SHOP_MODEL is 1.0: a domain file that copied the source's version
+    // would claim 1.0 for a 4.0 document.
+    const result = splitModel(SHOP_MODEL, {
+      projectName: "Shop",
+      domains: { crm: ["Customer"], billing: ["Invoice"] },
+    });
+    expect(result.domains).toHaveLength(2);
+    for (const domain of result.domains) {
+      expect((parse(domain.yaml) as { orm_version: unknown; }).orm_version).toBe(
+        CURRENT_ORM_VERSION,
+      );
+    }
   });
 
   it("produces one domain file per configured context", () => {

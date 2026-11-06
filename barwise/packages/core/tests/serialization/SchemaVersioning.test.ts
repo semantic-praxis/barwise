@@ -38,6 +38,16 @@ describe("OrmYamlSerializer version handling", () => {
     expect(() => serializer.deserialize(modelYaml("5.0"))).not.toThrow(/must be equal to constant/);
   });
 
+  it("refuses a document with no orm_version, naming the missing field [adr:schema-versioning#version-signal]", () => {
+    // A file with no version is not read as the oldest or the newest: either
+    // guess would put a version on a file that never stated one, and a
+    // guessed current version would let a pre-versioning file reach the
+    // current reader as if it were valid.
+    const unstamped = "model:\n  name: T\n";
+    expect(() => serializer.deserialize(unstamped)).toThrow(DeserializationError);
+    expect(() => serializer.deserialize(unstamped)).toThrow(/orm_version is missing/);
+  });
+
   it("rejects an unknown older version with a no-path message", () => {
     expect(() => serializer.deserialize(modelYaml("0.9"))).toThrow(/no migration path/);
   });

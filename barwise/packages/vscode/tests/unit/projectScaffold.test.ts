@@ -4,7 +4,7 @@ import { parse } from "yaml";
 import { PROJECT_SCAFFOLD } from "../../src/commands/projectScaffold.js";
 
 describe("PROJECT_SCAFFOLD", () => {
-  it("claims the orm_version the serializer writes today (barwise-5t9.14)", () => {
+  it("claims the orm_version the serializer writes today (barwise-5t9.14) [adr:schema-versioning#version-signal]", () => {
     // The scaffold carried a literal "1.0" through the bump to 1.1. A
     // new file migrates on load either way, but a scaffold that says
     // an older version than the tool that wrote it is a claim about
