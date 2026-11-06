@@ -31,6 +31,12 @@
  *     writes nothing, where `uv run` would sync the project and could
  *     rebuild a venv; and it answers for a venv already on another minor,
  *     which the file alone cannot show.
+ *   - the uv that runs (`uv --version`) on another version than
+ *     scripts/install-uv.sh's VERSION, or that script or its VERSION line
+ *     missing (python-from-the-lockfile decision 5, python-uv-widened WS4).
+ *     uv is installed only by that script; this reads back what runs,
+ *     however it was installed, since a cached older uv first on PATH is
+ *     what a session kept before the installer ran on every start.
  *   - a pin file or workflow that would not read.
  * A finding outranks a refusal. The exact versions print on every run, so
  * a reading is attributable; a Node patch that differs is printed, not
@@ -110,6 +116,42 @@ export function hookReadsNvmrc(text) {
     const code = line.replace(/(^|\s)#.*$/, "$1");
     return /\.nvmrc/.test(code) && !/^\s*(echo|printf)\b/.test(code);
   });
+}
+
+const UV_VERSION_LINE = /^VERSION="([^"]+)"$/m;
+
+/** The uv version scripts/install-uv.sh installs, read from its text. */
+export function installerVersion(text) {
+  const m = UV_VERSION_LINE.exec(text);
+  if (!m) throw new Error('scripts/install-uv.sh has no VERSION="..." line');
+  return m[1];
+}
+
+/**
+ * A refusal when the uv that runs is not the installer's pin, or null.
+ * `reported` is `uv --version`'s output, e.g. "uv 0.12.7 (abc123 2026-10-30)".
+ */
+export function uvVersionProblem({ pinned, reported }) {
+  const m = /^uv (\S+)/.exec(reported.trim());
+  if (m && m[1] === pinned) return null;
+  return `uv ${
+    m ? m[1] : `"${reported.trim()}"`
+  } is running, not scripts/install-uv.sh's ${pinned}; `
+    + "run `bash barwise/scripts/install-uv.sh ~/.local/bin` and put ~/.local/bin first on PATH";
+}
+
+/** `uv --version`, from the uv on PATH: the one every other uv call runs. */
+function uvVersion() {
+  const r = spawnSync("uv", ["--version"], { encoding: "utf8" });
+  if (r.error) {
+    throw new Error(
+      `uv could not be run (${
+        r.error.code ?? r.error.message
+      }); install it with scripts/install-uv.sh, the session hook does`,
+    );
+  }
+  if (r.status !== 0) throw new Error(`uv --version exited ${r.status}`);
+  return r.stdout.trim();
 }
 
 /** The Python uv would start for the project, read without syncing. */
@@ -195,6 +237,22 @@ function main(argv) {
     if (problem) findings.push(`${label} ${problem}`);
   }
 
+  // The uv first: when it cannot run, or is not the pin, that is the
+  // refusal to name, ahead of anything it would say about Python.
+  let uv = null;
+  try {
+    const installer = join(barwise, "scripts", "install-uv.sh");
+    if (!existsSync(installer)) {
+      throw new Error("scripts/install-uv.sh is missing, so there is no uv pin to hold");
+    }
+    const pinned = installerVersion(readFileSync(installer, "utf8"));
+    uv = uvVersion();
+    const problem = uvVersionProblem({ pinned, reported: uv });
+    if (problem) refuse(problem);
+  } catch (e) {
+    refuse(e.message);
+  }
+
   let python = null;
   try {
     python = uvPython(barwise);
@@ -215,7 +273,7 @@ function main(argv) {
 
   const ran = `ran Node ${process.version} (.nvmrc ${nvmrc.trim()}), Python ${
     python ?? "unknown"
-  } (barwise/.python-version ${(uvPin ?? "missing").trim()})`;
+  } (barwise/.python-version ${(uvPin ?? "missing").trim()}), ${uv ?? "uv unknown"}`;
   for (const f of findings) say(f);
   if (findings.length > 0) {
     say(`FAIL -- ${findings.length} finding(s); ${ran}.`);

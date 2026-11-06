@@ -97,9 +97,7 @@
   },
   {
     "decision": "python-from-the-lockfile#uv-bootstrap",
-    "file": ".github/workflows/ci.yml",
-    "old": "python3 -m pip install --quiet uv==",
-    "new": "python3 -m pip install --quiet uv>="
+    "unprobed": "check:pins reads back the uv that runs against install-uv.sh's VERSION; a probe edits one file's content, which cannot change the installed uv, and the installer's tests plant the digest mismatch"
   },
   {
     "decision": "surface-capability-parity#matrix-records-reach",

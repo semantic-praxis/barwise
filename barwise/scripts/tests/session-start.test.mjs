@@ -75,6 +75,8 @@ function fixture({ nvm = "ok", preinstalled = false, driver = "installed" } = {}
   mkdirSync(join(project, "barwise", "scripts"), { recursive: true });
   writeFileSync(join(project, ".nvmrc"), `${PINNED}\n`);
   exe(join(project, "barwise", "scripts", "install-gitleaks.sh"), "exit 0");
+  // Records its arguments: the hook runs it on every start, warm or cold.
+  exe(join(project, "barwise", "scripts", "install-uv.sh"), `echo "install-uv $*" >>"${calls}"`);
   exe(join(home, ".local", "bin", "uv"), "exit 0");
 
   // The image's Node, first on PATH until the hook selects another.
@@ -192,6 +194,20 @@ test("firing again (resume) does not append duplicate PATH exports", () => {
   assert.equal(r.status, 0, r.stderr);
   assert.equal(readFileSync(fx.envFile, "utf8"), first, "env file grew on the second fire");
   assert.equal(r.env.length, 2, `expected the Node and ~/.local/bin exports once each: ${r.env}`);
+});
+
+test("a warm start, with uv already in ~/.local/bin, still runs install-uv.sh on ~/.local/bin [adr:python-from-the-lockfile#uv-bootstrap]", () => {
+  // Installing only when ~/.local/bin/uv was absent kept a container's first
+  // uv forever (0.11.32 against CI's 0.12.7); the installer decides, by
+  // version, whether there is anything to do (python-uv-widened WS4).
+  const fx = fixture({ preinstalled: true });
+  assert.ok(existsSync(join(fx.home, ".local", "bin", "uv")), "fixture lacks a cached uv");
+  const r = runHook(fx, "resume");
+  assert.equal(r.status, 0, r.stderr);
+  assert.deepEqual(
+    r.calls.filter((c) => c.startsWith("install-uv")),
+    [`install-uv ${join(fx.home, ".local", "bin")}`],
+  );
 });
 
 test("warns when the tracker merge driver is unregistered, or registered with no wrapper on disk", () => {

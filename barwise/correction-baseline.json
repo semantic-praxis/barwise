@@ -817,7 +817,7 @@
       "caught_by": "reasoning",
       "note": "Copilot's review of PR #646: the archive exclusion was missing from the untracked listing, and the notice printed before the verdict where Scope said after. Both found by reading the diff against the spec, not by running anything."
     },
-    "python-uv-widened::23e1c1b5acb2": {
+    "python-uv-widened::9230809b7c59": {
       "spec": "python-uv-widened.spec.md",
       "excerpt": "1. a uv call is parsed, not matched (fq7, l69). one function reads a command into uv's subcommand and the options uv itself receives: - the subcommand is found ",
       "caught_by": "execution",
