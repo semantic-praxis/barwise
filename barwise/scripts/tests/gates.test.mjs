@@ -1834,6 +1834,9 @@ const UV_BOOTSTRAP = "          python3 -m pip install --quiet uv==0.12.7\n";
 function pythonUvRepo(files = {}) {
   const dir = tempRepo();
   stage(dir, ".github/workflows/ci.yml", `jobs:\n  ci:\n    steps:\n${UV_BOOTSTRAP}`);
+  // The one project every Python run resolves from (python-uv-widened WS3).
+  stage(dir, "barwise/pyproject.toml", '[project]\nname = "x"\n');
+  stage(dir, "barwise/uv.lock", "version = 1\n");
   for (const [name, contents] of Object.entries(files)) stage(dir, name, contents);
   return dir;
 }
@@ -2088,6 +2091,37 @@ const COMMAND_FILES = [
     /barwise\/\.husky\/pre-commit:1 .*neither --frozen nor --locked/,
   ],
 ];
+
+// python-uv-widened WS3: one project, and nothing else that changes what resolves.
+const MANIFESTS = [
+  ["a second pyproject.toml", "tools/pyproject.toml"],
+  ["a requirements file", "requirements-dev.txt"],
+  ["a setup.py", "pkg/setup.py"],
+  ["a uv.toml", "barwise/uv.toml"],
+  ["a pylock.toml", "pylock.toml"],
+  ["a second uv.lock", "tools/uv.lock"],
+];
+
+for (const [name, file] of MANIFESTS) {
+  test(`check-python-uv fails on ${name}`, () => {
+    const r = pythonUv({ [file]: "x\n" });
+    assert.equal(r.status, 1, `expected failure, got:\n${r.stdout}`);
+    assert.match(r.stderr, new RegExp(`${file.replace(/\./g, "\\.")}:1 .*Python manifest outside`));
+  });
+}
+
+test("check-python-uv fails when the project file is not tracked", () => {
+  const dir = tempRepo();
+  try {
+    stage(dir, ".github/workflows/ci.yml", `jobs:\n  ci:\n    steps:\n${UV_BOOTSTRAP}`);
+    stage(dir, "barwise/uv.lock", "version = 1\n");
+    const r = gate("check-python-uv.mjs", dir);
+    assert.equal(r.status, 1, r.stdout);
+    assert.match(r.stderr, /barwise\/pyproject\.toml:0 .*not tracked/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
 
 test("check-python-uv cannot answer for a package.json it cannot parse, never a clean pass", () => {
   const r = pythonUv({ "package.json": '{ "scripts": { "a": "python3 x.py", } ' });
