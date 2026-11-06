@@ -11,7 +11,8 @@ Enforced-by: npm run audit:duplication -- --check (every-candidate-verdict),
 npm run check:parity (registered-sets-identical),
 none (barwise-ym8.edf: check-on-copy), none (barwise-ym8.3tg: share-by-composition),
 none (barwise-ym8.8nq: registered-sets-identical),
-npm run check:findings (every-candidate-verdict)
+npm run check:findings (every-candidate-verdict),
+tests (registered-sets-identical)
 
 ## Context
 
@@ -68,16 +69,16 @@ members.
   reaches them; a step with no guard is skipped once an earlier step
   fails. `ci:local` runs both before each push, and it keeps going
   after a failure.
-- `check:parity` fails when members differ, or when a member does not
-  resolve. Several parts of decision 3 escape it (barwise-tdu):
+- `check:parity` fails when members differ, when a member does not
+  resolve, and when a set has fewer than two members, which used to pass
+  as a check and was how a half-retired entry looked; it refuses (exit
+  2) an `ignore` it does not apply and an `ignore` on a symbol or field
+  set, which it used to skip without saying so (audit-finding-reader
+  WS4). Two parts of decision 3 still escape it (barwise-tdu):
   - it compares raw text, not normalised text or printed syntax trees;
-  - it resolves only top-level function and variable declarations;
-  - it ignores an unknown `ignore` value, and any `ignore` on a symbol
-    or field set, without saying so;
-  - a set with one member, or with none, passes trivially, so dropping
-    members is an unchecked partial retirement.
-- Nothing gates decision 3's retirement clause, or decision 4's verdict
-  content (barwise-ym8.8nq, barwise-ym8.onf; related barwise-u5d). `pr-review` lists both under "Ratchets
+  - it resolves only top-level function and variable declarations.
+- Nothing gates decision 3's retirement clause: an entry deleted while
+  both copies remain passes (barwise-ym8.8nq). `pr-review` lists both under "Ratchets
   silenced". `REVIEW.md`'s "Do not report" tells reviewers to skip
   registered copies and the duplication ratchet because CI enforces
   them, so the review instructions contradict each other (barwise-iil).

@@ -121,11 +121,65 @@ function describeMember(member) {
   return `${member.file}#${member.field ?? member.symbol}`;
 }
 
+/** The one sanctioned difference between members; see the header. */
+const IGNORES = new Set(["leading-docblock"]);
+
+/**
+ * What is wrong with the manifest itself, before any member is read
+ * (must-agree-copies#registered-sets-identical, barwise-ym8.8nq):
+ *   refusals  a set this check cannot compare as written: an `ignore` it
+ *             does not know, or an `ignore` on a symbol or field set,
+ *             which it never applied and so silently compared raw
+ *   findings  a set that checks nothing: fewer than two members, which
+ *             is how a half-retired entry used to pass
+ */
+export function validateManifest(manifest) {
+  const refusals = [];
+  const findings = [];
+  if (!Array.isArray(manifest?.sets)) {
+    return { refusals: ["parity.manifest.json has no sets array"], findings };
+  }
+  for (const [i, set] of manifest.sets.entries()) {
+    const name = typeof set?.name === "string" ? set.name : `#${i}`;
+    if (!Array.isArray(set?.members)) {
+      refusals.push(`set "${name}" has no members array`);
+      continue;
+    }
+    if (set.ignore !== undefined) {
+      if (!IGNORES.has(set.ignore)) {
+        refusals.push(
+          `set "${name}": ignore "${set.ignore}" is not one this check applies (${
+            [...IGNORES].join(", ")
+          })`,
+        );
+      } else if (!set.members.every((m) => typeof m === "string")) {
+        refusals.push(
+          `set "${name}": ignore applies to whole-file members only, and this set has a symbol or field member`,
+        );
+      }
+    }
+    if (set.members.length < 2) {
+      findings.push(
+        `set "${name}" has ${set.members.length} member(s), so it checks nothing; `
+          + "retire the entry with the shared owner that replaced its copies, or restore the missing member",
+      );
+    }
+  }
+  return { refusals, findings };
+}
+
 function main() {
   const manifest = JSON.parse(readFileSync(join(root, "parity.manifest.json"), "utf8"));
-  const failures = [];
+  const { refusals, findings } = validateManifest(manifest);
+  if (refusals.length > 0) {
+    console.error("check-parity: cannot answer -- the manifest says what it cannot mean:");
+    for (const r of refusals) console.error("  " + r);
+    process.exit(2);
+  }
+  const failures = [...findings];
 
   for (const set of manifest.sets) {
+    if (set.members.length < 2) continue;
     try {
       const texts = set.members.map((m) => memberText(m, set.ignore));
       const [first, ...rest] = texts;

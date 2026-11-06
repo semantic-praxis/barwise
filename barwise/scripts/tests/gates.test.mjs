@@ -1690,9 +1690,47 @@ test("audit-spec-status refuses a shallow clone rather than reporting OK", () =>
 // directly here -- `root` inside the gate is script-relative by design
 // (barwise-905 again), so a fixture repo cannot reach `main()`.
 
-const { parseFieldPath, fieldValue } = await import(
+const { parseFieldPath, fieldValue, validateManifest } = await import(
   pathToFileURL(join(SCRIPTS, "check-parity.mjs")).href
 );
+
+test("check-parity refuses a set it cannot compare as written, and finds a set that checks nothing [adr:must-agree-copies#registered-sets-identical]", () => {
+  // The three escapes barwise-tdu and barwise-ym8.8nq named: an unknown
+  // ignore was silently not applied, an ignore on a symbol or field set
+  // was silently ignored, and a set of one compared a member with nothing
+  // and passed, which is how a half-retired entry looked like a check.
+  const pair = ["a.ts", "b.ts"];
+  assert.deepEqual(validateManifest({ sets: [{ name: "ok", members: pair }] }), {
+    refusals: [],
+    findings: [],
+  });
+  const unknown = validateManifest({
+    sets: [{ name: "u", ignore: "trailing-comment", members: pair }],
+  });
+  assert.match(unknown.refusals.join("\n"), /set "u": ignore "trailing-comment" is not one/);
+  const onSymbol = validateManifest({
+    sets: [{
+      name: "s",
+      ignore: "leading-docblock",
+      members: [{ file: "a.ts", symbol: "f" }, "b.ts"],
+    }],
+  });
+  assert.match(onSymbol.refusals.join("\n"), /set "s": ignore applies to whole-file members only/);
+  for (const members of [[], ["a.ts"]]) {
+    const thin = validateManifest({ sets: [{ name: "thin", members }] });
+    assert.deepEqual(thin.refusals, []);
+    assert.match(
+      thin.findings.join("\n"),
+      new RegExp(`set "thin" has ${members.length} member\\(s\\), so it checks nothing`),
+    );
+  }
+  assert.match(validateManifest({}).refusals.join("\n"), /no sets array/);
+});
+
+test("the committed parity manifest holds no set check-parity cannot compare or that checks nothing", () => {
+  const manifest = JSON.parse(readFileSync(join(REPO, "barwise", "parity.manifest.json"), "utf8"));
+  assert.deepEqual(validateManifest(manifest), { refusals: [], findings: [] });
+});
 
 test("parseFieldPath splits dotted keys and bracketed non-identifiers", () => {
   assert.deepEqual(parseFieldPath("version"), ["version"]);
