@@ -3,6 +3,7 @@
 Status: Draft -- no workstream implemented
 Created: 2026-11-06
 Last-updated: 2026-11-06
+Plan-reviewed: 14e4076e (code-review, pr-review)
 Tracking: barwise-ym8.gc9 (adr-refactor batch 6, credential half),
 barwise-ym8.7zs, barwise-ym8.kf3, barwise-ym8.gc7, barwise-ym8.nxs
 Touches: +barwise/scripts/tests/credential-handling.test.mjs,
