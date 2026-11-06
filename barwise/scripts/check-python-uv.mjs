@@ -36,12 +36,16 @@
  * What it deliberately does NOT read, so the next reader does not have to
  * infer the boundary from the code:
  *
- *   .md, Makefile, package.json   prose and script strings. A banned form
- *                                 there instructs a human rather than
- *                                 running, which is a real failure -- two
- *                                 such instructions were fixed alongside
- *                                 this gate -- but not one this matcher
- *                                 can separate from a mention.
+ *   .md                           prose. A banned form there instructs a
+ *                                 human rather than running, which is a
+ *                                 real failure -- two such instructions
+ *                                 were fixed alongside this gate -- but
+ *                                 not one this matcher can separate from
+ *                                 a mention. package.json scripts,
+ *                                 Makefile recipes and the git hooks ARE
+ *                                 read (python-uv-widened WS2): they run.
+ *   .beads/hooks/                 vendored by the tracker, and named as
+ *                                 unread in the gate's OK line.
  *   a command inside a string     `bash -c "python3 ..."`, or an
  *                                 interpreter held in a variable. Quoted
  *                                 text is blanked before matching (see
@@ -52,13 +56,14 @@
  *                                 question from how uv was invoked.
  */
 import { readFileSync } from "node:fs";
-import { extname, resolve } from "node:path";
+import { basename, extname, resolve } from "node:path";
 import {
   bannedFlag,
   bareInterpreter,
   blankQuoted,
   INTERPRETER,
   logicalLines,
+  shellCommandFindings,
   uvFindings,
 } from "./lib/python-uv-rules.mjs";
 import { REPO_ROOT, trackedFiles } from "./lib/tracked.mjs";
@@ -187,17 +192,82 @@ function uvArgsArray(file, text) {
 const findings = [];
 const allowHits = new Set();
 
+/**
+ * What kind of command-bearing file this is, beyond the extension rules
+ * (python-uv-widened WS2): "package" for a package.json, whose scripts
+ * values are commands; "make" for a makefile, whose recipe lines are; and
+ * ".sh" for the extensionless git hooks under barwise/.husky/, which are
+ * shell and go through the main loop like any .sh file. Null otherwise.
+ * One classifier, so which files are read is decided in one place.
+ */
+function fileKind(file) {
+  const name = basename(file);
+  if (name === "package.json") return "package";
+  if (/^(GNUmakefile|makefile|Makefile)$|\.mk$/.test(name)) return "make";
+  if (/^barwise\/\.husky\/(?!_\/)[^./]+$/.test(file)) return ".sh";
+  return null;
+}
+
+/**
+ * The commands in a package.json's scripts or a makefile's recipes, as
+ * `{ line, text }`. A package.json that does not parse throws: the gate
+ * cannot see its scripts, which is a refusal, never a clean read.
+ */
+function commandLines(kind, text) {
+  if (kind === "package") {
+    const scripts = JSON.parse(text).scripts ?? {};
+    const lines = text.split("\n");
+    // Each name is looked up inside the scripts object, so a same-named key
+    // elsewhere (vscode's contributes) does not take its line.
+    const from = lines.findIndex((l) => l.includes('"scripts":'));
+    return Object.entries(scripts).map(([name, cmd]) => ({
+      line: lines.findIndex((l, i) => i > from && l.includes(JSON.stringify(name) + ":")) + 1,
+      text: String(cmd),
+    }));
+  }
+  // make's recipe prefixes (@ silent, - ignore errors, + always run) come
+  // before the command; left on, `@python3` was not read as python3.
+  return logicalLines(text)
+    .filter(({ text: l }) => l.startsWith("\t"))
+    .map(({ line, text: l }) => ({ line, text: l.replace(/^\t[@+-]*/, "") }));
+}
+
+const unreadable = [];
+
 for (const file of trackedFiles()) {
-  const ext = extname(file);
-  if (!SHELLISH.has(ext) && !JSISH.has(ext) && ext !== ".py") continue;
   if (SELF.has(file)) continue;
   if (file.startsWith(".beads/hooks/")) continue;
+  const kind = fileKind(file);
+  const ext = kind === ".sh" ? ".sh" : extname(file);
+  const special = kind === "package" || kind === "make";
+  if (!special && !SHELLISH.has(ext) && !JSISH.has(ext) && ext !== ".py") continue;
 
   let text;
   try {
     text = readFileSync(resolve(REPO_ROOT, file), "utf8");
   } catch {
     continue; // deleted in the working tree; not this gate's business
+  }
+
+  if (special) {
+    let commands;
+    try {
+      commands = commandLines(kind, text);
+    } catch (err) {
+      unreadable.push(`${file}: ${err instanceof Error ? err.message : err}`);
+      continue;
+    }
+    for (const { line, text: command } of commands) {
+      const allowed = ALLOWLIST.find((a) => a.file === file && command.includes(a.match));
+      if (allowed) {
+        allowHits.add(allowed.match);
+        continue;
+      }
+      for (const f of shellCommandFindings(command)) {
+        findings.push({ file, line: line + f.line - 1, what: f.what, raw: command });
+      }
+    }
+    continue;
   }
 
   if (JSISH.has(ext)) findings.push(...uvArgsArray(file, text));
@@ -268,10 +338,18 @@ if (findings.length > 0 || stale.length > 0) {
         + "stops describing the code.",
     );
   }
+  for (const u of unreadable) console.error(`\ncould not read ${u}`);
   process.exit(1);
+}
+// A finding outranks a refusal; with none, a file the gate could not read
+// is "could not answer", never a clean pass (gate-refusal-contract).
+if (unreadable.length > 0) {
+  console.error("check-python-uv: cannot answer --");
+  for (const u of unreadable) console.error(`  could not read ${u}`);
+  process.exit(2);
 }
 
 console.log(
   `check-python-uv: no bare interpreters, no lock bypasses; `
-    + `${ALLOWLIST.length} allowlisted (uv bootstrap). OK`,
+    + `${ALLOWLIST.length} allowlisted (uv bootstrap); .beads/hooks/ not read, vendored. OK`,
 );

@@ -109,13 +109,16 @@ export function commandSegments(cmd) {
  * was wrong when written from memory (`--python` is not global,
  * `--allow-insecure-host` is; python-uv-widened, plan review).
  */
-const UV_SUBCOMMANDS = new Set([
+export const UV_SUBCOMMANDS = new Set([
   "add",
+  "audit",
   "auth",
   "build",
   "cache",
+  "check",
   "export",
   "format",
+  "generate-shell-completion",
   "help",
   "init",
   "lock",
@@ -130,6 +133,7 @@ const UV_SUBCOMMANDS = new Set([
   "tree",
   "venv",
   "version",
+  "workspace",
 ]);
 
 /** `uv run` options that take a value, so their value is not the command. */

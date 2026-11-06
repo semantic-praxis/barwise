@@ -1,6 +1,6 @@
 # check:python-uv, widened to the rest of the ADR
 
-Status: WS1 implemented 2026-11-06 (parseUv: subcommand by name, run options end at the launched command, banned flags by prefix with -w, UV_NO_PROJECT and UV_ISOLATED read, UV_FROZEN and UV_LOCKED accepted; shared by the gate, its args-array and .py-list checks, and the agent hook); WS2 to WS4 not started, WS4 waits on open decision 1
+Status: WS1 implemented 2026-11-06 (parseUv: subcommand by name, run options end at the launched command, banned flags by prefix with -w, UV_NO_PROJECT and UV_ISOLATED read, UV_FROZEN and UV_LOCKED accepted; shared by the gate, its args-array and .py-list checks, and the agent hook); WS2 implemented 2026-11-06 (package.json scripts, Makefile recipes and the git hooks are read; .beads/hooks/ named as unread; UV_SUBCOMMANDS completed and held to the installed `uv help` by a test); WS3 and WS4 not started, WS4 waits on open decision 1
 Created: 2026-11-06
 Last-updated: 2026-11-06
 Tracking: barwise-ym8.gc9 (adr-refactor batch 3), barwise-ym8.fq7,
