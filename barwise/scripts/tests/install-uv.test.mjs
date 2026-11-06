@@ -20,11 +20,21 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
+import { installerVersion } from "../check-pins.mjs";
 
 const SCRIPTS = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const INSTALLER = join(SCRIPTS, "install-uv.sh");
-const VERSION = /^VERSION="([^"]+)"$/m.exec(readFileSync(INSTALLER, "utf8"))[1];
+// The pin comes from the installer through check:pins's own reader, so a
+// version bump changes one line and no test.
+const VERSION = installerVersion(readFileSync(INSTALLER, "utf8"));
+const V = VERSION.replaceAll(".", "\\.");
 const TARGET = "x86_64-unknown-linux-gnu";
+// The digest the installer pins for TARGET, so a stand-in sha256sum can
+// report a match without the crafted tarball having to be the real one.
+const DIGEST =
+  readFileSync(INSTALLER, "utf8").match(/^SHA256_x86_64_unknown_linux_gnu="([0-9a-f]{64})"$/m)[1];
+/** A sha256sum stand-in that reports the pinned digest, as a match would. */
+const MATCHES = `echo "${DIGEST}  $1"`;
 
 /** The environment without git's location variables, as credential-handling's. */
 function cleanEnv(extra = {}) {
@@ -111,6 +121,17 @@ test("a uv in BIN_DIR already at the pin is left alone, and nothing is downloade
   assert.ok(!existsSync(join(bin, "curl-ran")), "downloaded with the pin already in place");
 });
 
+test("a uvx beside a uv already at the pin is still removed [adr:python-from-the-lockfile#uv-bootstrap]", (t) => {
+  const bin = standIns(t);
+  const target = tempDir(t, "barwise-uv-to-");
+  exe(join(target, "uv"), uvAt(VERSION));
+  exe(join(target, "uvx"), "exit 0");
+  const r = install(t, bin, target, TOOLS);
+  assert.equal(r.status, 0, r.stderr);
+  assert.ok(!existsSync(join(target, "uvx")), "uvx is banned (decision 2) and must be removed");
+  assert.ok(existsSync(join(target, "uv")), "the uv at the pin is kept");
+});
+
 test("a uv in BIN_DIR on another version is replaced: the download runs [adr:python-from-the-lockfile#uv-bootstrap]", (t) => {
   // Presence is read from BIN_DIR, never PATH: a uv at the pin earlier on
   // PATH must not stop the cached older one in BIN_DIR being replaced.
@@ -119,7 +140,7 @@ test("a uv in BIN_DIR on another version is replaced: the download runs [adr:pyt
   const target = tempDir(t, "barwise-uv-to-");
   exe(join(target, "uv"), uvAt("0.11.32"));
   const r = install(t, bin, target, TOOLS);
-  assert.match(r.stderr, /uv 0\.11\.32 .*pin is 0\.12\.7; installing the pin/);
+  assert.match(r.stderr, new RegExp(`uv 0\\.11\\.32 .*pin is ${V}; installing the pin`));
   assert.ok(existsSync(join(bin, "curl-ran")), `the older uv was kept:\n${r.stderr}`);
   assert.equal(r.status, 2, "the junk download still fails its digest");
 });
@@ -140,7 +161,7 @@ function release(t, version) {
 }
 
 test("installing puts only uv in BIN_DIR, removes a stale uvx, and reads the pin back", (t) => {
-  const bin = standIns(t, { served: release(t, VERSION), sha256sum: "cat >/dev/null; exit 0" });
+  const bin = standIns(t, { served: release(t, VERSION), sha256sum: MATCHES });
   const target = tempDir(t, "barwise-uv-to-");
   exe(join(target, "uv"), uvAt("0.11.32"));
   exe(join(target, "uvx"), "exit 0");
@@ -149,16 +170,16 @@ test("installing puts only uv in BIN_DIR, removes a stale uvx, and reads the pin
   assert.match(r.stdout, new RegExp(`installed uv ${VERSION.replace(/\./g, "\\.")} `));
   assert.match(
     execFileSync(join(target, "uv"), ["--version"], { encoding: "utf8" }),
-    /uv 0\.12\.7/,
+    new RegExp(`uv ${V}`),
   );
   assert.ok(!existsSync(join(target, "uvx")), "uvx is banned (decision 2) and must be removed");
 });
 
 test("an installed uv that does not report the pin is a refusal, not a success", (t) => {
-  const bin = standIns(t, { served: release(t, "0.12.6"), sha256sum: "cat >/dev/null; exit 0" });
+  const bin = standIns(t, { served: release(t, "0.12.6"), sha256sum: MATCHES });
   const target = tempDir(t, "barwise-uv-to-");
   const r = install(t, bin, target, [...TOOLS.filter((x) => x !== "sha256sum"), "tar", "gzip"]);
   assert.equal(r.status, 2, `${r.stdout}${r.stderr}`);
-  assert.match(r.stderr, /reports uv 0\.12\.6 .*after installing 0\.12\.7/);
+  assert.match(r.stderr, new RegExp(`reports uv 0\\.12\\.6 .*after installing ${V}`));
   assert.doesNotMatch(r.stdout, /installed/);
 });

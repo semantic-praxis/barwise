@@ -97,7 +97,7 @@
   },
   {
     "decision": "python-from-the-lockfile#uv-bootstrap",
-    "unprobed": "check:pins reads back the uv that runs against install-uv.sh's VERSION; a probe edits one file's content, which cannot change the installed uv, and the installer's tests plant the digest mismatch"
+    "unprobed": "check:pins compares the uv that runs with install-uv.sh's VERSION, and a mismatch is a refusal (exit 2) about this machine, as a Node mismatch is; the probe runner expects exit 1 and reads any other code as off-code, so a VERSION edit cannot serve as a probe. The installer's tests plant the digest mismatch, and check-pins' tests plant another uv version."
   },
   {
     "decision": "surface-capability-parity#matrix-records-reach",

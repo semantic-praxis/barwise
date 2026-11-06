@@ -184,13 +184,13 @@ test("the gate refuses a uv on another version than install-uv.sh's, naming both
   assert.doesNotMatch(r.stderr, /OK/);
 });
 
-test("the gate refuses when install-uv.sh, or its VERSION line, is missing", (t) => {
+test("a missing install-uv.sh, or one with no VERSION line, is a finding about the tree", (t) => {
   const gone = run(tree(t, { installer: null }));
-  assert.equal(gone.status, 2, gone.stderr);
-  assert.match(gone.stderr, /cannot answer: scripts\/install-uv\.sh is missing/);
+  assert.equal(gone.status, 1, gone.stderr);
+  assert.match(gone.stderr, /scripts\/install-uv\.sh is missing, so there is no uv pin to hold/);
   const noLine = run(tree(t, { installer: "set -euo pipefail\nV=0.12.7\n" }));
-  assert.equal(noLine.status, 2, noLine.stderr);
-  assert.match(noLine.stderr, /cannot answer: scripts\/install-uv\.sh has no VERSION/);
+  assert.equal(noLine.status, 1, noLine.stderr);
+  assert.match(noLine.stderr, /scripts\/install-uv\.sh has no VERSION/);
 });
 
 test("the gate: a workflow naming a Node version fails [adr:pinned-runtimes#node-from-nvmrc]", (t) => {

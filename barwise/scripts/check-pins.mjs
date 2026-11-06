@@ -237,20 +237,30 @@ function main(argv) {
     if (problem) findings.push(`${label} ${problem}`);
   }
 
-  // The uv first: when it cannot run, or is not the pin, that is the
-  // refusal to name, ahead of anything it would say about Python.
+  // The uv first: read what runs before anything else, so the summary names
+  // it whatever else fails. A missing installer or VERSION line is a fact
+  // about the tree, so a finding; a uv that cannot run, or runs another
+  // version, is about this machine, so a refusal, as for Node.
   let uv = null;
   try {
-    const installer = join(barwise, "scripts", "install-uv.sh");
-    if (!existsSync(installer)) {
-      throw new Error("scripts/install-uv.sh is missing, so there is no uv pin to hold");
-    }
-    const pinned = installerVersion(readFileSync(installer, "utf8"));
     uv = uvVersion();
-    const problem = uvVersionProblem({ pinned, reported: uv });
-    if (problem) refuse(problem);
   } catch (e) {
     refuse(e.message);
+  }
+  let pinned = null;
+  const installer = join(barwise, "scripts", "install-uv.sh");
+  if (!existsSync(installer)) {
+    findings.push("scripts/install-uv.sh is missing, so there is no uv pin to hold");
+  } else {
+    try {
+      pinned = installerVersion(readFileSync(installer, "utf8"));
+    } catch (e) {
+      findings.push(e.message);
+    }
+  }
+  if (uv !== null && pinned !== null) {
+    const problem = uvVersionProblem({ pinned, reported: uv });
+    if (problem) refuse(problem);
   }
 
   let python = null;

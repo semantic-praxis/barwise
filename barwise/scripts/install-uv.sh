@@ -44,6 +44,11 @@ mkdir -p "${BIN_DIR}"
 # Presence is read from BIN_DIR itself, never `command -v`: the first uv on
 # PATH may be the cached one this script exists to replace, and a check
 # that asked PATH would find it, see a uv, and leave the wrong one in place.
+# uvx is banned (python-from-the-lockfile decision 2), and astral's own
+# installer puts it beside uv; removed before the early exit, so a uv that
+# is already at the pin does not keep a uvx next to it.
+rm -f "${BIN_DIR}/uvx"
+
 if [[ -x "${BIN_DIR}/uv" ]]; then
   have="$("${BIN_DIR}/uv" --version 2>/dev/null || echo unknown)"
   if [[ "${have}" == "uv ${VERSION}" || "${have}" == "uv ${VERSION} "* ]]; then
@@ -101,8 +106,19 @@ fi
 
 # Verified BEFORE it is unpacked, not after: unpacking runs no code, but the
 # point of a digest is that nothing downstream ever sees unverified bytes.
-if ! echo "${digest}  ${tmp}/${tarball}" | sha256sum -c - >/dev/null 2>&1; then
-  actual="$(sha256sum "${tmp}/${tarball}" | cut -d' ' -f1)"
+# sha256sum on Linux, shasum -a 256 on macOS, which ships no sha256sum;
+# without either the script refuses by name rather than dying on a bare
+# "command not found" under set -e.
+if command -v sha256sum >/dev/null 2>&1; then
+  sha() { sha256sum "$@"; }
+elif command -v shasum >/dev/null 2>&1; then
+  sha() { shasum -a 256 "$@"; }
+else
+  echo "install-uv: neither sha256sum nor shasum is available, so the download cannot be verified." >&2
+  exit 2
+fi
+actual="$(sha "${tmp}/${tarball}" | cut -d' ' -f1)"
+if [[ "${actual}" != "${digest}" ]]; then
   echo "install-uv: CHECKSUM MISMATCH for ${tarball}." >&2
   echo "  Expected ${digest}" >&2
   echo "  Got      ${actual}" >&2
@@ -114,9 +130,6 @@ fi
 # decision 2 bans, so it is neither unpacked nor installed.
 tar -xzf "${tmp}/${tarball}" -C "${tmp}" "uv-${target}/uv"
 install -m 0755 "${tmp}/uv-${target}/uv" "${BIN_DIR}/uv"
-# A uvx left by an earlier installer (astral's install.sh puts one beside
-# uv) would still be on PATH, so it goes too.
-rm -f "${BIN_DIR}/uvx"
 
 # By absolute path, NOT through PATH: BIN_DIR may not be on PATH yet (the
 # CI case), and an older uv earlier on PATH would answer for it. Anything
