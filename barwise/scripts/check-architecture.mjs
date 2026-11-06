@@ -17,6 +17,10 @@
  *     dependencies count too). `devDependencies` are not compared:
  *     `@barwise/llm` lists `@barwise/diagram` there for its tests, which
  *     ship nothing.
+ *   - core's external runtime dependencies, against the list in
+ *     `scripts/lib/external-deps.cjs`, both ways, and with no alias or
+ *     non-registry source under a listed name
+ *     (docs/adr/package-graph-authority.md#core-external-deps).
  *
  * Package names map to directories through the manifests themselves, not
  * a naming rule, so `barwise-vscode` needs no special case and a package
@@ -38,7 +42,7 @@
  * read only when an entry needs them; one that cannot be read is exit 2,
  * reported after the findings and never in place of them.
  *
- * `--root <dir>` reads CLAUDE.md, barwise/scripts/lib/intended.cjs,
+ * `--root <dir>` reads CLAUDE.md, barwise/scripts/lib/intended.cjs and external-deps.cjs,
  * barwise/packages/* and the tracked files of another git tree, for this
  * check's own tests; nothing else passes it.
  */
@@ -358,6 +362,8 @@ for (const { dir, json } of manifests) {
 // dependency nobody decided on, and a listed one the manifest dropped is a
 // list that no longer says what the package ships.
 const manifestOf = new Map(manifests.map((m) => [m.dir, m.json]));
+// An npm alias or a source outside the registry, which a listed name can hide.
+const NON_REGISTRY = /^(npm:|file:|link:|portal:|workspace:|git(\+|:)|github:|https?:)/;
 for (const [p, allowedExternal] of Object.entries(externalDeps)) {
   const json = manifestOf.get(p);
   if (json === undefined) {
@@ -371,6 +377,12 @@ for (const [p, allowedExternal] of Object.entries(externalDeps)) {
       declared.add(dep);
       if (!allowedExternal.includes(dep)) {
         problems.push(`packages/${p}: ${field} has ${dep}, external-deps.cjs does not list it`);
+      } else if (NON_REGISTRY.test(String(json[field][dep]))) {
+        // A listed name installing something else: `"yaml": "npm:z3-solver@4"`.
+        problems.push(
+          `packages/${p}: ${field} has ${dep} as "${json[field][dep]}", not a registry version`
+            + " the list can vouch for",
+        );
       }
     }
   }
@@ -528,7 +540,8 @@ if (problems.length > 0 || adrProblems.length > 0 || stale || enforcementProblem
 if (refusals.length > 0) process.exit(2);
 console.log(
   `check:architecture: ${drawnEdges.size} edges in CLAUDE.md and ${manifests.length} package`
-    + ` manifests agree with INTENDED; ${adrs.length} ADRs are well-formed and every reference`
+    + ` manifests agree with INTENDED, and core's external dependencies with external-deps.cjs;`
+    + ` ${adrs.length} ADRs are well-formed and every reference`
     + ` in ${citing.length} files resolves; ${held.decisions} decisions: ${held.gate} with a gate,`
     + ` ${held.testsOnly} tests and no gate, ${held.noneOnly} none only; ${held.gap} carry a gap`
     + ` issue${

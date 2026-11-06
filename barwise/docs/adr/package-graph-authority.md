@@ -6,7 +6,7 @@ Tracking: barwise-ubc, docs/specs/architecture-index.spec.md,
 docs/specs/format-renderers-to-connectors.spec.md
 Enforced-by: npm run depcruise (intended-is-graph),
 npm run check:architecture (claude-md-rendering, runtime-deps-within, core-external-deps),
-none (barwise-ym8.d3m: intended-is-graph)
+none (barwise-ym8.d3m: intended-is-graph), none (barwise-ym8.xyn: core-external-deps)
 
 ## Context
 
@@ -34,8 +34,7 @@ the alternatives are in the spec named above.
 4. **Core's external runtime dependencies are a reviewed list.** {#core-external-deps}
    Core's `dependencies`, `peerDependencies` and `optionalDependencies`
    name only the external packages `barwise/scripts/lib/external-deps.cjs`
-   lists for it (`ajv`, `effect`, `yaml` today), and core imports only
-   what its manifest declares. Every surface ships what core depends on,
+   lists for it, and core imports only what its manifest declares. Every surface ships what core depends on,
    so adding a library to core is a decision taken in that file, in
    review, rather than in a manifest line.
 
@@ -50,10 +49,13 @@ the alternatives are in the spec named above.
   against the map (barwise-ym8.d3m).
 - `package-graph-authority.md#core-external-deps`: `check:architecture`
   compares core's runtime dependency fields with its list both ways, so an
-  unlisted package and a listed one core dropped both fail. The import
-  half is held by `knip`'s `unlisted` check, a CI step, which fails an
-  import in core that its manifest does not declare, so the list cannot
-  be bypassed by importing a package another workspace installed. `knip`
+  unlisted package, a listed one core dropped, and a listed name that
+  installs something else (an `npm:` alias, a `file:` or git source) all
+  fail. `knip`'s `unlisted` check, a CI step, fails an import in core
+  that its manifest does not declare at all. It runs in default mode,
+  which counts `devDependencies` as declared, so a package added to
+  core's `devDependencies` and imported from `src` passes both
+  (barwise-ym8.xyn). `knip`
   is not named in `Enforced-by:` because `check:architecture` accepts
   only gate names there (`check:*`, `audit:*` and its listed exceptions),
   and widening that list is a separate decision. The list lives in its own file

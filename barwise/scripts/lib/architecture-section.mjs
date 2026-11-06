@@ -60,29 +60,43 @@ export function readFiles(root, paths) {
   }));
 }
 
+/**
+ * A map of package directory to a list of names, from a CommonJS file under
+ * barwise/scripts/lib, refused unless it is non-empty, every `required` key
+ * is present and each list is strings (none repeated, when `unique`): an
+ * empty or keyless map would check nothing and print OK
+ * (docs/adr/gate-refusal-contract.md). INTENDED's repeats are findings the
+ * check names instead, so it does not ask for `unique`.
+ */
+function loadPackageMap(root, file, what, { required = [], unique = false } = {}) {
+  const path = join(root, "barwise", "scripts", "lib", file);
+  const map = createRequire(import.meta.url)(path);
+  const shape = isMap(map) && Object.keys(map).length > 0
+    && required.every((k) => Object.hasOwn(map, k))
+    && Object.values(map).every(
+      (v) =>
+        Array.isArray(v) && v.every((d) => typeof d === "string")
+        && (!unique || new Set(v).size === v.length),
+    );
+  if (!shape) throw new Error(`${path} does not export a map of package to ${what}`);
+  return map;
+}
+
 /** INTENDED under `root`, refused unless it is a non-empty map of package to package list. */
 export function loadIntended(root) {
-  const path = join(root, "barwise", "scripts", "lib", "intended.cjs");
-  const intended = createRequire(import.meta.url)(path);
-  const shape = isMap(intended) && Object.keys(intended).length > 0
-    && Object.values(intended).every(
-      (v) => Array.isArray(v) && v.every((d) => typeof d === "string"),
-    );
-  if (!shape) throw new Error(`${path} does not export a map of package to package list`);
-  return intended;
+  return loadPackageMap(root, "intended.cjs", "package list");
 }
 
 /**
  * The external runtime dependencies each listed package may declare
- * (scripts/lib/external-deps.cjs; package-graph-authority#core-external-deps).
+ * (scripts/lib/external-deps.cjs; docs/adr/package-graph-authority.md#core-external-deps).
+ * The list for core must be present: the decision is about core.
  */
 export function loadExternalDeps(root) {
-  const path = join(root, "barwise", "scripts", "lib", "external-deps.cjs");
-  const deps = createRequire(import.meta.url)(path);
-  const shape = isMap(deps)
-    && Object.values(deps).every((v) => Array.isArray(v) && v.every((d) => typeof d === "string"));
-  if (!shape) throw new Error(`${path} does not export a map of package to dependency list`);
-  return deps;
+  return loadPackageMap(root, "external-deps.cjs", "dependency list", {
+    required: ["core"],
+    unique: true,
+  });
 }
 
 /**

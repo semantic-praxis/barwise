@@ -6774,6 +6774,13 @@ const ARCH_DISAGREEMENTS = [
     `"ghost": [],\n  "core":`,
     /external-deps\.cjs lists ghost, which is not a package under packages\//,
   ],
+  // A listed name that installs something else.
+  [
+    CORE_PKG,
+    `"yaml": "^`,
+    `"yaml": "npm:z3-solver@^`,
+    /packages\/core: dependencies has yaml as "npm:z3-solver@\^/,
+  ],
 ];
 
 test("check:architecture passes the real graph and catches each planted disagreement", () => {
@@ -6900,10 +6907,21 @@ test("check:architecture cannot answer when an input is unreadable or misshapen"
     // or skip a field whose keys are array indices.
     refused(archPlanted(dir, CORE_PKG, () => "null\n"), core);
     // The external-deps list, misshapen, is a refusal too.
-    refused(
-      archPlanted(dir, EXTERNAL_CJS, () => 'module.exports = { core: "ajv" };\n'),
-      /external-deps\.cjs does not export a map of package to dependency list/,
-    );
+    // An empty list, one without core, or a name listed twice would check
+    // less than it says, so each is refused rather than read as clean.
+    for (
+      const body of [
+        'module.exports = { core: "ajv" };\n',
+        "module.exports = {};\n",
+        "module.exports = { learn: [] };\n",
+        'module.exports = { core: ["ajv", "ajv"] };\n',
+      ]
+    ) {
+      refused(
+        archPlanted(dir, EXTERNAL_CJS, () => body),
+        /external-deps\.cjs does not export a map of package to dependency list/,
+      );
+    }
     refused(
       archPlanted(dir, CORE_PKG, (s) => s.replace(`"name": "@barwise/core"`, `"name": 5`)),
       core,
