@@ -7,6 +7,7 @@ Tracking: barwise-ym8.gc9 (adr-refactor batch 3), barwise-ym8.fq7,
 barwise-ym8.l69, barwise-ym8.q07, barwise-ym8.usv, barwise-ym8.suc
 Touches: barwise/scripts/check-python-uv.mjs, barwise/scripts/lib/python-uv-rules.mjs,
 barwise/scripts/hooks/python-uv-guard.mjs, barwise/scripts/tests/,
++barwise/scripts/install-uv.sh, .github/workflows/ci.yml,
 .claude/hooks/session-start.sh, barwise/docs/adr/python-from-the-lockfile.md,
 barwise/docs/adr/probes.json, barwise/docs/ARCHITECTURE.md
 
@@ -52,33 +53,52 @@ not a new instrument.
 
 ## Scope
 
-In scope, one workstream per gap issue:
+In scope, by gap issue:
 
 1. **A uv call is parsed, not matched** (fq7, l69). One function reads a
-   command into uv's global options, its subcommand and the subcommand's
-   arguments, so `uv --quiet run`, `uv --directory x sync` and `uv -q
-   run` are runs. Flags are checked on the parsed arguments, with
-   aliases (`-w` for `--with`) and `=` forms, in shell lines, JS args
-   arrays (a literal that starts with a banned flag) and `.py`
-   subprocess lists. Both the gate and the agent hook use it.
+   command into uv's subcommand and the options uv itself receives:
+   - the subcommand is found by name, from uv's subcommand list (`run`,
+     `sync`, `pip`, `tool`, `lock`, `add` and the rest), not by
+     skipping a hand-kept list of value-taking global options. Such a list
+     was wrong in this spec's first draft (`--python` is not a global
+     option, `--allow-insecure-host` is; plan review, 2026-11-06);
+   - for `run`, the options end at the command it launches (or `--`):
+     `uv run python x.py --frozen` passes `--frozen` to `x.py`, and uv
+     re-locks. Run options that take a value (`--only-group`, `--group`,
+     `--extra`, `--with`, `--with-requirements`, `--with-editable`,
+     `--project`, `--directory`, `--env-file`, `--python`, `--index`)
+     consume their value; an unknown option is read as a flag;
+   - banned flags match by prefix, so `--with-editable` stays caught
+     (the substring check catches it today), plus the `-w` alias and
+     `=` forms;
+   - the environment spellings count: `UV_NO_PROJECT` or `UV_ISOLATED`
+     in a leading assignment is a finding, and `UV_FROZEN` or `UV_LOCKED`
+     there satisfies the assertion.
+     Shell lines, JS args arrays (a literal that starts with a banned flag)
+     and `.py` subprocess lists all read through it, and so does the agent
+     hook, which shares the rules module.
 2. **The gate reads every file that runs commands** (fq7). Each
    `package.json`'s `scripts` values as shell lines, `barwise/Makefile`
    recipe lines, and the extensionless hooks under `barwise/.husky/`.
    `.beads/hooks/` stays out, vendored by the tracker, and the gate names
    that exclusion in its output.
-3. **A call from above `barwise/` passes `--project`** (q07). A uv run or
-   sync in a file outside `barwise/` (`.github/workflows/`, `.claude/`)
-   must pass `--project` naming `barwise`, or sit in a workflow step whose
-   `working-directory` is under `barwise/`.
-4. **One Python manifest** (usv). The gate lists tracked files named
-   `pyproject.toml`, `requirements*.txt`, `setup.py`, `setup.cfg` or
-   `Pipfile`, and fails on any but `barwise/pyproject.toml`. The
-   "outside the repo" clause of decision 4 goes to prose.
-5. **The bootstrap is exact, and pinned twice** (suc). The allowlist
-   entry matches a whole command segment, so nothing chains onto it. The
-   session hook installs uv at a pinned version through the versioned
-   installer URL, and a test fails when that version and CI's
-   `uv==<version>` disagree, a parity check rather than a comment.
+3. **The project and its manifests** (q07, usv). `barwise/pyproject.toml`
+   exists and is the only file of its kind tracked, and no other file that
+   changes resolution is: `requirements*.txt`, `setup.py`, `setup.cfg`,
+   `Pipfile`, `uv.toml`, `pylock.toml`, or a `uv.lock` other than
+   `barwise/uv.lock`. Decision 3's per-call `--project` rule for tracked
+   scripts is not checked: whether a call runs from above `barwise/` is
+   its working directory, which the text cannot show (quoted paths are
+   blanked, and `ci.yml` sets a job-level `working-directory`), and the
+   agent-hook spec's R6 leaves tracked scripts to review by decision. The
+   agent hook keeps checking the calls an agent runs.
+4. **One installer for uv, which verifies what runs** (suc). Following
+   `scripts/install-gitleaks.sh`, one `scripts/install-uv.sh` holds the
+   version, installs it, and checks `uv --version` afterwards; `ci.yml`
+   and the session hook both call it, and the session hook calls it even
+   when a uv is already present, so a cached older uv is replaced. The
+   bootstrap allowlist entry becomes that script's one install line,
+   matched as a whole command segment so nothing chains onto it.
 
 Out of scope: whether `uv.lock` is current (`uv lock --check` answers
 that, a different question from how uv was invoked); commands inside
@@ -86,6 +106,13 @@ quoted strings, which the gate blanks on purpose (its header says why).
 
 ## Alternatives considered
 
+- **Checking decision 3 per call in tracked files.** Rejected in Scope 3:
+  the working directory is not in the text, and a check that guessed it
+  would both miss the ADR's own example (`check-beads.sh` sits inside
+  `barwise/` and runs from above it) and fail correct calls in `ci.yml`.
+- **A parity test between two uv pins.** Rejected for one installer (open
+  decision 1): it guards a duplicate the installer removes, and compares
+  files rather than the uv that runs.
 - **Requiring `--locked` on every call that CI runs.** The npm scripts
   CI runs are the ones a developer runs too, where `--locked` would fail
   on any local lock drift. CI's own `uv sync --locked` step asserts the
@@ -99,35 +126,35 @@ quoted strings, which the gate blanks on purpose (its header says why).
 
 ### 1. Parse a uv call
 
-`parseUv(segment)` in `python-uv-rules.mjs` returns `{ globals,
-subcommand, args }` or null, from uv's documented global options (those
-that take a value: `--directory`, `--project`, `--cache-dir`, `--color`,
-`--config-file`, `--python`; flags otherwise). `uvFindings`, `uvArgsArray`
-and the agent hook use it. Each planted form in the gap issues
-(`uv -q run python -V`, `uv --directory barwise run --with x`, `uv run -w
-x`, `"--with=sqlglot"` in an array, `["uv", "run", "--with", ...]` in a
-`.py` subprocess call) lands as a red test first.
+`parseUv(segment)` in `python-uv-rules.mjs` returns `{ env, subcommand,
+options }` or null, per Scope 1. `uvFindings`, `uvArgsArray` and the
+agent hook use it. Each planted form lands as a red test first: `uv -q
+run python -V`, `uv --directory barwise run --with x python`, `uv
+--allow-insecure-host h run --with x python`, `uv run -w x python`, `uv
+run --frozen --with-editable ./p python`, `uv run python x.py --frozen`,
+`UV_NO_PROJECT=1 uv run --frozen python`, `"--with=sqlglot"` in an args
+array, and `["uv", "run", "--with", ...]` in a `.py` subprocess call.
+The gate runs over main before it lands; anything it newly finds is fixed
+or allowlisted with a reason in the same PR.
 
 ### 2. Every command-bearing file (provisional: not yet grounded)
 
-`package.json` scripts, `barwise/Makefile` and `barwise/.husky/*`, each
-with a planted violation red first; a test that CI holds a `uv sync
---locked` step.
+### 3. The project and its manifests (provisional: not yet grounded)
 
-### 3. `--project` from above `barwise/` (provisional: not yet grounded)
-
-### 4. One manifest (provisional: not yet grounded)
-
-### 5. The bootstrap (provisional: not yet grounded)
-
-Fixes the session hook's unpinned install as its first commit.
+### 4. One installer for uv (provisional: waits on open decision 1)
 
 ## Open decisions (for review)
 
-1. **The session hook's uv pin.** Recommended: the same version as CI's
-   `uv==` pin, held equal by a test. The alternative, a `parity.manifest`
-   set, compares text and would need the version to sit in the same shape
-   in both files; a test reads each and compares the versions.
+1. **How uv is installed** (decision 5's wording). Recommended: one
+   `scripts/install-uv.sh`, called by CI and the session hook, holding the
+   version and checking the uv that runs, as `install-gitleaks.sh` does
+   for gitleaks. Decision 5 says CI installs uv with `python3 -m pip
+   install uv==<pinned>`; the script may keep that form or use the
+   versioned astral installer, and decision 5 is restated to "uv is
+   installed only by `scripts/install-uv.sh`, at its pinned version".
+   That is the owner's call because it changes a decision's text. Today
+   the session hook installs an unpinned uv only when none is present:
+   this container runs uv 0.11.32 against CI's 0.12.7.
 2. **`.beads/hooks/` stays unscanned.** Recommended: yes, as vendored
    code, with the exclusion printed by the gate so it is not silent.
 
