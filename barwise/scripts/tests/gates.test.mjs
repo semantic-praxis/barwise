@@ -103,6 +103,25 @@ function gateWithStubGit(script, mode, ...args) {
   }
 }
 
+/**
+ * Skip a case that runs a history-reading gate (audit-spec-status) against
+ * this repository when the clone is shallow: the gate refuses there, by
+ * design, so the case cannot ask its question. Six such cases failed
+ * instead of skipping under the fault matrix's git-shallow axis, which a
+ * real shallow clone would reproduce (gate-contract-enforced WS1). Read
+ * lazily, so a broken git fails the case that asked, not the module.
+ * Returns true when it skipped.
+ */
+let shallowClone;
+function skipIfShallow(t) {
+  shallowClone ??= execFileSync("git", ["rev-parse", "--is-shallow-repository"], {
+    cwd: REPO,
+    encoding: "utf8",
+  }).trim() === "true";
+  if (shallowClone) t.skip("shallow clone: run `git fetch --unshallow` to exercise this gate");
+  return shallowClone;
+}
+
 // --- barwise-989: a gate that cannot see its input must not print PASS ---
 
 /**
@@ -126,6 +145,9 @@ const ROOT_DEPENDENT_GATES = [
   "check-lockfile-agrees.mjs",
   "check-git-listing.mjs",
   "check-plan-review.mjs",
+  // A test runner whose cases need git: it refused nothing and reported
+  // failed cases as a finding until gate-contract-enforced WS1.
+  "test-adr-model.mjs",
 ];
 
 for (const script of ROOT_DEPENDENT_GATES) {
@@ -1585,7 +1607,8 @@ test("check-root-scripts fails on drift in either direction", () => {
  * way passes, which is the barwise-906 shape -- so the red reading has
  * to come from the commit where the defect actually was.
  */
-test("audit-spec-status fires on the header that went stale at 7fbbba7", () => {
+test("audit-spec-status fires on the header that went stale at 7fbbba7", (t) => {
+  if (skipIfShallow(t)) return;
   const r = gate("audit-spec-status.mjs", REPO, "--at", "7fbbba7");
   assert.equal(r.status, 0, `--at failed:\n${r.stdout}${r.stderr}`);
   assert.match(
@@ -1601,14 +1624,7 @@ test("audit-spec-status --check is green on the current tree, from every cwd", (
   // says so instead of printing OK -- which is how it shipped red once:
   // 309 commits locally against CI's full history. Skipping loudly here
   // is not the silent hole; reporting the smaller question's answer was.
-  const shallow = execFileSync("git", ["rev-parse", "--is-shallow-repository"], {
-    cwd: REPO,
-    encoding: "utf8",
-  }).trim() === "true";
-  if (shallow) {
-    t.skip("shallow clone: run `git fetch --unshallow` to exercise this gate");
-    return;
-  }
+  if (skipIfShallow(t)) return;
   for (const cwd of CWDS) {
     const r = gate("audit-spec-status.mjs", cwd, "--check");
     assert.equal(r.status, 0, `--check failed in ${cwd}:\n${r.stdout}${r.stderr}`);
@@ -2687,6 +2703,7 @@ const STALE_CASES = {
   },
   specs: {
     row: { status: "Draft", commits: ["00000000"], note: "a planted stale row" },
+    needsHistory: true,
     output: /STALE baseline row: zz-planted-stale-row\b/,
   },
   corrections: {
@@ -2710,6 +2727,7 @@ for (const [source, c] of Object.entries(STALE_CASES).filter(([, x]) => x.row)) 
       t.skip(`${c.needsDist} not built; run npm run build first`);
       return;
     }
+    if (c.needsHistory && skipIfShallow(t)) return;
     const path = join(REPO, "barwise", FINDING_SOURCE_FILES[source]);
     const before = readFileSync(path, "utf8");
     try {
@@ -3022,6 +3040,8 @@ const BASELINE_WRITERS = [
     args: ["--write"],
     file: "barwise/spec-status-baseline.json",
     key: "specs",
+    // It reads history, and refuses a shallow clone (skipIfShallow).
+    needsHistory: true,
     human: ["note"],
     placeholder: "TODO: classify",
     // The one change a rewrite may make to a verdict: reopening it, with the
@@ -3041,6 +3061,7 @@ for (const w of BASELINE_WRITERS) {
       t.skip(`${w.needsDist} not built; run npm run build first`);
       return;
     }
+    if (w.needsHistory && skipIfShallow(t)) return;
 
     const path = join(REPO, w.file);
     const before = readFileSync(path, "utf8");
@@ -3095,6 +3116,7 @@ for (const w of BASELINE_WRITERS) {
       t.skip(`${w.needsDist} not built; run npm run build first`);
       return;
     }
+    if (w.needsHistory && skipIfShallow(t)) return;
     // The order a writer writes, whatever order its baseline held: the
     // committed rows are reversed first so the input is never already the
     // answer. The sort itself is the helper's (and, for audit-spec-status,
@@ -3259,7 +3281,8 @@ test("audit-corrections --write reports a row it dropped rather than dropping it
   }
 });
 
-test("audit-spec-status writes nothing without --write [adr:baselines-merge-on-write#specs-write-on-ask]", () => {
+test("audit-spec-status writes nothing without --write [adr:baselines-merge-on-write#specs-write-on-ask]", (t) => {
+  if (skipIfShallow(t)) return;
   // The write path used to be the `else` of `--check`, so bare
   // `npm run audit:specs` -- the spelling a reader tries first to see what the
   // gate says -- rewrote the baseline and blanked every note. The operator
@@ -3276,7 +3299,8 @@ test("audit-spec-status writes nothing without --write [adr:baselines-merge-on-w
   }
 });
 
-test("audit-spec-status leaves a stale, unsorted baseline alone unless asked, and rewrites it with --write [adr:baselines-merge-on-write#specs-write-on-ask]", () => {
+test("audit-spec-status leaves a stale, unsorted baseline alone unless asked, and rewrites it with --write [adr:baselines-merge-on-write#specs-write-on-ask]", (t) => {
+  if (skipIfShallow(t)) return;
   // The committed baseline already equals what --write would produce, so a
   // bare run that wrote identical bytes would pass the test above. Reversing
   // the rows makes a write visible: a bare run must leave them reversed, and
@@ -5530,6 +5554,74 @@ test("check-tracker-closes, run as ci:local --commit runs it, fails a close besi
   } finally {
     rmSync(tree, { recursive: true, force: true });
     rmSync(r.dir, { recursive: true, force: true });
+  }
+});
+
+test("check-tracker-closes refuses when git answers emptily, with and without BASE_SHA (barwise-ydl) [adr:gate-refusal-contract#refuse-not-find]", () => {
+  // The fault matrix's git-empty axis read a FALSE GREEN here: an empty
+  // merge-base became base "", and an empty `git show` of the tracker a
+  // tracker with no issues, so nothing could be closed and the gate said
+  // OK. With BASE_SHA set, as CI sets it, the empty tracker read alone
+  // gave the same answer.
+  const dir = mkdtempSync(join(tmpdir(), "barwise-nogit-"));
+  try {
+    const stub = join(dir, "git");
+    writeFileSync(stub, "#!/bin/sh\nexit 0\n");
+    chmodSync(stub, 0o755);
+    for (const baseSha of ["", "0123456789abcdef0123456789abcdef01234567"]) {
+      const r = spawnSync(process.execPath, [join(SCRIPTS, "check-tracker-closes.mjs")], {
+        cwd: REPO,
+        encoding: "utf8",
+        env: { ...process.env, BASE_SHA: baseSha, PATH: `${dir}:${process.env.PATH ?? ""}` },
+      });
+      assert.equal(r.status, 2, `BASE_SHA=${JSON.stringify(baseSha)}: ${r.stdout}${r.stderr}`);
+      assert.doesNotMatch(r.stdout, /OK/);
+      // Which refusal fired: the empty merge-base without BASE_SHA, the
+      // empty tracker read with it.
+      assert.match(
+        r.stderr,
+        baseSha ? /git show of .* printed nothing/ : /merge-base printed nothing/,
+      );
+    }
+    // Only merge-base empty, every other call real: the base "" would make
+    // `git show :<tracker>` read the index, which is not empty, so the
+    // empty-tracker refusal cannot stand in for the empty-base one.
+    const realGit = execFileSync("sh", ["-c", "command -v git"], { encoding: "utf8" }).trim();
+    writeFileSync(
+      stub,
+      `#!/bin/sh\nif [ "$1" = merge-base ]; then exit 0; fi\nexec "${realGit}" "$@"\n`,
+    );
+    const r = spawnSync(process.execPath, [join(SCRIPTS, "check-tracker-closes.mjs")], {
+      cwd: REPO,
+      encoding: "utf8",
+      env: { ...process.env, BASE_SHA: "", PATH: `${dir}:${process.env.PATH ?? ""}` },
+    });
+    assert.equal(r.status, 2, `merge-base empty only: ${r.stdout}${r.stderr}`);
+    assert.match(r.stderr, /merge-base printed nothing/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("check-tracker-closes refuses a close when git diff answers emptily (barwise-ydl) [adr:gate-refusal-contract#refuse-not-find]", () => {
+  const r = trackerRepo();
+  const shim = mkdtempSync(join(tmpdir(), "barwise-nodiff-"));
+  try {
+    r.issues([["a", "closed"], ["b", "open"]]);
+    writeFileSync(join(r.dir, "src.ts"), "export const x = 2;\n");
+    r.commit("close a beside code");
+    const realGit = execFileSync("sh", ["-c", "command -v git"], { encoding: "utf8" }).trim();
+    writeFileSync(
+      join(shim, "git"),
+      `#!/bin/sh\nif [ "$1" = diff ]; then exit 0; fi\nexec "${realGit}" "$@"\n`,
+    );
+    chmodSync(join(shim, "git"), 0o755);
+    const out = r.run({ BASE_SHA: r.base, PATH: `${shim}:${process.env.PATH ?? ""}` });
+    assert.equal(out.status, 2, out.stdout + out.stderr);
+    assert.match(out.stderr, /does not name/);
+  } finally {
+    rmSync(r.dir, { recursive: true, force: true });
+    rmSync(shim, { recursive: true, force: true });
   }
 });
 
