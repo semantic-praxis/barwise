@@ -25,7 +25,7 @@
  * total correct and the run incomplete. Measured, per-file costs nothing --
  * 39.6s parallel against 42.6s combined, since one file dominates either way.
  */
-import { execFileSync, spawn } from "node:child_process";
+import { spawn } from "node:child_process";
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -51,33 +51,6 @@ const MANIFEST_COMMENT =
   + "same commit: `npm run test:scripts -- --write`, which refuses to record a "
   + "run that failed or printed no summary. "
   + "Spec: docs/specs/test-run-completeness.spec.md.";
-
-// Several cases run gates that read history and refuse a shallow clone
-// (check-secrets, check-spec-touches, check-plan-review). On one, those
-// cases fail, and a failed case is this runner's word for a finding, so a
-// shallow clone read as broken gates (the fault matrix's git-shallow axis,
-// gate-contract-enforced WS1). The precondition is the runner's, checked
-// once, and its absence is a refusal.
-let shallow;
-try {
-  shallow = execFileSync("git", ["rev-parse", "--is-shallow-repository"], {
-    cwd: REPO_ROOT,
-    encoding: "utf8",
-    stdio: ["ignore", "pipe", "pipe"],
-  }).trim();
-} catch (err) {
-  refuse([
-    `git cannot say whether the clone is shallow (${
-      err instanceof Error ? err.message.split("\n")[0] : err
-    }).`,
-  ]);
-}
-if (shallow !== "false") {
-  refuse([
-    `the clone is shallow (git rev-parse --is-shallow-repository: ${JSON.stringify(shallow)}),`,
-    "and the gate tests need its full history. Fetch it: git fetch --unshallow.",
-  ]);
-}
 
 /**
  * Every gate-test file, by basename, sorted so output order is stable.

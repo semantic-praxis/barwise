@@ -97,6 +97,12 @@ const after = statuses("HEAD");
 const closed = [...after]
   .filter(([id, status]) => status === "closed" && before.get(id) !== "closed")
   .map(([id]) => id);
+// A close means the tracker changed, so a diff that does not name it was
+// not read: git answered the diff emptily (barwise-ydl's third read), and
+// an empty diff would pass any close as tracker-only.
+if (closed.length > 0 && !paths.includes(TRACKER)) {
+  refuse(`${closed.length} issue(s) closed, but git diff ${base}..HEAD does not name ${TRACKER}.`);
+}
 const elsewhere = paths.filter((p) => !p.startsWith(".beads/"));
 
 if (closed.length > 0 && elsewhere.length > 0) {

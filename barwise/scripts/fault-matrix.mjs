@@ -251,8 +251,14 @@ function withGitShim(gate, mode) {
     const body = {
       empty: "exit 0\n",
       absent: "exit 127\n",
+      // Only the repository under test is shallow. A gate test builds
+      // sandbox repositories of its own, and answering "true" for them too
+      // reported test cases as crashing on a fault no real shallow clone
+      // produces (gate-contract-enforced WS1, its code review).
       shallow: `if [ "$1" = "rev-parse" ] && [ "$2" = "--is-shallow-repository" ]; then\n`
-        + `  echo true\n  exit 0\nfi\nexec ${JSON.stringify(real)} "$@"\n`,
+        + `  top=$(${JSON.stringify(real)} rev-parse --show-toplevel 2>/dev/null)\n`
+        + `  if [ "$top" = ${JSON.stringify(GIT_ROOT)} ]; then echo true; exit 0; fi\n`
+        + `fi\nexec ${JSON.stringify(real)} "$@"\n`,
     }[mode];
     const stub = join(dir, "git");
     writeFileSync(stub, `#!/bin/sh\nprintf '%s\\n' "$*" >> ${JSON.stringify(log)}\n${body}`);

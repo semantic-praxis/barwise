@@ -5536,30 +5536,6 @@ test("check-tracker-closes, run as ci:local --commit runs it, fails a close besi
   }
 });
 
-test("run-script-tests refuses a shallow clone rather than reporting failed cases [adr:gate-refusal-contract#refuse-not-find]", () => {
-  // Cases that run history-reading gates fail on a shallow clone; the
-  // runner read that as a finding (the fault matrix's git-shallow axis).
-  const dir = mkdtempSync(join(tmpdir(), "barwise-shallow-"));
-  try {
-    const realGit = execFileSync("sh", ["-c", "command -v git"], { encoding: "utf8" }).trim();
-    const stub = join(dir, "git");
-    writeFileSync(
-      stub,
-      `#!/bin/sh\nif [ "$1" = rev-parse ] && [ "$2" = --is-shallow-repository ]; then echo true; exit 0; fi\nexec "${realGit}" "$@"\n`,
-    );
-    chmodSync(stub, 0o755);
-    const r = spawnSync(process.execPath, [join(SCRIPTS, "run-script-tests.mjs")], {
-      cwd: REPO,
-      encoding: "utf8",
-      env: { ...process.env, PATH: `${dir}:${process.env.PATH ?? ""}` },
-    });
-    assert.equal(r.status, 2, r.stdout + r.stderr);
-    assert.match(r.stderr, /the clone is shallow/);
-  } finally {
-    rmSync(dir, { recursive: true, force: true });
-  }
-});
-
 test("check-tracker-closes refuses when git answers emptily, with and without BASE_SHA (barwise-ydl) [adr:gate-refusal-contract#refuse-not-find]", () => {
   // The fault matrix's git-empty axis read a FALSE GREEN here: an empty
   // merge-base became base "", and an empty `git show` of the tracker a
@@ -5579,6 +5555,12 @@ test("check-tracker-closes refuses when git answers emptily, with and without BA
       });
       assert.equal(r.status, 2, `BASE_SHA=${JSON.stringify(baseSha)}: ${r.stdout}${r.stderr}`);
       assert.doesNotMatch(r.stdout, /OK/);
+      // Which refusal fired: the empty merge-base without BASE_SHA, the
+      // empty tracker read with it.
+      assert.match(
+        r.stderr,
+        baseSha ? /git show of .* printed nothing/ : /merge-base printed nothing/,
+      );
     }
     // Only merge-base empty, every other call real: the base "" would make
     // `git show :<tracker>` read the index, which is not empty, so the
@@ -5597,6 +5579,28 @@ test("check-tracker-closes refuses when git answers emptily, with and without BA
     assert.match(r.stderr, /merge-base printed nothing/);
   } finally {
     rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("check-tracker-closes refuses a close when git diff answers emptily (barwise-ydl) [adr:gate-refusal-contract#refuse-not-find]", () => {
+  const r = trackerRepo();
+  const shim = mkdtempSync(join(tmpdir(), "barwise-nodiff-"));
+  try {
+    r.issues([["a", "closed"], ["b", "open"]]);
+    writeFileSync(join(r.dir, "src.ts"), "export const x = 2;\n");
+    r.commit("close a beside code");
+    const realGit = execFileSync("sh", ["-c", "command -v git"], { encoding: "utf8" }).trim();
+    writeFileSync(
+      join(shim, "git"),
+      `#!/bin/sh\nif [ "$1" = diff ]; then exit 0; fi\nexec "${realGit}" "$@"\n`,
+    );
+    chmodSync(join(shim, "git"), 0o755);
+    const out = r.run({ BASE_SHA: r.base, PATH: `${shim}:${process.env.PATH ?? ""}` });
+    assert.equal(out.status, 2, out.stdout + out.stderr);
+    assert.match(out.stderr, /does not name/);
+  } finally {
+    rmSync(r.dir, { recursive: true, force: true });
+    rmSync(shim, { recursive: true, force: true });
   }
 });
 
