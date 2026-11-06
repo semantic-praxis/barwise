@@ -109,59 +109,69 @@ for (const pkg of readdirSync(join(root, "packages"))) {
 // so externals and the depcruise binary resolve.
 const mirror = mkdtempSync(join(tmpdir(), "barwise-depcruise-probe-"));
 const probePath = join(mirror, "packages/core/src/__depcruise-gate-probe__.ts");
+// Building the mirror is a precondition: if it fails, the probe could
+// not run, which is a refusal, not a finding (the setup try below).
 try {
-  for (
-    const f of [
-      ".dependency-cruiser.cjs",
-      "tsconfig.depcruise.json",
-      "tsconfig.base.json",
-      "scripts/lib/intended.cjs",
-    ]
-  ) {
-    mkdirSync(dirname(join(mirror, f)), { recursive: true });
-    writeFileSync(join(mirror, f), readFileSync(join(root, f)));
-  }
-  for (const pkg of readdirSync(join(root, "packages"))) {
-    const src = join(root, "packages", pkg, "src");
-    if (existsSync(src)) cpSync(src, join(mirror, "packages", pkg, "src"), { recursive: true });
-    const manifest = join(root, "packages", pkg, "package.json");
-    if (existsSync(manifest)) cpSync(manifest, join(mirror, "packages", pkg, "package.json"));
-  }
-  symlinkSync(join(root, "node_modules"), join(mirror, "node_modules"), "dir");
-  writeFileSync(probePath, 'import "@barwise/diagram-ui/server";\nexport {};\n');
-  let out;
   try {
-    out = execFileSync(
-      "npx",
-      ["depcruise", "packages", "--config", ".dependency-cruiser.cjs", "--output-type", "json"],
-      { cwd: mirror, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 },
+    for (
+      const f of [
+        ".dependency-cruiser.cjs",
+        "tsconfig.depcruise.json",
+        "tsconfig.base.json",
+        "scripts/lib/intended.cjs",
+      ]
+    ) {
+      mkdirSync(dirname(join(mirror, f)), { recursive: true });
+      writeFileSync(join(mirror, f), readFileSync(join(root, f)));
+    }
+    for (const pkg of readdirSync(join(root, "packages"))) {
+      const src = join(root, "packages", pkg, "src");
+      if (existsSync(src)) cpSync(src, join(mirror, "packages", pkg, "src"), { recursive: true });
+      const manifest = join(root, "packages", pkg, "package.json");
+      if (existsSync(manifest)) cpSync(manifest, join(mirror, "packages", pkg, "package.json"));
+    }
+    // "junction" makes a directory link on Windows without privileges and
+    // is ignored elsewhere.
+    symlinkSync(join(root, "node_modules"), join(mirror, "node_modules"), "junction");
+    writeFileSync(probePath, 'import "@barwise/diagram-ui/server";\nexport {};\n');
+  } catch (err) {
+    refusal = `the probe's mirror could not be built (${err instanceof Error ? err.message : err})`;
+  }
+  if (refusal === undefined) {
+    let out;
+    try {
+      out = execFileSync(
+        "npx",
+        ["depcruise", "packages", "--config", ".dependency-cruiser.cjs", "--output-type", "json"],
+        { cwd: mirror, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 },
+      );
+    } catch (e) {
+      // depcruise exits nonzero when violations exist; the JSON is on stdout.
+      out = e.stdout;
+    }
+    let parsed;
+    try {
+      parsed = JSON.parse(out ?? "");
+    } catch {
+      refusal =
+        "dependency-cruiser did not answer (npx depcruise printed no JSON; is it installed? npm ci)";
+    }
+    if (parsed !== undefined && !Array.isArray(parsed?.summary?.violations)) {
+      refusal =
+        "dependency-cruiser's JSON has no summary.violations list (another depcruise on PATH?)";
+    }
+    const violations = parsed?.summary?.violations ?? [];
+    const hit = violations.some(
+      (v) =>
+        v.from.includes("__depcruise-gate-probe__")
+        && v.to.includes("packages/diagram-ui/src/server.ts"),
     );
-  } catch (e) {
-    // depcruise exits nonzero when violations exist; the JSON is on stdout.
-    out = e.stdout;
-  }
-  let parsed;
-  try {
-    parsed = JSON.parse(out ?? "");
-  } catch {
-    refusal =
-      "dependency-cruiser did not answer (npx depcruise printed no JSON; is it installed? npm ci)";
-  }
-  if (parsed !== undefined && !Array.isArray(parsed?.summary?.violations)) {
-    refusal =
-      "dependency-cruiser's JSON has no summary.violations list (another depcruise on PATH?)";
-  }
-  const violations = parsed?.summary?.violations ?? [];
-  const hit = violations.some(
-    (v) =>
-      v.from.includes("__depcruise-gate-probe__")
-      && v.to.includes("packages/diagram-ui/src/server.ts"),
-  );
-  if (!hit && refusal === undefined) {
-    failures.push(
-      "probe: a forbidden subpath import from core (@barwise/diagram-ui/server) produced no violation -- "
-        + "the gate has gone blind to subpath edges again (check tsconfig.depcruise.json paths)",
-    );
+    if (!hit && refusal === undefined) {
+      failures.push(
+        "probe: a forbidden subpath import from core (@barwise/diagram-ui/server) produced no violation -- "
+          + "the gate has gone blind to subpath edges again (check tsconfig.depcruise.json paths)",
+      );
+    }
   }
 } finally {
   rmSync(mirror, { recursive: true, force: true });
