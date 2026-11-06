@@ -1,6 +1,6 @@
 # ADR refactor: each decision enforced, restated, or retired to prose
 
-Status: Draft -- no workstream implemented
+Status: WS1 decided 2026-11-06 (the owner's answers on all 25 rows); decision citations by id implemented 2026-11-06 (`check:architecture` resolves `<adr>.md#<id>`, and the numbered citations in the five ADRs the refactor edits first are rewritten (credential-handling, constraint-coverage-policy and metamodel-evolution-policy, which WS1 renumbers; connector-packages, which row 1's spec renumbers; review-policy, whose retired decision is its last)); row 1's spec and the batches not started
 
 Created: 2026-11-05
 Last-updated: 2026-11-06
