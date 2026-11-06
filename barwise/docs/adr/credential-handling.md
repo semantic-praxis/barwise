@@ -18,8 +18,8 @@ rewriting history all leave the key valid and already disclosed.
 `.gitignore` covering `.env` stood in for a gate and could not see the
 three paths a secret actually arrives by here -- machine-written tracked
 files under `eval-payloads/` and `eval-runs/`, commands pasted into
-documentation, and fixtures imitating real payloads. Why detection is delegated, why the wrapper exists, and the
-rejected alternatives are in `credential-scanning.spec.md`; removing the
+documentation, and fixtures imitating real payloads. Why detection is
+delegated, why the wrapper exists, and the rejected alternatives are in `credential-scanning.spec.md`; removing the
 places a key can be written down is `docs/adr/keyless-model-access.md`,
 and the exit contract `credential-handling.md#wrapper-contract` applies is
 `docs/adr/gate-refusal-contract.md`.

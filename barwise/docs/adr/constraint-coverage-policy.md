@@ -68,9 +68,8 @@ check can hold: `adr-refactor.spec.md`, row 19.)
    a transcript, breaking realism. Their home is a didactic gym
    exercise: the gym is allowed to be pedagogically complete where the
    eval suite must stay naturalistic. Until that exercise exists they
-   sit outside the validated envelope and the trust statement (below,
-   under Consequences) applies
-   to them indefinitely.
+   sit outside the validated envelope and the trust statement (under
+   Consequences) applies to them indefinitely.
 
 3. **The living inventory stays out of this record.**{#inventory-outside} Which types are
    covered today, and the workstreams closing the gaps, live in
