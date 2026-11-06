@@ -1,6 +1,6 @@
 # Core purity widened, and the model SDK boundary held
 
-Status: Draft -- no workstream implemented
+Status: WS1 and WS3 implemented 2026-11-06 (purity reads TypeScript's import list and scanner, with the new rules, a refusal on no source, and arch-triage taking its rules; the four sorts use compareCodeUnits with a two-locale test; modelSdkBoundary.test.ts holds one-layer-out); WS2 provisional
 Created: 2026-11-06
 Last-updated: 2026-11-06
 Plan-reviewed: fc79ebb8 (code-review, pr-review)

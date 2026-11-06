@@ -41,6 +41,7 @@ import type { ObjectTypeConfig } from "../model/ObjectType.js";
 import { OrmModel } from "../model/OrmModel.js";
 import { toPopulationConfig } from "../model/Population.js";
 import { toSubtypeFactConfig } from "../model/SubtypeFact.js";
+import { compareCodeUnits } from "../util/compareCodeUnits.js";
 
 /** Which element an old id names: a 3.x file may give two kinds one id. */
 type Kind =
@@ -177,7 +178,7 @@ export function replayIds(source: OrmModel, options: ReplayOptions = {}): Replay
   // the role resolve; a model with none keeps a fact type of that name.
   const reshaped = new Set<string>();
   let rolesReshaped = false;
-  for (const [kind, olds] of [...byKind].sort(([a], [b]) => a.localeCompare(b))) {
+  for (const [kind, olds] of [...byKind].sort(([a], [b]) => compareCodeUnits(a, b))) {
     const { pattern, shape } = RESHAPE[kind];
     for (const old of [...olds].sort()) {
       // Kept only where 4.0 reads it as written: its shape, and in NFC.
