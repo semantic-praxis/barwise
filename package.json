@@ -35,6 +35,7 @@
     "check:book-citations": "npm --prefix barwise run check:book-citations --",
     "check:instruction-refs": "npm --prefix barwise run check:instruction-refs --",
     "check:architecture": "npm --prefix barwise run check:architecture --",
+    "check:capability-matrix": "npm --prefix barwise run check:capability-matrix --",
     "check:adr-tests": "npm --prefix barwise run check:adr-tests --",
     "check:adr-model": "npm --prefix barwise run check:adr-model --",
     "test:scripts": "npm --prefix barwise run test:scripts --",

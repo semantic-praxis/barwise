@@ -163,6 +163,14 @@ jobs:
       # (docs/specs/architecture-index.spec.md, WS1).
       - run: npm run check:architecture
 
+      # The capability matrix in the root CLAUDE.md against
+      # scripts/lib/capability-map.json, which records each row's cells, and
+      # the Divergence vocabulary. No docs-only guard: a docs-only change can
+      # edit the matrix, and it cannot change the map or the registrations,
+      # so a cell it flips disagrees with the map here. The full run, after the build, reads the
+      # registrations (docs/specs/capability-matrix-check.spec.md).
+      - run: npm run check:capability-matrix -- --static
+
       # Fast, source-only static gates next (none need the build), so a lint
       # or architecture violation fails in seconds rather than after the
       # build and test suite.
@@ -362,6 +370,12 @@ jobs:
         if: steps.changes.outputs.docs_only != 'true'
 
       - run: npm run build
+        if: steps.changes.outputs.docs_only != 'true'
+
+      # Each matrix row against what the CLI, the MCP server and the VS Code
+      # extension register, read from the build (surface-capability-parity,
+      # decisions 1 to 3).
+      - run: npm run check:capability-matrix
         if: steps.changes.outputs.docs_only != 'true'
 
       # The vscode package's own type-checks. Every other package builds

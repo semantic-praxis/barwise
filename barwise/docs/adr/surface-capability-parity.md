@@ -4,10 +4,11 @@ Scope: architecture
 Date: 2026-11-04
 Tracking: barwise-ubc, barwise-0wa, docs/specs/surface-mirroring.spec.md, barwise-1fr, barwise-1005, barwise-xpt,
 docs/specs/cli-surface-parity.spec.md,
-docs/specs/getting-started-guides.spec.md
-Enforced-by: tests (pinned-tool-lists), none (barwise-ym8.0pq: pinned-tool-lists),
-none (barwise-ym8.wfy: matrix-records-reach), none (barwise-ym8.3nm: matrix-same-commit),
-none (barwise-ym8.0hi: vscode-yes-means)
+docs/specs/getting-started-guides.spec.md,
+docs/specs/capability-matrix-check.spec.md
+Enforced-by: npm run check:capability-matrix (matrix-records-reach, matrix-same-commit,
+vscode-yes-means), tests (pinned-tool-lists), none (barwise-ym8.0pq: pinned-tool-lists),
+none (barwise-ym8.wfy: matrix-records-reach), none (barwise-ym8.3nm: matrix-same-commit)
 
 ## Context
 
@@ -46,26 +47,38 @@ Consequences below).
 
 ## Consequences
 
-- Decision 4 is the one with a gate: `mcp/tests/serverSpawn.test.ts`
+- `npm run check:capability-matrix` holds decisions 1 to 3
+  (`docs/specs/capability-matrix-check.spec.md`). It reads the matrix,
+  `scripts/lib/capability-map.json` (which names, per row and surface,
+  what would carry the row's reach) and the registrations themselves: the
+  CLI's commander tree and the MCP server's `listTools` from the build,
+  VS Code's `contributes` and the extension's `registerCommand` calls
+  from source. It fails on a row and map that disagree, a cell the
+  registrations contradict (a `no` where the gap has closed included),
+  a registration no row names, a palette command contributed and never
+  registered, and a Divergence outside this ADR's vocabulary; it refuses
+  a missing build. `--static` runs the rows-against-map half
+  with no docs-only guard, so a docs-only edit to the matrix is checked;
+  the full run follows the build. A command path is covered by a row
+  naming it or an ancestor, the matrix's own granularity, so `lineage
+  show` and `gym show` still sit under rows that read `none` or `yes`
+  (below). Decision 2 is held per pull request head and push to main, not
+  per commit (that spec's open decision 1). The bundled MCP server
+  provider and the chat participant are not counted as VS Code reach,
+  per decision 3; whether they should be is that spec's open decision 3.
+- Decision 4 has its own tests: `mcp/tests/serverSpawn.test.ts`
   and `vscode/tests/unit/toolRegistration.test.ts` fail when a tool is
   added or removed without updating their list. They run in CI through
   `npm run test:coverage` (`if: steps.changes.outputs.docs_only !=
   'true'`, so skipped on a docs-only pull request and, like any step,
   once an earlier step fails).
-- No CI test compares the matrix rows with the registrations, so
-  decisions 1 to 3 have no gate. A tool added to the code and to its
-  pinned list leaves the matrix row unchanged and the suite green
-  (barwise-1005, for the MCP and VS Code columns).
-  For the rest (barwise-xpt): `commandRouting.test.ts` pins the CLI's
-  own 19-entry table and that each entry routes to its command, but not
-  the matrix's CLI column or its subcommand rows; an integration test
-  asserts six palette commands are registered and is not run in CI; the
-  option rows are compared with nothing. `check:instruction-refs` reads
-  the root `CLAUDE.md` for dead paths only. The two pinned tests call
-  themselves "the executable form" of their matrix column, and other
-  documents imply the matrix is checked (barwise-xpt). Decisions 1 and 2
-  are on the `pr-review` checklist ("When a surface changed"); decision 3
-  is on no checklist.
+- What remains open: decision 1 at a finer grain than a row (a
+  subcommand or option gap under a row that reads `none`; below, and
+  `surface-mirroring.spec.md` workstream 1); decision 2 per commit
+  (barwise-ym8.3nm); and decision 4's tests, where `check:adr-tests`
+  passes on either one of the two and nothing checks the `toEqual`
+  form (barwise-ym8.0pq). Decisions 1 and 2 are also on the `pr-review`
+  checklist ("When a surface changed").
 - The owner re-decided the rows that existed on 2026-10-13, under the
   2026-10-12 direction that MCP and VS Code mirror the CLI (barwise-0wa,
   `docs/specs/surface-mirroring.spec.md`): each now reads `deliberate`
