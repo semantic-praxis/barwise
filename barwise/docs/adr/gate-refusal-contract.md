@@ -8,7 +8,7 @@ docs/specs/gate-refusal-contract.spec.md
 Enforced-by: npm run fault-matrix (three-results, refuse-not-find, cwd-invariant),
 tests (three-results, refuse-not-find, cwd-invariant, readers-keep-third),
 none (barwise-ym8.j31: three-results), none (barwise-ym8.rl7: refuse-not-find),
-none (barwise-ym8.c42: cwd-invariant), none (barwise-ym8.aep: readers-keep-third),
+none (barwise-ym8.aep: readers-keep-third),
 none (barwise-ym8.if3: no-writes)
 
 ## Context
