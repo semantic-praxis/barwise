@@ -57,7 +57,7 @@ Consequences below).
   registrations contradict (a `no` where the gap has closed included),
   a registration no row names, a palette command contributed and never
   registered, and a Divergence outside this ADR's vocabulary; it refuses
-  a missing or stale build. `--static` runs the rows-against-map half
+  a missing build. `--static` runs the rows-against-map half
   with no docs-only guard, so a docs-only edit to the matrix is checked;
   the full run follows the build. A command path is covered by a row
   naming it or an ancestor, the matrix's own granularity, so `lineage

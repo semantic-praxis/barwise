@@ -7,7 +7,7 @@
  */
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { test } from "node:test";
@@ -35,6 +35,7 @@ function fixture() {
   const map = {
     rows: {
       "`merge`": {
+        cells: ["yes", "yes", "yes"],
         cli: ["merge --output"],
         mcp: ["merge_models.base"],
         vscode: ["barwise_merge_models"],
@@ -207,18 +208,23 @@ test("the gate refuses when the matrix is missing, and a finding outranks a refu
   assert.match(both.stderr, /also could not read the registrations/);
 });
 
-test("the gate refuses a build older than its source", (t) => {
-  const dir = tree();
+test("--static fails on a cell flipped in the matrix alone, with its Divergence still valid", (t) => {
+  const migrate = CLAUDE_MD.split("\n").find((l) => l.startsWith("| `migrate`"));
+  const flipped = migrate.replace("| yes | no  | no      |", "| yes | yes | no      |");
+  assert.notEqual(flipped, migrate);
+  const dir = tree(CLAUDE_MD.replace(migrate, flipped));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
-  for (const sub of ["src", "dist"]) {
-    mkdirSync(join(dir, "barwise", "packages", "cli", sub), { recursive: true });
-  }
-  const dist = join(dir, "barwise", "packages", "cli", "dist", "cli.js");
-  const src = join(dir, "barwise", "packages", "cli", "src", "cli.ts");
-  writeFileSync(dist, "export {};\n");
-  writeFileSync(src, "export {};\n");
-  utimesSync(dist, new Date(1000), new Date(1000));
-  const r = run(dir);
-  assert.equal(r.status, 2, r.stderr);
-  assert.match(r.stderr, /packages\/cli\/dist is older than its src/);
+  const r = run(dir, "--static");
+  assert.equal(r.status, 1, r.stderr);
+  assert.match(r.stderr, /row "`migrate`": the mcp cell reads "yes", the map's cells say "no"/);
+  assert.doesNotMatch(r.stderr, /Divergence/);
+});
+
+test("`not yet` on a row every surface reaches is a finding: the gap closed and the label stayed", () => {
+  const r = {
+    capability: "x",
+    cells: { cli: "yes", mcp: "yes", vscode: "yes" },
+    divergence: "not yet: WS3",
+  };
+  assert.match(divergenceProblem(r), /every surface reaches/);
 });

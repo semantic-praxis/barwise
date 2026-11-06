@@ -20,9 +20,11 @@
  *
  * Findings, exit 1:
  *   - a matrix row with no map entry, or a map entry with no row;
+ *   - a matrix cell that differs from the map's `cells` for that row;
  *   - a Divergence cell outside the ADR's vocabulary: `none` on a row
- *     with a `no`, `not yet` naming no workstream or issue, `deliberate`
- *     with no reason, or any other first word;
+ *     with a `no`, `not yet` naming no workstream or issue or standing
+ *     on a row with no `no`, `deliberate` with no reason, or any other
+ *     first word;
  *   - a cell that disagrees with the registrations;
  *   - a registration no row names and `unlisted` does not excuse (a
  *     command path is covered by any row naming it or an ancestor, which
@@ -31,19 +33,25 @@
  *   - a VS Code palette command contributed and not registered, or
  *     registered and neither contributed nor unlisted.
  * Refusals, exit 2 (docs/adr/gate-refusal-contract.md): the matrix or
- * the map would not read, a surface's build is missing, a build is older
- * than its source (a stale local dist answers for code that is not
- * there), or the MCP server would not list its tools. A finding outranks
- * a refusal.
+ * the map would not read, a surface's build is missing, git would not
+ * list the extension's source, or the MCP server would not list its
+ * tools. A finding outranks a refusal. The full run reads the CLI and MCP
+ * server from their build, which CI and `ci:local` make first; a local
+ * run after a pull without a build reads the old one. Comparing file
+ * times was tried and dropped: the packages build incrementally, so an
+ * up-to-date build can be older than a source file git rewrote.
  *
- * `--static` checks only what needs no build -- the rows against the map
- * and the Divergence vocabulary -- for CI's docs-only path. A docs-only
- * change cannot touch the map or the registrations, so that subset is
- * the whole question there. Only the full run is the ADR's enforcer.
+ * `--static` checks only what needs no build -- the rows and cells
+ * against the map, and the Divergence vocabulary -- for CI's docs-only
+ * path. The map records each row's cells, so a docs-only edit that flips
+ * a cell disagrees with it; changing the map is not docs-only, and runs
+ * the full check. Only the full run is the ADR's enforcer.
  *
  * Usage: node scripts/check-capability-matrix.mjs [--static] [--root <repo>]
  */
-import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { existsSync, readFileSync } from "node:fs";
+import { createRequire } from "node:module";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
@@ -75,6 +83,7 @@ export function divergenceProblem(row) {
   if (/^deliberate( \(owner\))?:\s*\S/.test(d)) return null;
   if (/^deliberate\b/.test(d)) return "reads `deliberate` with no reason after a colon";
   if (/^not yet:/.test(d)) {
+    if (!anyNo) return "reads `not yet` on a row every surface reaches; the gap has closed";
     return /\bWS\d|\bbarwise-[a-z0-9]/.test(d)
       ? null
       : "reads `not yet` naming no workstream (WS<n>) or issue";
@@ -94,6 +103,17 @@ export function staticFindings(rows, map) {
     }
     if (!keys.has(row.capability)) {
       out.push(`row "${row.capability}" has no entry in scripts/lib/capability-map.json`);
+    } else {
+      const want = map.rows[row.capability].cells ?? [];
+      SURFACES.forEach((s, i) => {
+        if (want[i] !== row.cells[s]) {
+          out.push(
+            `row "${row.capability}": the ${s} cell reads "${row.cells[s]}", the map's cells say "${
+              want[i]
+            }"`,
+          );
+        }
+      });
     }
     const problem = divergenceProblem(row);
     if (problem) out.push(`row "${row.capability}": its Divergence ${problem}`);
@@ -198,22 +218,26 @@ export function registrationFindings(rows, map, reg) {
   return out;
 }
 
-/** Every file under a directory, recursively. */
-function filesUnder(dir) {
-  return readdirSync(dir, { withFileTypes: true }).flatMap((e) =>
-    e.isDirectory() ? filesUnder(join(dir, e.name)) : [join(dir, e.name)]
-  );
+/** Throws when a package has no build to read. */
+function assertBuilt(root, pkg) {
+  if (!existsSync(join(root, "packages", pkg, "dist"))) {
+    throw new Error(`packages/${pkg}/dist is missing; run npm run build`);
+  }
 }
 
-const newest = (dir) => Math.max(...filesUnder(dir).map((f) => statSync(f).mtimeMs));
-
-/** Throws when a package's dist is missing or older than its src. */
-function assertBuilt(root, pkg) {
-  const dist = join(root, "packages", pkg, "dist");
-  if (!existsSync(dist)) throw new Error(`packages/${pkg}/dist is missing; run npm run build`);
-  if (newest(join(root, "packages", pkg, "src")) > newest(dist)) {
-    throw new Error(`packages/${pkg}/dist is older than its src; run npm run build`);
-  }
+/**
+ * The extension's tracked source files. Tracked, not walked: an untracked
+ * scratch file must not register a command the committed tree lacks
+ * (barwise-905's shape). An empty listing is a refusal, never a pass.
+ */
+function trackedSource(root) {
+  const out = execFileSync("git", ["ls-files", "-z", "--", "packages/vscode/src"], {
+    cwd: root,
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "pipe"],
+  }).split("\0").filter((f) => /\.tsx?$/.test(f));
+  if (out.length === 0) throw new Error("git lists no tracked source under packages/vscode/src");
+  return out.map((f) => join(root, f));
 }
 
 /** The VS Code registrations: contributes, plus the extension's registerCommand calls. */
@@ -223,8 +247,7 @@ export function readVscode(root) {
   const tools = new Map((c.languageModelTools ?? []).map((t) => [t.name, t.inputSchema ?? {}]));
   const palette = new Set((c.commands ?? []).map((x) => x.command));
   const registered = new Set();
-  for (const f of filesUnder(join(dir, "src"))) {
-    if (!/\.tsx?$/.test(f)) continue;
+  for (const f of trackedSource(root)) {
     for (const m of readFileSync(f, "utf8").matchAll(/registerCommand\(\s*["'`]([^"'`]+)["'`]/g)) {
       registered.add(m[1]);
     }
@@ -261,7 +284,10 @@ async function readMcp(root) {
   const { createServer } = await import(
     pathToFileURL(join(root, "packages/mcp/dist/server.js")).href
   );
-  const sdk = join(root, "node_modules/@modelcontextprotocol/sdk/dist/esm");
+  // The SDK the mcp package itself resolves, wherever npm placed it.
+  const sdkPkg = createRequire(join(root, "packages/mcp/package.json"))
+    .resolve("@modelcontextprotocol/sdk/package.json");
+  const sdk = join(sdkPkg.replace(/[\\/]dist[\\/]cjs[\\/]package\.json$/, ""), "dist", "esm");
   const { Client } = await import(pathToFileURL(join(sdk, "client/index.js")).href);
   const { InMemoryTransport } = await import(pathToFileURL(join(sdk, "inMemory.js")).href);
   const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();

@@ -1,6 +1,6 @@
 # The capability matrix, checked against what each surface registers
 
-Status: WS1 implemented 2026-11-06 (check:capability-matrix, full run and --static, with capability-map.json for all 22 rows; probes for matrix-records-reach, matrix-same-commit and vscode-yes-means CAUGHT; the gate agreed with main on its first run); WS2 provisional
+Status: WS1 implemented 2026-11-06 (check:capability-matrix, full run and --static, with capability-map.json for all 22 rows and their cells; probes for matrix-records-reach, matrix-same-commit and vscode-yes-means CAUGHT; the gate agreed with main on its first run; code review dropped the stale-build refusal and made --static compare cells); WS2 provisional
 Created: 2026-11-06
 Last-updated: 2026-11-06
 Plan-reviewed: 8d9588bb (code-review, pr-review)
@@ -101,15 +101,22 @@ not the matrix.
      `deliberate` without a reason; any other first word.
 
    It refuses (exit 2) when a surface's registrations cannot be read: a
-   missing `dist`, a `dist` older than its package's `src` (a stale local
-   build), or a server that does not answer. It never prints OK then.
-3. **`--static`, a subset for docs-only changes.** The rows against the
-   map and the Divergence vocabulary need no build, so `--static` runs
-   them in the unguarded static section of `ci.yml`. The full run does
-   everything `--static` does and then reads the registrations, after
-   `npm run build` behind the docs-only guard. A docs-only pull request
-   cannot change the map (it lives under `scripts/`) or the
-   registrations, so `--static` covers it. Only the full run is named in
+   missing `dist`, an empty listing of the extension's tracked source, or
+   a server that does not answer. It never prints OK then. (WS1 first
+   refused a `dist` older than its `src`; code review showed the
+   packages build incrementally, so an up-to-date build can be older than
+   a source file git rewrote, and the refusal would never clear. Dropped:
+   CI and `ci:local` build before the check.)
+3. **`--static`, a subset for docs-only changes.** The map also records
+   each row's three cells. The rows and cells against the map, and the
+   Divergence vocabulary, need no build, so `--static` runs them in the
+   unguarded static section of `ci.yml`. The full run does everything
+   `--static` does and then holds the map's cells to the registrations,
+   after `npm run build` behind the docs-only guard. A docs-only pull
+   request cannot change the map (it lives under `scripts/`) or the
+   registrations, so a cell it flips disagrees with the map and
+   `--static` fails it. (WS1 first checked only rows and labels there;
+   code review showed a docs-only flip of a cell passed CI.) Only the full run is named in
    the ADR's `Enforced-by`, so every probe runs against a check that
    reads everything.
 4. **Decision 3** (`vscode-yes-means`): the map's VS Code names can only
@@ -141,8 +148,8 @@ some formats (barwise-i22), a behaviour question.
   are caught. It would report through `check:adr-tests` rather than an
   `npm` gate, so it would have no `--static` half for docs-only pull
   requests and no exit-2 refusal of its own; a test cannot be "could
-  not answer". Rejected; the full run instead refuses a `dist` older
-  than `src`, so a stale build is a refusal, not a wrong answer.
+  not answer". Rejected; the cost is that a local run reads whatever
+  build is there, which CI and `ci:local` make first.
 - **Comparing the matrix with the pinned lists**, which is what the
   refactor plan wrote. Cheaper, but a pinned list is a copy, and the CLI
   has no pinned list of subcommands or options. Rejected.
@@ -164,13 +171,17 @@ Scope 3. Tests plant each finding red: a row deleted from the map, a
 cell flipped, an option added to a surface marked `no` (the
 `not yet` row's gap closing unrecorded), a tool added to a fake
 registration, a palette command contributed and not registered, a
-Divergence of `under review`, `not yet` without a workstream, and the
-refusals on a missing and a stale `dist`. Probes, both against the full
-run and both read without a rebuild: `matrix-records-reach` flips a
-`yes` to `no` in `CLAUDE.md`; `matrix-same-commit` adds a
-`languageModelTools` entry to `packages/vscode/package.json`. A probe
-of an MCP or CLI source edit makes `src` newer than `dist`, which the
-check refuses; that is stated beside the probes rather than probed. The
+Divergence of `under review`, `not yet` without a workstream or on a
+row with no `no`, a cell flipped in the matrix alone, and the refusals
+on a missing `dist` and a missing matrix. Probes, all against the full
+run and read without a rebuild: `matrix-records-reach` flips the
+`migrate` row's MCP cell to `yes` in `CLAUDE.md`, leaving its
+Divergence valid, so the vocabulary rule cannot be what catches it;
+`matrix-same-commit` adds a `languageModelTools` entry to
+`packages/vscode/package.json`; `vscode-yes-means` renames a contributed
+palette command. A probe of an MCP or CLI source edit would read
+MISSED, since the full run reads their build; that is stated here
+rather than probed. The
 ADR's `Enforced-by` and Consequences change in the same PR, and the
 gate runs on main before it lands; any disagreement is fixed in the
 same PR and named.
@@ -214,8 +225,9 @@ The `toEqual` half waits on open decision 2.
 
 - The map is a second copy of the matrix. The check fails on any
   disagreement in either direction.
-- The full run imports built code and refuses a stale build, so a
-  developer who pulls without building gets a refusal, not a pass.
+- The full run imports built code, so a developer who pulls and runs
+  it without building reads the old build. CI and `ci:local` build
+  first.
 - Running the gate on main may find disagreements; WS1 fixes and names
   each.
 

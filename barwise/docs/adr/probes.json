@@ -104,8 +104,8 @@
   {
     "decision": "surface-capability-parity#matrix-records-reach",
     "file": "CLAUDE.md",
-    "old": "| `review`                                              | yes | yes | yes     |",
-    "new": "| `review`                                              | yes | no  | yes     |"
+    "old": "| `migrate`                                             | yes | no  | no      ",
+    "new": "| `migrate`                                             | yes | yes | no      "
   },
   {
     "decision": "surface-capability-parity#matrix-same-commit",

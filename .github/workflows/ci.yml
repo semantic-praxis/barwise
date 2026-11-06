@@ -164,10 +164,10 @@ jobs:
       - run: npm run check:architecture
 
       # The capability matrix in the root CLAUDE.md against
-      # scripts/lib/capability-map.json and the Divergence vocabulary. No
-      # docs-only guard: a docs-only change can edit the matrix, and it
-      # cannot change the map or the registrations, so this half is the
-      # whole question there. The full run, after the build, reads the
+      # scripts/lib/capability-map.json, which records each row's cells, and
+      # the Divergence vocabulary. No docs-only guard: a docs-only change can
+      # edit the matrix, and it cannot change the map or the registrations,
+      # so a cell it flips disagrees with the map here. The full run, after the build, reads the
       # registrations (docs/specs/capability-matrix-check.spec.md).
       - run: npm run check:capability-matrix -- --static
 

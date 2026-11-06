@@ -1,8 +1,20 @@
 {
-  "_comment": "Each row of the capability matrix in the root CLAUDE.md, keyed by its first cell, names what would carry its reach on each surface (docs/specs/capability-matrix-check.spec.md). CLI: a command path, optionally with one option ('import transcript --samples'). MCP: a tool, or a tool input as tool.property[.property]. VS Code: a palette command (barwise.x) or a language-model tool or its input (barwise_x[.property]). A surface is reached when every name is registered; null is a surface where no single name would carry it, and the unnamed-registration rule covers it. 'unlisted' holds the registrations no row is about, each with its reason. check:capability-matrix holds this file and the matrix together.",
+  "_comment": "Each row of the capability matrix in the root CLAUDE.md, keyed by its first cell, names what would carry its reach on each surface (docs/specs/capability-matrix-check.spec.md). CLI: a command path, optionally with one option ('import transcript --samples'). MCP: a tool, or a tool input as tool.property[.property]. VS Code: a palette command (barwise.x) or a language-model tool or its input (barwise_x[.property]). A surface is reached when every name is registered; null is a surface where no single name would carry it, and the unnamed-registration rule covers it. 'unlisted' holds the registrations no row is about, each with its reason. 'cells' repeats the row's three matrix cells (CLI, MCP, VS Code), so a docs-only edit that flips one disagrees with this file. check:capability-matrix holds this file and the matrix together.",
   "rows": {
     "validate, verbalize, diagram, export, import, analyze": {
-      "cli": ["validate", "verbalize", "diagram", "export", "import", "analyze"],
+      "cells": [
+        "yes",
+        "yes",
+        "yes"
+      ],
+      "cli": [
+        "validate",
+        "verbalize",
+        "diagram",
+        "export",
+        "import",
+        "analyze"
+      ],
       "mcp": [
         "validate_model",
         "verbalize_model",
@@ -28,12 +40,35 @@
       ]
     },
     "`review`": {
-      "cli": ["review"],
-      "mcp": ["review_model"],
-      "vscode": ["barwise_review_model"]
+      "cells": [
+        "yes",
+        "yes",
+        "yes"
+      ],
+      "cli": [
+        "review"
+      ],
+      "mcp": [
+        "review_model"
+      ],
+      "vscode": [
+        "barwise_review_model"
+      ]
     },
     "schema, diff, query, describe, lineage, impact": {
-      "cli": ["schema", "diff", "query", "describe", "lineage", "lineage impact"],
+      "cells": [
+        "yes",
+        "yes",
+        "yes"
+      ],
+      "cli": [
+        "schema",
+        "diff",
+        "query",
+        "describe",
+        "lineage",
+        "lineage impact"
+      ],
       "mcp": [
         "generate_schema",
         "diff_models",
@@ -52,99 +87,282 @@
       ]
     },
     "`merge`": {
-      "cli": ["merge"],
-      "mcp": ["merge_models"],
-      "vscode": ["barwise_merge_models"]
+      "cells": [
+        "yes",
+        "yes",
+        "yes"
+      ],
+      "cli": [
+        "merge"
+      ],
+      "mcp": [
+        "merge_models"
+      ],
+      "vscode": [
+        "barwise_merge_models"
+      ]
     },
     "`migrate`": {
-      "cli": ["migrate"],
+      "cells": [
+        "yes",
+        "no",
+        "no"
+      ],
+      "cli": [
+        "migrate"
+      ],
       "mcp": null,
       "vscode": null
     },
     "`rename`": {
-      "cli": ["rename"],
-      "mcp": ["rename_element"],
-      "vscode": ["barwise_rename_element"]
+      "cells": [
+        "yes",
+        "yes",
+        "yes"
+      ],
+      "cli": [
+        "rename"
+      ],
+      "mcp": [
+        "rename_element"
+      ],
+      "vscode": [
+        "barwise_rename_element"
+      ]
     },
     "`gym`": {
-      "cli": ["gym"],
-      "mcp": ["gym_list", "gym_check"],
+      "cells": [
+        "yes",
+        "yes",
+        "no"
+      ],
+      "cli": [
+        "gym"
+      ],
+      "mcp": [
+        "gym_list",
+        "gym_check"
+      ],
       "vscode": null
     },
     "gym session log (`--no-state`)": {
-      "cli": ["gym check --no-state"],
-      "mcp": ["gym_check.state"],
+      "cells": [
+        "yes",
+        "no",
+        "no"
+      ],
+      "cli": [
+        "gym check --no-state"
+      ],
+      "mcp": [
+        "gym_check.state"
+      ],
       "vscode": null
     },
     "`project split`": {
-      "cli": ["project split"],
-      "mcp": ["split_model"],
-      "vscode": ["barwise_split_model"]
+      "cells": [
+        "yes",
+        "yes",
+        "yes"
+      ],
+      "cli": [
+        "project split"
+      ],
+      "mcp": [
+        "split_model"
+      ],
+      "vscode": [
+        "barwise_split_model"
+      ]
     },
     "`project init`": {
-      "cli": ["project init"],
+      "cells": [
+        "yes",
+        "no",
+        "no"
+      ],
+      "cli": [
+        "project init"
+      ],
       "mcp": null,
       "vscode": null
     },
     "`history`": {
-      "cli": ["history"],
+      "cells": [
+        "yes",
+        "no",
+        "no"
+      ],
+      "cli": [
+        "history"
+      ],
       "mcp": null,
       "vscode": null
     },
     "`prompt eval`, `prompt run`": {
-      "cli": ["prompt eval", "prompt run"],
+      "cells": [
+        "yes",
+        "no",
+        "no"
+      ],
+      "cli": [
+        "prompt eval",
+        "prompt run"
+      ],
       "mcp": null,
       "vscode": null
     },
     "`prompt schema`, `prompt artifact`": {
-      "cli": ["prompt schema", "prompt artifact"],
+      "cells": [
+        "yes",
+        "no",
+        "no"
+      ],
+      "cli": [
+        "prompt schema",
+        "prompt artifact"
+      ],
       "mcp": null,
       "vscode": null
     },
     "`prompt score`, `rescore`, `history`, `compare`": {
-      "cli": ["prompt score", "prompt rescore", "prompt history", "prompt compare"],
+      "cells": [
+        "yes",
+        "no",
+        "no"
+      ],
+      "cli": [
+        "prompt score",
+        "prompt rescore",
+        "prompt history",
+        "prompt compare"
+      ],
       "mcp": null,
       "vscode": null
     },
     "`import batch`": {
-      "cli": ["import batch"],
+      "cells": [
+        "yes",
+        "no",
+        "no"
+      ],
+      "cli": [
+        "import batch"
+      ],
       "mcp": null,
       "vscode": null
     },
     "`llm-usage`": {
-      "cli": ["llm-usage"],
+      "cells": [
+        "yes",
+        "no",
+        "no"
+      ],
+      "cli": [
+        "llm-usage"
+      ],
       "mcp": null,
       "vscode": null
     },
     "prompt-artifact override (`--artifacts`)": {
-      "cli": ["prompt eval --artifacts", "prompt artifact --artifacts", "prompt run --artifacts"],
-      "mcp": ["import_transcript.artifacts"],
-      "vscode": ["barwise_import_transcript.artifacts"]
+      "cells": [
+        "yes",
+        "no",
+        "no"
+      ],
+      "cli": [
+        "prompt eval --artifacts",
+        "prompt artifact --artifacts",
+        "prompt run --artifacts"
+      ],
+      "mcp": [
+        "import_transcript.artifacts"
+      ],
+      "vscode": [
+        "barwise_import_transcript.artifacts"
+      ]
     },
     "multi-sample import (`--samples`)": {
-      "cli": ["import transcript --samples"],
-      "mcp": ["import_transcript.samples"],
-      "vscode": ["barwise_import_transcript.samples"]
+      "cells": [
+        "yes",
+        "yes",
+        "no"
+      ],
+      "cli": [
+        "import transcript --samples"
+      ],
+      "mcp": [
+        "import_transcript.samples"
+      ],
+      "vscode": [
+        "barwise_import_transcript.samples"
+      ]
     },
     "thinking-budget override (`--thinking-budget`)": {
-      "cli": ["prompt eval --thinking-budget", "prompt run --thinking-budget"],
-      "mcp": ["import_transcript.thinkingBudget"],
-      "vscode": ["barwise_import_transcript.thinkingBudget"]
+      "cells": [
+        "yes",
+        "no",
+        "no"
+      ],
+      "cli": [
+        "prompt eval --thinking-budget",
+        "prompt run --thinking-budget"
+      ],
+      "mcp": [
+        "import_transcript.thinkingBudget"
+      ],
+      "vscode": [
+        "barwise_import_transcript.thinkingBudget"
+      ]
     },
     "reference inference (`--infer-references`)": {
-      "cli": ["import model --infer-references", "import sql --infer-references"],
-      "mcp": ["import_model.inferReferences"],
-      "vscode": ["barwise_import_model.inferReferences"]
+      "cells": [
+        "yes",
+        "no",
+        "no"
+      ],
+      "cli": [
+        "import model --infer-references",
+        "import sql --infer-references"
+      ],
+      "mcp": [
+        "import_model.inferReferences"
+      ],
+      "vscode": [
+        "barwise_import_model.inferReferences"
+      ]
     },
     "generated keys on export (`--surrogate-keys`)": {
-      "cli": ["export --surrogate-keys"],
-      "mcp": ["export_model.options.surrogateKeys"],
-      "vscode": ["barwise_export_model.options.surrogateKeys"]
+      "cells": [
+        "yes",
+        "yes",
+        "no"
+      ],
+      "cli": [
+        "export --surrogate-keys"
+      ],
+      "mcp": [
+        "export_model.options.surrogateKeys"
+      ],
+      "vscode": [
+        "barwise_export_model.options.surrogateKeys"
+      ]
     },
     "content-only matching on diff (`--matching content`)": {
-      "cli": ["diff --matching"],
-      "mcp": ["diff_models.matching"],
-      "vscode": ["barwise_diff_models.matching"]
+      "cells": [
+        "yes",
+        "yes",
+        "yes"
+      ],
+      "cli": [
+        "diff --matching"
+      ],
+      "mcp": [
+        "diff_models.matching"
+      ],
+      "vscode": [
+        "barwise_diff_models.matching"
+      ]
     }
   },
   "unlisted": {
