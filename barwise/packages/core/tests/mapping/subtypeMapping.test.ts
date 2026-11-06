@@ -9,7 +9,6 @@
  */
 import { describe, expect, it } from "vitest";
 import { RelationalMapper } from "../../src/mapping/RelationalMapper.js";
-import { renderDdl } from "../../src/mapping/renderers/ddl.js";
 import { ModelBuilder } from "../helpers/ModelBuilder.js";
 
 const mapper = new RelationalMapper();
@@ -49,8 +48,9 @@ describe("subtype relational mapping", () => {
 
     it("does not keep the subtype's own identity on the shared key", () => {
       // The shared key takes the supertype's value, so an auto_counter
-      // subtype key must not generate one -- nor render UUID GENERATED ...
-      // AS IDENTITY after copying a UUID supertype key (PR #586 review).
+      // subtype key must not generate one after copying a UUID supertype
+      // key (PR #586 review). That the DDL renderer then writes no identity
+      // is formats' renderDdl test.
       const model = new ModelBuilder("Test")
         .withEntityType("Person", { referenceMode: "person_id" })
         .withValueType("PersonId", { dataType: { name: "uuid" } })
@@ -75,7 +75,6 @@ describe("subtype relational mapping", () => {
       const key = schema.tables.find((t) => t.name === "employee")!.columns[0]!;
       expect(key).toMatchObject({ name: "employee_id", dataType: "UUID" });
       expect(key.identity).toBeUndefined();
-      expect(renderDdl(schema)).not.toContain("UUID GENERATED");
     });
 
     it("still creates tables for both entity types", () => {
@@ -200,9 +199,15 @@ describe("subtype relational mapping", () => {
         .build();
 
       const schema = mapper.map(model);
-      const ddl = renderDdl(schema);
+      const employee = schema.tables.find((t) => t.name === "employee")!;
 
-      expect(ddl).toContain("FOREIGN KEY (employee_id) REFERENCES person (person_id)");
+      expect(employee.foreignKeys).toContainEqual(
+        expect.objectContaining({
+          columnNames: ["employee_id"],
+          referencedTable: "person",
+          referencedColumns: ["person_id"],
+        }),
+      );
     });
   });
 });

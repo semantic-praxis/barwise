@@ -11,9 +11,8 @@ registry, the format interfaces, and the native `.orm.yaml`.
 
 This package depends on `@barwise/core` for model types, the
 `ImportFormat` / `ExportFormatAdapter` interfaces, the format registry,
-and the capabilities the descriptors wrap: `RelationalMapper`, the
-renderers (`renderDdl`, `renderOpenApi`, `renderAvro`),
-`renderPopulationAsSql`, the constraint router and dialect profiles
+and the relational capabilities its renderers build on: `RelationalMapper`,
+the constraint router and dialect profiles
 (`routeConstraints`, `resolveDialectProfile`), the ConstraintSpec builder
 (`buildConstraintSpec`), the CHECK predicate parser (`parseValuePredicate`),
 and the SQL cascade parser (`parseSqlFile`). It
@@ -35,20 +34,28 @@ absent).
 src/
   index.ts                       Public API
   registration.ts                The 6 descriptors + registerStandardFormats()
-  naming.ts                      Name helpers shared by the adapters (snakeCase)
+  naming.ts                      Name helpers shared by the adapters (snakeCase,
+                                 toPascalCase, uniqueNames)
   constraintReport.ts            The text the export surfaces show for a result's
                                  constraintSpecs (CLI stderr, MCP block)
   ddl/DdlImportFormat.ts         SQL DDL -> ORM
-  ddl/DdlExportFormat.ts         ORM -> SQL DDL (wraps renderDdl; applies core's
+  ddl/DdlExportFormat.ts         ORM -> SQL DDL (calls renderDdl; applies core's
                                  dialect constraint routing as a text pass)
+  ddl/renderDdl.ts               The DDL renderer (moved from core,
+                                 format-renderers-to-connectors WS1)
+  ddl/sqlIdentifiers.ts          SQL names as dialects write them, and quoteIdent
+  population/populationRenderer.ts  A population as SQL inserts or OpenAPI examples
   ddl/barwiseAnnotation.ts       The `-- barwise:v1 {json}` line the DDL
                                  export writes and the DDL import reads:
                                  the one owner of that format
   openapi/OpenApiImportFormat.ts OpenAPI 3.x -> ORM
-  openapi/OpenApiExportFormat.ts ORM -> OpenAPI JSON (wraps renderOpenApi)
-  avro/AvroExportFormat.ts       ORM -> Avro schema (wraps renderAvro)
-  avro/avroNames.ts              Avro's namespace rule, and the repair the editor
-                                 uses for a namespace taken from a file name
+  openapi/OpenApiExportFormat.ts ORM -> OpenAPI JSON (calls renderOpenApi)
+  openapi/renderOpenApi.ts       The OpenAPI renderer
+  avro/AvroExportFormat.ts       ORM -> Avro schema (calls renderAvro)
+  avro/renderAvro.ts             The Avro renderer
+  avro/avroNames.ts              Avro's name and namespace rules, field names,
+                                 and the repair the editor uses for a
+                                 namespace taken from a file name
   sql/SqlImportFormat.ts         Raw SQL files -> ORM (text + directory scan)
   sql/SqlglotBridge.ts           Optional sqlglot sidecar: structural SQL tier
                                  + sourceText normalization
@@ -93,14 +100,14 @@ Lint is run from the repo root: `npm run lint`.
 ## Key Conventions
 
 - Importers follow the `ImportFormat` interface; exporters follow
-  `ExportFormatAdapter`. An export descriptor is a thin shell when core
-  has the renderer (DDL, OpenAPI, Avro call back into it); a format core
-  has no renderer for keeps its writer here, as NORMA and Ossie do.
+  `ExportFormatAdapter`. A format's renderer lives here beside its
+  descriptor (`docs/adr/connector-packages.md#format-in-its-connector`);
+  core supplies the relational schema it renders.
 - Format registration uses `registerStandardFormats()`, called at tool
   startup alongside `registerDbtFormats()` and `registerCodeFormats()`.
 
 ## Dependencies
 
-| Direction | Package         | What is used                                                       |
-| --------- | --------------- | ------------------------------------------------------------------ |
-| Upstream  | `@barwise/core` | Model types, ImportFormat/ExportFormatAdapter, registry, renderers |
+| Direction | Package         | What is used                                                     |
+| --------- | --------------- | ---------------------------------------------------------------- |
+| Upstream  | `@barwise/core` | Model types, ImportFormat/ExportFormatAdapter, registry, mapping |

@@ -9,12 +9,11 @@
  *   - Associative tables for many-to-many relationships
  *   - Value-type columns (absorbed into the entity table)
  */
+import { OrmModel } from "@barwise/core";
+import { RelationalMapper, type RelationalSchema } from "@barwise/core/mapping";
 import { describe, expect, it } from "vitest";
-import { RelationalMapper } from "../../src/mapping/RelationalMapper.js";
-import type { RelationalSchema } from "../../src/mapping/RelationalSchema.js";
-import { renderDdl } from "../../src/mapping/renderers/ddl.js";
-import { OrmModel } from "../../src/model/OrmModel.js";
-import { ModelBuilder } from "../helpers/ModelBuilder.js";
+import { renderDdl } from "../src/ddl/renderDdl.js";
+import { ModelBuilder } from "./helpers/ModelBuilder.js";
 
 const mapper = new RelationalMapper();
 
@@ -222,5 +221,35 @@ describe("DDL renderer", () => {
     expect(ddl).toContain("name TEXT");
     // Only one table (customer), no separate table for the value type.
     expect((ddl.match(/CREATE TABLE/g) ?? []).length).toBe(1);
+  });
+
+  it("renders no identity on a subtype's shared UUID key", () => {
+    // The mapper drops the subtype's auto_counter identity when the shared
+    // key copies a UUID supertype key; the renderer must then not write
+    // UUID GENERATED ... AS IDENTITY (PR #586 review). Moved from core's
+    // subtypeMapping test with the renderer.
+    const model = new ModelBuilder("Test")
+      .withEntityType("Person", { referenceMode: "person_id" })
+      .withValueType("PersonId", { dataType: { name: "uuid" } })
+      .withBinaryFactType("Person has PersonId", {
+        role1: { player: "Person", name: "has" },
+        role2: { player: "PersonId", name: "identifies" },
+        uniqueness: "role1",
+        mandatory: "role1",
+      })
+      .withEntityType("Employee", { referenceMode: "employee_id" })
+      .withValueType("EmployeeId", { dataType: { name: "auto_counter" } })
+      .withBinaryFactType("Employee has EmployeeId", {
+        role1: { player: "Employee", name: "has" },
+        role2: { player: "EmployeeId", name: "identifies" },
+        uniqueness: "role1",
+        mandatory: "role1",
+      })
+      .withSubtypeFact("Employee", "Person")
+      .build();
+
+    const ddl = renderDdl(mapper.map(model));
+    expect(ddl).toContain("employee_id UUID");
+    expect(ddl).not.toContain("UUID GENERATED");
   });
 });

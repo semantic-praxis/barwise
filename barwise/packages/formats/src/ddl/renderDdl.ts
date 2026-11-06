@@ -4,9 +4,10 @@
  * Produces SQL DDL (CREATE TABLE) statements from a RelationalSchema.
  */
 
-import { renderPopulationAsSql } from "../../export/populationRenderer.js";
-import type { OrmModel } from "../../model/OrmModel.js";
-import type { RelationalSchema, Table } from "../RelationalSchema.js";
+import type { OrmModel } from "@barwise/core";
+import type { RelationalSchema, Table } from "@barwise/core/mapping";
+import { renderPopulationAsSql } from "../population/populationRenderer.js";
+import { quoteIdent } from "./sqlIdentifiers.js";
 
 export interface DdlRenderOptions {
   /** Include population examples as INSERT statements (default: true). */
@@ -90,13 +91,4 @@ function sqlDefaultLiteral(value: string): string {
     return value;
   }
   return `'${value.replace(/'/g, "''")}'`;
-}
-
-function quoteIdent(name: string): string {
-  // Simple quoting: wrap in double quotes if the name contains special chars,
-  // otherwise return as-is.
-  if (/^[a-z_][a-z0-9_]*$/.test(name)) {
-    return name;
-  }
-  return `"${name.replace(/"/g, '""')}"`;
 }

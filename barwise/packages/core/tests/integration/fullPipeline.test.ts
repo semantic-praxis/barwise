@@ -12,7 +12,6 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { RelationalMapper } from "../../src/mapping/RelationalMapper.js";
-import { renderDdl } from "../../src/mapping/renderers/ddl.js";
 import { OrmYamlSerializer } from "../../src/serialization/OrmYamlSerializer.js";
 import { ValidationEngine } from "../../src/validation/ValidationEngine.js";
 import { Verbalizer } from "../../src/verbalization/Verbalizer.js";
@@ -74,16 +73,6 @@ describe("Full pipeline integration: load -> validate -> verbalize -> map -> DDL
       expect(tableNames).toContain("customer");
       expect(tableNames).toContain("order");
       expect(tableNames).toContain("product");
-    });
-
-    it("renders valid DDL", () => {
-      const schema = mapper.map(model);
-      const ddl = renderDdl(schema);
-      expect(ddl).toContain("CREATE TABLE customer");
-      expect(ddl).toContain("CREATE TABLE order");
-      const createCount = (ddl.match(/CREATE TABLE/g) ?? []).length;
-      const closeCount = (ddl.match(/\);/g) ?? []).length;
-      expect(closeCount).toBe(createCount);
     });
   });
 
@@ -165,33 +154,6 @@ describe("Full pipeline integration: load -> validate -> verbalize -> map -> DDL
       expect(dateCol).toBeDefined();
     });
 
-    it("renders valid DDL", () => {
-      const schema = mapper.map(model);
-      const ddl = renderDdl(schema);
-
-      // Basic DDL structure.
-      expect(ddl).toContain("CREATE TABLE customer");
-      expect(ddl).toContain("CREATE TABLE order");
-      expect(ddl).toContain("CREATE TABLE product");
-      expect(ddl).toContain("PRIMARY KEY");
-      expect(ddl).toContain("FOREIGN KEY");
-
-      // Every CREATE TABLE should have a matching closing );
-      const createCount = (ddl.match(/CREATE TABLE/g) ?? []).length;
-      const closeCount = (ddl.match(/\);/g) ?? []).length;
-      expect(closeCount).toBe(createCount);
-    });
-
-    it("DDL contains NOT NULL for mandatory columns", () => {
-      const schema = mapper.map(model);
-      const ddl = renderDdl(schema);
-
-      // customer_id PK should be NOT NULL.
-      expect(ddl).toContain("customer_id TEXT NOT NULL");
-      // order_number PK should be NOT NULL.
-      expect(ddl).toContain("order_number TEXT NOT NULL");
-    });
-
     it("frequency constraint passes validation", () => {
       // The Customer rates Product fact type has a frequency constraint.
       const ratesFt = model.getFactTypeByName("Customer rates Product");
@@ -250,15 +212,6 @@ describe("Full pipeline integration: load -> validate -> verbalize -> map -> DDL
       )!;
       expect(personTable).toBeDefined();
       expect(personTable.primaryKey.columnNames).toEqual(["person_id"]);
-    });
-
-    it("generates DDL for the full model", () => {
-      const schema = mapper.map(model);
-      const ddl = renderDdl(schema);
-      expect(ddl).toContain("CREATE TABLE person");
-      expect(ddl).toContain("CREATE TABLE car");
-      expect(ddl).toContain("CREATE TABLE bus");
-      expect(ddl).toContain("CREATE TABLE ticket");
     });
   });
 
@@ -374,33 +327,6 @@ describe("Full pipeline integration: load -> validate -> verbalize -> map -> DDL
       // into the Enrollment entity table instead.
       const tableNames = schema.tables.map((t) => t.name);
       expect(tableNames).not.toContain("student_enrolls_in_course");
-    });
-
-    it("renders valid DDL with objectified table", () => {
-      const schema = mapper.map(model);
-      const ddl = renderDdl(schema);
-
-      // Entity tables should all be present.
-      expect(ddl).toContain("CREATE TABLE student");
-      expect(ddl).toContain("CREATE TABLE course");
-      expect(ddl).toContain("CREATE TABLE enrollment");
-      expect(ddl).toContain("CREATE TABLE instructor");
-
-      // Enrollment table should have composite PK.
-      expect(ddl).toContain("PRIMARY KEY (student_id, course_code)");
-
-      // FK constraints from enrollment to student and course.
-      expect(ddl).toContain(
-        "FOREIGN KEY (student_id) REFERENCES student (student_id)",
-      );
-      expect(ddl).toContain(
-        "FOREIGN KEY (course_code) REFERENCES course (course_code)",
-      );
-
-      // Every CREATE TABLE should have a matching closing );
-      const createCount = (ddl.match(/CREATE TABLE/g) ?? []).length;
-      const closeCount = (ddl.match(/\);/g) ?? []).length;
-      expect(closeCount).toBe(createCount);
     });
   });
 });

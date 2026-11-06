@@ -18,12 +18,12 @@ import {
 import { collectExportAnnotations, type ExportAnnotation } from "@barwise/core/annotation";
 import { generateDdlLineage } from "@barwise/core/lineage";
 import {
-  openApiToJson,
   RelationalMapper,
-  renderOpenApi,
   unreportedConstraintSpecs,
   withConstraintSpecs,
 } from "@barwise/core/mapping";
+import { toPascalCase } from "../naming.js";
+import { openApiToJson, renderOpenApi } from "./renderOpenApi.js";
 
 /**
  * OpenAPI 3.0 export format.
@@ -171,18 +171,4 @@ function injectAnnotationExtensions(
       }
     }
   }
-}
-
-/**
- * Convert a snake_case name to PascalCase.
- *
- * Registered in parity.manifest.json ("pascal-case-openapi") with the
- * copy in core's openapi renderer: schema names must align, and
- * check:parity fails when the copies differ.
- */
-function toPascalCase(name: string): string {
-  return name
-    .split("_")
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
-    .join("");
 }

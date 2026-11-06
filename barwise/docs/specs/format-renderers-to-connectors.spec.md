@@ -1,6 +1,6 @@
 # Format renderers live in their connectors, and dbt composes formats' SQL parser
 
-Status: Draft -- no workstream implemented
+Status: WS1 implemented 2026-11-06 (the DDL, OpenAPI, Avro and population renderers in `@barwise/formats`; `connector-packages.md#format-in-its-connector` held by `core/tests/public/exports.test.ts`); WS2-WS4 not started
 
 Created: 2026-11-06
 Last-updated: 2026-11-06
@@ -235,6 +235,10 @@ line for each new `tests` entry.
 2. **The core export allowlist's granularity.** Recommended: per subpath,
    names only, types included (a type is surface too), in a JSON list
    beside the test, so a reviewer sees one line per new export.
+   Implemented in WS1 without the types: `exports.json` lists runtime
+   names only, because reading a module's types needs the TypeScript
+   compiler in a test, and a renderer is a value. A type-only export is
+   not seen, which `connector-packages.md`'s Consequences state.
 
 ## Risks and testing
 
@@ -246,3 +250,7 @@ line for each new `tests` entry.
 - **A behaviour change hiding in a move.** Each file's move commit
   changes only its import paths; edits to shared helpers follow in a
   separate commit.
+  WS1 did not: one commit carries the moves and the helper sharing
+  (`toPascalCase`, `quoteIdent`), so a reviewer reads the renamed files'
+  diffs (`git diff -M`) for anything beyond imports and those helpers.
+  WS2 and WS3 split them.

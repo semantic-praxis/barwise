@@ -1,5 +1,4 @@
 // Mapping: relational mapper, schema, and format renderers.
-export { renderPopulationAsSql } from "../export/populationRenderer.js";
 export {
   type ConstraintPlacement,
   type ConstraintRouting,
@@ -29,15 +28,6 @@ export type {
   Table,
 } from "./RelationalSchema.js";
 export {
-  type AvroField,
-  type AvroFieldType,
-  type AvroRenderOptions,
-  type AvroSchema,
-  type AvroSchemaSet,
-  avroSchemaToJson,
-  renderAvro,
-} from "./renderers/avro.js";
-export {
   DBT_KEY_TEST,
   type DbtModelFile,
   type DbtProject,
@@ -45,15 +35,6 @@ export {
   renderDbt,
 } from "./renderers/dbt.js";
 export { annotateDbtExport, type ExportAnnotationResult } from "./renderers/DbtExportAnnotator.js";
-export { renderDdl } from "./renderers/ddl.js";
-export { AVRO_NAME, avroFieldNames, toAvroName } from "./renderers/names.js";
-export {
-  type OpenApiPropertyType,
-  type OpenApiRenderOptions,
-  type OpenApiSpec,
-  openApiToJson,
-  renderOpenApi,
-} from "./renderers/openapi.js";
 export {
   hasGeneratedKeys,
   SURROGATE_KEY_TYPE,
