@@ -520,48 +520,48 @@ correspondence is to be designed.
 
 ## Open decisions (for review)
 
-1. **Which tier is `asymmetric`?** It is a core ring type and in neither
+1. **Which tier is `asymmetric`?** **Resolved (owner, 2026-11-06): common.** It is a core ring type and in neither
    tier of `tiered-types`. Adding it changes the decision's text.
    Recommended: common, because "no one approves their own request in
    both directions" is the shape of rules real sessions state; the owner
    may judge it rare.
-2. **How `core-external-deps` sees devDependency imports.** (a)
+2. **How `core-external-deps` sees devDependency imports.** **Taken as recommended (owner not asked; 2026-11-06).** (a)
    `check:architecture` reads `core/src` specifiers, which is
    declarable, probed and core-only. (b) knip `--production` for core,
    which needs `GATE_EXCEPTIONS` widened. Recommended: (a).
-3. **`minor-and-major`: restate or narrow.** (a) Restate to "a minor
+3. **`minor-and-major`: restate or narrow.** **Resolved (owner, 2026-11-06): restate.** (a) Restate to "a minor
    step goes to the next minor, a major step to the next major's first;
    the schema const equals `CURRENT_ORM_VERSION`" and move the
    additive/structural classification to Context, closing 31z. (b)
    Keep the text and leave 31z open on the judgment. Recommended: (a).
    Plan open decision 4 listed this as the owner's to reopen.
-4. **What "released" means for `shared-minor` (barwise-6om).**
+4. **What "released" means for `shared-minor` (barwise-6om).** **Resolved (owner, 2026-11-06): a `v*` tag; the ADR's v2.0.0 sentence is corrected.**
    Recommended: a `v*` tag, not `edge`. If `edge` counted, every PR
    that changes the schema would need a bump, which contradicts the
    decision. The ADR's "v2.0.0 is the first release since" names a tag
    that does not exist on origin. Either the tag is cut or the sentence
    is corrected in the same decision.
-5. **Are diagram positions "rendered output"?** `diagrams[].positions`
+5. **Are diagram positions "rendered output"?** **Taken as recommended (owner not asked; 2026-11-06).** `diagrams[].positions`
    persist pixel coordinates. Recommended: `presentation`, authored and
    not recomputed (users place elements). If the owner reads them as
    rendered layout, `recompute-derived` is violated today.
-6. **The Ossie boundary's residue.** A reader written from scratch that
+6. **The Ossie boundary's residue.** **Resolved (owner, 2026-11-06): close, the residue review-only.** A reader written from scratch that
    imports nothing Ossie (or a mapping-document reader built the same
    way) passes every check. (a) Close zec, yc6 and k74 with the residue
    moved to Consequences as review-only. (b) Keep them open, narrowed.
    Recommended: (a). No source scan tells a new YAML reader apart from
    the others.
-7. **Package CLAUDE.md dependency prose.** (a) The Upstream table is
+7. **Package CLAUDE.md dependency prose.** **Taken as recommended (owner not asked; 2026-11-06).** (a) The Upstream table is
    the checked copy, and `## Dependency Rule` prose stops listing
    internal packages. (b) Keep the prose lists unchecked. Recommended:
    (a), applied to the three files that lack a table and any prose list
    that disagrees.
-8. **Case as domain for `two-instances`.** (a) Accept that two cases
+8. **Case as domain for `two-instances`.** **Taken as recommended (owner not asked; 2026-11-06).** (a) Accept that two cases
    are two domains (employee-hierarchy and project-staffing are both HR
    settings). (b) Add a `domain:` field to eval cases and count
    distinct values. Recommended: (a) now, with (b) when a case set
    shares a domain in practice.
-9. **Restate `tiered-types`** to "never enters an eval case: no
+9. **Restate `tiered-types`** **Resolved (owner, 2026-11-06): not restated; barwise-ym8.vq8 stays open on transcript prose.** to "never enters an eval case: no
    reference or rubric in the suite holds a rare-tier constraint", or
    keep "transcript" with vq8 open on prose. Recommended: restate. The
    reference is where the suite records what a transcript settles.
