@@ -5,6 +5,7 @@
  * versions and migrations so the seam is covered without registering a
  * real migration.
  */
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   applyMigrations,
@@ -13,6 +14,7 @@ import {
   CURRENT_ORM_VERSION,
   LEGACY_ORM_VERSION,
   majorFirst,
+  ORM_VERSION_MIGRATIONS,
   type OrmVersionMigration,
   planMigration,
   planRead,
@@ -196,8 +198,8 @@ describe("this build's versions", () => {
 
   it("reach the current version from its major's first through registered steps [adr:schema-versioning#minor-and-major]", () => {
     // Fails when a minor bump forgets its step: the earlier minor would be
-    // refused. A step that skips a minor (3.0 to 3.2) still
-    // passes here and leaves 3.1 files unreadable; nothing checks that.
+    // refused. A step that skips a minor (3.0 to 3.2) passes here; the
+    // shape test below is what refuses it.
     expect(planRead(CURRENT_MAJOR_FIRST_VERSION)).toMatchObject({ ok: true, reader: "current" });
     expect(planRead(CURRENT_ORM_VERSION)).toEqual({
       ok: true,
@@ -225,5 +227,102 @@ describe("this build's versions", () => {
     expect(planRead("1.0")).toMatchObject({ ok: true, reader: "legacy", target: "2.0" });
     expect(planRead("3.1")).toEqual({ ok: false, reason: "unknown" });
     expect(planRead("2.5")).toEqual({ ok: false, reason: "unknown" });
+  });
+});
+
+/** `"3.1"` as `[3, 1]`, or undefined when it is not major.minor. */
+function parts(version: string): [number, number] | undefined {
+  const m = /^(\d+)\.(\d+)$/.exec(version);
+  return m ? [Number(m[1]), Number(m[2])] : undefined;
+}
+
+/**
+ * Steps that are neither a minor step (same major, the next minor) nor a
+ * major step (the next major's first version), each named. ADR
+ * `schema-versioning` decision 2.
+ */
+function stepShapeProblems(migrations: readonly OrmVersionMigration[]): string[] {
+  const problems: string[] = [];
+  for (const { from, to } of migrations) {
+    const f = parts(from);
+    const t = parts(to);
+    const minor = f && t && t[0] === f[0] && t[1] === f[1] + 1;
+    const major = f && t && t[0] === f[0] + 1 && t[1] === 0;
+    if (!minor && !major) problems.push(`${from} -> ${to} is neither a minor nor a major step`);
+  }
+  return problems;
+}
+
+/**
+ * Where the steps fail to form one path: a version that is the `from` of
+ * more than one step (`planMigration` takes the first and ignores the
+ * rest), or a major step that leaves a minor which is not its major's last
+ * -- a later minor some step or `current` names would be stranded.
+ */
+function chainProblems(migrations: readonly OrmVersionMigration[], current: string): string[] {
+  const problems: string[] = [];
+  const froms = new Map<string, number>();
+  for (const { from } of migrations) froms.set(from, (froms.get(from) ?? 0) + 1);
+  for (const [from, count] of froms) {
+    if (count > 1) problems.push(`${count} steps leave ${from}`);
+  }
+  const named = [current, ...migrations.flatMap((m) => [m.from, m.to])];
+  for (const { from, to } of migrations) {
+    const f = parts(from);
+    const t = parts(to);
+    if (!f || !t || t[0] === f[0]) continue;
+    const later = named.filter((v) => {
+      const p = parts(v);
+      return p !== undefined && p[0] === f[0] && p[1] > f[1];
+    });
+    if (later.length > 0) {
+      problems.push(`major step ${from} -> ${to} leaves ${from} while ${later[0]} exists`);
+    }
+  }
+  return problems;
+}
+
+describe("the migration registry's shape (ADR schema-versioning decision 2)", () => {
+  // The checks run on the real registry below; these synthetic registries
+  // show each one can fail, so a check that returned [] for everything
+  // would not pass here.
+  it("names a step that skips a minor, and a major step that lands past the next major's first", () => {
+    expect(stepShapeProblems([bump("3.0", "3.2"), bump("1.1", "2.1"), bump("1.0", "3.0")]))
+      .toEqual([
+        "3.0 -> 3.2 is neither a minor nor a major step",
+        "1.1 -> 2.1 is neither a minor nor a major step",
+        "1.0 -> 3.0 is neither a minor nor a major step",
+      ]);
+    expect(stepShapeProblems([bump("1.0", "1.1"), bump("1.1", "2.0")])).toEqual([]);
+  });
+
+  it("names two steps from one version, and a major step that leaves a minor before its major's last", () => {
+    expect(chainProblems([bump("1.0", "1.1"), bump("1.0", "2.0")], "2.0")).toEqual([
+      "2 steps leave 1.0",
+      "major step 1.0 -> 2.0 leaves 1.0 while 1.1 exists",
+    ]);
+    // The current version counts as named: a 3.0 -> 4.0 step in a 3.1 build
+    // would strand every 3.1 file.
+    expect(chainProblems([bump("3.0", "4.0")], "3.1")).toEqual([
+      "major step 3.0 -> 4.0 leaves 3.0 while 3.1 exists",
+    ]);
+    expect(chainProblems([bump("1.0", "1.1"), bump("1.1", "2.0")], "4.0")).toEqual([]);
+  });
+
+  it("holds every registered step to a minor or major step [adr:schema-versioning#minor-and-major]", () => {
+    expect(stepShapeProblems(ORM_VERSION_MIGRATIONS)).toEqual([]);
+  });
+
+  it("holds the registered steps to one path, each major step leaving its major's last minor [adr:schema-versioning#minor-and-major]", () => {
+    expect(chainProblems(ORM_VERSION_MIGRATIONS, CURRENT_ORM_VERSION)).toEqual([]);
+  });
+
+  it("pins the schema's orm_version const to CURRENT_ORM_VERSION [adr:schema-versioning#minor-and-major]", () => {
+    // Read directly rather than through a load, so a mismatch is named as
+    // one rather than surfacing as a decoder refusal of every current file.
+    const schema = JSON.parse(
+      readFileSync(new URL("../../schemas/orm-model.schema.json", import.meta.url), "utf8"),
+    ) as { properties: { orm_version: { const: string; }; }; };
+    expect(schema.properties.orm_version.const).toBe(CURRENT_ORM_VERSION);
   });
 });

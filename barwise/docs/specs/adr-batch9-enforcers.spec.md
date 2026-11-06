@@ -1,6 +1,6 @@
 # Batch 9: schema, Ossie, eval-coverage and package-graph decisions enforced
 
-Status: Planned; plan reviewed 2026-11-06 (one code-review round, ten findings, all addressed in the revision); WS1 (`recompute-derived`) implemented; WS2-WS8 not started
+Status: Planned; plan reviewed 2026-11-06 (one code-review round, ten findings, all addressed in the revision); WS1 (`recompute-derived`) implemented; WS2 (schema-versioning tests, `minor-and-major` restated) implemented; WS3-WS8 not started
 
 Created: 2026-11-06
 Last-updated: 2026-11-06
@@ -18,6 +18,8 @@ barwise/docs/adr/constraint-coverage-policy.md, barwise/docs/adr/probes.json,
 barwise/docs/adr/tested-in.json, barwise/docs/ARCHITECTURE.md,
 +barwise/packages/core/schemas/orm-model.property-classes.json,
 barwise/packages/core/tests/serialization/,
+barwise/packages/core/tests/project/splitModel.test.ts,
+barwise/packages/vscode/tests/unit/projectScaffold.test.ts,
 barwise/packages/core/tests/validation/idsAndImports.test.ts,
 .claude/skills/pr-review/checklist.md,
 barwise/packages/cli/tests/commands/merge.test.ts,
