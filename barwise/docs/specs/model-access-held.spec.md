@@ -33,14 +33,23 @@ test for it. No product code changes in WS1 and WS2.
   reader of the deprecated `anthropicApiKey` setting; `package.json`
   declares it `application`-scoped and `barwise.llmProvider` defaulting
   to `copilot`.
-- MCP: `tools/import.ts` and `tools/review.ts` resolve a client with
-  `resolveLlmClient` at registration, and their execute functions fall
-  back to `createLlmClient` when given none.
-- `@barwise/llm`: only it reads `ANTHROPIC_API_KEY` or `OPENAI_API_KEY`
-  from the environment (`providers/factory.ts`). Other packages name
-  the variables only in messages.
+- MCP: `tools/import.ts` and `tools/review.ts` call `resolveLlmClient`
+  inside each tool callback, per call, with that call's provider and
+  model; their execute functions fall back to `createLlmClient` when
+  given no client (plan review corrected "at registration").
+- `@barwise/llm`: only `providers/factory.ts` reads `ANTHROPIC_API_KEY`
+  or `OPENAI_API_KEY`. Other packages name the variables only in
+  messages. `PROVIDER_NAMES` is anthropic, openai, ollama.
 - `selectArtifact(surface, target, override?)` returns the override after
-  `assertArtifactSurface`, else resolves from `builtinArtifacts`.
+  `assertArtifactSurface`, else resolves from `builtinArtifacts`; it
+  imports five modules, none touching the file system.
+  `processTranscript` and `reviewModel` route `options.artifact`
+  through it before any client call.
+- No option of `import transcript`, `review` or `import batch`, and no
+  input of the MCP or VS Code transcript and review tools, names an
+  artifact, prompt or candidate today. `--max-tokens` (prompt eval) and
+  `--surrogate-keys` (export) exist, so a substring match on "token" or
+  "key" would fail on main (plan review).
 
 ## Scope
 
@@ -49,46 +58,66 @@ Tests, each tagged with the decision it holds:
 **keyless-model-access**
 
 1. `no-key-in-argv` (4gl, xsg): walk every command and subcommand of
-   `createProgram()` and fail on any option whose long name contains
-   `key`, `token`, `secret`, `password` or `credential`, other than the
-   declared `--api-key` that the hook refuses.
-2. `no-key-in-setting` (nw4, ybi): no file under `packages/vscode/src`
-   other than `llm/anthropicKey.ts` names the `anthropicApiKey` setting
-   in a configuration read; the setting's scope in `package.json` is
-   `application`.
-3. `keyless-defaults` (52o): `barwise.llmProvider` defaults to `copilot`;
-   over an in-memory MCP connection whose client advertises
-   `sampling.tools`, with no key in the environment, `import_transcript`
-   and `review_model` reach the client's sampling handler (so the
-   registration passes the resolved client), and the result names the
-   sampling route.
-4. `library-takes-key` (dxy): for every provider that takes a key
-   (Anthropic, OpenAI), `createLlmClient({ provider, apiKey })` hands
-   that key to the SDK constructor, observed through a module mock.
-5. `measurement-key`, its first clause: no file under `packages/*/src`
-   outside `packages/llm` reads `process.env` for a name containing
-   `KEY`, `TOKEN` or `SECRET`. The credential fingerprint is WS3.
+   `createProgram()` and fail on an option whose long name has a
+   hyphen-separated word `key`, `secret`, `password` or `credential`,
+   or ends in `-token`, other than the declared `--api-key`. This is
+   barwise-xsg's own rule, so `--max-tokens` and `--surrogate-keys` pass.
+2. `no-key-in-setting` (nw4, in part): with comments stripped, no file
+   under `packages/vscode/src` other than `llm/anthropicKey.ts` contains
+   the literal `anthropicApiKey` (its constant there is not exported, so
+   any other reader must spell it); the setting's scope in `package.json`
+   is `application`.
+3. `keyless-defaults` (52o, in part): `barwise.llmProvider` defaults to
+   `copilot`; over an in-memory MCP connection whose client advertises
+   `sampling.tools`, with no key in the environment and no `provider`
+   argument, `import_transcript` and `review_model` reach the client's
+   sampling handler and the result names the sampling route.
+4. `library-takes-key` (dxy): `PROVIDER_NAMES` equals exactly anthropic,
+   openai, ollama, so a new provider fails the test until it is added
+   here; for each keyed one, `createLlmClient({ provider, apiKey })`
+   hands the key to the SDK constructor, observed through a module mock.
+5. `measurement-key`, first clause: no file under `packages/*/src`
+   outside `packages/llm` reads a key from the environment, in any of the
+   forms `process.env.X`, `process.env["X"]`, `const { X } = process.env`,
+   `env.X` after importing `env` from `node:process`, with X containing
+   `KEY`, `TOKEN` or `SECRET`; and none indexes `process.env` with a
+   computed name. The credential fingerprint is WS3.
 
 **production-prompt-resolution**
 
-6. `shipped-only` (mdg): with candidate-looking environment variables
-   and a temporary `XDG_CONFIG_HOME` and `HOME` holding a `prompts/`
-   directory, `selectArtifact` with no override returns an element of
-   `builtinArtifacts`; and `selectArtifact.ts` imports neither `node:fs`
-   nor `node:process` and reads no `process.env`.
+6. `shipped-only` (mdg): `selectArtifact.ts`'s imports equal exactly the
+   five it has today, so a new import (a loader, `node:os`) fails until
+   reviewed; with candidate-looking environment variables and temporary
+   `HOME` and `XDG_CONFIG_HOME` holding prompt directories, it returns
+   an element of `builtinArtifacts`; and the production call sites (CLI
+   `import/transcript.ts`, `import/batch.ts`, `review.ts`; MCP
+   `tools/import.ts`, `tools/review.ts`; VS Code `ToolRegistration.ts`
+   and `ImportTranscriptCommand.ts`) pass no `artifact` property, read
+   with comments stripped.
 7. `candidates-in-prompt-lane` (w0p, qxt): every option of `import
-   transcript`, `review` and `import batch`, hidden included, fails a
-   deny pattern (`artifact`, `prompt`, `candidate`); the MCP
+   transcript`, `review` and `import batch`, hidden included, has no
+   word `artifact`, `artifacts`, `prompt` or `candidate`; the MCP
    `import_transcript` and `review_model` input schemas and the VS Code
    transcript and review tools' `inputSchema` carry no such property.
-8. `recovered-not-recorded` (x2g): a call-log record built by the
-   writer has no `artifactVersion` (nor any `artifact` key).
+8. `recovered-not-recorded` (x2g, in part): a call-log record built by
+   the writer has no key containing `artifact`.
 9. `library-seam` (29c): `processTranscript` and `reviewModel`, each
    given an explicit artifact authored for another surface, throw the
-   guard's error before any client call.
+   guard's error and never call the client.
 
-The ADRs' four plus four gap entries go for the decisions these hold in
-full; `measurement-key` keeps its gap entry until WS3.
+**What closes and what narrows.** The ADRs drop the gap entries for
+`no-key-in-argv`, `library-takes-key`, `shipped-only`,
+`candidates-in-prompt-lane` and `library-seam`, which these tests hold
+in full. Three stay, narrowed in a tracker PR, because their issues name
+violations a test cannot hold (plan review): `no-key-in-setting` (a
+workspace copy of the key survives on the Copilot path until migration
+clears it regardless of provider, barwise-ybi, a product change);
+`keyless-defaults` (a calling model's `provider: "anthropic"` skips
+sampling, and the Ollama fallback's route note, barwise-2n1);
+`recovered-not-recorded` (other record writers, an `--alternatives`
+hash with no command to print it, prompt-lane rows indistinguishable
+from production, barwise-49k). `measurement-key` keeps its entry until
+WS3.
 
 ## Alternatives considered
 
