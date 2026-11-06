@@ -55,8 +55,9 @@ const jsonl = (rows) =>
   + "\n";
 
 /** A tree where decision one passes in vitest and two in a script test. */
-function fixture({ core, script, trial } = {}) {
+function fixture({ core, script, trial, testedIn = "[]" } = {}) {
   const dir = tree();
+  put(dir, "barwise/docs/adr/tested-in.json", testedIn);
   put(dir, "barwise/docs/adr/a-concern.md", ADR);
   put(
     dir,
@@ -359,4 +360,233 @@ test("turbo hashes the vitest configs for test and test:coverage, and keeps the 
     assert.ok(inputs.some((p) => p.startsWith("../../examples/")), `${id}: no examples/`);
     assert.ok(t.outputs.includes("test-results/**"), `${id}: ${t.outputs.join(" ")}`);
   }
+});
+
+// The per-file rule (docs/specs/capability-matrix-check.spec.md, WS2): a
+// tested-in row names the files a decision rests on, and each must hold a
+// passed test carrying its tag. The reports name absolute paths from
+// whichever checkout wrote them; turbo's cache can restore one written in a
+// pre-push worktree, so these use a prefix that is not the fixture's.
+const ELSEWHERE = "/tmp/other-checkout/barwise";
+const A = "barwise/packages/core/tests/a.test.ts";
+const B = "barwise/scripts/tests/g.test.mjs";
+const row = (files, decision = "a-concern#one") =>
+  JSON.stringify([{ decision, files, why: "each file pins its own half" }]);
+const vitestIn = (file, results) =>
+  JSON.stringify({
+    testResults: [{
+      name: file,
+      assertionResults: results.map(([title, status]) => ({ title, status, ancestorTitles: [] })),
+    }],
+  });
+const jsonlIn = (file, rows) =>
+  rows.map(([name, status, type = "test"]) => JSON.stringify({ name, status, type, file }))
+    .join("\n")
+  + "\n";
+const T1 = "pins one [adr:a-concern#one]";
+const T2 = "pins two [adr:a-concern#two]";
+/** Both named files tracked; decision two passes in the script report beside B's rows. */
+function perFile({ core, scriptRows, testedIn = row([A, B]) }) {
+  return (body) => {
+    const dir = fixture({
+      core,
+      script: jsonlIn(`${ELSEWHERE}/scripts/tests/g.test.mjs`, [[T2, "passed"], ...scriptRows]),
+      testedIn,
+    });
+    try {
+      put(dir, A, "");
+      put(dir, B, "");
+      body(run(dir));
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  };
+}
+
+test("check:adr-tests: each file a tested-in row names has a passed tagged test, read from another checkout's paths", () => {
+  perFile({
+    core: vitestIn(`${ELSEWHERE}/packages/core/tests/a.test.ts`, [[T1, "passed"]]),
+    scriptRows: [[`${T1} too`, "passed"]],
+  })((r) => {
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    assert.match(r.stdout, /so do the 2 file\(s\) named by 1 tested-in row\(s\)/);
+  });
+});
+
+test("check:adr-tests: one of two named files passing is a finding naming the other", () => {
+  // Planted red: the decision rule alone passes here, on A's test.
+  perFile({
+    core: vitestIn(`${ELSEWHERE}/packages/core/tests/a.test.ts`, [[T1, "passed"]]),
+    scriptRows: [["pins one, untagged", "passed"]],
+  })((r) => {
+    assert.equal(r.status, 1, r.stdout + r.stderr);
+    assert.match(r.stderr, /FAIL -- 1 finding\(s\)/);
+    assert.match(
+      r.stderr,
+      /"a-concern#one": no test in barwise\/scripts\/tests\/g\.test\.mjs carrying \[adr:a-concern#one\] passed/,
+    );
+    assert.doesNotMatch(r.stderr, /a\.test\.ts carrying/);
+  });
+  // A failure in the named file is an answer too.
+  perFile({
+    core: vitestIn(`${ELSEWHERE}/packages/core/tests/a.test.ts`, [[T1, "passed"]]),
+    scriptRows: [[`${T1} too`, "failed"]],
+  })((r) => {
+    assert.equal(r.status, 1, r.stdout + r.stderr);
+    assert.match(r.stderr, /a test in barwise\/scripts\/tests\/g\.test\.mjs carrying .* failed/);
+  });
+});
+
+test("check:adr-tests: a named file whose tagged tests all skipped is a refusal, counted apart", () => {
+  perFile({
+    core: vitestIn(`${ELSEWHERE}/packages/core/tests/a.test.ts`, [[T1, "passed"]]),
+    scriptRows: [[`${T1} too`, "skipped"]],
+  })((r) => {
+    assert.equal(r.status, 2, r.stdout + r.stderr);
+    assert.match(
+      r.stderr,
+      /every test in barwise\/scripts\/tests\/g\.test\.mjs carrying \[adr:a-concern#one\] skipped/,
+    );
+    // Not counted as an unproven decision: decision one passed on A.
+    assert.match(
+      r.stderr,
+      /0 report\(s\) not read, 0 decision\(s\) left unproven by them, 0 decision\(s\) whose tagged tests all skipped, 0 named file\(s\) left unproven by them, 1 named file\(s\) whose tagged tests all skipped:/,
+    );
+    assert.doesNotMatch(r.stderr, /FAIL/);
+  });
+});
+
+test("check:adr-tests: a test whose report names no file proves its decision, not a named file", () => {
+  // The tag reporter writes `file: null` when node gives none; vitest's
+  // name could fall outside the package. Either is left out of the per-file
+  // rule only.
+  perFile({
+    core: vitestIn("elsewhere/a.test.ts", [[T1, "passed"]]),
+    scriptRows: [[`${T1} too`, "passed"]],
+  })((r) => {
+    assert.equal(r.status, 1, r.stdout + r.stderr);
+    assert.match(r.stderr, /no test in barwise\/packages\/core\/tests\/a\.test\.ts carrying/);
+    assert.doesNotMatch(r.stderr, /tests \(one\)/);
+  });
+  // With the file's own report unread, a named file with no tagged test
+  // cannot be told.
+  const dir = fixture({ script: "not a report\n", testedIn: row([B]) });
+  try {
+    put(dir, B, "");
+    const r = run(dir);
+    assert.equal(r.status, 2, r.stdout + r.stderr);
+    assert.match(
+      r.stderr,
+      /no test in barwise\/scripts\/tests\/g\.test\.mjs .*, and its report barwise\/test-results\/script-tests\/g\.test\.jsonl was not read/,
+    );
+    assert.match(r.stderr, /1 named file\(s\) left unproven by them, 0 named file\(s\)/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("check:adr-tests: another report unread leaves a named file's finding standing", () => {
+  // Only the file's own report can hold its test: A's vitest report was read
+  // and holds no tagged test, so the missing trial report changes nothing.
+  const dir = fixture({
+    core: vitestIn(`${ELSEWHERE}/packages/core/tests/a.test.ts`, [[
+      "pins one, untagged",
+      "passed",
+    ]]),
+    script: jsonl([[T1, "passed"], [T2, "passed"]]),
+    testedIn: row([A]),
+  });
+  try {
+    put(dir, A, "");
+    rmSync(join(dir, TRIAL_REPORT));
+    const r = run(dir);
+    assert.equal(r.status, 1, r.stdout + r.stderr);
+    assert.match(
+      r.stderr,
+      /FAIL -- 1 finding\(s\):\n\s+.*no test in barwise\/packages\/core\/tests\/a\.test\.ts carrying/,
+    );
+    assert.match(r.stderr, /trial\.jsonl: missing/);
+    assert.match(
+      r.stderr,
+      /1 report\(s\) not read, 0 decision\(s\) left unproven by them, 0 decision\(s\) whose tagged tests all skipped, 0 named file\(s\) left unproven/,
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("check:adr-tests: a row that outlived its decision, or names an untracked path, is a finding", () => {
+  const passing = {
+    core: vitestIn(`${ELSEWHERE}/packages/core/tests/a.test.ts`, [[T1, "passed"]]),
+    scriptRows: [[`${T1} too`, "passed"]],
+  };
+  // Decision three is an id of the ADR, but held by a none entry, not tests.
+  for (const decision of ["a-concern#three", "a-concern#retired", "no-such-adr#one"]) {
+    perFile({ ...passing, testedIn: row([A], decision) })((r) => {
+      assert.equal(r.status, 1, `${decision}\n${r.stdout}${r.stderr}`);
+      assert.match(r.stderr, /is not a tests entry of .*; a row that outlived its decision/);
+    });
+  }
+  perFile({ ...passing, testedIn: row([A, "barwise/packages/core/tests/gone.test.ts"]) })((r) => {
+    assert.equal(r.status, 1, r.stdout + r.stderr);
+    assert.match(
+      r.stderr,
+      /names barwise\/packages\/core\/tests\/gone\.test\.ts, which git does not track/,
+    );
+  });
+});
+
+test("check:adr-tests refuses, exit 2, a tested-in.json it cannot read, and still judges the decisions", () => {
+  for (
+    const [label, body, why] of [
+      ["unparsable", "[", /tested-in\.json: not read \(/],
+      ["not a list", "{}", /tested-in\.json: not a list of rows/],
+      [
+        "a row without why",
+        JSON.stringify([{ decision: "a-concern#one", files: [A] }]),
+        /row 1 is not/,
+      ],
+      [
+        "no files",
+        JSON.stringify([{ decision: "a-concern#one", files: [], why: "w" }]),
+        /row 1 is not/,
+      ],
+      ["a decision with no id", row([A], "a-concern"), /row 1 is not/],
+      // A pair named twice is one row edited and its copy not.
+      [
+        "a path twice in a row",
+        row([A, A]),
+        /row 1 names .*a\.test\.ts for a-concern#one again \(row 1\)/,
+      ],
+      [
+        "a pair across rows",
+        JSON.stringify([
+          { decision: "a-concern#one", files: [A], why: "w" },
+          { decision: "a-concern#one", files: [B, A], why: "w" },
+        ]),
+        /row 2 names .*a\.test\.ts for a-concern#one again \(row 1\)/,
+      ],
+    ]
+  ) {
+    withFixture({ testedIn: body }, (_, r) => {
+      assert.equal(r.status, 2, `${label}\n${r.stdout}${r.stderr}`);
+      assert.match(r.stderr, why);
+      assert.match(r.stderr, /tested-in\.json not read:/);
+      assert.doesNotMatch(r.stderr, /FAIL/);
+    });
+  }
+  const missing = fixture();
+  try {
+    rmSync(join(missing, "barwise/docs/adr/tested-in.json"));
+    const r = run(missing);
+    assert.equal(r.status, 2, r.stdout + r.stderr);
+    assert.match(r.stderr, /barwise\/docs\/adr\/tested-in\.json: missing/);
+  } finally {
+    rmSync(missing, { recursive: true, force: true });
+  }
+  // Beside an unreadable manifest, a finding of the decision rule is exit 1.
+  withFixture({ testedIn: "[", core: vitest([[T1, "failed"]]) }, (_, r) => {
+    assert.equal(r.status, 1, r.stdout + r.stderr);
+    assert.match(r.stderr, /tested-in\.json: not read/);
+  });
 });

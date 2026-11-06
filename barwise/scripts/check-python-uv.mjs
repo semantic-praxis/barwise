@@ -33,6 +33,12 @@
  * required and banned form above is literal text in a command, which is
  * what makes this checkable where "activate the venv first" is not.
  *
+ * There is no exemption for any bare interpreter, the bootstrap included:
+ * uv itself comes from scripts/install-uv.sh's verified release tarball
+ * (python-uv-widened WS4), so nothing runs Python before uv exists, and a
+ * `python3 -m pip install uv` line fails here like any other bare
+ * python3. Which uv runs is check:pins' question, not this one.
+ *
  * What it deliberately does NOT read, so the next reader does not have to
  * infer the boundary from the code:
  *
@@ -80,30 +86,18 @@ const JSISH = new Set([".ts", ".tsx", ".js", ".mjs", ".cjs"]);
  * own violation. Both are exempt by path rather than by some cleverness
  * that distinguishes a pattern from an invocation, because that
  * cleverness is exactly the kind of thing that fails silently.
+ * install-uv.test.mjs is here for the same reason: it plants a uvx in a
+ * stand-in release and a stale BIN_DIR, to prove the installer removes
+ * it, and runs no Python.
  */
 const SELF = new Set([
   "barwise/scripts/check-python-uv.mjs",
   "barwise/scripts/lib/python-uv-rules.mjs",
   "barwise/scripts/hooks/python-uv-guard.mjs",
   "barwise/scripts/tests/gates.test.mjs",
+  "barwise/scripts/tests/install-uv.test.mjs",
   "barwise/scripts/tests/python-uv-guard.test.mjs",
 ]);
-
-/**
- * The one execution that cannot go through uv, with its reason inline.
- *
- * Ratcheted in both directions, like `audit:duplication` and
- * `audit:rubric`: an entry whose `match` is no longer present fails, so
- * removing a violation forces its row out and the allowlist always
- * enumerates exactly what is exempt.
- */
-const ALLOWLIST = [
-  {
-    file: ".github/workflows/ci.yml",
-    match: "python3 -m pip install --quiet uv==",
-    why: "bootstrapping uv itself -- the one execution that cannot go through uv",
-  },
-];
 
 /** `subprocess.run(["python3", ...])` and `os.system("python3 ...")`. A .py
  *  file spawning a bare interpreter escapes the lock exactly as a shell one
@@ -200,7 +194,6 @@ function uvArgsArray(file, text) {
 }
 
 const findings = [];
-const allowHits = new Set();
 
 /**
  * What kind of command-bearing file this is, beyond the extension rules
@@ -270,11 +263,6 @@ for (const file of tracked) {
       continue;
     }
     for (const { line, text: command } of commands) {
-      const allowed = ALLOWLIST.find((a) => a.file === file && command.includes(a.match));
-      if (allowed) {
-        allowHits.add(allowed.match);
-        continue;
-      }
       for (const f of shellCommandFindings(command)) {
         findings.push({ file, line: line + f.line - 1, what: f.what, raw: command });
       }
@@ -285,11 +273,6 @@ for (const file of tracked) {
   if (JSISH.has(ext)) findings.push(...uvArgsArray(file, text));
 
   for (const { line, text: raw } of logicalLines(text)) {
-    const allowed = ALLOWLIST.find((a) => a.file === file && raw.includes(a.match));
-    if (allowed) {
-      allowHits.add(allowed.match);
-      continue;
-    }
     // Tested BEFORE the comment skip: a PEP 723 block IS a comment block,
     // so skipping comments first made this rule unreachable. The per-form
     // test caught it; an aggregate one would have stayed green.
@@ -358,31 +341,17 @@ for (const file of PROJECT_FILES) {
   }
 }
 
-// A stale exemption is a failure in its own right: it means a violation
-// was fixed and its licence outlived it. Without this, an allowlist only
-// ever grows, and stops describing the code.
-const stale = ALLOWLIST.filter((a) => !allowHits.has(a.match));
-
-if (findings.length > 0 || stale.length > 0) {
-  if (findings.length > 0) {
-    console.error("Python must resolve from the project lockfile:\n");
-    for (const f of findings) {
-      console.error(`  ${f.file}:${f.line}  ${f.what}`);
-      console.error(`      ${f.raw.trim().slice(0, 110)}`);
-    }
-    console.error(
-      "\nUse `uv run --frozen --only-group <group> python ...` (or --locked in\n"
-        + "CI). Never a bare interpreter, and never --with/--isolated/uv pip:\n"
-        + "those resolve outside uv.lock, and --frozen does not close them.",
-    );
+if (findings.length > 0) {
+  console.error("Python must resolve from the project lockfile:\n");
+  for (const f of findings) {
+    console.error(`  ${f.file}:${f.line}  ${f.what}`);
+    console.error(`      ${f.raw.trim().slice(0, 110)}`);
   }
-  for (const s of stale) {
-    console.error(
-      `\nSTALE allowlist entry: ${s.file} no longer contains\n  ${s.match}\n`
-        + "Remove it from ALLOWLIST -- an exemption that outlives its violation\n"
-        + "stops describing the code.",
-    );
-  }
+  console.error(
+    "\nUse `uv run --frozen --only-group <group> python ...` (or --locked in\n"
+      + "CI). Never a bare interpreter, and never --with/--isolated/uv pip:\n"
+      + "those resolve outside uv.lock, and --frozen does not close them.",
+  );
   for (const u of unreadable) console.error(`\ncould not read ${u}`);
   process.exit(1);
 }
@@ -395,6 +364,6 @@ if (unreadable.length > 0) {
 }
 
 console.log(
-  `check-python-uv: no bare interpreters, no lock bypasses; `
-    + `${ALLOWLIST.length} allowlisted (uv bootstrap); .beads/hooks/ not read, vendored. OK`,
+  "check-python-uv: no bare interpreters, no lock bypasses; "
+    + ".beads/hooks/ not read, vendored. OK",
 );

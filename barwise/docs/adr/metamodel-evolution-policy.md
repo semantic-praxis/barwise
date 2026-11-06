@@ -4,7 +4,7 @@ Scope: architecture
 Date: 2026-10-17
 Tracking: barwise-5t9 (+ children), docs/NORMA_VS_ORM_YAML.md,
 docs/specs/norma-export.spec.md
-Enforced-by: none (barwise-ym8.3ai: recompute-derived)
+Enforced-by: tests (recompute-derived), none (barwise-ym8.3ai: recompute-derived)
 
 ## Context
 
@@ -69,9 +69,15 @@ rows 18, 21, 22 and 23); the decision below is the one a check can.
    them (as NORMA does) would cost the determinism of core and the
    leanness of the file; not adding them is itself a decision. Restated
    on 2026-11-06 (`adr-refactor.spec.md`, row 10) from "keep
-   recomputing derived artifacts; never persist them". Its check, an
-   allowlist of the schema's properties classified as conceptual, is
-   batch 9 of that spec. Whether a format's `x-` value may hold output
+   recomputing derived artifacts; never persist them". Its check is an
+   allowlist, `schemas/orm-model.property-classes.json` in core: every
+   property slot the schema defines, keyed by its full JSON pointer, is
+   classified `conceptual`, `identity` or `presentation` (authored
+   diagram layout), and a slot with no row fails until review classifies
+   it (`adr-batch9-enforcers.spec.md`, WS1). The same test holds the
+   schema closed, so a key no row names cannot be written. A derived
+   slot added with a `conceptual` row passes it; that half is review's
+   (barwise-ym8.3ai). Whether a format's `x-` value may hold output
    barwise can recompute is barwise-83g's.
 
 ## Tiering
@@ -106,5 +112,33 @@ The versioning rule is its own ADR: `docs/adr/schema-versioning.md`.
   that uses Tier 3/4 constructs without loss. That is the same superset
   asymmetry the export spec already accepts (RT-B fidelity is bounded by
   what the metamodel represents).
+- `recompute-derived` is held by a core test
+  (`tests/serialization/propertyClasses.test.ts`) that walks every
+  property slot `orm-model.schema.json` defines, at any depth, and fails
+  on a slot `orm-model.property-classes.json` lacks or a row with no
+  slot. Keying by pointer means a familiar name in a new place still
+  needs a row. `identity` is allowed only for the identity names and
+  `presentation` only under the diagram layout.
+- The same test holds the schema closed: every object schema has
+  `additionalProperties: false` and none uses `patternProperties`,
+  except four maps whose keys are data, not property names --
+  `model.imports` (prefix to namespace), a fact instance's
+  `role_values` (role id to value), and a diagram's `positions` and
+  `orientations` (element id to layout). The test's exception list
+  names them by pointer, so a fifth open map fails until it is added
+  there with its reason. With the schema closed, `writer40.test.ts`
+  validating the writer's output against it is what keeps the
+  serializer from writing an unlisted key.
+- What the test cannot see is a slot classified wrongly: a derived
+  property added with a `conceptual` row passes. That half is held only
+  by review of the table's diff (`pr-review/checklist.md`), which is why
+  the header keeps `none (barwise-ym8.3ai)` beside the test.
+- A diagram's saved `positions` are `presentation`, not rendered output,
+  although `DiagramSession.collectPositions`
+  (`packages/diagram/src/session/DiagramSession.ts`) stores every entity's
+  laid-out position, and a fact type's only once the user has moved it:
+  saving is the user's choice to freeze an arrangement, and the layout
+  engine is not stable enough to recompute the same picture (owner,
+  2026-11-06).
 - This ADR is the standing answer to "should we add X from NORMA/the
   book?": run X through the four filters (Context) and place it in a tier.

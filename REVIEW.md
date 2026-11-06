@@ -148,7 +148,7 @@ checklist groups whose trigger the diff meets.
    the capability matrix checks reach, not behaviour (barwise-1fr). A fix to one importer is checked in the DDL, dbt and
    OpenAPI siblings (74a71ad3). A new export has a non-test caller; a
    new `package.json` gate has a CI step, or the PR says why it runs on
-   demand, as `mutate` and `fault-matrix` do (da360d7e).
+   demand, as `mutate` does (da360d7e).
 5. **A restated fact went stale.** A message naming a format, command or
    flag names a registered one; docs name published packages
    (941cc09b); an MCP or language-model tool description matches what

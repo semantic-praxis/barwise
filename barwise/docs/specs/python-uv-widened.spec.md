@@ -1,16 +1,17 @@
 # check:python-uv, widened to the rest of the ADR
 
-Status: WS1 implemented 2026-11-06 (parseUv: subcommand by name, run options end at the launched command, banned flags by prefix with -w, UV_NO_PROJECT and UV_ISOLATED read, UV_FROZEN and UV_LOCKED accepted; shared by the gate, its args-array and .py-list checks, and the agent hook); WS2 implemented 2026-11-06 (package.json scripts, Makefile recipes and the git hooks are read; .beads/hooks/ named as unread; UV_SUBCOMMANDS completed and held to the installed `uv help` by a test); WS3 implemented 2026-11-06 (barwise/pyproject.toml and barwise/uv.lock must be tracked, and no other pyproject.toml, requirements file, setup.py, setup.cfg, Pipfile, uv.toml, pylock.toml or uv.lock may be); WS4 waits on open decision 1
+Status: WS1 implemented 2026-11-06 (parseUv: subcommand by name, run options end at the launched command, banned flags by prefix with -w, UV_NO_PROJECT and UV_ISOLATED read, UV_FROZEN and UV_LOCKED accepted; shared by the gate, its args-array and .py-list checks, and the agent hook); WS2 implemented 2026-11-06 (package.json scripts, Makefile recipes and the git hooks are read; .beads/hooks/ named as unread; UV_SUBCOMMANDS completed and held to the installed `uv help` by a test); WS3 implemented 2026-11-06 (barwise/pyproject.toml and barwise/uv.lock must be tracked, and no other pyproject.toml, requirements file, setup.py, setup.cfg, Pipfile, uv.toml, pylock.toml or uv.lock may be); WS4 implemented 2026-11-06 (scripts/install-uv.sh with per-platform digests, called by CI and the session hook on every start; check:python-uv's allowlist gone; check:pins refuses a uv other than the pin; decision 5 restated by the owner's choice)
 Created: 2026-11-06
 Last-updated: 2026-11-06
 Tracking: barwise-ym8.gc9 (adr-refactor batch 3), barwise-ym8.fq7,
 barwise-ym8.l69, barwise-ym8.q07, barwise-ym8.usv, barwise-ym8.suc
-Plan-reviewed: 0bd887bb (code-review, pr-review)
+Plan-reviewed: 799bd428 (code-review, pr-review; WS4 re-reviewed 2026-11-06)
 Touches: barwise/scripts/check-python-uv.mjs, barwise/scripts/lib/python-uv-rules.mjs,
 barwise/scripts/hooks/python-uv-guard.mjs, barwise/scripts/tests/,
 +barwise/scripts/install-uv.sh, .github/workflows/ci.yml,
 .claude/hooks/session-start.sh, barwise/docs/adr/python-from-the-lockfile.md,
-barwise/docs/adr/probes.json, barwise/docs/ARCHITECTURE.md
+barwise/docs/adr/probes.json, barwise/docs/ARCHITECTURE.md,
+barwise/docs/adr/pinned-runtimes.md, CLAUDE.md
 
 ## Principle
 
@@ -97,9 +98,9 @@ In scope, by gap issue:
    `scripts/install-gitleaks.sh`, one `scripts/install-uv.sh` holds the
    version, installs it, and checks `uv --version` afterwards; `ci.yml`
    and the session hook both call it, and the session hook calls it even
-   when a uv is already present, so a cached older uv is replaced. The
-   bootstrap allowlist entry becomes that script's one install line,
-   matched as a whole command segment so nothing chains onto it.
+   when a uv is already present, so a cached older uv is replaced. No
+   allowlist entry remains: the installer downloads the release tarball,
+   so no bare interpreter is exempted (WS4).
 
 Out of scope: whether `uv.lock` is current (`uv lock --check` answers
 that, a different question from how uv was invoked); commands inside
@@ -142,7 +143,62 @@ or allowlisted with a reason in the same PR.
 
 ### 3. The project and its manifests (provisional: not yet grounded)
 
-### 4. One installer for uv (provisional: waits on open decision 1)
+### 4. One installer for uv
+
+Open decision 1 is resolved (owner, 2026-11-06: the script). Grounded
+on main at cfff1486 and revised after plan review:
+
+- **Today.** CI's "Python toolchain (uv)" step runs `python3 -m pip
+  install --quiet uv==0.12.7`, which `check:python-uv` exempts through
+  its one ALLOWLIST row (a substring of the line; `gates.test.mjs` has a
+  `UV_BOOTSTRAP` fixture and a stale-entry test). The session hook runs
+  astral's `install.sh` only when `~/.local/bin/uv` is absent, so a
+  container keeps its first uv (0.11.32 here, with `uvx` beside it).
+  ADR decision 1 allows a bare `python3` "apart from decision 5";
+  `pinned-runtimes.md` says uv is pinned only in CI.
+- **The installer.** `scripts/install-uv.sh <BIN_DIR>`, in the shape of
+  `install-gitleaks.sh`: one `VERSION` (0.12.7) and the published
+  SHA-256 of each platform's release tarball (x86_64 and aarch64, Linux
+  and macOS, from the release's `.sha256` files, checked against a
+  download of the Linux x86_64 tarball, 2026-11-06). Presence is read as
+  `"${BIN_DIR}/uv" --version`, never `command -v` (plan review: the
+  first uv on PATH is the cached one); at the pin it is left alone, any
+  other version is replaced. The tarball is verified before `tar` runs;
+  only `uv` is installed, and a `uvx` in `BIN_DIR` is removed, since
+  decision 2 bans it. `"${BIN_DIR}/uv" --version` is read back, and
+  anything but the pin exits 2.
+- **Callers.** `ci.yml`'s Python step runs `bash scripts/install-uv.sh
+  "${HOME}/.local/bin"`, puts that directory first on `PATH` for the rest
+  of the step and on `GITHUB_PATH` for later ones. The session hook runs
+  it with `"${HOME}/.local/bin"` on every start, non-fatally, as it runs
+  the gitleaks installer.
+- **No bare interpreter anywhere.** The GitHub release replaces `pip`,
+  so ADR decision 1 drops "apart from decision 5", and `check:python-uv`
+  drops its ALLOWLIST and the stale-entry ratchet with it (there is
+  nothing left to exempt; the bootstrap line, planted, now fails as a
+  bare `python3`). Its OK line stops mentioning an exemption.
+- **Decision 5's holder.** Restated to "uv is installed only by
+  `scripts/install-uv.sh`, at its pinned version, verified before it is
+  unpacked". An allowlist over the callers' lines cannot hold it, because
+  the same lines run `uv python install` and `uv sync` (plan review). It
+  is held instead by what runs: `check:pins`, which CI runs after the
+  Python step and pre-push runs through `ci:local`, reads `uv --version`
+  and refuses (exit 2) when it is not the installer's `VERSION`, read
+  from the script, however that uv was installed; and a test that the
+  installer, given a download no digest matches, exits 2 before `tar`
+  runs. Enforced-by: `npm run check:pins (uv-bootstrap)` (recorded
+  unprobed: a file edit cannot change the uv that runs) and `tests
+  (uv-bootstrap)`; the `none (barwise-ym8.suc)` entry and the old probe
+  row go, and suc closes in a tracker PR.
+- **Text that changes with it.** Scope 4 above (no allowlist row
+  remains); `ci.yml`'s comments on pip; `install-gitleaks.sh`'s header;
+  the ADR's Consequences on the allowlist and on decision 5's gap;
+  `pinned-runtimes.md`'s "uv is pinned only in CI"; the root CLAUDE.md's
+  "the one exception is CI's pinned uv bootstrap".
+- **Tests.** `session-start.test.mjs` stubs `install-uv.sh` as it stubs
+  the gitleaks installer, and asserts the hook calls it with
+  `~/.local/bin` on a warm start; `check-pins.test.mjs` plants a stand-in
+  uv on another version (refused) and the pinned one (passes).
 
 ## Open decisions (for review)
 

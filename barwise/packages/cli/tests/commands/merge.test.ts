@@ -6,6 +6,7 @@
  * merge command's real risk is what it does to files, not what it
  * prints.
  */
+import { CURRENT_ORM_VERSION } from "@barwise/core";
 import { copyFileSync, existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -41,12 +42,17 @@ describe("barwise merge", () => {
     expect(`${result.stdout}${result.stderr}`).toContain("ft-typo");
   });
 
-  it("leaves both inputs untouched", async () => {
+  it("loads both 1.0 inputs forward, merges them at the current version, and leaves both untouched [adr:schema-versioning#load-forward]", async () => {
     // The destructive default is the risk this command carries, so the
     // absence of writes is asserted directly rather than assumed. The
     // MCP tool writes back to its base file; this deliberately does not.
+    // The success assertions come first: a merge that refused the files
+    // would leave them untouched too.
     const before = [readFileSync(base, "utf8"), readFileSync(incoming, "utf8")];
-    await runCli(["merge", base, incoming]);
+    expect(before.every((text) => text.startsWith('orm_version: "1.0"'))).toBe(true);
+    const result = await runCli(["merge", base, incoming]);
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain(`orm_version: "${CURRENT_ORM_VERSION}"`);
     expect([readFileSync(base, "utf8"), readFileSync(incoming, "utf8")]).toEqual(before);
   });
 

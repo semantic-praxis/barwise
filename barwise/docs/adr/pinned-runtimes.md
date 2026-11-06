@@ -90,9 +90,9 @@ declared authority is proposed, not built: workstream 4 of
   - 3: `check:pins` reads back both runtimes in CI and at pre-push; the
     pre-commit hook does not run it. Whether a Node patch should be
     refused is the spec's open decision 2.
-- uv itself is pinned only in CI (0.12.7, "a version input like any
-  other"). The web-session hook installs the latest release. Whether to
-  pin it locally is an open question recorded on barwise-921.
+- uv is pinned in `scripts/install-uv.sh` (0.12.7), which CI and the
+  session hook both run, and `check:pins` refuses a uv at another
+  version (`python-from-the-lockfile.md#uv-bootstrap`).
 - Until they are replaced with links (barwise-5h3; the root `CLAUDE.md` states
   the rule in one line with a link since architecture-index WS5), `README.md`, `GETTING_STARTED.md`,
   `steward` section 4, `session-start.sh` and `ci.yml` comments also

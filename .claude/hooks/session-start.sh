@@ -217,11 +217,17 @@ if [[ "${shallow}" == "true" ]]; then
     || echo "session-start: could not unshallow; check:secrets will refuse (exit 2), and so will check:spec-touches if its cutoff commit is missing." >&2
 fi
 
-# uv drives optimizer/ (the offline DSPy lane); ~/.local/bin survives in
-# the cached container, so the install is skipped on warm starts.
-if [[ ! -x "${HOME}/.local/bin/uv" ]]; then
-  curl -LsSf https://astral.sh/uv/install.sh | sh
-fi
+# uv runs every Python call here (check:beads, the sqlglot tier, the DSPy
+# lane), pinned and digest-verified by the script it shares with ci.yml
+# (python-uv-widened WS4). It runs on EVERY start, warm ones included:
+# ~/.local/bin survives in the cached container, and the old "install only
+# when absent" kept the first uv a container fetched -- 0.11.32 against CI's
+# 0.12.7 -- forever. At the pin the script exits at once; any other version
+# is replaced, and a stray uvx removed. Non-fatal like gitleaks above:
+# check:pins refuses (exit 2) when the uv that runs is not the pin.
+# shellcheck disable=SC2310  # `run` inside `||` is deliberate: see gitleaks above.
+run bash "${CLAUDE_PROJECT_DIR}/barwise/scripts/install-uv.sh" "${HOME}/.local/bin" \
+  || echo "session-start: pinned uv unavailable; check:pins will refuse (exit 2)." >&2
 # shellcheck disable=SC2016  # the single quotes are the point: this
 # writes the literal ${HOME}/${PATH} expansion into the env file, to be
 # resolved by the shell that later sources it. Expanding it here would

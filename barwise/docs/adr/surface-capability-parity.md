@@ -74,12 +74,13 @@ Consequences below).
   added or removed without updating their list. They run in CI through
   `npm run test:coverage` (`if: steps.changes.outputs.docs_only !=
   'true'`, so skipped on a docs-only pull request and, like any step,
-  once an earlier step fails).
+  once an earlier step fails). Both are named in `docs/adr/tested-in.json`,
+  and `check:adr-tests` requires a passing test tagged with decision 4
+  in each, so one of the two gone or untagged fails it.
 - What remains open: decision 1 at a finer grain than a row (a
   subcommand or option gap under a row that reads `none`; below, and
-  `surface-mirroring.spec.md` workstream 1); and decision 4's tests, where `check:adr-tests`
-  passes on either one of the two and nothing checks the `toEqual`
-  form (barwise-ym8.0pq). Decisions 1 and 2 are also on the `pr-review`
+  `surface-mirroring.spec.md` workstream 1); and decision 4's tests, where nothing checks the `toEqual` form,
+  which stays to review (owner, 2026-11-06, option A; barwise-ym8.0pq). Decisions 1 and 2 are also on the `pr-review`
   checklist ("When a surface changed").
 - The owner re-decided the rows that existed on 2026-10-13, under the
   2026-10-12 direction that MCP and VS Code mirror the CLI (barwise-0wa,

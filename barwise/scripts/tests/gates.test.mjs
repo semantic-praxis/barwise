@@ -1825,15 +1825,12 @@ test("every registered field member still resolves", () => {
 
 // --- barwise-921: every Python execution resolves from the lockfile ---
 //
-// The gate's ALLOWLIST names `.github/workflows/ci.yml` and is ratcheted,
-// so a fixture repo WITHOUT that bootstrap line fails as stale -- which is
-// itself one of the cases below. Every other fixture stages the line, so
-// the only variable under test is the planted violation.
-const UV_BOOTSTRAP = "          python3 -m pip install --quiet uv==0.12.7\n";
+// The gate exempts nothing (python-uv-widened WS4: uv comes from
+// install-uv.sh, not pip), so a fixture repo holds only the project files
+// and the planted case.
 
 function pythonUvRepo(files = {}) {
   const dir = tempRepo();
-  stage(dir, ".github/workflows/ci.yml", `jobs:\n  ci:\n    steps:\n${UV_BOOTSTRAP}`);
   // The one project every Python run resolves from (python-uv-widened WS3).
   stage(dir, "barwise/pyproject.toml", '[project]\nname = "x"\n');
   stage(dir, "barwise/uv.lock", "version = 1\n");
@@ -1852,10 +1849,16 @@ function pythonUv(files) {
   }
 }
 
-test("check-python-uv passes a repo whose only Python call is the allowlisted bootstrap", () => {
-  const r = pythonUv();
-  assert.equal(r.status, 0, r.stderr);
-  assert.match(r.stdout, /no bare interpreters/);
+test("check-python-uv fails the old pip bootstrap of uv as a bare python3 [adr:python-from-the-lockfile#uv-bootstrap]", () => {
+  // It was the gate's one ALLOWLIST row until install-uv.sh replaced it; a
+  // planted copy must now fail like any other bare interpreter.
+  const r = pythonUv({
+    ".github/workflows/ci.yml":
+      "jobs:\n  ci:\n    steps:\n      - run: |\n          python3 -m pip install --quiet uv==0.12.7\n",
+  });
+  assert.equal(r.status, 1, `expected failure, got:\n${r.stdout}`);
+  assert.match(r.stderr, /\.github\/workflows\/ci\.yml:5 +bare `python3`/);
+  assert.doesNotMatch(r.stdout, /OK/);
 });
 
 // One planted defect per banned form. A gate verified only in aggregate can
@@ -1992,15 +1995,6 @@ for (const [name, files, expected] of VIOLATIONS) {
   });
 }
 
-test("check-python-uv fails on a STALE allowlist entry, so a fixed site forces its row out", () => {
-  // No ci.yml at all: the bootstrap the allowlist exempts no longer exists.
-  const dir = tempRepo();
-  stage(dir, "README.md", "nothing to see\n");
-  const r = gate("check-python-uv.mjs", dir);
-  assert.equal(r.status, 1, `expected failure, got:\n${r.stdout}`);
-  assert.match(r.stderr, /STALE allowlist entry/);
-});
-
 test("check-python-uv does not flag a mention inside a quoted string", () => {
   // `echo "== uv sync"` is a heading, not an invocation. Flagging it is how
   // a gate cries wolf on the repo's own error messages and gets disabled.
@@ -2113,7 +2107,6 @@ for (const [name, file] of MANIFESTS) {
 test("check-python-uv fails when the project file is not tracked", () => {
   const dir = tempRepo();
   try {
-    stage(dir, ".github/workflows/ci.yml", `jobs:\n  ci:\n    steps:\n${UV_BOOTSTRAP}`);
     stage(dir, "barwise/uv.lock", "version = 1\n");
     const r = gate("check-python-uv.mjs", dir);
     assert.equal(r.status, 1, r.stdout);
@@ -2631,7 +2624,9 @@ test("BARWISE_COVERAGE_DIR survives Turborepo and redirects a real package's cov
 // `docs/specs/gate-refusal-contract.spec.md`.
 
 const fm = await import(pathToFileURL(join(SCRIPTS, "fault-matrix.mjs")).href);
-const { ciGates } = await import(pathToFileURL(join(SCRIPTS, "lib", "ci-gates.mjs")).href);
+const { ciGates, ciSteps, shouldRun, MATRIX_EXCEPTIONS } = await import(
+  pathToFileURL(join(SCRIPTS, "lib", "ci-gates.mjs")).href
+);
 
 test("classify: a gate that answers 0 having reached for the broken thing is a false green", () => {
   // The verdict the harness exists for. No gate returns it today, which
@@ -2780,6 +2775,63 @@ test("every node gate CI runs is a script that exists", () => {
     gates.some((g) => g.script === "scripts/fmt-root.mjs"),
     "the compound `fmt:check` script must still resolve to its node half",
   );
+});
+
+test("a ci.yml step whose npm script starts a node gate resolves to it, so the matrix cannot drop it unseen", () => {
+  // gate-contract-enforced WS2. The matrix's reach is resolveNodeGate's: a
+  // script it cannot parse (a prefix, an env assignment, a pipe) is read as
+  // "not a node gate" and silently left out. So every step whose script runs
+  // `node scripts/...` must resolve; the only way out of the matrix is a
+  // named MATRIX_EXCEPTIONS entry, and every name there is a node gate
+  // ci.yml runs, with its reason.
+  const scripts = JSON.parse(
+    readFileSync(join(REPO, "barwise", "package.json"), "utf-8"),
+  ).scripts;
+  const steps = ciGates();
+  const resolved = new Map();
+  for (const step of steps) {
+    const name = step.slice(4).split(" -- ")[0].trim();
+    const gate = fm.resolveNodeGate(step, scripts);
+    if (gate !== null) resolved.set(gate.name, gate);
+    else if (step.startsWith("run ") && /(^|[\s;&|])node\s+scripts\//.test(scripts[name] ?? "")) {
+      assert.fail(`${name} runs a node gate (${scripts[name]}) that the matrix cannot resolve`);
+    }
+  }
+  for (const [name, reason] of Object.entries(MATRIX_EXCEPTIONS)) {
+    assert.ok(resolved.has(name), `MATRIX_EXCEPTIONS names ${name}, not a node gate ci.yml runs`);
+    assert.ok(reason.length > 20, `${name} needs its reason`);
+  }
+  const run = new Set(fm.nodeGates(steps, scripts).map((g) => g.name));
+  const all = new Set(fm.nodeGates(steps, scripts, { all: true }).map((g) => g.name));
+  for (const name of Object.keys(MATRIX_EXCEPTIONS)) {
+    assert.ok(!run.has(name), `${name} is on MATRIX_EXCEPTIONS but the matrix runs it`);
+    assert.ok(all.has(name), `--all does not bring ${name} back`);
+  }
+  assert.ok(!all.has("fault-matrix"), "the matrix never runs itself, --all included");
+});
+
+test("the fault matrix runs last in CI, on pull requests that are not docs-only, with CI's BASE_SHA", () => {
+  // Option D (owner, 2026-11-06). ci:local reads the same step and guard,
+  // so pre-push runs it on the same changes. Pull requests only, with the
+  // base the PR-only gates read: on a push to main those gates do not run,
+  // and the matrix would run them with no base.
+  const steps = ciSteps();
+  const at = steps.findIndex((s) => s.args === "run fault-matrix");
+  assert.ok(at >= 0, "ci.yml runs npm run fault-matrix");
+  assert.equal(at, steps.length - 1, "the matrix is the last npm step, after every gate it reads");
+  const { condition } = steps[at];
+  assert.match(condition, /github\.event_name == 'pull_request'/);
+  assert.deepEqual(shouldRun(condition, { docsOnly: false, optimizer: false }), {
+    run: true,
+    understood: true,
+  });
+  assert.deepEqual(shouldRun(condition, { docsOnly: true, optimizer: false }), {
+    run: false,
+    understood: true,
+  });
+  const workflow = readFileSync(join(REPO, ".github", "workflows", "ci.yml"), "utf-8");
+  const block = workflow.slice(workflow.indexOf("run: npm run fault-matrix"));
+  assert.match(block, /BASE_SHA: \$\{\{ steps\.base\.outputs\.sha \}\}/);
 });
 
 // --- barwise-984: an id names one issue, and created_at says which ---------

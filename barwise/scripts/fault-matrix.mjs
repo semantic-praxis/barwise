@@ -39,12 +39,14 @@
  *
  * Usage:
  *   node scripts/fault-matrix.mjs [--only <substring>] [--node <path>]
- *                                 [--json <path>]
+ *                                 [--json <path>] [--all]
  *
  *   --only   restrict to gates whose script name contains the substring
  *   --node   also run the wrong-Node-major axis using this interpreter;
  *            refused unless it runs and reports a DIFFERENT major
  *   --json   write the full matrix as JSON for a follow-up reading
+ *   --all    also run the steps on MATRIX_EXCEPTIONS (lib/ci-gates.mjs),
+ *            which CI leaves out; the matrix itself is always left out
  *
  * Exit codes:
  *   0  every readable gate conformed on every axis run
@@ -60,7 +62,7 @@ import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { ciGates } from "./lib/ci-gates.mjs";
+import { ciGates, MATRIX_EXCEPTIONS } from "./lib/ci-gates.mjs";
 
 const SCRIPTS = resolve(dirname(fileURLToPath(import.meta.url)));
 const NPM_ROOT = resolve(SCRIPTS, "..");
@@ -124,12 +126,19 @@ export function resolveNodeGate(step, scripts) {
   return { name, script: matches[0].script, args: [...matches[0].args, ...extra] };
 }
 
-/** Every ci.yml step that is a node gate, in CI's order. */
-export function nodeGates(steps, scripts) {
+/**
+ * Every ci.yml step that is a node gate, in CI's order, less the steps on
+ * `MATRIX_EXCEPTIONS` unless `all` is set (the on-demand `--all`).
+ */
+export function nodeGates(steps, scripts, { all = false } = {}) {
   const gates = [];
   for (const step of steps) {
     const gate = resolveNodeGate(step, scripts);
-    if (gate !== null) gates.push(gate);
+    if (gate === null) continue;
+    // Never itself, --all included: it would run itself under every axis.
+    if (gate.script === "scripts/fault-matrix.mjs") continue;
+    if (!all && Object.hasOwn(MATRIX_EXCEPTIONS, gate.name)) continue;
+    gates.push(gate);
   }
   return gates;
 }
@@ -306,12 +315,13 @@ function main() {
   const only = flag("only");
   const altNode = flag("node");
   const jsonPath = flag("json");
+  const all = argv.includes("--all");
 
   const manifest = join(NPM_ROOT, "package.json");
   if (!existsSync(manifest)) refuse(`no package.json at ${NPM_ROOT}`);
   const scripts = JSON.parse(readFileSync(manifest, "utf8")).scripts ?? {};
 
-  let gates = nodeGates(ciGates(), scripts);
+  let gates = nodeGates(ciGates(), scripts, { all });
   if (gates.length === 0) {
     refuse("ci.yml declares no node gates, which cannot be right");
   }

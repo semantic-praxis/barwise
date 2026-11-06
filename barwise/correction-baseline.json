@@ -1,6 +1,12 @@
 {
   "$comment": "Correction records in docs/specs, from scripts/audit-corrections.mjs (npm run audit:corrections -- --check; CI runs it). A spec that records what its draft got wrong carries a verdict here saying what CAUGHT it -- execution, reasoning, or provenance -- or not-a-correction when the detector over-matched. --check fails on a detected record missing here AND on a row no longer detected, so the file always enumerates exactly the corpus. The detector is deliberately over-inclusive; the markers are in the script, which is their only home. Seed and method: docs/spec-correction-taxonomy-2026-09-11.md. Spec: docs/specs/correction-record-ratchet.spec.md.",
   "records": {
+    "adr-batch9-enforcers::a7ca09d36a00": {
+      "spec": "adr-batch9-enforcers.spec.md",
+      "excerpt": "the first draft's \"two places, plus a type in verifyossie.ts\" was wrong: a key-and-template scan misses the as",
+      "caught_by": "reasoning",
+      "note": "Plan review (code-review on the draft): verifyOssie.ts:169 assigns doc.orm_version in document30(), so the writer census was redone with a full parse."
+    },
     "adr-refactor::9d07bb9afdb8": {
       "spec": "adr-refactor.spec.md",
       "excerpt": "- copilot-requested (barwise-ym8.7y6) -- procedure, buildable (low), batch 10: the copilot request job running only on workflowdispatch; enforcer: workflow test",
@@ -78,6 +84,12 @@
       "excerpt": "- measured over the tracked corpus with barwise verbalize, before and after: 20 sentences change. that is the 8 mandatory and uniqueness sentences that regain t",
       "caught_by": "execution",
       "note": "The plan sent a reading with text before its subject to the reverse frame; the high implementation review ran such a reading through the verbalizer and got \"the that Order\", so the forward builder lets Each replace that text instead."
+    },
+    "capability-matrix-check::8fc3dcde55b8": {
+      "spec": "capability-matrix-check.spec.md",
+      "excerpt": "- where a decision names its files: docs/adr/tested-in.json, a list of { decision, files, why } rows beside pr",
+      "caught_by": "reasoning",
+      "note": "WS2 design: reading test paths from Consequences prose and a header grammar change were weighed and set aside before any code, as alternatives considered."
     },
     "ci-local-condition-parity::0bc9b629f788": {
       "spec": "ci-local-condition-parity.spec.md",
@@ -817,7 +829,7 @@
       "caught_by": "reasoning",
       "note": "Copilot's review of PR #646: the archive exclusion was missing from the untracked listing, and the notice printed before the verdict where Scope said after. Both found by reading the diff against the spec, not by running anything."
     },
-    "python-uv-widened::23e1c1b5acb2": {
+    "python-uv-widened::9230809b7c59": {
       "spec": "python-uv-widened.spec.md",
       "excerpt": "1. a uv call is parsed, not matched (fq7, l69). one function reads a command into uv's subcommand and the options uv itself receives: - the subcommand is found ",
       "caught_by": "execution",

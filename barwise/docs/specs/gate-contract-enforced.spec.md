@@ -1,6 +1,6 @@
 # The gate refusal contract, enforced: the fault matrix green and in CI
 
-Status: WS1 implemented 2026-11-06 (#962, #963, #964: barwise-ydl, barwise-shq, barwise-vt2 and barwise-w43 fixed, test-adr-model refuses a broken git, the matrix's shallow shim answers only for the repository under test, and test:scripts' history-reading cases skip on a shallow clone); WS4 implemented 2026-11-06 (ci:local over a mixed run, the pre-commit secrets step, barwise-jha; the skip rule stays a gap); WS2 waits on open decision 1; WS3 needs its own design pass
+Status: WS1 implemented 2026-11-06 (#962, #963, #964: barwise-ydl, barwise-shq, barwise-vt2 and barwise-w43 fixed, test-adr-model refuses a broken git, the matrix's shallow shim answers only for the repository under test, and test:scripts' history-reading cases skip on a shallow clone); WS4 implemented 2026-11-06 (ci:local over a mixed run, the pre-commit secrets step, barwise-jha; the skip rule stays a gap); WS2 implemented 2026-11-06 (option D, owner: `fault-matrix` last in the `ci` job, pull requests only, with CI's `BASE_SHA`, about two minutes, green on main; `MATRIX_EXCEPTIONS` holds `test:scripts` and `audit`, `--all` runs them, and the matrix never runs itself; `Enforced-by:` names the matrix for three decisions, each probed. No separate `test:scripts` precondition test: WS1's runner-wide refusal was reverted, and its exclusion is pinned instead); WS3 needs its own design pass
 Created: 2026-11-06
 Last-updated: 2026-11-06
 Tracking: barwise-ym8.gc9 (adr-refactor batch 2), barwise-ym8.j31,
@@ -11,12 +11,12 @@ Touches: barwise/scripts/fault-matrix.mjs, barwise/scripts/check-tracker-closes.
 barwise/scripts/test-adr-model.mjs, barwise/scripts/run-script-tests.mjs,
 barwise/scripts/check-depcruise-gate.mjs, barwise/scripts/audit-rubric.mjs,
 barwise/scripts/ci-local.mjs, barwise/scripts/lib/ci-gates.mjs,
-+barwise/scripts/run-depcruise.mjs, barwise/package.json,
++barwise/scripts/run-depcruise.mjs, barwise/package.json, barwise/scripts/lib/adr-enforcement.mjs,
 +barwise/scripts/hooks/check-staged-secrets.sh, barwise/docs/adr/credential-handling.md,
 barwise/scripts/tests/,
 barwise/.husky/pre-commit, .github/workflows/ci.yml,
 barwise/docs/adr/gate-refusal-contract.md, barwise/docs/adr/probes.json,
-barwise/docs/ARCHITECTURE.md
+barwise/docs/ARCHITECTURE.md, CLAUDE.md, REVIEW.md
 
 ## Principle
 
@@ -191,10 +191,10 @@ Each fix lands red first, under the matrix or a planted test:
 Exit: the matrix, without the steps on `MATRIX_EXCEPTIONS`, exits 0 on
 main.
 
-### 2. In CI (provisional: waits on open decision 1)
+### 2. In CI
 
 `MATRIX_EXCEPTIONS` and `nodeGates()` reading it, the `ci.yml` step,
-`test:scripts` with its own precondition test, and `Enforced-by:` naming the matrix for
+and `Enforced-by:` naming the matrix for
 `three-results`, `refuse-not-find` and `cwd-invariant`, with a probe per
 decision in `probes.json`.
 

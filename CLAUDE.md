@@ -253,9 +253,9 @@ The labels follow the ADR's decision 1, and each `not yet` names a
 workstream of `docs/specs/surface-mirroring.spec.md`. `migrate` was
 added since, and the owner chose on 2026-11-05 to mirror it.
 
-The MCP and VS Code tool lists are pinned by `toEqual` tests
-(`mcp/tests/serverSpawn.test.ts`, `vscode/tests/unit/toolRegistration.test.ts`),
-so adding a tool means updating that list and this table.
+The MCP and VS Code tool lists are pinned by `toEqual` tests, one per
+surface, named in `barwise/docs/adr/tested-in.json`, so adding a tool
+means updating that surface's list and this table.
 `npm run check:capability-matrix` compares each row with what the CLI,
 the MCP server and the extension register, through
 `barwise/scripts/lib/capability-map.json`, which names what carries each
@@ -412,8 +412,8 @@ skill (`.claude/skills/release/`).
   are fine.
 - **Every Python execution resolves from the project lockfile.** The
   form is `uv run --frozen [--only-group <g>] ...`, and `--locked` in
-  CI. Never a bare `python3`, `python`, `pip` or `pip3` (the one
-  exception is CI's pinned uv bootstrap); never `--with`,
+  CI. Never a bare `python3`, `python`, `pip` or `pip3` (uv itself
+  comes from `scripts/install-uv.sh`, pinned and verified); never `--with`,
   `--with-requirements`, `--isolated`, `--no-project`, `uv pip`, `uvx`,
   `uv tool run` or PEP 723 inline metadata. An optional tier (sqlglot)
   is a dependency-group in the single `pyproject.toml`. Keep
@@ -442,7 +442,7 @@ skill (`.claude/skills/release/`).
 - **A gate that cannot see its input must not print PASS.** Exit 0
   pass, 1 a finding, 2 could not answer; a refusal never uses the
   finding code (`docs/adr/gate-refusal-contract.md`).
-  `npm run fault-matrix` measures it, on demand.
+  `npm run fault-matrix` measures it on every pull request, last in CI.
 - **Credential detection is gitleaks'.** `npm run check:secrets --
   --staged` at pre-commit, the full history in CI, and `.gitleaks.toml`
   takes no rule beyond the one for Anthropic keys; a real finding is

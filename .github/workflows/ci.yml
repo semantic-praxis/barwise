@@ -100,13 +100,22 @@ jobs:
       # anywhere runs unpinned (docs/specs/python-lockfile-execution.spec.md).
       #
       # uv itself is pinned, because it is a version input like any other
-      # and it was the one left floating. This container carries 0.8.17 and
-      # 0.12.7 on PATH simultaneously, and an unpinned `pip install uv`
-      # takes whatever pip resolves that day. The three behaviours this
-      # design rests on -- `uv run` failing OPEN with no project, `uv sync`
-      # failing closed, and `--only-group` erroring on a project that does
-      # not define the group -- were verified identical on both, so the pin
-      # is about reproducibility rather than a known incompatibility.
+      # and it was the one left floating. It comes from
+      # scripts/install-uv.sh: the release tarball for this platform,
+      # verified against its published digest before it is unpacked, the
+      # same installer the session hook runs (python-uv-widened WS4). Not
+      # `pip install uv`, which needed a bare python3 before uv existed --
+      # the one exemption check:python-uv had to carry. The three behaviours
+      # this design rests on -- `uv run` failing OPEN with no project,
+      # `uv sync` failing closed, and `--only-group` erroring on a project
+      # that does not define the group -- were verified identical on 0.8.17
+      # and 0.12.7, so the pin is about reproducibility rather than a known
+      # incompatibility. check:pins reads back the uv that runs against the
+      # installer's VERSION.
+      #
+      # ~/.local/bin goes first on PATH for the rest of this step, so the
+      # pinned uv answers rather than any the runner image carries, and on
+      # $GITHUB_PATH for the later steps (each `run:` is its own shell).
       #
       # --locked, not --frozen: a stale lock should fail the build here
       # rather than be re-resolved silently. The sqlglot group is synced
@@ -115,7 +124,9 @@ jobs:
       - name: Python toolchain (uv)
         working-directory: barwise
         run: |
-          python3 -m pip install --quiet uv==0.12.7
+          bash scripts/install-uv.sh "${HOME}/.local/bin"
+          export PATH="${HOME}/.local/bin:${PATH}"
+          echo "${HOME}/.local/bin" >> "${GITHUB_PATH}"
           uv python install
           uv sync --locked --only-group sqlglot
 
@@ -272,7 +283,7 @@ jobs:
       # per-rule allowlists, none of which this project should be writing.
       # The pin is a release tarball with a verified digest rather than a
       # third-party action, which keeps this workflow first-party `actions/*`
-      # only -- the same shape as the pinned `pip install uv` above. The
+      # only -- the same shape as scripts/install-uv.sh's uv above. The
       # version is pinned because gitleaks ships RULES, so it decides what is
       # found; the install script is the single home for it, shared with the
       # session bootstrap.
@@ -418,9 +429,10 @@ jobs:
       # `packages/cli/dist` rather than mocking it. `--frozen` respects
       # the committed uv.lock rather than re-resolving, which is the same
       # reason the lock is committed: a compile costs money, so pin what
-      # produced it. uv comes from pip rather than a third-party action --
-      # this workflow uses first-party `actions/*` only, and widening that
-      # is not this change's call.
+      # produced it. uv comes from scripts/install-uv.sh's verified release
+      # tarball (the Python toolchain step) rather than a third-party
+      # action -- this workflow uses first-party `actions/*` only, and
+      # widening that is not this change's call.
       #
       # working-directory is `barwise/`, not `barwise/optimizer/`: the
       # project moved up so that it is an ancestor of every workspace
@@ -574,3 +586,19 @@ jobs:
         if: ${{ !cancelled() }}
       - run: npm run test:adr-model
         if: ${{ !cancelled() }}
+
+      # Every node gate above under the fault matrix: git empty, absent and
+      # shallow, and three working directories. It fails on a gate that
+      # passes blind or reads differently by cwd, and refuses on one it
+      # cannot read (docs/adr/gate-refusal-contract.md; option D of
+      # docs/specs/gate-contract-enforced.spec.md, owner 2026-11-06). Last,
+      # where the build, the test reports and the full history exist, so
+      # each gate's unperturbed run can answer. The steps it leaves out,
+      # each with why, are MATRIX_EXCEPTIONS in scripts/lib/ci-gates.mjs.
+      # Pull requests only, with the BASE_SHA the PR-only gates above read:
+      # on a push to main those gates do not run, and the matrix would run
+      # them with no base.
+      - run: npm run fault-matrix
+        if: github.event_name == 'pull_request' && steps.changes.outputs.docs_only != 'true'
+        env:
+          BASE_SHA: ${{ steps.base.outputs.sha }}
