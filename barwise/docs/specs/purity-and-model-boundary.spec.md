@@ -12,6 +12,8 @@ barwise/packages/core/src/diff/elementDiff.ts,
 barwise/packages/core/src/serialization/replay.ts,
 barwise/packages/llm/tests/, barwise/docs/adr/determinism-in-core.md,
 barwise/docs/adr/connector-packages.md, barwise/docs/adr/probes.json,
+barwise/scripts/arch-triage.mjs, +barwise/packages/core/src/util/compareCodeUnits.ts,
+barwise/packages/core/tests/,
 barwise/docs/ARCHITECTURE.md
 
 ## Principle
@@ -47,58 +49,82 @@ imports a model SDK; nothing checks that.
 
 ## Scope
 
-1. **`check-core-purity.mjs` reads code, not lines.** Comments (line and
-   block, wherever they sit) are stripped with strings kept, so a
-   comment cannot hide a line and a comment's text cannot raise a
-   finding. Files come from `git ls-files` (tracked, as the other gates),
-   and zero files is a refusal (exit 2), per the gate-refusal contract.
-2. **New patterns**, each a finding in `core/src`:
-   - imports (static, `export ... from`, `require(`, a dynamic import at
-     runtime) of `node:process`, `node:module`, `node:worker_threads`,
-     `node:readline`, `node:dns`, `node:vm`, `node:perf_hooks`, `undici`;
-     a runtime dynamic import of anything (`await import(`, or
-     `import(...).then`), which the type form `import("x").T` is not;
-   - `process.cwd()`, `process.` anything else ambient (`hrtime`,
-     `argv`, `platform`), global `fetch(`, `performance.now(`;
-   - named randomness from `node:crypto` (`randomUUID`, `randomBytes`,
-     `randomInt`, `getRandomValues`);
-   - a `localeCompare` call with fewer than two arguments, and any
-     `toLocaleString`, `toLocaleUpperCase`, `toLocaleLowerCase` or
-     `Intl.` use with no explicit locale argument.
-3. **The four locale-dependent sorts in core** pass an explicit `"en"`,
-   which decision 1 allows ("a collator with an explicit locale") and
-   which keeps today's order wherever the tests run (barwise-c3z).
-4. **`one-layer-out`**: a test in `llm` (beside `keyFromEnvironment.test.ts`,
-   reusing its source helper) fails when any `packages/*/src` outside
-   `llm` imports `@anthropic-ai/sdk` or `openai` in any form, or any
-   `package.json` outside `llm` lists them; tagged
-   `[adr:determinism-in-core#one-layer-out]`. A plain `fetch` to a
+1. **`check-core-purity.mjs` reads TypeScript's view of the source**, not
+   lines. Module references come from `ts.preProcessFile` (static and
+   dynamic imports, `export ... from`, `require`, type imports), and
+   names from `ts.createScanner` tokens, so comments and strings can
+   neither hide a violation nor raise one, with no hand-written comment
+   stripper (plan review: the one in `llm` goes out of phase on three core
+   files with a quote in a regex literal). Files come from `git ls-files`;
+   zero files is a refusal (exit 2). The rules are exported, and
+   `scripts/arch-triage.mjs` uses them instead of its own copy of the
+   eleven patterns (plan review: a must-agree copy with no check).
+2. **Rules**, each a finding in `core/src`:
+   - modules: the existing `node:fs`, `child_process`, `os`, network
+     modules and model SDKs, plus `node:process`, `node:module`,
+     `node:worker_threads`, `node:readline`, `node:dns`, `node:vm`,
+     `node:perf_hooks`, `undici`;
+   - a runtime `import(`: every `import` keyword token followed by `(`
+     fails unless it is a type form, `import("...").Ident` with `Ident`
+     not `then`, `catch` or `finally`, or `typeof import(...)` (plan
+     review: listing bad shapes missed `return import(...)` and others);
+   - the identifiers `process`, `fetch`, `performance`, `localeCompare`,
+     `toLocaleString`, `toLocaleUpperCase`, `toLocaleLowerCase`, `Intl`,
+     `randomUUID`, `randomBytes`, `randomInt`, `getRandomValues`, as
+     tokens, whatever form uses them; core uses none of them today except
+     the four `localeCompare` calls fixed below (measured);
+   - the existing `new Date(`, `Date.now`, `Math.random` and global
+     `crypto.` rules, as token sequences.
+3. **The four locale-dependent sorts use code-unit order** through one
+   `compareCodeUnits` in core. Plan review measured it: with the bare
+   calls patched to code-unit order, 12,105 calls in the core, mcp and cli
+   suites never disagreed, so no test or golden changes; and code-unit
+   order is the same on every ICU build, where an explicit `"en"` still
+   depends on the runtime's CLDR data (VS Code runs core in Electron).
+   A test sorts barwise-c3z's measured names (`Zebra`, `Ärende`, `Apa`,
+   `aa`, `Ab`) through the comparator and through `query`'s by-name
+   ordering, in a child process under `LANG=sv_SE.UTF-8` and
+   `LANG=en_US.UTF-8`, and asserts one order.
+4. **`one-layer-out`**: a test in `llm` fails when `ts.preProcessFile`
+   finds `@anthropic-ai/sdk` or `openai` imported by any
+   `packages/*/src` file outside `llm`, or a `package.json` outside `llm`
+   lists either; a negative self-check keeps the provider name
+   `"openai"` in a string (as `mcp/src/tools/review.ts` has) passing.
+   Tagged `[adr:determinism-in-core#one-layer-out]`. A plain `fetch` to a
    provider host stays a gap, as the restatement says.
 
-Out of scope: `explicit-registration` (barwise-ym8.2n3), per-surface
-tests through each surface's real boot path, which the CLI's lazy
-per-command registration makes a design of its own (WS2, provisional);
-`format-in-its-connector`'s second half (barwise-ym8.x9w).
+Out of scope, and stated as remaining gaps in the ADRs:
+`lineage/resolveArtifact.ts` resolves relative paths with
+`path.resolve`, so a match depends on the working directory
+(barwise-dko, a known violation of `pure-ops`; `lxl` stays open,
+narrowed to it); `explicit-registration` (barwise-ym8.2n3), whose
+per-surface boot-path tests are a design of their own given the CLI's
+lazy per-command registration (WS2, provisional); `format-in-its-
+connector`'s second half (barwise-ym8.x9w).
 
 ## Alternatives considered
 
 - **A depcruise rule for the SDK boundary** (the refactor plan's form).
   `includeOnly` drops `node_modules` from the graph, and widening it
   changes every other rule's input. Rejected for a source test.
-- **Code-unit order for the four sorts.** Equally deterministic, but it
-  reorders case-mixed names (`Zebra` before `apple`) and would rewrite
-  goldens. An explicit `"en"` keeps the order the tests already pin.
-- **A TypeScript AST walk for purity.** Exact, but the patterns are all
-  literal text once comments are stripped; the gate stays a pattern
-  check, as its header says.
+- **`localeCompare(b, "en")`** for the four sorts. Deterministic only as
+  far as the runtime's ICU data is; code-unit order needs none and, as
+  measured, changes no order the suites see.
+- **Regexes over comment-stripped text.** That needs a comment stripper
+  that knows regex literals, and argument-counting rules cannot be
+  checked by text at all. TypeScript's scanner and `preProcessFile` are
+  already a dependency (`check-parity.mjs` uses `typescript`).
 
 ## Workstreams
 
 ### 1. Purity widened, and the four sorts fixed
 
-Scope 1 to 3, with each new pattern planted red in a `gates.test.mjs`
-case (a throwaway core file) and the existing pure-ops probe still
-CAUGHT; the four sorts' tests still green.
+Scope 1 to 3. Each new rule is planted red in a `gates.test.mjs` case,
+staged in a `tempRepo()` at `barwise/packages/core/src/` (an untracked
+file is invisible to a gate that reads `git ls-files`, plan review),
+beside green cases for the forms that stay allowed (a type-position
+`import("x").T`, `typeof import("x")`, a string mentioning `fetch`). The
+pure-ops and connector-owns-io probes still CAUGHT.
 
 ### 2. Registration through each surface's boot path (provisional)
 
@@ -109,8 +135,9 @@ Scope 4, planted red (an `openai` import in `cli/src`, the SDK in
 
 ## Risks and testing
 
-- A wider pattern can flag a legitimate future use (an explicit
-  `Intl.Collator("en")` is allowed, a bare one is not); the gate's
-  message names the rule and the fix.
-- The comment stripper must not hide code; it keeps strings, and the
-  gate's tests plant a violation after a block comment on the same line.
+- Banning identifiers outright is stricter than the decision: a future
+  explicit `Intl.Collator("en")` in core is refused too. Core uses no
+  `Intl` today, and the gate's message names the rule and the fix
+  (`compareCodeUnits`, or an argument from the surface).
+- The scanner reads TypeScript; a `.tsx` file in core would need
+  `LanguageVariant.JSX`, which the gate sets by extension.
