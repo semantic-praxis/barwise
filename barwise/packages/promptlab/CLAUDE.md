@@ -10,11 +10,10 @@ offline DSPy optimizer lane consumes the same scorer through
 
 ## Dependency Rule
 
-Depends on `@barwise/core` (validation, serialization), `@barwise/llm`
-(prompt construction, extraction parsing, conformance), `@barwise/learn`
-(`evaluateCandidate` and the check vocabulary), and `yaml`. ZERO
-dependencies on VS Code. `@barwise/cli` (`barwise prompt`) consumes
-this package; it must never depend on the CLI.
+`yaml` is its one external. ZERO dependencies on VS Code. The CLI
+(`barwise prompt`) consumes this package; it must never depend on the
+CLI. Its internal dependencies are the Upstream rows of `## Dependencies` below; `INTENDED` in
+`barwise/scripts/lib/intended.cjs` is the authority and `npm run check:architecture` compares the two.
 
 promptlab is an application built on barwise, not a library other
 packages reuse (owner, 2026-11-04). The CLI is its front end and its
@@ -256,6 +255,14 @@ tests/         Vitest; fixtures/responses/ holds the recorded payloads
 - Live LLM runs happen only through `barwise prompt eval` with keys
   configured; CI tests use mock clients and canned payloads, per the
   `llm` package convention.
+
+## Dependencies
+
+| Direction | Package          | What is used                                         |
+| --------- | ---------------- | ---------------------------------------------------- |
+| Upstream  | `@barwise/core`  | Validation, serialization                            |
+| Upstream  | `@barwise/llm`   | Prompt construction, extraction parsing, conformance |
+| Upstream  | `@barwise/learn` | `evaluateCandidate` and the check vocabulary         |
 
 ## Commands
 

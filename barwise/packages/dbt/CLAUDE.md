@@ -8,19 +8,19 @@ the same pattern as `@barwise/code-analysis`. Core ships no dbt format.
 
 ## Dependency Rule
 
-This package depends on `@barwise/core` for model types, the
-`ImportFormat` / `ExportFormatAdapter` interfaces, the format registry,
+Internal dependencies are the Upstream rows of `## Dependencies`
+below, checked against `INTENDED` by `npm run check:architecture`.
+From core it uses model types, the `ImportFormat` / `ExportFormatAdapter` interfaces, the format registry,
 the relational mapping (`RelationalMapper`), the export annotation
 collector and comment helpers (`@barwise/core/annotation`), and the SQL
-dialect types (`@barwise/core/sql`). It depends on `@barwise/formats` for
-the SQL pattern cascade (`parseSqlPatterns`) and `parseSqlDataType`: dbt
+dialect types (`@barwise/core/sql`). From formats it takes the SQL pattern cascade (`parseSqlPatterns`) and `parseSqlDataType`: dbt
 composes the SQL format rather than keeping its own copy of the parser
 or the sqlglot bridge (docs/adr/must-agree-copies.md#share-by-composition).
 It owns the dbt renderer (`render/`). It does NOT depend on any editor or
 tool package.
 
-Allowed runtime dependencies: `@barwise/core`, `@barwise/formats`, `yaml`.
-No others without discussion. The package uses `node:fs` for project
+The one allowed external runtime dependency is `yaml`. No others without
+discussion. The package uses `node:fs` for project
 discovery and `node:child_process` for `dbt compile` (via
 `DbtSqlCompiler`). The optional sqlglot sidecar runs inside formats'
 `parseSqlPatterns`, which falls back to the regex tier when uv or sqlglot

@@ -7,9 +7,10 @@ renderer-consolidation spec); this package is layout only.
 
 ## Dependency Rule
 
-This package depends on `@barwise/core` (model types) and `elkjs`
-(layout engine). It has ZERO dependencies on VS Code, browser APIs, or
-React. The output is a plain `PositionedGraph` data structure, so it
+Its one external is `elkjs` (layout engine); internal dependencies
+are the Upstream rows of `## Dependencies` below, checked against
+`INTENDED` by `npm run check:architecture`. It has ZERO dependencies on
+VS Code, browser APIs, or React. The output is a plain `PositionedGraph` data structure, so it
 works in any environment.
 
 ## Package Layout

@@ -22,6 +22,15 @@
  *     non-registry source under a listed name
  *     (docs/adr/package-graph-authority.md#core-external-deps).
  *
+ *   - each package's CLAUDE.md "## Dependencies" table: its Upstream rows
+ *     that name an internal package, against `INTENDED`, both ways. External
+ *     rows (diagram-ui's `react`) are ignored.
+ *   - the scripts, for a copy of the graph: a property keyed by a package
+ *     whose value is an array of package names, which is one `INTENDED`
+ *     entry. A copy in another shape passes (lib/architecture-scan.mjs).
+ *   - core's source, for bare imports its runtime dependency fields do not
+ *     declare (`knip` counts a devDependency as declared).
+ *
  * Package names map to directories through the manifests themselves, not
  * a naming rule, so `barwise-vscode` needs no special case and a package
  * outside the `@barwise/` scope is still recognised as internal.
@@ -52,6 +61,7 @@ import { fileURLToPath } from "node:url";
 import { decisionIds } from "./lib/adr-enforcement.mjs";
 import { createGovernanceReader } from "./lib/adr-facts.mjs";
 import { judgeDeclarations, needsWorkflow } from "./lib/adr-judge.mjs";
+import { bareImports, graphLiterals, upstreamRows } from "./lib/architecture-scan.mjs";
 import {
   ADR_DIR,
   currentSection,
@@ -221,6 +231,8 @@ function graphLines(claudeMd) {
 }
 
 let intended, externalDeps, drawnLines, manifests, adrs, citing, scriptFiles, root, section;
+let graphScripts, packageDocs, importers;
+const INTENDED_FILE = "barwise/scripts/lib/intended.cjs";
 try {
   // Inside the refusal: a bare `--root` throws, and that is "could not
   // answer", not the exit 1 a real disagreement uses.
@@ -272,6 +284,34 @@ try {
     root,
     tracked.filter((p) => p.startsWith("barwise/scripts/") && /\.(mjs|cjs|js|sh)$/.test(p)),
   );
+  // The scripts that could keep a copy of the graph: not the tests, whose
+  // fixtures state graphs on purpose, and not the authority itself.
+  graphScripts = scriptFiles.filter(({ f }) =>
+    !f.startsWith("barwise/scripts/tests/") && f !== INTENDED_FILE && /\.(mjs|cjs|js)$/.test(f)
+  );
+  // A scan that read nothing found nothing for want of looking.
+  if (graphScripts.length === 0) throw new Error("no script under barwise/scripts/ to scan");
+  // Every package states its Upstream rows in its own CLAUDE.md; one that
+  // cannot be read is not "no rows".
+  packageDocs = new Map(
+    manifests.map(({ dir }) => [
+      dir,
+      readFileSync(join(root, "barwise", "packages", dir, "CLAUDE.md"), "utf8"),
+    ]),
+  );
+  // The source of each package with an external-deps list, for its bare
+  // imports (core-external-deps): TypeScript under src/, from the tracked listing.
+  importers = new Map();
+  // A list for a package that is not one is the findings pass's to name.
+  for (const dir of Object.keys(externalDeps).filter((d) => manifests.some((m) => m.dir === d))) {
+    const prefix = `barwise/packages/${dir}/src/`;
+    const files = readFiles(
+      root,
+      tracked.filter((p) => p.startsWith(prefix) && /\.[cm]?tsx?$/.test(p)),
+    );
+    if (files.length === 0) throw new Error(`no TypeScript source under ${prefix}`);
+    importers.set(dir, files);
+  }
   // The generated first section of ARCHITECTURE.md (WS3): its markers must
   // be there to compare, so their absence is "could not answer".
   const doc = readFileSync(join(root, "barwise", "docs", "ARCHITECTURE.md"), "utf8");
@@ -389,6 +429,68 @@ for (const [p, allowedExternal] of Object.entries(externalDeps)) {
   for (const dep of allowedExternal) {
     if (!declared.has(dep)) {
       problems.push(`external-deps.cjs lists ${dep} for ${p}, which its manifest does not declare`);
+    }
+  }
+}
+
+// A listed package imports only what its manifest ships
+// (package-graph-authority#core-external-deps). knip's `unlisted` counts a
+// devDependency as declared, so a test library imported from `src` passes
+// it and reaches every consumer undeclared (barwise-ym8.xyn). A package
+// whose runtime fields name it, or the package itself, is declared.
+for (const [p, files] of importers) {
+  const json = manifestOf.get(p);
+  if (json === undefined) continue; // reported by the loop above
+  const declared = new Set([json.name]);
+  for (const field of RUNTIME) for (const dep of Object.keys(json[field] ?? {})) declared.add(dep);
+  for (const { f, text } of files) {
+    for (const spec of bareImports(f, text)) {
+      if (!declared.has(spec)) {
+        problems.push(
+          `${f}: imports ${spec}, which is not in packages/${p}'s ${RUNTIME.join(", ")}`,
+        );
+      }
+    }
+  }
+}
+
+// No script keeps a copy of the graph (package-graph-authority#intended-is-graph).
+const spellings = new Set([...dirOf.keys(), ...dirOf.values()]);
+for (const { f, text } of graphScripts) {
+  for (const { line, key, targets } of graphLiterals(f, text, spellings)) {
+    problems.push(
+      `${f}:${line}: "${key}": [${targets.map((t) => `"${t}"`).join(", ")}] is a copy of an`
+        + " INTENDED entry; require scripts/lib/intended.cjs instead",
+    );
+  }
+}
+
+// Each package's CLAUDE.md says what it depends on in its `## Dependencies`
+// table; the Upstream rows naming an internal package are a rendering of its
+// INTENDED entry, compared both ways like the root block. A name that looks
+// internal (`@barwise/...`) and resolves to no manifest is a misspelling,
+// not an external row.
+const internal = (n) => dirOf.has(n) || n.startsWith("@barwise/");
+for (const [dir, text] of packageDocs) {
+  const doc = `packages/${dir}/CLAUDE.md`;
+  if (!has(dir)) continue; // reported above
+  const { section: found, table, rows, bad } = upstreamRows(text, internal);
+  if (!found || !table) {
+    problems.push(`${doc}: has no "## Dependencies" table (Direction | Package | What is used)`);
+    continue;
+  }
+  for (const cell of bad) problems.push(`${doc}: Upstream row "${cell}" is not a backticked name`);
+  const named = rows.map((n) => dirOf.get(n) ?? n);
+  for (const n of repeated(named)) problems.push(`${doc}: lists Upstream ${n} twice`);
+  for (const n of new Set(named)) {
+    if (!has(n)) problems.push(`${doc}: Upstream ${n} is not a package in INTENDED`);
+    else if (!intended[dir].includes(n)) {
+      problems.push(`${doc}: Upstream ${n}, INTENDED does not allow ${dir} -> ${n}`);
+    }
+  }
+  for (const n of intended[dir]) {
+    if (!named.includes(n)) {
+      problems.push(`INTENDED has ${dir} -> ${n}, ${doc} has no Upstream row`);
     }
   }
 }
@@ -540,7 +642,11 @@ if (problems.length > 0 || adrProblems.length > 0 || stale || enforcementProblem
 if (refusals.length > 0) process.exit(2);
 console.log(
   `check:architecture: ${drawnEdges.size} edges in CLAUDE.md and ${manifests.length} package`
-    + ` manifests agree with INTENDED, and core's external dependencies with external-deps.cjs;`
+    + ` manifests agree with INTENDED, and so do ${packageDocs.size} package CLAUDE.md tables; no`
+    + ` copy of the graph in ${graphScripts.length} scripts; core's external dependencies match external-deps.cjs and`
+    + ` its ${
+      [...importers.values()].reduce((n, fs) => n + fs.length, 0)
+    } source files import only what it declares;`
     + ` ${adrs.length} ADRs are well-formed and every reference`
     + ` in ${citing.length} files resolves; ${held.decisions} decisions: ${held.gate} with a gate,`
     + ` ${held.testsOnly} tests and no gate, ${held.noneOnly} none only; ${held.gap} carry a gap`

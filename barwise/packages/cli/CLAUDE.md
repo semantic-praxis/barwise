@@ -9,9 +9,10 @@ and this package's `package.json` are checked against
 
 ## Dependency Rule
 
-This package may depend on any internal package except
-`barwise-vscode` and `@barwise/mcp`; `commander` is the only
-substantial external. It has ZERO dependencies on VS Code.
+`commander` is the only substantial external. It has ZERO dependencies
+on VS Code. Its internal dependencies are the Upstream rows of
+`## Dependencies` below, checked against `INTENDED` by
+`npm run check:architecture`.
 
 ## Package Layout
 

@@ -17,10 +17,11 @@ into the browser bundle.
 
 ## Dependency Rule
 
-Depends on `@barwise/diagram` for the `PositionedGraph` type
-(`import type`, erased at build) and the styling constants (the
-`@barwise/diagram/theme` subpath, which carries no `elkjs`), plus
-`react` and `react-dom` (`react-dom/server` for the headless render). It
+Its internal dependency is the Upstream row of `## Dependencies` below,
+checked against `INTENDED` by `npm run check:architecture`: the
+`PositionedGraph` type (`import type`, erased at build) and the styling
+constants (the `@barwise/diagram/theme` subpath, which carries no
+`elkjs`). Its externals are `react` and `react-dom` (`react-dom/server` for the headless render). It
 has ZERO dependency on `elkjs`, the layout pipeline, or VS Code, so the
 webview can bundle the main barrel without pulling the layout engine or
 `react-dom/server` into the browser.

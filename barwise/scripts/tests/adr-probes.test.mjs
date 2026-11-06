@@ -43,13 +43,13 @@ const GATE = "import { readFileSync } from 'node:fs';\n"
 const ONE = { decision: "a-concern#one", file: "barwise/src.txt", old: "good", new: "BAD" };
 const TWO = { decision: "a-concern#two", file: "barwise/src.txt", old: "good", new: "WORSE" };
 
-function fixture(rows, { gate = GATE, src = "all good\n" } = {}) {
+function fixture(rows, { gate = GATE, src = "all good\n", adr = ADR } = {}) {
   const dir = mkdtempSync(join(tmpdir(), "adr-probes-"));
   const w = (p, s) => {
     mkdirSync(dirname(join(dir, p)), { recursive: true });
     writeFileSync(join(dir, p), s);
   };
-  w("barwise/docs/adr/a-concern.md", ADR);
+  w("barwise/docs/adr/a-concern.md", adr);
   w("barwise/package.json", PACKAGE);
   w("barwise/gate.mjs", gate);
   w("barwise/src.txt", src);
@@ -165,6 +165,37 @@ test("adr-probes: a manifest absent, unreadable, malformed or empty refuses, exi
       assert.match(r.stderr, message);
     });
   }
+});
+
+// Decision one held by two gates that read different words: one edit cannot
+// please both, so each row names the gate it probes.
+const TWO_GATES = ADR.replace(
+  "Enforced-by: npm run check:x (one),",
+  "Enforced-by: npm run check:x (one), npm run check:args -- --strict (one),",
+);
+
+test("adr-probes: a row's gate limits it to that entry, and must name one the decision has", () => {
+  const forX = { ...ONE, gate: "check:x" };
+  const forArgs = { ...ONE, new: "WORSE", gate: "check:args" };
+  withFixture([forX, forArgs], { adr: TWO_GATES }, (dir) => {
+    const r = run(dir);
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    assert.equal(r.stdout.match(/CAUGHT/g).length, 2, r.stdout);
+    assert.doesNotMatch(r.stdout, /MISSED/);
+  });
+  // Without the field the first row also runs against check:args, which
+  // ignores BAD: the case the field exists for.
+  withFixture([ONE], { adr: TWO_GATES }, (dir) => {
+    const r = run(dir);
+    assert.equal(r.status, 1, r.stdout + r.stderr);
+    assert.match(r.stdout, /MISSED {3}a-concern#one by "npm run check:args/);
+  });
+  withFixture([{ ...ONE, gate: "check:nope" }], { adr: TWO_GATES }, (dir) => {
+    const r = run(dir);
+    assert.equal(r.status, 1, r.stdout + r.stderr);
+    assert.match(r.stderr, /a-concern#one: no npm entry running check:nope lists it/);
+  });
+  assert.ok(readRows(JSON.stringify([{ ...ONE, gate: "" }])).problem);
 });
 
 test("adr-probes: readRows accepts the two row shapes and nothing between them", () => {
