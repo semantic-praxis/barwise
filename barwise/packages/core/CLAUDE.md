@@ -30,9 +30,11 @@ src/
   serialization/  YAML round-trip (.orm.yaml, .map.yaml, .orm-project.yaml)
   validation/     Rule-based validation engine and rule sets
   verbalization/  FORML verbalization of fact types and constraints
-  mapping/        Relational mapper (ORM -> tables/columns/keys), DDL renderer,
-                  and constraint routing: what the schema realized, and what a
-                  dialect adds as UNIQUE/CHECK or spills as a ConstraintSpec
+  mapping/        Relational mapper (ORM -> tables/columns/keys) and
+                  constraint routing: what the schema realized, and what a
+                  dialect adds as UNIQUE/CHECK or spills as a ConstraintSpec.
+                  Format renderers live in their connectors
+                  (docs/adr/connector-packages.md#format-in-its-connector).
   decode/         Effect Schemas and decoders for the 3.0 file format, with
                   the cross-field harness; the 3.0 loader reads files
                   through them alone (effect-adoption R4)

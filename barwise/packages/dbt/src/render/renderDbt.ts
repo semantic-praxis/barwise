@@ -9,14 +9,15 @@
  * RelationalMapper already follows absorption-based normalization.
  */
 
-import { stringify } from "yaml";
 import type {
   Column,
   ForeignKey,
   RelationalSchema,
   RoutedUnique,
   Table,
-} from "../RelationalSchema.js";
+} from "@barwise/core/mapping";
+import { stringify } from "yaml";
+import { DBT_KEY_TEST } from "../keyTest.js";
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -141,13 +142,6 @@ function sqlTypeToDbtType(sqlType: string): string {
 // ---------------------------------------------------------------------------
 // schema.yml rendering
 // ---------------------------------------------------------------------------
-
-/**
- * The dbt_utils test that keys a model on several columns. The dbt
- * importer reads the same name back as a composite key, so it imports this
- * constant rather than spelling it again.
- */
-export const DBT_KEY_TEST = "dbt_utils.unique_combination_of_columns";
 
 /**
  * The columns a model's `DBT_KEY_TEST` names, or undefined when the model

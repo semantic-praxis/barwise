@@ -27,8 +27,6 @@ import {
   type DialectCapabilityProfile,
   hasGeneratedKeys,
   RelationalMapper,
-  renderDdl,
-  renderPopulationAsSql,
   resolveDialectProfile,
   routeConstraints,
   type RoutedClause,
@@ -36,7 +34,9 @@ import {
   SURROGATE_POPULATION_NOTE,
   withConstraintSpecs,
 } from "@barwise/core/mapping";
+import { renderPopulationAsSql } from "../population/populationRenderer.js";
 import { injectBarwiseAnnotations } from "./barwiseAnnotation.js";
+import { renderDdl } from "./renderDdl.js";
 
 /**
  * The options that render DDL alone: no annotation comments and no

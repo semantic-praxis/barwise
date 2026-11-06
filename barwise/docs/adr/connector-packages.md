@@ -1,14 +1,15 @@
 # Connector packages
 
 Scope: architecture
-Date: 2026-10-24
+Date: 2026-11-06
 Tracking: barwise-ubc, barwise-2uz, barwise-5zi, barwise-5f9,
 docs/specs/archive/connector-io-migration.spec.md,
 docs/specs/ossie-ontology-format.spec.md,
-docs/specs/archive/code-analysis.spec.md, docs/specs/norma-export.spec.md
+docs/specs/archive/code-analysis.spec.md, docs/specs/norma-export.spec.md,
+docs/specs/format-renderers-to-connectors.spec.md
 Enforced-by: npm run purity (connector-owns-io),
-tests (core-no-interop, explicit-registration), none (barwise-ym8.paz: core-no-interop),
-none (barwise-ym8.iyw: connector-owns-io), none (barwise-ym8.y5z: descriptor-wraps-core),
+tests (core-no-interop, format-in-its-connector, explicit-registration),
+none (barwise-ym8.iyw: connector-owns-io), none (barwise-ym8.x9w: format-in-its-connector),
 none (barwise-ym8.2n3: explicit-registration)
 
 ## Context
@@ -46,13 +47,14 @@ format lives and how it reaches the surfaces.
    file-system and `dbt compile` I/O), and `@barwise/code-analysis`
    (TypeScript, Java and Kotlin, with LSP sessions and repository
    scanning).
-3. **A descriptor wraps core's capability where core has one.**{#descriptor-wraps-core} The
-   mapping and rendering logic stays in core -- `RelationalMapper`,
-   `renderDdl`, `renderOpenApi`, `renderAvro`, `renderDbt` -- and the
-   DDL, OpenAPI, Avro and dbt exporters are thin shells over it; the SQL
-   and dbt importers call core's `parseSqlFile`. A format core has no
-   renderer for keeps its writer in the connector, as NORMA and Ossie
-   do.
+3. **A format's rendering and parsing live in its connector.**{#format-in-its-connector}
+   A format's descriptor and the code that writes or reads its text sit
+   in one package: the DDL, OpenAPI and Avro renderers and the
+   population renderers are `@barwise/formats`', and the dbt renderer
+   and its export annotator are `@barwise/dbt`'s. Core keeps the
+   relational mapping (`RelationalMapper`, which ORM, a relational
+   technology, owns) and the SQL dialect types and value predicates its
+   own mapping uses; a format reaches them from its connector.
 4. **Registration is explicit and by name.**{#explicit-registration} Each tool surface calls the
    `register*Formats()` functions it needs; the registry discovers
    nothing on its own, and a format no one registered fails as an
@@ -62,8 +64,9 @@ format lives and how it reaches the surfaces.
 
 - `npm run purity` (ci.yml, `if: steps.changes.outputs.docs_only !=
   'true'`) refuses static file-system, subprocess and network imports
-  and environment access in core, so the I/O half of decision 2 and the
-  "no discovery" half of decision 4 have a backstop
+  and environment access in core, so the I/O half of `connector-packages.md#connector-owns-io` and the
+  "no discovery" half of `connector-packages.md#explicit-registration`
+  have a backstop
   (`architecture-scenarios.md` S-EXPL-5). It misses dynamic imports,
   `process.cwd()` and global `fetch` (barwise-fzd), and a `require`
   call, which no issue tracks yet (barwise-fzd's list is measured and
@@ -72,13 +75,21 @@ format lives and how it reaches the surfaces.
   'true'`) fails when core's source imports another internal package's
   source, so core cannot reach a connector; tests and external
   libraries are outside it.
-- Decision 1 has no gate of its own: a pure, text-in text-out
-  `ImportFormat` or `ExportFormatAdapter` under `core/src` -- a class, an
-  object literal, or a `formatRegistry.register` call -- passes every
-  gate. None exists
-  today (barwise-2uz).
-- Decision 3 has no gate; whether code is domain logic or descriptor is
-  a review judgment, and no check is proposed for it.
+- `connector-packages.md#core-no-interop` and
+  `connector-packages.md#format-in-its-connector` are held by
+  `core/tests/public/exports.test.ts`: it pins every runtime name core
+  and its subpath exports export to a reviewed list (`exports.json`), so
+  an exported renderer cannot come back into core unseen, and it fails on
+  code in `core/src` that declares a value as an `ImportFormat`,
+  `ExportFormatAdapter` or `FormatDescriptor` (`implements`, `satisfies`,
+  `as`, or a type annotation) or registers a format outside the
+  registry's own file (barwise-2uz). Not seen: a renderer core keeps
+  unexported and calls from an exported function, a type-only export,
+  and an untyped literal that only matches an interface's shape.
+- One known violation of `connector-packages.md#format-in-its-connector`
+  remains until `format-renderers-to-connectors.spec.md` WS3 lands: the
+  SQL parser (`parseSqlFile` and its cascade) is still in core
+  (barwise-ym8.x9w).
 - That each surface registers what it needs is review-only (S-EXPL-5).
   A missing registration fails loudly ("not registered", "Unknown
   format") when a test or a user asks for that format. One copy is
@@ -93,7 +104,7 @@ format lives and how it reaches the surfaces.
   `@barwise/dbt` directly. The connector-io-migration spec (workstream
   4) re-pointed that import to `@barwise/dbt` and named it "the only
   tool-layer code that imports a dbt symbol directly rather than through
-  the registry". Decision 4 says how formats get registered, not whether
+  the registry". `connector-packages.md#explicit-registration` says how formats get registered, not whether
   a surface may also call a connector's functions directly, which
   surfaces do in other places too; that is open (barwise-5zi).
 - Core cannot import or export on its own until a connector registers,

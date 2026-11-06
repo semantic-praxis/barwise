@@ -8,8 +8,8 @@ Tracking: barwise-go4
 Plan-reviewed: addd6d6d (code-review, pr-review)
 Touches: barwise/packages/core/src/mapping/constraintRouting.ts,
 barwise/packages/core/src/mapping/index.ts,
-barwise/packages/core/src/mapping/renderers/dbt.ts,
-barwise/packages/core/src/mapping/renderers/DbtExportAnnotator.ts,
+barwise/packages/dbt/src/render/renderDbt.ts,
+barwise/packages/dbt/src/render/DbtExportAnnotator.ts,
 barwise/packages/core/tests/mapping/,
 barwise/packages/dbt/src/,
 barwise/packages/dbt/tests/,

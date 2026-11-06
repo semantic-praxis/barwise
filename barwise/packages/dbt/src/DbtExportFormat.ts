@@ -16,16 +16,16 @@ import {
 } from "@barwise/core";
 import { generateDdlLineage } from "@barwise/core/lineage";
 import {
-  annotateDbtExport,
   hasGeneratedKeys,
   RelationalMapper,
   type RelationalSchema,
-  renderDbt,
   routeUniqueOnly,
   SURROGATE_POPULATION_NOTE,
   type Table,
   withConstraintSpecs,
 } from "@barwise/core/mapping";
+import { annotateDbtExport } from "./render/DbtExportAnnotator.js";
+import { renderDbt } from "./render/renderDbt.js";
 
 /**
  * dbt (data build tool) export format.

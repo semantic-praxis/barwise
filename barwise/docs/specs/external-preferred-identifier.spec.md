@@ -9,7 +9,7 @@ Plan-reviewed: 2e3c189e (code-review, pr-review)
 Touches: barwise/packages/core/src/model/identification.ts,
 barwise/packages/core/src/mapping/RelationalMapper.ts,
 barwise/packages/core/src/validation/rules/completenessWarnings.ts,
-barwise/packages/core/src/export/populationRenderer.ts,
+barwise/packages/formats/src/population/populationRenderer.ts,
 barwise/packages/core/src/query/evaluate.ts,
 barwise/packages/core/src/diff/ModelMerge.ts,
 barwise/packages/core/src/diff/elementDiff.ts,

@@ -1,9 +1,9 @@
 /**
  * Tests for ExportAnnotationCollector.
  *
- * Verifies that the extracted collectExportAnnotations() function
- * produces identical annotation output to the original inline
- * collectAnnotations() in DbtExportAnnotator for the same inputs.
+ * Verifies collectExportAnnotations() on its own inputs. It was extracted
+ * from DbtExportAnnotator, which now lives in @barwise/dbt; core's tests
+ * cannot import a connector, so no test here compares the two.
  */
 import { describe, expect, it } from "vitest";
 import { collectExportAnnotations } from "../../src/annotation/ExportAnnotationCollector.js";

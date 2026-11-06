@@ -36,3 +36,13 @@ export type {
 } from "./DbtSchemaTypes.js";
 export { DbtMappingError, type DbtMapResult, mapDbtToOrm } from "./DbtToOrmMapper.js";
 export { annotateDbtYaml, type AnnotationOptions } from "./DbtYamlAnnotator.js";
+
+// The dbt renderer and its export annotator (format-renderers-to-connectors.spec.md, WS2)
+export { DBT_KEY_TEST } from "./keyTest.js";
+export { annotateDbtExport, type ExportAnnotationResult } from "./render/DbtExportAnnotator.js";
+export {
+  type DbtModelFile,
+  type DbtProject,
+  type DbtRenderOptions,
+  renderDbt,
+} from "./render/renderDbt.js";

@@ -4,10 +4,10 @@
  * Verifies that TODO/NOTE comments are injected into rendered schema.yml
  * based on analysis of the ORM model and relational schema.
  */
+import { RelationalMapper } from "@barwise/core/mapping";
 import { describe, expect, it } from "vitest";
-import { RelationalMapper } from "../../src/mapping/RelationalMapper.js";
-import { renderDbt } from "../../src/mapping/renderers/dbt.js";
-import { annotateDbtExport } from "../../src/mapping/renderers/DbtExportAnnotator.js";
+import { annotateDbtExport } from "../../src/render/DbtExportAnnotator.js";
+import { renderDbt } from "../../src/render/renderDbt.js";
 import { ModelBuilder } from "../helpers/ModelBuilder.js";
 
 const mapper = new RelationalMapper();

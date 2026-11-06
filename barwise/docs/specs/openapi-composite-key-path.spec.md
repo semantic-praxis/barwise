@@ -6,8 +6,8 @@ Created: 2026-10-28
 Last-updated: 2026-10-28
 Tracking: barwise-pki
 Plan-reviewed: 783aafc7 (code-review, pr-review)
-Touches: barwise/packages/core/src/mapping/renderers/openapi.ts,
-barwise/packages/core/tests/mapping/openapi.test.ts,
+Touches: barwise/packages/formats/src/openapi/renderOpenApi.ts,
+barwise/packages/formats/tests/renderOpenApi.test.ts,
 barwise/packages/cli/tests/characterization/golden/,
 barwise/docs/IMPORT_EXPORT.md,
 barwise/docs/release-notes/2.0.0.md

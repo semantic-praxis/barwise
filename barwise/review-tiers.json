@@ -256,7 +256,10 @@
         "barwise/packages/core/src/verbalization/",
         "barwise/packages/formats/src/ddl/",
         "barwise/packages/formats/src/openapi/",
-        "barwise/packages/dbt/src/dbtMapping/"
+        "barwise/packages/formats/src/avro/",
+        "barwise/packages/formats/src/population/",
+        "barwise/packages/dbt/src/dbtMapping/",
+        "barwise/packages/dbt/src/render/"
       ],
       "why": "the model and every place that walks roles or builds ids: the sites of REVIEW.md failure mode 7's cited defects (bb9b4660 in mapping, 35ee5c4a in the importers and dbtMapping)"
     },

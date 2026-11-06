@@ -11,10 +11,10 @@
  *   - Custom source name option
  *   - Disabling relationship test generation
  */
+import { RelationalMapper } from "@barwise/core/mapping";
 import { describe, expect, it } from "vitest";
 import { parse } from "yaml";
-import { RelationalMapper } from "../../src/mapping/RelationalMapper.js";
-import { renderDbt } from "../../src/mapping/renderers/dbt.js";
+import { renderDbt } from "../../src/render/renderDbt.js";
 import { ModelBuilder } from "../helpers/ModelBuilder.js";
 
 const mapper = new RelationalMapper();

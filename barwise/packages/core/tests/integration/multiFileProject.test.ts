@@ -16,7 +16,6 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { RelationalMapper } from "../../src/mapping/RelationalMapper.js";
-import { renderDdl } from "../../src/mapping/renderers/ddl.js";
 import { OrmProject } from "../../src/model/OrmProject.js";
 import { MappingSerializer } from "../../src/serialization/MappingSerializer.js";
 import { OrmYamlSerializer } from "../../src/serialization/OrmYamlSerializer.js";
@@ -276,35 +275,6 @@ describe("Multi-file project integration", () => {
       );
       expect(amountCol).toBeDefined();
       expect(amountCol!.nullable).toBe(false);
-    });
-
-    it("CRM domain renders valid DDL", () => {
-      const model = modelSerializer.deserialize(crmYaml);
-      const schema = mapper.map(model);
-      const ddl = renderDdl(schema);
-
-      expect(ddl).toContain("CREATE TABLE customer");
-      expect(ddl).toContain("customer_id TEXT NOT NULL");
-      expect(ddl).toContain("PRIMARY KEY (customer_id)");
-      expect(ddl).toContain("email TEXT NOT NULL");
-      expect(ddl).toContain("status TEXT NOT NULL");
-
-      // Only one table (customer) since Email and Status are value types.
-      expect((ddl.match(/CREATE TABLE/g) ?? []).length).toBe(1);
-    });
-
-    it("Billing domain renders valid DDL", () => {
-      const model = modelSerializer.deserialize(billingYaml);
-      const schema = mapper.map(model);
-      const ddl = renderDdl(schema);
-
-      expect(ddl).toContain("CREATE TABLE account");
-      expect(ddl).toContain("CREATE TABLE invoice");
-      expect(ddl).toContain("FOREIGN KEY");
-      expect(ddl).toContain("REFERENCES account");
-
-      // Two tables: account and invoice.
-      expect((ddl.match(/CREATE TABLE/g) ?? []).length).toBe(2);
     });
   });
 

@@ -6,12 +6,13 @@
  * XML format without embedding any NORMA source code.
  */
 import { ValidationEngine } from "@barwise/core";
-import { RelationalMapper, renderDdl } from "@barwise/core/mapping";
+import { RelationalMapper } from "@barwise/core/mapping";
 import { Verbalizer } from "@barwise/core/verbalization";
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import { renderDdl } from "../src/ddl/renderDdl.js";
 import { importNormaXml, NormaImportError } from "../src/norma/NormaXmlImporter.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
