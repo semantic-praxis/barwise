@@ -10,7 +10,8 @@ Touches: barwise/scripts/check-python-uv.mjs, barwise/scripts/lib/python-uv-rule
 barwise/scripts/hooks/python-uv-guard.mjs, barwise/scripts/tests/,
 +barwise/scripts/install-uv.sh, .github/workflows/ci.yml,
 .claude/hooks/session-start.sh, barwise/docs/adr/python-from-the-lockfile.md,
-barwise/docs/adr/probes.json, barwise/docs/ARCHITECTURE.md
+barwise/docs/adr/probes.json, barwise/docs/ARCHITECTURE.md,
+barwise/docs/adr/pinned-runtimes.md, CLAUDE.md
 
 ## Principle
 
@@ -142,7 +143,50 @@ or allowlisted with a reason in the same PR.
 
 ### 3. The project and its manifests (provisional: not yet grounded)
 
-### 4. One installer for uv (provisional: waits on open decision 1)
+### 4. One installer for uv
+
+Open decision 1 is resolved (owner, 2026-11-06: the script). Grounded
+on main at cfff1486:
+
+- **Today.** CI's "Python toolchain (uv)" step runs `python3 -m pip
+  install --quiet uv==0.12.7`, which `check:python-uv` allowlists by a
+  substring of the line (its one ALLOWLIST row, with a `gates.test.mjs`
+  fixture `UV_BOOTSTRAP`). The session hook runs `curl -LsSf
+  https://astral.sh/uv/install.sh | sh` only when `~/.local/bin/uv` is
+  absent, so a container keeps whatever uv it first got (0.11.32 here).
+  `pinned-runtimes.md` says uv is pinned only in CI.
+- **The installer.** `scripts/install-uv.sh`, the shape of
+  `install-gitleaks.sh`: one `VERSION` (0.12.7) and the published
+  SHA-256 of each platform's release tarball (x86_64 and aarch64, Linux
+  and macOS, read from the release's `.sha256` files and checked against
+  a download of the Linux x86_64 tarball, 2026-11-06); `BIN_DIR` as its
+  argument; a present uv at the pinned version is left alone, any other
+  version is replaced; the tarball is verified before `tar` runs; only
+  `uv` is installed (`uvx` is banned by decision 2); and `uv --version`
+  is read back from `BIN_DIR`, failing (exit 2) when it is not the pin.
+  Downloading from the GitHub release rather than `pip install` drops
+  the one bare `python3` the ADR allowed, so decision 2's rule has no
+  exception left.
+- **Callers.** `ci.yml`'s Python step runs `bash scripts/install-uv.sh
+  "${HOME}/.local/bin"` and puts that directory on `PATH` for the rest of
+  the step and on `GITHUB_PATH` for later ones. The session hook runs it
+  on every start (non-fatal, as gitleaks), so a cached older uv is
+  replaced.
+- **The gate.** `check:python-uv` loses its allowlist row, now stale,
+  and the `UV_BOOTSTRAP` fixture with it; a bare `python3` has no
+  exemption anywhere.
+- **The rule's holder.** Decision 5 is restated to "uv is installed only
+  by `scripts/install-uv.sh`, at its pinned version, verified before it
+  is unpacked", held by tests in the shape of the credential-handling
+  ones, tagged `uv-bootstrap`: `ci.yml` and the session hook mention a
+  uv install only as `install-uv.sh` (an allowlist over their lines, so
+  `pip install uv`, the astral script and a `uses:` action all fail);
+  and the installer, given a download no digest matches, exits 2 before
+  `tar` runs. The ADR's Enforced-by moves `uv-bootstrap` from
+  `check:python-uv` to `tests`, and its probe row goes (tests are not
+  probed). `pinned-runtimes.md`'s "uv is pinned only in CI" and the root
+  CLAUDE.md's "the one exception is CI's pinned uv bootstrap" change with
+  it.
 
 ## Open decisions (for review)
 
