@@ -2067,11 +2067,34 @@ const COMMAND_FILES = [
     /Makefile:2 .*bare `python3`/,
   ],
   [
+    "a Makefile recipe behind make's @ prefix",
+    { "Makefile": "test:\n\t@python3 -m pytest\n" },
+    /Makefile:2 .*bare `python3`/,
+  ],
+  [
+    "a script whose name also keys an earlier object, reported at its own line",
+    {
+      "package.json": JSON.stringify(
+        { contributes: { check: "x" }, scripts: { check: "uv run python -V" } },
+        null,
+        2,
+      ) + "\n",
+    },
+    /package\.json:6 /,
+  ],
+  [
     "a git hook, which has no extension",
     { "barwise/.husky/pre-commit": "uv run python -V\n" },
     /barwise\/\.husky\/pre-commit:1 .*neither --frozen nor --locked/,
   ],
 ];
+
+test("check-python-uv cannot answer for a package.json it cannot parse, never a clean pass", () => {
+  const r = pythonUv({ "package.json": '{ "scripts": { "a": "python3 x.py", } ' });
+  assert.equal(r.status, 2, r.stdout + r.stderr);
+  assert.match(r.stderr, /cannot answer[\s\S]*package\.json/);
+  assert.doesNotMatch(r.stdout, /OK/);
+});
 
 for (const [name, files, expected] of COMMAND_FILES) {
   test(`check-python-uv reads ${name}`, () => {

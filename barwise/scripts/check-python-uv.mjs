@@ -63,12 +63,10 @@ import {
   blankQuoted,
   INTERPRETER,
   logicalLines,
+  shellCommandFindings,
   uvFindings,
 } from "./lib/python-uv-rules.mjs";
 import { REPO_ROOT, trackedFiles } from "./lib/tracked.mjs";
-
-/** package.json, Makefile and the git hooks: read by commandLines. */
-const COMMAND_FILE = /(^|\/)(package\.json|Makefile)$|^barwise\/\.husky\/(?!_\/)[^./]+$/;
 
 /** Files whose contents are commands. */
 const SHELLISH = new Set([".sh", ".yml", ".yaml"]);
@@ -195,43 +193,53 @@ const findings = [];
 const allowHits = new Set();
 
 /**
- * Command lines held in files the extension rules do not reach
- * (python-uv-widened WS2): each package.json's `scripts` values, a
- * Makefile's recipe lines, and the extensionless git hooks under
- * barwise/.husky/, which are shell. Each yields `{ line, text }` for the
- * shell rules, or null when the file is not one of these.
+ * What kind of command-bearing file this is, beyond the extension rules
+ * (python-uv-widened WS2): "package" for a package.json, whose scripts
+ * values are commands; "make" for a makefile, whose recipe lines are; and
+ * ".sh" for the extensionless git hooks under barwise/.husky/, which are
+ * shell and go through the main loop like any .sh file. Null otherwise.
+ * One classifier, so which files are read is decided in one place.
  */
-function commandLines(file, text) {
-  if (basename(file) === "package.json") {
-    let scripts;
-    try {
-      scripts = JSON.parse(text).scripts ?? {};
-    } catch {
-      return [];
-    }
-    const lines = text.split("\n");
-    return Object.entries(scripts).map(([name, cmd]) => ({
-      line: lines.findIndex((l) => l.includes(JSON.stringify(name) + ":")) + 1,
-      text: String(cmd),
-    }));
-  }
-  if (basename(file) === "Makefile") {
-    return logicalLines(text).filter(({ text: l }) => l.startsWith("\t"));
-  }
-  if (
-    file.startsWith("barwise/.husky/") && !file.startsWith("barwise/.husky/_/")
-    && extname(file) === ""
-  ) {
-    return logicalLines(text).filter(({ text: l }) => !l.trimStart().startsWith("#"));
-  }
+function fileKind(file) {
+  const name = basename(file);
+  if (name === "package.json") return "package";
+  if (/^(GNUmakefile|makefile|Makefile)$|\.mk$/.test(name)) return "make";
+  if (/^barwise\/\.husky\/(?!_\/)[^./]+$/.test(file)) return ".sh";
   return null;
 }
 
+/**
+ * The commands in a package.json's scripts or a makefile's recipes, as
+ * `{ line, text }`. A package.json that does not parse throws: the gate
+ * cannot see its scripts, which is a refusal, never a clean read.
+ */
+function commandLines(kind, text) {
+  if (kind === "package") {
+    const scripts = JSON.parse(text).scripts ?? {};
+    const lines = text.split("\n");
+    // Each name is looked up inside the scripts object, so a same-named key
+    // elsewhere (vscode's contributes) does not take its line.
+    const from = lines.findIndex((l) => l.includes('"scripts":'));
+    return Object.entries(scripts).map(([name, cmd]) => ({
+      line: lines.findIndex((l, i) => i > from && l.includes(JSON.stringify(name) + ":")) + 1,
+      text: String(cmd),
+    }));
+  }
+  // make's recipe prefixes (@ silent, - ignore errors, + always run) come
+  // before the command; left on, `@python3` was not read as python3.
+  return logicalLines(text)
+    .filter(({ text: l }) => l.startsWith("\t"))
+    .map(({ line, text: l }) => ({ line, text: l.replace(/^\t[@+-]*/, "") }));
+}
+
+const unreadable = [];
+
 for (const file of trackedFiles()) {
-  const ext = extname(file);
   if (SELF.has(file)) continue;
   if (file.startsWith(".beads/hooks/")) continue;
-  const special = COMMAND_FILE.test(file);
+  const kind = fileKind(file);
+  const ext = kind === ".sh" ? ".sh" : extname(file);
+  const special = kind === "package" || kind === "make";
   if (!special && !SHELLISH.has(ext) && !JSISH.has(ext) && ext !== ".py") continue;
 
   let text;
@@ -242,11 +250,22 @@ for (const file of trackedFiles()) {
   }
 
   if (special) {
-    for (const { line, text: raw } of commandLines(file, text) ?? []) {
-      const cmd = blankQuoted(raw);
-      const bare = bareInterpreter(cmd);
-      if (bare) findings.push({ file, line, what: `bare \`${bare}\``, raw });
-      for (const what of uvFindings(cmd)) findings.push({ file, line, what, raw });
+    let commands;
+    try {
+      commands = commandLines(kind, text);
+    } catch (err) {
+      unreadable.push(`${file}: ${err instanceof Error ? err.message : err}`);
+      continue;
+    }
+    for (const { line, text: command } of commands) {
+      const allowed = ALLOWLIST.find((a) => a.file === file && command.includes(a.match));
+      if (allowed) {
+        allowHits.add(allowed.match);
+        continue;
+      }
+      for (const f of shellCommandFindings(command)) {
+        findings.push({ file, line: line + f.line - 1, what: f.what, raw: command });
+      }
     }
     continue;
   }
@@ -319,7 +338,15 @@ if (findings.length > 0 || stale.length > 0) {
         + "stops describing the code.",
     );
   }
+  for (const u of unreadable) console.error(`\ncould not read ${u}`);
   process.exit(1);
+}
+// A finding outranks a refusal; with none, a file the gate could not read
+// is "could not answer", never a clean pass (gate-refusal-contract).
+if (unreadable.length > 0) {
+  console.error("check-python-uv: cannot answer --");
+  for (const u of unreadable) console.error(`  could not read ${u}`);
+  process.exit(2);
 }
 
 console.log(
