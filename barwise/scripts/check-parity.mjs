@@ -185,6 +185,7 @@ function main() {
     const path = i === -1 ? join(root, "parity.manifest.json") : resolve(process.argv[i + 1]);
     manifest = JSON.parse(readFileSync(path, "utf8"));
     if (!Array.isArray(manifest?.sets)) throw new Error("it has no sets array");
+    if (manifest.sets.length === 0) throw new Error("its sets array is empty");
   } catch (err) {
     console.error(`check-parity: cannot answer -- parity.manifest.json: ${err.message}`);
     process.exit(2);

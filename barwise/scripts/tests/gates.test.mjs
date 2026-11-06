@@ -1749,7 +1749,15 @@ test("check-parity finds a set it cannot mean without hiding the others, and ref
     ) {
       assert.match(r.stderr, pattern);
     }
-    for (const unreadable of ["{ not json", JSON.stringify({ groups: [] })]) {
+    // An empty sets array names nothing to compare; "0 set(s) ... OK"
+    // would be a pass over no input.
+    for (
+      const unreadable of [
+        "{ not json",
+        JSON.stringify({ groups: [] }),
+        JSON.stringify({ sets: [] }),
+      ]
+    ) {
       const u = runWith(unreadable);
       assert.equal(u.status, 2, u.stdout + u.stderr);
       assert.match(u.stderr, /cannot answer -- parity\.manifest\.json: /);
