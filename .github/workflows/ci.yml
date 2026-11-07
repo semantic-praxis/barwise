@@ -239,6 +239,14 @@ jobs:
       # every later run; it needs the cutoff commit, which the
       # `fetch-depth: 0` checkout provides (exit 2 without it).
       - run: npm run check:spec-touches
+      # The schema differs from the latest v* tag's while CURRENT_ORM_VERSION
+      # still equals what that tag wrote: the first additive change after a
+      # release skipped its bump (schema-versioning#shared-minor). It reads
+      # `git describe` and `git show <tag>:<path>`, so the `fetch-depth: 0`
+      # checkout above must bring tags; a shallow clone or no reachable v* tag
+      # refuses (exit 2). No `if:`: a docs-only change cannot move it, and a
+      # step that sometimes skips is a gate that sometimes cannot answer.
+      - run: npm run check:schema-bump
       # A spec's plan is reviewed (/code-review, /pr-review) before its
       # implementation is committed, recorded as `Plan-reviewed: <commit>`
       # in its header (plan-scope-check.spec.md, WS6). Wired like

@@ -19,6 +19,7 @@
     "depcruise": "npm --prefix barwise run depcruise --",
     "check:depcruise-gate": "npm --prefix barwise run check:depcruise-gate --",
     "check:source-sites": "npm --prefix barwise run check:source-sites --",
+    "check:schema-bump": "npm --prefix barwise run check:schema-bump --",
     "check:eval-coverage": "npm --prefix barwise run check:eval-coverage --",
     "check:parity": "npm --prefix barwise run check:parity --",
     "check:pins": "npm --prefix barwise run check:pins --",
