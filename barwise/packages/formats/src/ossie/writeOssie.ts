@@ -384,6 +384,11 @@ export function writeOssie(model: OrmModel): OssieWriteResult {
   for (const d of model.definitions) {
     lose(`definition ${d.term}`, "Ossie has no glossary", { kind: "definition", id: d.term });
   }
+  // Layout state, which diff does not compare: only the property test over
+  // generated models (nothing-lost-silently) found it unreported.
+  for (const d of model.diagramLayouts) {
+    lose(`diagram ${d.name}`, "Ossie has no diagram layouts", { kind: "model" });
+  }
   if (model.domainContext) {
     lose("model", `domain context ${model.domainContext} not written`, { kind: "model" });
   }
