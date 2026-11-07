@@ -311,6 +311,17 @@ test("end to end: copilot-requested -- a restored condition passes only once the
         .replace("PAUSED 2026-10-19 by the owner", "Paused by the owner"),
   });
   assert.equal(resumed.status, 0, output(resumed));
+
+  // Code review: the trigger's own filters count. A resumed job whose
+  // pull_request_target only fires on labeled never starts on an opened PR.
+  const labeled = gateIn({}, {
+    ".github/workflows/copilot-review.yml": (text) =>
+      restore(text)
+        .replace("PAUSED 2026-10-19 until", "Paused until")
+        .replace("PAUSED 2026-10-19 by the owner", "Paused by the owner")
+        .replace("types: [opened, reopened, ready_for_review, synchronize]", "types: [labeled]"),
+  });
+  assert.equal(labeled.status, 1, output(labeled));
 });
 
 test("end to end: an if: the evaluator does not know is a refusal, never a pass", () => {

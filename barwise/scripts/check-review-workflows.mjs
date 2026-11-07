@@ -375,7 +375,16 @@ function copilotRequestedFindings({ workflows, issues }) {
   const events = w.doc.on && typeof w.doc.on === "object" ? Object.keys(w.doc.on) : [w.doc.on];
   let admits;
   try {
-    admits = ifAdmitsPullRequest(job.if) && events.includes("pull_request_target");
+    // The trigger's own filters count too (code review): a types: list
+    // without opened and synchronize, or any branches: filter, keeps the
+    // job from starting on an ordinary pull request whatever its if: says.
+    const trigger = w.doc.on && typeof w.doc.on === "object" ? w.doc.on.pull_request_target : null;
+    const types = trigger?.types;
+    const filtered = (Array.isArray(types) && !["opened", "synchronize"].every((t) =>
+      types.includes(t)
+    ))
+      || trigger?.branches !== undefined || trigger?.["branches-ignore"] !== undefined;
+    admits = ifAdmitsPullRequest(job.if) && events.includes("pull_request_target") && !filtered;
   } catch (error) {
     if (error instanceof Unsupported) {
       refuse(
@@ -822,9 +831,13 @@ function main() {
     inputs = readInputs();
     found = findings(inputs);
   } catch (error) {
-    if (!(error instanceof Refusal)) throw error;
+    // An unexpected shape (a null step, say) is input this gate could not
+    // read, so it refuses rather than exiting 1 through an uncaught throw.
+    const why = error instanceof Refusal
+      ? error.message
+      : `could not read the input (${error.message})`;
     process.stderr.write(
-      `review workflows: ${error.message}\n  Refusing rather than printing OK over input it did not read.\n`,
+      `review workflows: ${why}\n  Refusing rather than printing OK over input it did not read.\n`,
     );
     process.exit(2);
   }
