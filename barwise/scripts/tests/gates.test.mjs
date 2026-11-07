@@ -6305,17 +6305,36 @@ test("check-plan-review passes a review recorded before the first implementation
 });
 
 test("check-plan-review fails a Plan-reviewed: line that names only one review", () => {
+  // Each review alone, and a name only embedded in a longer word.
+  for (const names of ["code-review", "pr-review", "code-review, non-pr-review"]) {
+    const r = planRepo();
+    try {
+      r.spec();
+      const reviewed = r.commit("spec");
+      r.spec({ reviewed, names });
+      r.commit("record the review");
+      r.implement(1);
+      r.commit("implement");
+      const out = r.run();
+      assert.equal(out.status, 1, names + ": " + out.stdout + out.stderr);
+      assert.match(out.stderr, /must name both reviews/);
+    } finally {
+      rmSync(r.dir, { recursive: true, force: true });
+    }
+  }
+});
+
+test("check-plan-review reads review names past the first parenthetical", () => {
   const r = planRepo();
   try {
     r.spec();
     const reviewed = r.commit("spec");
-    r.spec({ reviewed, names: "code-review" });
+    r.spec({ reviewed, names: "re-pointed from 1234567) (code-review, pr-review" });
     r.commit("record the review");
     r.implement(1);
     r.commit("implement");
     const out = r.run();
-    assert.equal(out.status, 1, out.stdout + out.stderr);
-    assert.match(out.stderr, /must name both reviews/);
+    assert.equal(out.status, 0, out.stdout + out.stderr);
   } finally {
     rmSync(r.dir, { recursive: true, force: true });
   }
@@ -6355,7 +6374,7 @@ test("check-plan-review fails a Plan-reviewed: line added in the implementation 
     r.commit("implement and record the review");
     const out = r.run();
     assert.equal(out.status, 1, out.stdout + out.stderr);
-    assert.match(out.stderr, /line was added in/);
+    assert.match(out.stderr, /line is not in the spec at the parent of/);
   } finally {
     rmSync(r.dir, { recursive: true, force: true });
   }
@@ -6372,7 +6391,7 @@ test("check-plan-review fails a Plan-reviewed: line added after the implementati
     r.commit("record the review late");
     const out = r.run();
     assert.equal(out.status, 1, out.stdout + out.stderr);
-    assert.match(out.stderr, /line was added in/);
+    assert.match(out.stderr, /line is not in the spec at the parent of/);
   } finally {
     rmSync(r.dir, { recursive: true, force: true });
   }
