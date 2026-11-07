@@ -4,7 +4,7 @@ Status: Planned; plan reviewed 2026-11-07 (one review round, eight findings, all
 
 Created: 2026-11-07
 Last-updated: 2026-11-07
-Plan-reviewed: fd04a3a7 (code-review, pr-review)
+Plan-reviewed: 17b00ffd (code-review, pr-review; re-pointed after rebase from fd04a3a7)
 Tracking: barwise-ym8.gc9 (adr-refactor batch 10), barwise-ym8.2ds,
 barwise-ym8.vl9, barwise-ym8.2vy, barwise-ym8.oof, barwise-ym8.n0m,
 barwise-ym8.yg7, barwise-ym8.ogi, barwise-ym8.8hq, barwise-ym8.l7d,
