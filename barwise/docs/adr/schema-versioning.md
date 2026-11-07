@@ -167,9 +167,31 @@ which a check can hold (`docs/specs/adr-batch9-enforcers.spec.md`).
   `format30.test.ts`, the command in `cli/tests/commands/migrate.test.ts`,
   and `merge.test.ts` asserting `barwise merge` succeeds on two 1.0
   inputs, prints the merge at the current version, and leaves both inputs
-  untouched, all under `test:coverage`. No general check covers other
-  commands; the capability matrix's `migrate` and `merge` rows record by
-  hand which surfaces write files.
+  untouched, all under `test:coverage`. Two tests cover the rest of the
+  CLI and MCP surfaces (`cli/tests/loadForward.test.ts`,
+  `mcp/tests/loadForward.test.ts`, both named in `tested-in.json`). Each
+  reads its surface's registration (the commander tree `createProgram`
+  builds; the server's `listTools`) and requires a row for every command
+  or tool, so a new one fails until it is declared. A row either runs the
+  command on a copy of a 3.0 file, which must succeed, print something and
+  leave the file's bytes unchanged, or is a skip with its reason: a model
+  API key, a source repository, a foreign format, no model file. The
+  editing commands are an explicit list with a reason each (CLI `migrate`
+  and `rename`; MCP `merge_models` and `rename_element`), and each must
+  still change the file and stamp the current version. Success is checked
+  before bytes, since a command that refused the file leaves it unchanged
+  too; the MCP check also reads an `error` key in a tool's JSON, which
+  `rename_element` uses without `isError`. Three findings shape the
+  rows. Both `rename` and `rename_element` refuse a 3.0 file and name
+  `barwise migrate` rather than loading it forward, so their edit is
+  tested on a file already at the current version and the refusal is
+  pinned separately. MCP `split_model` writes a new project to `outDir`
+  and never its source, so it is held read-only on the source. `gym
+  check` is skipped because its verdict is its exit code and the only
+  passing answer is a 4.0 file. Still open for decision 4 (barwise-ym8.yfi):
+  VS Code's open and save path, which has no headless harness here, and
+  the language-model tools, which reach the MCP code but are not run by
+  these tests.
 - Migration loses what the serializer or a lenient load does not carry:
   `barwise migrate` drops YAML comments because it writes from the model
   (barwise-ok6), and a 2.0 merge fragment's `is_preferred` flags are

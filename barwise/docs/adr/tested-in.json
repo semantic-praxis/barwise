@@ -15,5 +15,13 @@
       "barwise/packages/vscode/tests/unit/projectScaffold.test.ts"
     ],
     "why": "The serializer and each writer that builds a document outside it state the version separately; one passing test proves only its own writer."
+  },
+  {
+    "decision": "schema-versioning#load-forward",
+    "files": [
+      "barwise/packages/cli/tests/loadForward.test.ts",
+      "barwise/packages/mcp/tests/loadForward.test.ts"
+    ],
+    "why": "Each surface's tests walk that surface's own command or tool list; one passing test proves only its own surface leaves a 3.0 file alone."
   }
 ]
