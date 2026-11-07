@@ -7,8 +7,7 @@ docs/specs/ossie-ontology-format.spec.md,
 docs/specs/iri-identity.spec.md
 Enforced-by: tests (ontology-layer-only, pinned-version, nothing-lost-silently, readable-iri),
 npm run depcruise (peer-standard, own-vocabulary),
-npm run check:source-sites (peer-standard, own-vocabulary),
-none (barwise-ym8.zkd: nothing-lost-silently)
+npm run check:source-sites (peer-standard, own-vocabulary)
 
 ## Context
 
@@ -155,9 +154,17 @@ renames its terms to match the other (row 13 moved that clause here).
   barwise-5bv). The read-back tests in `OssieVerify.test.ts` that expect
   a line only the read-back writes, or its refusal line, are tagged, so an
   exporter that stops reading back fails them. A property test over
-  generated models, which would reach constructs the example and the unit
-  cases lack, is open (barwise-ym8.zkd; `adr-batch9-enforcers.spec.md`
-  WS8).
+  generated models reaches constructs the example and the unit cases lack
+  (`formats/tests/OssieNothingLost.property.test.ts`, tagged). It exports
+  each model from core's arbitrary, reads the document back, and requires
+  a loss line naming every element whose serialized YAML differs from the
+  source's, so a field `diffModels` does not compare is not a blind spot.
+  Its first run found diagram layouts dropped with no line, now reported.
+  It names an element, not a field: a line about a fact type covers every
+  difference on that fact type, and the alignment of the read-back to the
+  source ids is `verifyOssie`'s own. A self-check fails the test unless
+  a generated model has a deontic mandatory on a first role, the shape
+  only the read-back names.
 - The model's name is the one exception decision 4 does not report: a
   caller-supplied name replaces the document's `name` without a warning,
   and the CLI always supplies one (`--name`, defaulting to the file name),

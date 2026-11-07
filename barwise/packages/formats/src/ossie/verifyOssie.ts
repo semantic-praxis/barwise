@@ -86,9 +86,11 @@ export function verifyOssie(
  * that `diffModels` pairs them by id and anything it reports is a real
  * difference. Elements with no source id (constraints, subtype facts) keep
  * their minted ids; the diff pairs those by content, as it pairs an LLM
- * draft against its base.
+ * draft against its base. Exported so the property test over generated
+ * models (`OssieNothingLost.property.test.ts`) aligns the way the verifier
+ * does and compares what it finds by a different oracle.
  */
-function align(source: OrmModel, back: OrmModel, written: OssieCorrespondence): OrmModel {
+export function align(source: OrmModel, back: OrmModel, written: OssieCorrespondence): OrmModel {
   const ids = new Map<string, string>();
   const byConcept = new Map<string, string>();
   for (const [id, name] of written.conceptNames) byConcept.set(name, id);
