@@ -15,6 +15,7 @@
     "check-eval-coverage.test.mjs": 15,
     "check-findings.test.mjs": 9,
     "check-pins.test.mjs": 14,
+    "check-schema-bump.test.mjs": 11,
     "check-source-sites.test.mjs": 17,
     "ci-conditions.test.mjs": 21,
     "credential-handling.test.mjs": 7,

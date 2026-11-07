@@ -173,6 +173,12 @@
     "new": "const tracked = trackedFiles();\nreadFileSync(\"turbo.json\");"
   },
   {
+    "decision": "schema-versioning#shared-minor",
+    "file": "barwise/packages/core/src/serialization/schemaVersion.ts",
+    "old": "export const CURRENT_ORM_VERSION = \"4.0\";",
+    "new": "export const CURRENT_ORM_VERSION = \"1.1\";"
+  },
+  {
     "decision": "schema-versioning#version-signal",
     "file": "barwise/packages/cli/src/commands/verbalize.ts",
     "old": "import type { OrmModel } from \"@barwise/core\";",
