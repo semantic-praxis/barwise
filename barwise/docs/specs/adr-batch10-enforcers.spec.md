@@ -1,6 +1,6 @@
 # Batch 10: process gates -- merge, plan and review decisions enforced
 
-Status: Draft -- no workstream implemented
+Status: Draft revised after plan review 2026-11-07
 
 Created: 2026-11-07
 Last-updated: 2026-11-07
@@ -176,15 +176,16 @@ job. The corrected enforcer is in the decision's entry below.
    this limit (an agent's merge cannot be told from the owner's). On this
    history the limit has not bitten: 65 of 65 merges since #937 carry
    them. A gate that fails on a trailerless merge would fail on the likely
-   violation; whether to accept the cost to the owner's manual merges is an
-   owner call (Open decision 1).
+   violation; the owner chose to accept the cost to the owner's manual merges
+   (Open decision 1, resolved).
 2. **"Opens a tracker issue for the owner."** The gate writes nothing, and
    the tracker is `.beads/issues.jsonl` in the repository, which only a
    commit can change. A gate cannot open one. The mechanism is a printed
    `beads-crud create` command and a baseline row (below), not a write.
 3. **Row 9's "a non-driving reviewer never approves or merges".** Nothing
    distinguishes the reviewer; every action shows the owner's login. The
-   second sentence is not checkable and stays prose (Open decision 7).
+   second sentence is not checkable; the owner moved it to Consequences (Open
+   decision 7, resolved).
 4. **Row 20's "two verdicts other than `merge`".** No non-`merge` verdict
    has ever been posted as a comment (0 of 56), because `pr-review` section
    6 and `steward` 4b ask only for the verdict before the merge. A gate
@@ -248,14 +249,16 @@ has no trailers), `HEAD` on a push, `origin/main` locally. For each commit
 - `Owner-directed:` is non-empty text. With it, the review trailers are
   optional (as #983 shows, both may appear) and, if present, must still
   satisfy the line above.
-- A merge with none of the three is a finding (Open decision 1).
+- A merge with none of the three is a finding (Open decision 1, resolved
+  by the owner: a trailerless merge is a finding, and the owner's own
+  manual merges are accepted by baseline rows).
 
 **The API half** runs only when `GITHUB_EVENT_NAME` is `push` and reads
 GitHub; elsewhere it prints that it did not run, so a local pass is
 understood to be the git half. For each of the last 30 first-parent merges
 (a window, not `before..after`; see the cancellation fact above) it finds
 the pull request by `commits/{sha}/pulls`, reads the issue comments, and
-requires:
+requires, for a merge without an `Owner-directed:` trailer:
 
 - The latest verdict comment naming the merged head (a 7 to 40 hex prefix
   of `M^2`) and posted at or before `M`'s committer date has verdict
@@ -265,12 +268,28 @@ requires:
   corpus above match; the 2026-11-05 spellings do not, and sit before the
   cutoff.
 - Row 20: the verdict comments after the last `Owner-answer:` comment,
-  at or before `M`; two or more with verdict other than `merge`, and no
-  `Owner-directed:` trailer, is a finding.
-- It records, in the job summary, each comment it read: id, `created_at`,
-  `updated_at`, and a hash of the body. An `updated_at` after the merge is
-  reported, not a finding: a comment edited after the merge is evasion,
-  which the ADR's stated limit puts out of the gate's reach.
+  at or before `M`; two or more with verdict other than `merge` is a
+  finding.
+
+A merge carrying `Owner-directed:` is exempt from both comment rules,
+exactly as the git half exempts it from the review trailers (decision 5:
+the trailer stands "in place of" the review trailers, and the owner's
+instruction needs no verdict). It still gets the git half's form check
+(non-empty text). Without this the API half would flag the merges the
+git half accepts.
+
+It records, in the job summary, each comment it read: id, `created_at`,
+`updated_at`, and a hash of the body. **Edits.** Measured 2026-11-07 over
+the 56 verdict comments of #945 to #1000: 54 have `updated_at` equal to
+`created_at`; #966's was edited 3 seconds before the merge and #969's 27
+seconds after it (`gh api repos/semantic-praxis/barwise/issues/N/comments`).
+The API keeps no edit history, so the gate cannot read what a comment said
+at the merge. A comment edited after the merge is therefore _reported_ in
+the job summary and is neither a finding (it could be a typo fix, and the
+gate cannot tell) nor a refusal (that would blind the gate on #969 for
+good); a rewrite that fakes a verdict is the evasion the ADR's stated
+limit puts out of reach. The gate judges the body it reads, and the
+summary lets a reader see which verdicts rest on an edited comment.
 
 **How it gets data in CI.** The step sets `GITHUB_TOKEN:
 ${{ secrets.GITHUB_TOKEN }}` and the script calls the REST API with
@@ -310,6 +329,16 @@ reader already enforces that for the five baselines). Without it, one bad
 merge reds every later pull request, as the git half reads all history
 since the cutoff.
 
+**Under `fault-matrix` and `ci:local`.** The matrix's CI step runs on pull
+requests only, with `BASE_SHA` in its `env` (`ci.yml:627-630`), and the
+gates inherit that environment (`fault-matrix.mjs`, `run()`). For
+`check:merge-record` that is enough: `GITHUB_EVENT_NAME` is
+`pull_request` there, so only the git half runs, from `BASE_SHA`, and the
+matrix's git-fault and cwd axes judge it. The API half is never exercised
+by the matrix, and nothing in the matrix needs `GITHUB_TOKEN`; no
+`MATRIX_EXCEPTIONS` entry and no matrix `env` change. `ci:local` sets
+neither variable, so it runs the git half from `origin/main`.
+
 **The cutoff.** A constant `MERGE_RECORD_SINCE` in `lib/merge-record.mjs`,
 the merge commit of PR #956 (`21075c41`, the restatement of rows 7, 8, 9
 and 20 into the ADR). Between #937 and #956 the trailers existed but the
@@ -320,8 +349,15 @@ followed the practice of the day.
 `.claude/settings.json`) is the preventive half, beside `python-uv-guard`.
 It matches the GitHub merge tool, `enable_pr_auto_merge`, `gh pr merge` and
 `gh api ... pulls/N/merge`. For a merge it requires `expectedHeadSha` or
-`--match-head-commit` (decision 2); refuses auto-merge outright, since it
-merges whatever head arrives later and cannot carry a pin; and reads the
+`--match-head-commit` (decision 2); requires the merge method to be
+`merge`, because a squash or rebase produces a commit with no second
+parent and no trailers, which the pin and the git half cannot then
+check (the tool's `merge_method` must be present and equal `merge`,
+since an omitted value leaves the method to a default this spec has not
+verified; `gh pr merge` must carry `--merge` or `-m` and neither
+`--squash`/`-s` nor `--rebase`/`-r`; `gh api` must set `merge_method=merge`);
+refuses auto-merge outright (`enable_pr_auto_merge`, `gh pr merge --auto`),
+since it merges whatever head arrives later and cannot carry a pin; and reads the
 pull request's comments with the session's own credentials, requiring a
 verdict comment naming the pinned SHA with verdict `merge` unless the merge
 message carries `Owner-directed:`. Hook exit codes follow Claude Code's
@@ -338,8 +374,10 @@ verdict comment) and the hook. Wording: unchanged. Plants: a merge commit
 whose `Reviewed-head` names its first parent -> git half exits 1; a merge
 with the right trailers and no verdict comment (stub API returns none) ->
 API half exits 1; a verdict comment dated after the merge -> exit 1; the
-stub returning 403 -> exit 2 and no finding; a hook call to the merge tool
-with no verdict comment -> exit 2. All are `tempRepo()` histories and a
+stub returning 403 -> exit 2 and no finding; a merge with `Owner-directed:`
+and no verdict comment (stub returns none) -> API half exits 0, the same
+merge without the trailer -> exit 1; a hook call to the merge tool with no
+verdict comment -> exit 2. All are `tempRepo()` histories and a
 stubbed `fetch`, not working-tree probes, so the `probes.json` row is
 `unprobed` with that reason, as `check:plan-review`'s is. Header gains
 `npm run check:merge-record (review-before-merge, no-size-exemption,
@@ -352,8 +390,10 @@ into Consequences.
 `barwise-ym8.vl9` and the gap issue describes a post-merge comment the
 current text no longer asks for (the issue is corrected when it is closed).
 Enforcer: the hook, tagged `tests (pinned-merge)`: a test per refusal
-(merge call without `expectedHeadSha`; `gh pr merge` without
-`--match-head-commit`; auto-merge; `gh api` merge; an allowed pinned call),
+(merge call without `expectedHeadSha`; with `merge_method` `squash`,
+`rebase` or absent; `gh pr merge` without `--match-head-commit`, with
+`--squash`, `--rebase` or `--auto`; auto-merge; `gh api` merge; an allowed
+pinned `merge` call),
 plus a test that `.claude/settings.json` registers the hook with a matcher
 covering the MCP merge tool and `Bash`. The registration test is the one
 that goes red if the hook is unwired; `tested-in.json` gets a row naming
@@ -395,9 +435,9 @@ the instruction) is the owner's non-CI lane and is not built here (Non-
 goals). Plant: `Owner-directed:` with empty text and no review trailers ->
 exit 1. The second sentence ("a reviewer who is not the driving agent
 recommends, and never approves or merges") cannot fail any check while
-every action shows the owner's login. Open decision 7 asks whether to move
-it to Consequences, where the ADR already says so. Gap `n0m` narrows, or
-closes if the owner accepts Open decision 7.
+every action shows the owner's login. **Resolved (owner; Open decision 7):**
+it moves to Consequences, where the ADR already says it is not checkable,
+and decision 5 keeps the `Owner-directed:` sentence. Gap `n0m` closes.
 
 ### plan-before-code
 
@@ -423,15 +463,51 @@ properties follow. A body edited after the run is not seen until the next
 run: the default `pull_request` types are `opened`, `synchronize` and
 `reopened`, so WS3 adds `edited` to ci.yml's `types` (Open decision 9),
 and a manual re-run of a job reuses the original payload, so a re-run
-alone does not help. Locally, `ci:local` runs the step with `BASE_SHA` and
-no `PR_BODY`: the script then reads commit messages only, and when they
-name nothing it exits 2 ("the pull request body is not visible here"),
-never 0, because the body may still carry the declaration.
+alone does not help.
 
-Plants: package source changed, body and commits silent -> exit 1; a
-`No spec:` line with no text -> exit 1; a body naming `nothing.spec.md`
-that is in no corpus -> exit 1; the body in `PR_BODY` -> exit 0; `PR_BODY`
-unset and commits silent -> exit 2. Working-tree probes cannot reach it
+**Locally, and under `fault-matrix`.** `ci:local` sets neither `BASE_SHA`
+nor `PR_BODY` (it does not mention `BASE_SHA` at all; `check:plan-review`
+falls back to `origin/main`, and `check-spec-first` does the same). The
+step's `github.event_name == 'pull_request'` guard reads as true locally
+(`shouldRun`, `ci-gates.mjs:122-143`), so the gate runs in every pre-push.
+`.husky/pre-push` turns a `ci:local` status of 2 into exit 1 and blocks
+the push ("`git push --no-verify`" is the only way past), so a refusal for
+a missing body would block every push that changes package source and
+names no spec in a commit message, before any pull request exists to
+carry a body. The script therefore reads the environment it is in:
+
+- `GITHUB_ACTIONS` unset (a local run): after the git reads, when package
+  source changed and the commit messages name nothing, it prints
+  `check:spec-first: NOT CHECKED -- no pull request body in a local run;
+  CI reads it` and exits 0. It never prints `OK`.
+- `GITHUB_ACTIONS` set (CI) and `PR_BODY` unset: exit 2. In CI the body
+  always exists (empty when null), so an unset variable is a wiring fault.
+- Any git failure, a shallow clone, or an unresolvable base: exit 2 in
+  both, and these are read before the body, so a local run still refuses
+  where it cannot see the diff.
+
+This is a declared scope, printed in its own words, not a pass over input
+it could not see: the refusal contract forbids printing PASS for input the
+gate could not read, and this prints that it did not read it. The
+alternative that preserves the contract literally (exit 2 locally) blocks
+pushes, which is the worse failure for a check the author can satisfy only
+after the pull request exists. Under `fault-matrix` the CI step passes only
+`BASE_SHA` (`ci.yml:627-630`), so the gate would exit 2 on its unfaulted
+baseline reading ("CI, no `PR_BODY`") and the matrix would refuse. The
+choice is to add `PR_BODY: ${{ github.event.pull_request.body }}` to that
+step's `env` rather than list `check:spec-first` in `MATRIX_EXCEPTIONS`
+(`lib/ci-gates.mjs:32`): the exceptions are for steps that are not gates or
+that call a registry, the matrix's git-fault and cwd axes are exactly what
+this gate's diff and shallow-clone reads need, and the body travels through
+`env`, never the shell. The cost is one line in `ci.yml` and a body that is
+untrusted data in a process environment, as in `check:spec-first` itself.
+
+Plants: package source changed, body and commits silent, `GITHUB_ACTIONS`
+set -> exit 1; a `No spec:` line with no text -> exit 1; a body naming
+`nothing.spec.md` that is in no corpus -> exit 1; the body in `PR_BODY` ->
+exit 0; `PR_BODY` unset with `GITHUB_ACTIONS` set -> exit 2; `GITHUB_ACTIONS`
+unset and commits silent -> exit 0 with `NOT CHECKED` and no `OK`; a
+shallow clone in either mode -> exit 2. Working-tree probes cannot reach it
 (committed state plus an environment variable), so `probes.json` takes an
 `unprobed` row. Wording: unchanged. Gap `yg7` closes. Shadow stated:
 `No spec: n/a` passes. The owner chose presence and form over a stricter
@@ -451,8 +527,19 @@ Three of the gap's holes are checkable and one is not:
   the same commit as the reviewed one. Plant: a branch that adds the line
   in the implementation commit, naming an earlier commit -> exit 1.
 - _Review names are not checked_ (`wzl` 2). The parenthetical must be
-  exactly `(code-review, pr-review)`. This is a form check; it does not
-  show the reviews ran, which the ADR already says no gate can.
+  name both reviews, `code-review` and `pr-review`, as words, with
+  anything else allowed after them. An exact `(code-review, pr-review)`
+  match was the first draft and is wrong: seven specs carry a re-point or
+  review annotation after the names (`architecture-index`,
+  `capability-matrix-check`, `executable-adrs`, `python-uv-widened`,
+  `surface-mirroring` and `touches-required` write `(code-review,
+  pr-review; re-pointed ...)`; `iri-identity` writes `(pr-review x5,
+  code-review x3; re-pointed ...)`, so "starts with `code-review,
+  pr-review`" would also reject it). Checking for both words, in any
+  order, accepts all seven. This is a form check; it does not show the
+  reviews ran, which the ADR already says no gate can. Plants: `(code-review)`
+  alone -> exit 1; `(code-review, pr-review; re-pointed after WS2)` ->
+  exit 0; `(pr-review x2, code-review x1; note)` -> exit 0.
 - _A spec that lists one path can implement others unreviewed_ (`x3l`).
   The remedy the plan proposed is the withdrawn #714 design. Not built.
   `x3l`'s other half, that a Status claiming some work built takes the spec
@@ -464,7 +551,10 @@ Three of the gap's holes are checkable and one is not:
   spec that folds implementation notes in, which `spec-writer` step 8
   tells authors to do. The ADR's last sentence ("a plan edited afterwards
   needs the review again") disagrees with that practice and with the
-  gate's own reading ("the plan as implementation began"). Open decision 5.
+  gate's own reading ("the plan as implementation began"). **Resolved
+  (owner; Open decision 5):** decision 2's last sentence is restated to "a
+  plan edited before implementation begins needs the review again"; this
+  item closes with the wording and the gate is unchanged.
 
 The two checkable items go into `check:plan-review` (`wzl` 1 and 2 close);
 its `unprobed` row stays. The stacked-pull-request half of `barwise-z4h`
@@ -472,7 +562,7 @@ is moot (CI does not run on a pull request into another branch at all,
 `ci.yml:6-7`); the squash half is now a history fact (no squash since
 #868). A direct push to `main` is the remaining hole; `check:merge-record`'s
 single-parent finding covers it. Gap `ogi` narrows and stays open for
-`x3l`.
+`x3l`; `wzl` closes.
 
 **`touches-named`** (decision 3). Now: `check:spec-touches` holds the new-
 spec form (probe in `probes.json`). The gap is completeness: that the list
@@ -482,27 +572,39 @@ the most careful recent spec's last workstream. A pull request legitimately
 edits baselines, lockfiles, barrels and generated docs the plan did not
 list; the check would measure sloppiness of listing, not a defect, and
 `plan-scope-check.spec.md` refused it for the same reason. No gate is built.
-`plan-scope` stays the report. Two honest outcomes for the owner (Open
-decision 3): leave the decision as is and keep `8hq` open as the permanent
-record that completeness is review's; or restate decision 3 to what
-`check:spec-touches` holds ("a new spec's `Touches:` names at least one
-tracked path outside the specs directory") and close `8hq`. Recommended:
-restate.
+`plan-scope` stays the report. **Resolved (owner, 2026-11-07; Open
+decision 3):** restate decision 3 to what `check:spec-touches` holds ("a new
+spec's `Touches:` names at least one tracked path outside the specs
+directory"); `8hq` closes. This is the owner's recorded restatement, so the
+ADR edit is part of WS4, with the completeness half moved to Consequences as
+review's, held by the `plan-scope` report. The existing probe row for
+`touches-named` (`probes.json`) stays and already fails the restated text
+on its plant.
 
 **`open-decisions-reviewer`** (row 15, owner-restated). Now: nothing.
 Enforcer: `check:spec-form` (`scripts/check-spec-form.mjs`) over _new_
 specs only, by the same "file name absent at a fixed cutoff commit" rule
 `TOUCHES_REQUIRED_SINCE` uses (a second constant,
-`OPEN_DECISIONS_REQUIRED_SINCE`, in `lib/spec-reader.mjs`). It requires an
+`OPEN_DECISIONS_REQUIRED_SINCE`, in `lib/spec-reader.mjs`, with the value
+`d522e899b585ae19bc7159f74fa1d7b47f6f8226`, the tip of `main` at this
+draft, #1000's merge; verify with `git rev-parse d522e899`). It requires an
 `## Open decisions` heading and, for each top-level entry (a `- ` or `N. `
 item), one of "recommend", "resolved", "taken as", "decided" or "default"
 in the entry. A section that says only "None." is accepted, since the
 template's instruction to drop sections that do not apply otherwise
 contradicts the decision. Existing specs are exempt: 75 lack the heading
-today and the sweep that would fix them is `barwise-1007`'s. Plants (a
-post-cutoff spec; `probes.json` row against
-`adr-batch9-enforcers.spec.md`): rename its heading -> exit 1; delete the
-cue words from one entry -> exit 1. Wording: unchanged. The gate holds the
+today and the sweep that would fix them is `barwise-1007`'s. Which specs that
+covers: a spec is new when its file name is absent from the tree at that
+commit. `adr-batch9-enforcers.spec.md` is present at `d522e899`, so it is
+exempt and a probe planted in it would read as a proxy that cannot fail (the
+first draft planted there). This spec, `adr-batch10-enforcers.spec.md`, is
+absent at `d522e899` (it arrives on the batch 10 branch), so it is covered,
+and so is every spec added after the cutoff, including those added between
+this draft and the workstream (the cutoff is fixed, not the merge base).
+The `probes.json` row plants in `adr-batch10-enforcers.spec.md`: rename its
+`## Open decisions (for review)` heading -> exit 1; delete the cue words from
+one entry -> exit 1. A test also checks the cutoff commit resolves and that a
+spec file present at it is exempt (a fixture spec with no section passes). Wording: unchanged. The gate holds the
 section and the default; "options" and "trade-off" are not machine-
 readable, and a decision made silently in the body is review's. Gap `l7d`
 narrows to that residue and stays open.
@@ -577,18 +679,51 @@ Wording: unchanged. Gap `8ya` narrows to the settings half and stays open.
 
 **`tier-informs`** (decision 4). Now: tagged tests that `pr-risk` exits 0
 on either tier and prints the routing. Enforcer, a fourth rule: a
-declared reader list, each with its reason, of every file that imports
-`lib/review-tiers.mjs`, reads `review-tiers.json`, or runs `pr-risk.mjs`:
-`pr-risk.mjs` (computes), `check-review-tiers.mjs` (validates the table),
-`spec-reader.mjs`, `plan-scope.mjs`, `check-spec-touches.mjs` (path-glob
-helpers only), and `copilot-review.yml` (reads `.trivial`, prints
-`.tier`). A reader not on the list is a finding; a listed reader of a
-tier-bearing export (`classify`, `tierRows`) other than `pr-risk` and
-`check-review-tiers` is a finding. It holds "nothing else keys on the
-tier". It does not hold "author and reviewer run every group", which
+declared reader list, each with its reason. A **reader** is matched by code,
+not by text, in three places:
+
+- A `.mjs` or `.cjs` file under `barwise/scripts/` outside `tests/`,
+  parsed with the TypeScript scanner (as `check:source-sites` parses
+  source): an import, export-from, `require` or dynamic import whose
+  specifier ends in `review-tiers.mjs`; or a string literal that ends in
+  `review-tiers.json` or contains `pr-risk.mjs`. Comments are tokens the
+  scanner skips, so a comment naming `pr-risk` is not a reader.
+- A workflow, parsed with `yaml` (comments dropped): a step's `run:` or
+  `with:` value containing `pr-risk.mjs`, `pr:risk` or `review-tiers`.
+- `barwise/package.json` and the root `package.json` `scripts` values
+  with the same tokens. `probes.json`, `tested-in.json`, Markdown and
+  `review-tiers.json` itself are data and prose, not scanned.
+
+An npm script name in a `run:` (`npm run check:review-tiers`) is resolved
+to its `scripts` value, so it counts as the reader it runs, not as a
+new one. Run over main at `d522e899` (a scratch script, 2026-11-07), the
+matcher finds exactly these readers, which are the declared list, so the
+rule is green on main:
+
+| Reader                                                 | How it reads                                         | Allowed because                              |
+| ------------------------------------------------------ | ---------------------------------------------------- | -------------------------------------------- |
+| `scripts/lib/review-tiers.mjs`                         | the table, as `../review-tiers.json`                 | it is the module                             |
+| `scripts/pr-risk.mjs`                                  | imports it                                           | computes and prints the tier                 |
+| `scripts/check-review-tiers.mjs`                       | imports it                                           | validates the table against headings         |
+| `scripts/lib/spec-reader.mjs`                          | imports `matchesPattern`                             | path-glob helper only                        |
+| `scripts/plan-scope.mjs`                               | imports `matchesPattern`                             | path-glob helper only                        |
+| `scripts/check-spec-touches.mjs`                       | imports `matchesPattern`, `patternFault`             | path-glob helpers only                       |
+| `.github/workflows/copilot-review.yml`                 | runs `pr-risk.mjs --json`; reads `.trivial`, `.tier` | `.trivial` is decision 1; `.tier` is printed |
+| `.github/workflows/ci.yml`                             | `npm run check:review-tiers`                         | the table validator above                    |
+| `barwise/package.json` `check:review-tiers`, `pr:risk` | scripts that name the two files                      | the two listed scripts                       |
+| root `package.json` `check:review-tiers`               | forwarder                                            | generated forwarder                          |
+
+Two further conditions. A reader outside the list is a finding. A listed
+reader other than `pr-risk`, `check-review-tiers` and the module itself
+that imports a binding other than `matchesPattern` or `patternFault` is a
+finding (`classify`, `tierRows`, `isTrivial` are tier-bearing); the
+`copilot-review.yml` row also requires that `.tier` appears only as an
+argument to `echo` or `printf` and never in a test or `if`. It holds
+"nothing else keys on the tier". It does not hold "author and reviewer run every group", which
 nothing records (`barwise-953`). Plants (`probes.json`): add `import {
 classify } from "./lib/review-tiers.mjs"` to `check-pins.mjs` -> exit 1;
-add a `jq -e '.tier == "routine"'` to a ci.yml step -> exit 1. Wording:
+add a ci.yml step running `node barwise/scripts/pr-risk.mjs --json | jq -e
+'.tier == "routine"'` -> exit 1 (it is a reader outside the list). Wording:
 unchanged. Gap `ehz` closes; `953` and `6mf` stay.
 
 ## Alternatives considered
@@ -603,8 +738,7 @@ unchanged. Gap `ehz` closes; `953` and `6mf` stay.
   on whether a push-only step "runs on every code change". A step with no
   guard that reads `GITHUB_EVENT_NAME` inside the script keeps the judge
   and `ci:local` unchanged, at the cost that the guard is in the script.
-  Recommended; Open decision 8 asks whether the owner prefers the explicit
-  guard.
+  Chosen (owner; Open decision 8).
 - **A separate `merge-record.yml` workflow with `cancel-in-progress:
   false`.** It would not lose a range to cancellation, but the judge reads
   only `ci.yml`, so the declaration would need a second reader. A
@@ -661,20 +795,24 @@ Narrows `l7d`.
 ### 3. `check:spec-first` (plan-before-code, decision 1)
 
 The script, `BASE_SHA`/`PR_BODY` wiring, `edited` added to the
-`pull_request` types, the `ci:local` handling of a missing body (exit 2),
-and tests in `tempRepo()`. Closes `yg7`.
+`pull_request` types, `PR_BODY` added to the `fault-matrix` step's `env`,
+the local `NOT CHECKED` exit 0 (`GITHUB_ACTIONS` unset) against the CI exit 2
+(set, no body), and tests in `tempRepo()` for each mode. Closes `yg7`.
 
 ### 4. `check:plan-review` hardening and `touches-named` (plan-before-code, decisions 2 and 3)
 
-The line-introduction rule and the review-names form, in the existing
-gate. `touches-named` per Open decision 3; no gate. Closes `wzl`; narrows
-`ogi`.
+The line-introduction rule and the review-names form (both words,
+annotations allowed), in the existing gate. Decision 2's last sentence
+restated to "before implementation begins" (Open decision 5, resolved).
+Decision 3 restated to what `check:spec-touches` holds (Open decision 3,
+resolved); no new gate. Closes `8hq` and `wzl`; narrows `ogi`.
 
 ### 5. The merge hook (merge-delegation, decision 2)
 
 `merge-guard.mjs`, its registration, the refusal tests and the
 registration test, `tested-in.json`. Before WS6 so the preventive half is
-live when the detective half starts judging. Closes `vl9`. Provisional:
+live when the detective half starts judging. Closes `vl9`. The hook also refuses a `merge_method` other than `merge`.
+Provisional:
 whether `PreToolUse` fires for MCP tools in this harness, and the exact
 tool name in a remote session, are ungrounded (unverified list).
 
@@ -683,9 +821,11 @@ tool name in a remote session, are ungrounded (unverified list).
 The git half first, with the baseline and its `findings.mjs` adapter; then
 the API half behind `GITHUB_EVENT_NAME == push`. The `steward` 4b and
 `pr-review` section 6 edits (post every verdict; the finding-filing
-command). Closes `2ds`, `2vy`, `zdd`; narrows `oof`, `n0m`. Unlike the
+command). Closes `2ds`, `2vy`, `zdd`; narrows `oof`. Unlike the
 others, this gate's API half is exercised in CI only by a push to `main`,
-so its first live run is the merge of its own pull request: land the git
+so its first live run is the merge of its own pull request. Decision 5's
+second sentence moves to Consequences (Open decision 7, resolved), which
+closes `n0m` with the `Owner-directed:` form rule. Land the git
 half and the stub-API tests first, then wire the API half, and read the
 first push run's job summary before declaring it done.
 
@@ -712,55 +852,40 @@ first push run's job summary before declaring it done.
 
 ## Open decisions (for review)
 
-1. **Is a trailerless merge a finding?** Options: (a) finding, with the
-   baseline for the owner's manual UI merges; (b) check only merges that
-   carry trailers, as the plan words it. (a) can fail on the likely
-   violation (a merge without the review) and costs a baseline row per
-   manual owner merge, which the owner did not previously need to make.
-   (b) cannot fail on it. The ADR's limit says the two are
-   indistinguishable, and the record shows 65 of 65 since #937 trailered.
-   Recommended: (a), with `accepted-by-owner` rows, because a gate that
-   cannot fail on its likely violation is the failure this refactor exists
-   to remove.
-2. **Where the cutoff sits.** #956 (`21075c41`, the restatement) or #937
-   (the first trailered merge). #937 flags four merges whose comments use
-   an earlier spelling. Recommended: #956.
-3. **`touches-named`.** (a) Leave the decision, keep `8hq` open as the
-   record that completeness is review's. (b) Restate decision 3 to what
-   `check:spec-touches` holds and close `8hq`. (c) Reopen the
-   "plan-scope never fails" decision and gate on a baseline. The
-   measurement is 59 of 101. Recommended: (b); (c) is not recommended.
-4. **Is a declared pause green for `copilot-requested`?** The gate accepts
-   a dispatch-only job when the file carries a `PAUSED <date>` note naming
-   an open issue. Without the allowance the gate is red on main until
-   `ilb` resumes the job. Recommended: accept; the pause is the owner's
-   recorded call and the gate turns red when it is forgotten.
-5. **Decision 2's last sentence.** "A plan edited afterwards needs the
-   review again" is not what the gate checks or what `spec-writer` step 8
-   tells authors to do. Options: (a) restate to "a plan edited before
-   implementation begins"; (b) keep the text and accept the permanent
-   gap (`wzl` 3); (c) make the gate compare, and change `spec-writer`. A
-   wording change, so the owner's. Recommended: (a).
-6. **Which verdicts are posted.** `pr-review` section 6 and `steward` 4b
-   ask for one comment before the merge. Posting every verdict is what
-   lets decision 4's two-verdict clause be counted. It adds a comment per
-   non-`merge` round (the `barwise-q93` loop produced 28). Recommended:
-   post every verdict, as a skill edit.
-7. **Decision 5's second sentence** ("a reviewer who is not the driving
-   agent recommends, and never approves or merges") to Consequences, where
-   the ADR already says it is not checkable. Closes `n0m`. A wording
-   change. Recommended: yes.
-8. **How the API half is wired.** An unguarded ci.yml step that reads
-   `GITHUB_EVENT_NAME` itself, or an explicit `if: github.event_name ==
-   'push'` with `shouldRun` and the judge extended. Recommended: the
-   unguarded step now; extend the judge when a second push-only gate
-   exists.
-9. **`edited` in ci.yml's `pull_request` types.** A body edit re-runs all of
-   CI (concurrency cancels the in-flight run). Without it, adding a `No
-   spec:` line needs a push. Recommended: add it.
-10. **Which specs `check:spec-form` covers.** New specs only (recommended),
-    or all with a baseline of the 75 + 14 + 11 offenders. The sweep of old
-    specs is `barwise-1007`'s.
+Ten decisions were put to the owner; the owner answered all of them
+(2026-11-06 and 2026-11-07), and each is recorded as resolved, with the
+text it changes.
+
+1. **Is a trailerless merge a finding?** **Resolved (owner): yes, with
+   baseline acceptance rows.** The other option was to check only merges
+   that carry trailers, as the plan words it, which cannot fail on the
+   likely violation. Each manual owner merge costs an `accepted-by-owner`
+   row in `merge-record-baseline.json`.
+2. **Where the cutoff sits.** **Resolved (owner): #956** (`21075c41`).
+   A cutoff at #937 would flag four merges whose comments use an earlier
+   spelling.
+3. **`touches-named`.** **Resolved (owner): restate** decision 3 to what
+   `check:spec-touches` holds; `8hq` closes; no gate (59 of 101 spec-naming
+   merges change a path outside `Touches:`).
+4. **Is a declared pause green for `copilot-requested`?** **Resolved
+   (owner): yes.** The gate accepts a dispatch-only job with a `PAUSED
+   <date>` note naming an open issue, and goes red when the issue closes with
+   the job still paused.
+5. **Decision 2's last sentence.** **Resolved (owner): restate** to a plan
+   edited "before implementation begins". `wzl` 3 closes with the wording;
+   the gate keeps comparing the body as implementation began.
+6. **Which verdicts are posted.** **Resolved (owner): post every verdict**,
+   as a `pr-review` section 6 and `steward` 4b edit.
+7. **Decision 5's second sentence** moves to Consequences. **Resolved
+   (owner): yes;** `n0m` closes.
+8. **How the API half is wired.** **Resolved (owner): an unguarded step**
+   that checks the event inside the script; the judge and `shouldRun` are
+   not extended.
+9. **`edited` in ci.yml's `pull_request` types.** **Resolved (owner):
+   add it.**
+10. **Which specs `check:spec-form` covers.** **Resolved (owner): new
+    specs only,** by the fixed cutoff `d522e899`; the sweep of old specs is
+    `barwise-1007`'s.
 
 ## Risks and testing
 
@@ -789,8 +914,10 @@ first push run's job summary before declaring it done.
 - **New gates under `fault-matrix`.** `check:review-workflows`,
   `check:spec-form`, `check:spec-first` and `check:merge-record` join the
   matrix's git-fault and three-directory axes automatically as ci.yml
-  steps; `check:merge-record`'s git half and `check:spec-first`'s
-  missing-body refusal must each exit 2 under a shallow clone. Unverified
+  steps; `check:merge-record`'s git half and `check:spec-first` must each
+  exit 2 under a shallow clone. The matrix's CI step carries only
+  `BASE_SHA`: `check:spec-first` gets `PR_BODY` added to it and
+  `check:merge-record` needs nothing (see their entries). Unverified
   until `npm run fault-matrix` runs on a branch.
 - **Self-checks.** Each reader has positive and negative self-cases and
   refuses on zero merges read (`MERGE_RECORD_SINCE` must resolve and the
@@ -829,9 +956,15 @@ Each is a claim this draft makes and has not run to ground.
   runs one push-triggered step that prints the status of `curl -s -o
   /dev/null -w '%{http_code}' -H "Authorization: Bearer $GITHUB_TOKEN"
   $GITHUB_API_URL/repos/$GITHUB_REPOSITORY/issues/1000/comments`.
-- Verdict `updated_at` equals `created_at` on all 56 comments:
-  `gh api repos/semantic-praxis/barwise/issues/N/comments --jq '.[] |
-  select(.updated_at != .created_at)'` per pull request.
+- Edits: 2 of the 56 verdict comments have `updated_at` after `created_at`
+  (#966 before the merge, #969 after it); recheck with `gh api
+  repos/semantic-praxis/barwise/issues/N/comments --jq '.[] |
+  select(.updated_at != .created_at)'` per pull request. What the edited
+  bodies said at the merge is not recoverable from the API.
+- That `merge_method` omitted would not default to `merge` in the MCP
+  tool: the spec requires it present, so the default is not relied on.
+- That `.husky/pre-push` status handling is as read here (status 2 becomes
+  exit 1): read from `barwise/.husky/pre-push` in this checkout.
 - `commits/{sha}/pulls` returns exactly one pull request for every merge
   since #956: `gh api repos/semantic-praxis/barwise/commits/<sha>/pulls
   --jq length`. Checked for #1000 only.
