@@ -5,7 +5,8 @@ Date: 2026-10-25
 Tracking: barwise-ubc, docs/specs/plan-scope-check.spec.md,
 docs/specs/touches-required.spec.md
 Enforced-by: npm run check:plan-review (plan-reviewed),
-npm run check:spec-touches (touches-named), none (barwise-ym8.yg7: spec-first),
+npm run check:spec-touches (touches-named),
+npm run check:spec-form (open-decisions-reviewer), none (barwise-ym8.yg7: spec-first),
 none (barwise-ym8.ogi: plan-reviewed), none (barwise-ym8.8hq: touches-named),
 none (barwise-ym8.l7d: open-decisions-reviewer)
 
@@ -67,8 +68,22 @@ rejected alternatives are in the two specs above.
   an author or reviewer runs it (`pr-creation`, `pr-review`): size and
   "outside the plan" are shadows of review cost, and a gate on them
   would be gamed.
-- Decisions 1 and 4 have no gate. They are held by review: the
-  `spec-writer` design gate and `pr-review`.
+- `npm run check:spec-form` (a CI gate on every event, no `if:` guard)
+  fails a spec new since a fixed cutoff commit unless it has an
+  `## Open decisions` heading and each top-level entry says one of
+  "recommend", "resolved", "taken as", "decided" or "default"; a section
+  that says only `None.` is accepted, since the template tells an author
+  to drop sections that do not apply. A spec is new by the same file-name
+  rule as `check:spec-touches`, against its own constant
+  (`OPEN_DECISIONS_REQUIRED_SINCE`). Specs present at the cutoff are
+  exempt (owner, 2026-11-07), not conforming: 75 of 201 lacked the
+  heading, and sweeping them is barwise-1007's. The gate holds the section
+  and the default. The options and the trade-off are not machine-readable,
+  and a decision made silently in a spec's body is held by review (the
+  `spec-writer` design gate and `pr-review`); barwise-ym8.l7d stays open
+  for that residue.
+- Decision 1 has no gate yet; it is held by review until the gap issue in
+  the header lands one.
 - Gaps in what enforces decision 2, each open:
   - a spec whose Status claims some work is built is not checked, so
     its second workstream onward is unreviewed by the gate, and the

@@ -1,6 +1,6 @@
 # Batch 10: process gates -- merge, plan and review decisions enforced
 
-Status: Planned; plan reviewed 2026-11-07 (one review round, eight findings, all addressed; ten owner decisions recorded); WS1 (`check:review-workflows`, review-policy) implemented
+Status: Planned; plan reviewed 2026-11-07 (one review round, eight findings, all addressed; ten owner decisions recorded); WS1 (`check:review-workflows`, review-policy) and WS2 (`check:spec-form`, plan-before-code decision 4) implemented
 
 Created: 2026-11-07
 Last-updated: 2026-11-07
@@ -809,6 +809,21 @@ command substitution.
 
 New-spec rule, one constant in `spec-reader.mjs`, one script, one step.
 Narrows `l7d`.
+
+Implemented as specified, with these forms the spec left open. The
+"file name absent at the cutoff" reading moved out of
+`check-spec-touches.mjs` into `lib/spec-cutoff.mjs`, which both gates
+call, so the two cannot disagree on what is new. `openDecisions` and
+`openDecisionsFindings` in `spec-reader.mjs` read the section outside
+code fences; the heading is `## Open decisions` with any suffix, the
+section ends at the next `## `, and an entry is a column-0 `- ` or `N. `
+item with its continuation lines, so a cue in a nested bullet belongs to
+its entry and a cue on the next one does not. "None." counts only as the
+whole section's prose. The gate refuses (exit 2) on an empty tracked list
+or no corpus spec, besides the cutoff cases; zero new specs is a pass over
+the corpus it read, since a later tree may have none. The two
+`probes.json` rows plant here: the heading renamed, and the cue words
+dropped from the entry for Open decision 8.
 
 ### 3. `check:spec-first` (plan-before-code, decision 1)
 

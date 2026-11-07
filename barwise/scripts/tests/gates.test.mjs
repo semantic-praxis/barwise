@@ -6449,6 +6449,7 @@ function touchesRepo() {
       join("lib", "args.mjs"),
       join("lib", "git-run.mjs"),
       join("lib", "review-tiers.mjs"),
+      join("lib", "spec-cutoff.mjs"),
       join("lib", "spec-reader.mjs"),
       join("lib", "tracked.mjs"),
     ]

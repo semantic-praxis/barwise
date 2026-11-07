@@ -26,6 +26,7 @@
     "check:review-tiers": "npm --prefix barwise run check:review-tiers --",
     "check:review-workflows": "npm --prefix barwise run check:review-workflows --",
     "check:spec-touches": "npm --prefix barwise run check:spec-touches --",
+    "check:spec-form": "npm --prefix barwise run check:spec-form --",
     "check:plan-review": "npm --prefix barwise run check:plan-review --",
     "pr:risk": "npm --prefix barwise run pr:risk --",
     "plan-scope": "npm --prefix barwise run plan-scope --",
