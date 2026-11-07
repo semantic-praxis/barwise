@@ -76,7 +76,7 @@
   },
   {
     "decision": "plan-before-code#plan-reviewed",
-    "unprobed": "check:plan-review reads committed state only (its header: \"Committed state only, read through git\"), so a working-tree edit cannot reach it"
+    "unprobed": "check:plan-review reads committed state only (its header: \"Committed state only, read through git\"), so a working-tree edit cannot reach it; the line-introduction and review-names plants are temporary repositories in scripts/tests/gates.test.mjs"
   },
   {
     "decision": "plan-before-code#touches-named",

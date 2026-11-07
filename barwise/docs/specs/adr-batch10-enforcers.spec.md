@@ -1,6 +1,6 @@
 # Batch 10: process gates -- merge, plan and review decisions enforced
 
-Status: Planned; plan reviewed 2026-11-07 (one review round, eight findings, all addressed; ten owner decisions recorded); WS1 (`check:review-workflows`, review-policy), WS2 (`check:spec-form`, plan-before-code decision 4) and WS3 (`check:spec-first`, plan-before-code decision 1) implemented
+Status: Planned; plan reviewed 2026-11-07 (one review round, eight findings, all addressed; ten owner decisions recorded); WS1 (`check:review-workflows`, review-policy), WS2 (`check:spec-form`, plan-before-code decision 4), WS3 (`check:spec-first`, plan-before-code decision 1) and WS4 (`check:plan-review` hardening; plan-before-code decisions 2 and 3 restated) implemented
 
 Created: 2026-11-07
 Last-updated: 2026-11-07

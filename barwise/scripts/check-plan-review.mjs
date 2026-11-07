@@ -37,6 +37,19 @@
  * amendment one commit later passed (#721, measured). The parent is the
  * reading under which the two agree.
  *
+ * Two further holds (plan-before-code, decision 2; barwise-wzl). The commit
+ * that introduced the line -- the latest one at which the spec's header
+ * went from no `Plan-reviewed:` to having it, walking the spec's own
+ * history -- must be a proper ancestor of every implementing commit: a
+ * line added alongside or after the code can name an earlier commit and
+ * still have been written after the fact. A re-point of a standing line
+ * (after a rebase, say) is not an introduction, so it is judged only by
+ * rule (1) above. And the parenthetical must contain both words
+ * `code-review` and `pr-review`, in any order with anything else around
+ * them: eight specs annotate it (`; re-pointed ...`, `x5`), so an exact
+ * match rejects real ones. This is a form check; it does not show the
+ * reviews ran.
+ *
  * WHAT IT CANNOT PROVE: that the reviews ran well. It ties the claim to a
  * named commit and a body a later reader can compare.
  *
@@ -192,6 +205,14 @@ for (const spec of named) {
     failures.push(`${id}: no Plan-reviewed: line; ${at}.`);
     continue;
   }
+  const names = /\(([^)]*)\)/.exec(line)?.[1] ?? "";
+  if (!/\bcode-review\b/.test(names) || !/\bpr-review\b/.test(names)) {
+    failures.push(
+      `${id}: Plan-reviewed: "${line}" must name both reviews, \`code-review\` and \`pr-review\`, `
+        + `in a parenthetical; ${at}.`,
+    );
+    continue;
+  }
   const sha = /^([0-9a-f]{7,40})\b/.exec(line)?.[1];
   const reviewed = sha && resolveCommit(sha);
   if (!reviewed) {
@@ -210,6 +231,40 @@ for (const spec of named) {
       }, a change to its Touches: (the ${at}). The plan must be reviewed before it is implemented.`,
     );
     continue;
+  }
+  // When the line first appeared (see the header). Walked oldest first
+  // over the spec's own commits; a commit that lacks the file counts as
+  // no line, so a deleted-and-restored spec is introduced afresh.
+  let introduced;
+  let present = false;
+  for (
+    const c of git([
+      "log",
+      "--reverse",
+      "--topo-order",
+      "--no-merges",
+      "--format=%H",
+      head,
+      "--",
+      spec,
+    ]).split("\n").filter(Boolean)
+  ) {
+    const has = holds(c, spec) && header(read(c, spec), "Plan-reviewed") !== undefined;
+    if (has && !present) introduced = c;
+    present = has;
+  }
+  if (introduced !== undefined) {
+    const late = changing.find((c) =>
+      c === introduced || !gitAnswers(["merge-base", "--is-ancestor", introduced, c])
+    );
+    if (late !== undefined) {
+      failures.push(
+        `${id}: the Plan-reviewed: line was added in ${short(introduced)}, which does not precede ${
+          short(late)
+        }, a change to its Touches: (the ${at}); a review recorded after the code began is not before it.`,
+      );
+      continue;
+    }
   }
   if (!holds(reviewed, spec)) {
     failures.push(
