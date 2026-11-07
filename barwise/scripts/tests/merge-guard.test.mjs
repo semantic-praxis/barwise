@@ -270,3 +270,80 @@ test("settings.json registers the hook for the MCP merge tools and Bash [adr:mer
     ),
   );
 });
+
+test("sees a merge whose repo flag precedes the subcommand [adr:merge-delegation#pinned-merge]", () => {
+  comments(verdict(SHA));
+  refused(bash("gh pr -R o/r merge 5 --squash"), /method must be exactly/);
+  refused(bash(`gh pr --repo o/r merge 5 --squash --match-head-commit ${SHA}`), /method must be/);
+  const ok = run(bash(`gh pr -R o/r merge 7 --merge --match-head-commit ${SHA}`));
+  assert.equal(ok.status, 0, ok.stderr);
+  assert.match(readFileSync(CALLS, "utf8"), /repos\/o\/r\/issues\/7\/comments/);
+});
+
+test("sees gh by path, in $( ) and in backticks [adr:merge-delegation#pinned-merge]", () => {
+  comments(verdict(SHA));
+  refused(bash("/usr/bin/gh pr merge 5 -R o/r --squash"), /method must be/);
+  refused(bash("x=$(gh pr merge 5 -R o/r --squash)"), /method must be/);
+  refused(bash("echo `gh pr merge 5 -R o/r --squash`"), /method must be/);
+  refused(bash("echo $(gh pr merge 5 -R o/r --squash)"), /method must be/);
+});
+
+test("refuses a GraphQL merge mutation outright [adr:merge-delegation#pinned-merge]", () => {
+  comments(verdict(SHA));
+  for (const m of ["mergePullRequest", "enablePullRequestAutoMerge"]) {
+    refused(
+      bash(
+        `gh api graphql -f query='mutation { ${m}(input: {pullRequestId: "x"}) { clientMutationId } }'`,
+      ),
+      /GraphQL/,
+    );
+  }
+  assert.equal(run(bash("gh api graphql -f query='{ viewer { login } }'")).status, 0);
+});
+
+test("a heredoc body, a quoted message and a grep pattern are not commands [adr:merge-delegation#pinned-merge]", () => {
+  comments();
+  for (
+    const command of [
+      "cat <<EOF > f.md\nsteps:\ngh pr merge 5 --squash\nEOF",
+      "cat <<'EOF' > f.md\ngh pr merge 5\nEOF\nls",
+      'cat <<"END"\ngh pr merge 5\nEND',
+      "cat <<-EOF\n\tgh pr merge 5\n\tEOF",
+      'git commit -m "fix: gh pr merge 5 --squash was allowed\n\ngh pr merge 6"',
+      'grep "gh pr merge" docs/x.md',
+    ]
+  ) {
+    const r = run(bash(command));
+    assert.equal(r.status, 0, `${command}: ${r.stderr}`);
+  }
+});
+
+test("a merge after a heredoc is still seen [adr:merge-delegation#pinned-merge]", () => {
+  comments(verdict(SHA));
+  refused(bash("cat <<EOF > f\nbody\nEOF\ngh pr merge 5 -R o/r --squash"), /method must be/);
+});
+
+test("the pin refusal says the pin must be a literal sha [adr:merge-delegation#pinned-merge]", () => {
+  comments(verdict(SHA));
+  refused(bash('gh pr merge 7 -R o/r --merge --match-head-commit "$SHA"'), /must be a literal/);
+  refused(
+    bash("gh pr merge 7 -R o/r --merge --match-head-commit $(git rev-parse HEAD)"),
+    /must be a literal/,
+  );
+});
+
+test("--disable-auto, --help and the is-merged GET are not merges", () => {
+  comments();
+  for (
+    const command of [
+      "gh pr merge 5 -R o/r --disable-auto",
+      "gh pr merge --help",
+      "gh api repos/o/r/pulls/1/merge",
+    ]
+  ) {
+    const r = run(bash(command));
+    assert.equal(r.status, 0, `${command}: ${r.stderr}`);
+  }
+  refused(bash("gh api --method PUT repos/o/r/pulls/1/merge"), /no head pin/);
+  refused(bash("gh api repos/o/r/pulls/1/merge --input body.json"), /no head pin/);
+});

@@ -37,6 +37,31 @@ function block(...reasons) {
   process.exit(2);
 }
 
+/**
+ * The command with heredoc bodies removed. A body is data for another
+ * program, and read line by line it looks like commands: a markdown file
+ * written with `cat <<EOF` that mentions `gh pr merge 5` blocked every such
+ * call.
+ */
+function withoutHeredocBodies(command) {
+  const out = [];
+  let end = null;
+  let dash = false;
+  for (const line of command.split("\n")) {
+    if (end !== null) {
+      if ((dash ? line.replace(/^\t+/, "") : line) === end) end = null;
+      continue;
+    }
+    out.push(line);
+    const m = line.match(/<<(-?)\s*(['"]?)([A-Za-z_]\w*)\2/);
+    if (m && !line.includes("<<<")) {
+      dash = m[1] === "-";
+      end = m[3];
+    }
+  }
+  return out.join("\n");
+}
+
 /** Words of a shell command, split into command segments at unquoted operators. */
 function segments(command) {
   const out = [[]];
@@ -55,6 +80,10 @@ function segments(command) {
     if (quote === "'") {
       if (c === "'") quote = null;
       else word += c;
+    } else if ((c === "`" || command.startsWith("$(", i)) && quote !== "'") {
+      // A substitution runs its own command, wherever it sits.
+      cut();
+      if (c === "$") i++;
     } else if (quote === '"') {
       if (c === '"') quote = null;
       else if (c === "\\" && i + 1 < command.length) word += command[++i];
@@ -76,19 +105,59 @@ function segments(command) {
 /** `gh` argument lists in a command, looking through env prefixes and `bash -c`. */
 function ghCalls(command, depth = 0) {
   const calls = [];
-  for (const seg of segments(command)) {
+  for (const seg of segments(withoutHeredocBodies(command))) {
     let i = 0;
-    while (i < seg.length && /^[({]*(\w+=|env$|command$|exec$|nohup$|time$|sudo$)/.test(seg[i])) {
+    while (
+      i < seg.length && /^(?:\$\(|[({`])*(\w+=|env$|command$|exec$|nohup$|time$|sudo$)/.test(seg[i])
+    ) {
       i++;
     }
-    const head = seg[i]?.replace(/^[({]+/, "");
-    if (head === "gh") calls.push(seg.slice(i + 1));
+    const head = seg[i]?.replace(/^(?:\$\(|[({`])+/, "");
+    // A path to gh is gh; `xargs`, `eval` and `$GH` are known limits.
+    if (head?.split("/").pop() === "gh") calls.push(seg.slice(i + 1));
     else if (/^(ba|z|da)?sh$/.test(head ?? "") && depth < 3) {
       const c = seg.indexOf("-c", i);
       if (c >= 0 && seg[c + 1]) calls.push(...ghCalls(seg[c + 1], depth + 1));
     }
   }
   return calls;
+}
+
+/** Flags whose next word is a value, not a subcommand or a positional. */
+const VALUED = new Set([
+  "-R",
+  "--repo",
+  "-X",
+  "--method",
+  "-f",
+  "-F",
+  "--field",
+  "--raw-field",
+  "--input",
+  "-H",
+  "--header",
+  "-q",
+  "--jq",
+  "-t",
+  "--template",
+  "--hostname",
+  "--cache",
+  "-p",
+  "--preview",
+]);
+
+/** The non-flag words of a gh argument list, with their indexes, skipping flag values. */
+function subcommand(args) {
+  const words = [];
+  const at = [];
+  for (let i = 0; i < args.length; i++) {
+    if (VALUED.has(args[i])) i++;
+    else if (!args[i].startsWith("-")) {
+      words.push(args[i]);
+      at.push(i);
+    }
+  }
+  return { words, at };
 }
 
 /** Value of a flag in any of `--flag v`, `--flag=v`, `-f v` forms. */
@@ -168,9 +237,14 @@ function attempts(input) {
   if (input.tool_name !== "Bash" || typeof ti.command !== "string") return [];
   const found = [];
   for (const args of ghCalls(ti.command)) {
-    const words = args.filter((a) => !a.startsWith("-"));
-    if (words[0] === "pr" && words[1] === "merge") {
-      const rest = args.slice(args.indexOf("merge") + 1);
+    const { words, at } = subcommand(args);
+    if (words[0] === "api" && words[1] === "graphql") {
+      if (args.some((a) => /mergePullRequest|enablePullRequestAutoMerge/.test(a))) {
+        found.push({ graphql: true });
+      }
+    } else if (words[0] === "pr" && words[1] === "merge") {
+      const rest = args.slice(at[1] + 1);
+      if (rest.some((a) => ["--help", "-h", "--disable-auto"].includes(a))) continue;
       const valued = new Set([
         "--repo",
         "-R",
@@ -189,7 +263,7 @@ function attempts(input) {
         rest.includes(f)
       );
       found.push({
-        pr: prOfGhMerge(rest, positional),
+        pr: prOfGhMerge(args, positional),
         pin: flagValue(rest, ["--match-head-commit"]),
         method: methods.length === 1 && ["--merge", "-m"].includes(methods[0])
           ? "merge"
@@ -200,6 +274,9 @@ function attempts(input) {
     } else if (words[0] === "api") {
       const path = words.slice(1).find((w) => /pulls\/\d+\/merge\/?$/.test(w));
       if (!path) continue;
+      // Without PUT or a body, `gh api .../merge` is the is-merged GET.
+      const put = /^put$/i.test(flagValue(args, ["--method", "-X"]) ?? "");
+      if (!put && !args.some((a) => /^(-f|-F|--field|--raw-field|--input)(=|$)/.test(a))) continue;
       const m = path.match(/repos\/([^/]+)\/([^/]+)\/pulls\/(\d+)\/merge/);
       const f = apiFields(args);
       found.push({
@@ -242,6 +319,11 @@ try {
 }
 
 for (const a of attempts(input)) {
+  if (a.graphql) {
+    block(
+      "a GraphQL merge mutation cannot be checked for a pin or method. Use the REST merge or the GitHub MCP merge tool with expectedHeadSha and merge_method `merge`.",
+    );
+  }
   if (a.auto) {
     block(
       "auto-merge merges whatever head arrives later, so it cannot be pinned to a reviewed one. Merge by hand, pinned to the reviewed head.",
@@ -250,7 +332,7 @@ for (const a of attempts(input)) {
   const why = [];
   if (!FULL_SHA.test(a.pin ?? "")) {
     why.push(
-      "no head pin: pass the full 40-character reviewed sha as expectedHeadSha / --match-head-commit / sha",
+      "no head pin: pass the full 40-character reviewed sha as expectedHeadSha / --match-head-commit / sha. It must be a literal: \`$SHA\` or \`$(git rev-parse HEAD)\` is not expanded when this hook reads the command",
     );
   }
   if (a.method !== "merge") {
