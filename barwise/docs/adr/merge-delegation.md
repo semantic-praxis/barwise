@@ -5,7 +5,7 @@ Date: 2026-10-18
 Tracking: barwise-zdd, barwise-4q0, barwise-raw, docs/specs/steward-skill.spec.md,
 docs/specs/pr-skills.spec.md
 Enforced-by: none (barwise-ym8.2ds: review-before-merge),
-none (barwise-ym8.vl9: pinned-merge), none (barwise-ym8.2vy: no-size-exemption),
+tests (pinned-merge), none (barwise-ym8.2vy: no-size-exemption),
 none (barwise-ym8.oof: ask-owner), none (barwise-ym8.n0m: owner-overrides)
 
 ## Context

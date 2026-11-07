@@ -23,5 +23,12 @@
       "barwise/packages/mcp/tests/loadForward.test.ts"
     ],
     "why": "Each surface's tests walk that surface's own command or tool list; one passing test proves only its own surface leaves a 3.0 file alone."
+  },
+  {
+    "decision": "merge-delegation#pinned-merge",
+    "files": [
+      "barwise/scripts/tests/merge-guard.test.mjs"
+    ],
+    "why": "The refusal tests and the settings.json registration test live together; the registration test is the one that goes red if the hook is unwired, and it is the only test that does not run the hook."
   }
 ]
