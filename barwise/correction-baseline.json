@@ -1,6 +1,18 @@
 {
   "$comment": "Correction records in docs/specs, from scripts/audit-corrections.mjs (npm run audit:corrections -- --check; CI runs it). A spec that records what its draft got wrong carries a verdict here saying what CAUGHT it -- execution, reasoning, or provenance -- or not-a-correction when the detector over-matched. --check fails on a detected record missing here AND on a row no longer detected, so the file always enumerates exactly the corpus. The detector is deliberately over-inclusive; the markers are in the script, which is their only home. Seed and method: docs/spec-correction-taxonomy-2026-09-11.md. Spec: docs/specs/correction-record-ratchet.spec.md.",
   "records": {
+    "adr-batch10-enforcers::347550b98b44": {
+      "spec": "adr-batch10-enforcers.spec.md",
+      "excerpt": "the plan's enforcers (adr-refactor.spec.md, batch 10) were checked against the code and the live record before",
+      "caught_by": "execution",
+      "note": "Grounding: the plan's enforcers were measured against the code and the merge record before being adopted; several were replaced."
+    },
+    "adr-batch10-enforcers::b77ddf37fcc1": {
+      "spec": "adr-batch10-enforcers.spec.md",
+      "excerpt": "ask-owner (row 20, kept as a decision). now: nothing. enforcer: the api half's count (above), and it is the we",
+      "caught_by": "not-a-correction",
+      "note": "A decision's classification line (row 20 kept as a decision), not a correction."
+    },
     "adr-batch9-enforcers::a7ca09d36a00": {
       "spec": "adr-batch9-enforcers.spec.md",
       "excerpt": "the first draft's \"two places, plus a type in verifyossie.ts\" was wrong: a key-and-template scan misses the as",

@@ -60,7 +60,7 @@ Process:
 - [Pinned runtimes](adr/pinned-runtimes.md) -- 2026-08-30 -- declared: check:pins (node-from-nvmrc, python-minor, verify-running); gap: barwise-ym8.q89 (node-from-nvmrc)
 - [Plan before code](adr/plan-before-code.md) -- 2026-10-25 -- declared: check:plan-review (plan-reviewed), check:spec-touches (touches-named); gap: barwise-ym8.yg7 (spec-first); gap: barwise-ym8.ogi (plan-reviewed); gap: barwise-ym8.8hq (touches-named); gap: barwise-ym8.l7d (open-decisions-reviewer)
 - [Python from the lockfile](adr/python-from-the-lockfile.md) -- 2026-09-26 -- declared: check:python-uv (lockfile-only, no-outside-forms, project-ancestor, groups-and-one-offs), check:pins (uv-bootstrap), tests (project-ancestor, uv-bootstrap); gap: barwise-ym8.fq7 (lockfile-only); gap: barwise-ym8.l69 (no-outside-forms); gap: barwise-ym8.q07 (project-ancestor)
-- [Review policy](adr/review-policy.md) -- 2026-10-24 -- declared: tests (copilot-requested, tier-informs); gap: barwise-ym8.7y6 (copilot-requested); gap: barwise-ym8.8ya (copilot-never-blocks); gap: barwise-ym8.f9u (review-md-owns-lanes); gap: barwise-ym8.ehz (tier-informs)
+- [Review policy](adr/review-policy.md) -- 2026-10-24 -- declared: tests (copilot-requested, tier-informs, review-md-owns-lanes), check:review-workflows (review-md-owns-lanes, copilot-requested, copilot-never-blocks, tier-informs); gap: barwise-ym8.8ya (copilot-never-blocks)
 
 ### Package graph
 

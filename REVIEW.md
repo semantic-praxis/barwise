@@ -14,13 +14,14 @@ Evidence for every rule: `barwise/docs/specs/review-md.spec.md`.
 
 ## Which review runs when
 
-| Lane               | Run by                          | When                                                     | Reads this file        |
-| ------------------ | ------------------------------- | -------------------------------------------------------- | ---------------------- |
-| CI (`ci.yml`)      | GitHub and the pre-push hook    | Every push                                               | no                     |
-| `/code-review`     | The author                      | Before opening, at the effort the `pr-review` skill sets | no; reads `CLAUDE.md`  |
-| `/security-review` | The author                      | Before opening, when a trigger below is in the diff      | no                     |
-| Claude Code Review | GitHub                          | Every PR, once an Owner enables the service              | yes                    |
-| `/pr-review`       | The PR's agent, or anyone asked | Before merging, on the head being merged (`steward` 4b)  | yes, via its checklist |
+| Lane                                  | Run by                          | When                                                                         | Reads this file        |
+| ------------------------------------- | ------------------------------- | ---------------------------------------------------------------------------- | ---------------------- |
+| CI (`ci.yml`)                         | GitHub and the pre-push hook    | Push to `main`; pull request into `main`                                     | no                     |
+| Copilot review (`copilot-review.yml`) | GitHub Actions                  | Every non-trivial PR but Dependabot's; paused since 2026-10-19 (barwise-ilb) | no                     |
+| `/code-review`                        | The author                      | Before opening, at the effort the `pr-review` skill sets                     | no; reads `CLAUDE.md`  |
+| `/security-review`                    | The author                      | Before opening, when a trigger below is in the diff                          | no                     |
+| Claude Code Review                    | GitHub                          | Every PR, once an Owner enables the service                                  | yes                    |
+| `/pr-review`                          | The PR's agent, or anyone asked | Before merging, on the head being merged (`steward` 4b)                      | yes, via its checklist |
 
 `/pr-review` runs `/code-review` itself; the author's earlier run does
 not replace it.
