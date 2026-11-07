@@ -1,6 +1,6 @@
 # Batch 10: process gates -- merge, plan and review decisions enforced
 
-Status: Planned; plan reviewed 2026-11-07 (one review round, eight findings, all addressed; ten owner decisions recorded); no workstream implemented
+Status: Planned; plan reviewed 2026-11-07 (one review round, eight findings, all addressed; ten owner decisions recorded); WS1 (`check:review-workflows`, review-policy) implemented
 
 Created: 2026-11-07
 Last-updated: 2026-11-07
@@ -787,6 +787,23 @@ network and no new workflow wiring beyond one unguarded step. The four
 rules, `barwise/review-lanes.json`, the two REVIEW.md corrections, probes
 for the four decisions and `tests` entries for the lane-table and
 non-lane-workflow rules. Closes `f9u`, `7y6`, `ehz`, `j9d`; narrows `8ya`.
+
+Implemented as specified, with these forms the spec left open. The
+declared reader list, the lane list and the token list are one file,
+`barwise/review-lanes.json`, so the gate's source names no tier token and
+is not itself a reader. The `copilot-requested` pause note is the
+`PAUSED <date>` comment directly above the `request` job's `if:`; the
+issue it names is read from the comment paragraph that carries a
+`PAUSED` marker (a bare `#` line ends a paragraph), and a stale note on
+a job that admits pull requests is a finding. The `if:` is judged by a
+small evaluator over `&&`, `||`, `!`, `==`, `!=` and two context values; any
+other construct is exit 2, not false. `copilot-never-blocks` reads
+identifiers and string or template literals (a regex literal is not
+scanned, and the gate's own file is skipped by path, since it is the rule).
+The root `pr:risk` forwarder is a declared package-script reader beside
+the one the table lists, because the matcher finds it. A workflow line is
+a reader unless it is a shell comment or an `echo`/`printf` with no
+command substitution.
 
 ### 2. `check:spec-form` (plan-before-code, decision 4)
 

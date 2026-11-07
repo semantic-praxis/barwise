@@ -27,6 +27,7 @@
     "plan-scope.test.mjs": 8,
     "pushed-tree.test.mjs": 12,
     "python-uv-guard.test.mjs": 33,
+    "review-workflows.test.mjs": 27,
     "session-start.test.mjs": 8,
     "spec-reader.test.mjs": 17,
     "tracker-conflicts.test.mjs": 20,

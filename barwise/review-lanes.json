@@ -1,0 +1,123 @@
+{
+  "$comment": "The declared copy that check:review-workflows reads (review-policy#review-md-owns-lanes, #copilot-requested, #copilot-never-blocks, #tier-informs; docs/specs/adr-batch10-enforcers.spec.md, WS1). 'lanes' lists every review lane REVIEW.md's table must name, with the file or directory that carries it, or 'external' and why nothing in the tree does; 'nonLaneWorkflows' accounts for each other workflow file, so a new review workflow cannot appear unrecorded. 'whenFrom: on' marks the one row whose When cell is derived from the workflow's on: block. 'tierTokens' is what a reader of the review tier looks like, held here as data so that the gate's own source names none of it and is not itself a reader; 'tierReaders' is the complete list of readers, each with the reason it may read the tier. A new entry is a reviewed edit.",
+  "lanes": [
+    {
+      "name": "CI (ci.yml)",
+      "source": ".github/workflows/ci.yml",
+      "whenFrom": "on"
+    },
+    {
+      "name": "/code-review",
+      "source": "external",
+      "reason": "a Claude Code command; no file here runs it, the pr-review and pr-creation skills say when to"
+    },
+    {
+      "name": "/security-review",
+      "source": "external",
+      "reason": "a Claude Code command; no file here runs it, REVIEW.md lists the triggers"
+    },
+    {
+      "name": "Copilot review (copilot-review.yml)",
+      "source": ".github/workflows/copilot-review.yml"
+    },
+    {
+      "name": "Claude Code Review",
+      "source": "external",
+      "reason": "a GitHub-hosted service an Owner enables in repository settings; it reads REVIEW.md from the default branch"
+    },
+    {
+      "name": "/pr-review",
+      "source": ".claude/skills/pr-review"
+    }
+  ],
+  "nonLaneWorkflows": [
+    {
+      "file": ".github/workflows/release.yml",
+      "reason": "builds and publishes the release artifacts; it reviews nothing"
+    },
+    {
+      "file": ".github/workflows/tracker-conflicts.yml",
+      "reason": "comments on a pull request whose only conflict is the tracker; it reviews nothing"
+    }
+  ],
+  "tierTokens": {
+    "modulePath": "review-tiers.mjs",
+    "tablePath": "review-tiers.json",
+    "classifierPath": "pr-risk.mjs",
+    "workflowTokens": ["pr-risk.mjs", "pr:risk", "review-tiers"]
+  },
+  "tierReaders": [
+    {
+      "kind": "script",
+      "file": "barwise/scripts/lib/review-tiers.mjs",
+      "bindings": "any",
+      "reason": "it is the module; it reads the table"
+    },
+    {
+      "kind": "script",
+      "file": "barwise/scripts/pr-risk.mjs",
+      "bindings": "any",
+      "reason": "computes and prints the tier"
+    },
+    {
+      "kind": "script",
+      "file": "barwise/scripts/check-review-tiers.mjs",
+      "bindings": "any",
+      "reason": "validates the table against the checklist headings"
+    },
+    {
+      "kind": "script",
+      "file": "barwise/scripts/lib/spec-reader.mjs",
+      "bindings": ["matchesPattern"],
+      "reason": "path-glob helper only"
+    },
+    {
+      "kind": "script",
+      "file": "barwise/scripts/plan-scope.mjs",
+      "bindings": ["matchesPattern"],
+      "reason": "path-glob helper only"
+    },
+    {
+      "kind": "script",
+      "file": "barwise/scripts/check-spec-touches.mjs",
+      "bindings": ["matchesPattern", "patternFault"],
+      "reason": "path-glob helpers only"
+    },
+    {
+      "kind": "workflow",
+      "file": ".github/workflows/copilot-review.yml",
+      "commands": ["node barwise/scripts/pr-risk.mjs --changes"],
+      "reason": "reads .trivial to decide whether to request (review-policy#copilot-requested); .tier is only printed"
+    },
+    {
+      "kind": "workflow",
+      "file": ".github/workflows/ci.yml",
+      "commands": ["npm run check:review-tiers"],
+      "reason": "the table validator, which keys on nothing"
+    },
+    {
+      "kind": "package-script",
+      "file": "barwise/package.json",
+      "script": "check:review-tiers",
+      "reason": "runs the table validator"
+    },
+    {
+      "kind": "package-script",
+      "file": "barwise/package.json",
+      "script": "pr:risk",
+      "reason": "runs the classifier for a human"
+    },
+    {
+      "kind": "package-script",
+      "file": "package.json",
+      "script": "check:review-tiers",
+      "reason": "generated forwarder"
+    },
+    {
+      "kind": "package-script",
+      "file": "package.json",
+      "script": "pr:risk",
+      "reason": "generated forwarder"
+    }
+  ]
+}

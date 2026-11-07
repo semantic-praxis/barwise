@@ -24,6 +24,7 @@
     "check:parity": "npm --prefix barwise run check:parity --",
     "check:pins": "npm --prefix barwise run check:pins --",
     "check:review-tiers": "npm --prefix barwise run check:review-tiers --",
+    "check:review-workflows": "npm --prefix barwise run check:review-workflows --",
     "check:spec-touches": "npm --prefix barwise run check:spec-touches --",
     "check:plan-review": "npm --prefix barwise run check:plan-review --",
     "pr:risk": "npm --prefix barwise run pr:risk --",

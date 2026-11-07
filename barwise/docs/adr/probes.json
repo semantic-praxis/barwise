@@ -213,5 +213,41 @@
     "file": "barwise/docs/specs/constraint-extraction-coverage.spec.md",
     "old": "| 2               | 1                         |",
     "new": "| 2               | 2                         |"
+  },
+  {
+    "decision": "review-policy#review-md-owns-lanes",
+    "file": "REVIEW.md",
+    "old": "Push to `main`; pull request into `main`",
+    "new": "Every push"
+  },
+  {
+    "decision": "review-policy#review-md-owns-lanes",
+    "file": "REVIEW.md",
+    "old": "| Copilot review (`copilot-review.yml`)",
+    "new": "| Copilot reviewer (`copilot-review.yml`)"
+  },
+  {
+    "decision": "review-policy#copilot-requested",
+    "file": ".github/workflows/copilot-review.yml",
+    "old": "PAUSED 2026-10-19 by the owner",
+    "new": "Paused"
+  },
+  {
+    "decision": "review-policy#copilot-never-blocks",
+    "file": ".github/workflows/ci.yml",
+    "old": "on:\n  push:\n    branches: [main]",
+    "new": "on:\n  workflow_run:\n    workflows: [Copilot review]\n    types: [completed]\n  push:\n    branches: [main]"
+  },
+  {
+    "decision": "review-policy#tier-informs",
+    "file": "barwise/scripts/check-pins.mjs",
+    "old": "import { parse } from \"yaml\";",
+    "new": "import { classify } from \"./lib/review-tiers.mjs\";\nimport { parse } from \"yaml\";"
+  },
+  {
+    "decision": "review-policy#tier-informs",
+    "file": ".github/workflows/ci.yml",
+    "old": "      - run: npm run check:review-tiers\n",
+    "new": "      - run: npm run check:review-tiers\n      - run: node barwise/scripts/pr-risk.mjs --json | jq -e '.tier == \"routine\"'\n"
   }
 ]
