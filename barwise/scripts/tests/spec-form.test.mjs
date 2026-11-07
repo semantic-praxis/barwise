@@ -38,6 +38,27 @@ test("each cue alone satisfies an entry, in any case", () => {
   }
 });
 
+test("a cue counts only as a whole word outside code spans (code review)", () => {
+  for (const entry of ["- Which? undecided", "- Which? unresolved", "- Which? `default` maybe"]) {
+    assert.equal(openDecisionsFindings(spec(`## Open decisions\n\n${entry}\n`)).length, 1, entry);
+  }
+});
+
+test("a starred or ### question is its own entry (code review)", () => {
+  for (
+    const body of [
+      "- A: recommend x\n* B: nothing here",
+      "### One\nRecommend x.\n### Two\nNothing here.",
+    ]
+  ) {
+    assert.equal(openDecisionsFindings(spec(`## Open decisions\n\n${body}\n`)).length, 1, body);
+  }
+  assert.deepEqual(
+    openDecisionsFindings(spec("## Open decisions\n\n### Q1\nWhat? default x\n")),
+    [],
+  );
+});
+
 test("no heading is a finding, and a different heading is not the heading", () => {
   assert.match(openDecisionsFindings("# S\n\n## Plan\n\nx\n")[0], /no `## Open decisions` heading/);
   const renamed = spec("## Decisions (for review)\n\n1. Recommend A.\n");

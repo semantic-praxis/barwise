@@ -29,7 +29,7 @@
     "python-uv-guard.test.mjs": 33,
     "review-workflows.test.mjs": 27,
     "session-start.test.mjs": 8,
-    "spec-form.test.mjs": 23,
+    "spec-form.test.mjs": 25,
     "spec-reader.test.mjs": 17,
     "tracker-conflicts.test.mjs": 20,
     "vitest-tmp.test.mjs": 1

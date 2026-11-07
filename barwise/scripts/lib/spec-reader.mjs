@@ -294,7 +294,10 @@ export const OPEN_DECISIONS_REQUIRED_SINCE = "d522e899b585ae19bc7159f74fa1d7b47f
  * the property: the gate holds that the cue is present, and a reviewer
  * holds that it is true.
  */
-export const DECISION_CUE = /recommend|resolved|taken as|decided|default/i;
+// Whole words only, and never inside a code span (code review: "undecided",
+// "unresolved" and `default` all passed as a substring match).
+export const DECISION_CUE = /\b(?:recommend(?:s|ed|ation)?|resolved|taken as|decided|default)\b/i;
+const withoutCodeSpans = (text) => text.replace(/`[^`\n]*`/g, "");
 
 /**
  * A spec's Open decisions section, read outside code fences: `undefined`
@@ -331,7 +334,11 @@ export function openDecisions(text) {
       continue;
     }
     if (!inSection) continue;
-    if (!fenced && /^(- |\d+\. )/.test(line)) entries.push(line);
+    // A top-level item with any marker, and a ### question, is an entry of
+    // its own (code review: a `*` bullet or a ### block folded into the item
+    // above). A nested bullet stays with its parent: options and the
+    // recommendation are written as sub-bullets under one question.
+    if (!fenced && /^([-*+] |\d+\. |#{3,} )/.test(line)) entries.push(line);
     else if (entries.length) entries[entries.length - 1] += `\n${line}`;
     else prose.push(line);
   }
@@ -356,7 +363,7 @@ export function openDecisionsFindings(text) {
         : "`## Open decisions` has no list entry and does not say only `None.`",
     ];
   }
-  return entries.filter((e) => !DECISION_CUE.test(e)).map((e) =>
+  return entries.filter((e) => !DECISION_CUE.test(withoutCodeSpans(e))).map((e) =>
     `an Open decisions entry names no recommendation or resolution (needs one of: recommend, resolved, taken as, decided, default): ${
       e.split("\n")[0].slice(0, 80)
     }`
