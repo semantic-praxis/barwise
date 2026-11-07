@@ -1,6 +1,6 @@
 # Batch 10: process gates -- merge, plan and review decisions enforced
 
-Status: Planned; plan reviewed 2026-11-07 (one review round, eight findings, all addressed; ten owner decisions recorded); WS1 (`check:review-workflows`, review-policy) and WS2 (`check:spec-form`, plan-before-code decision 4) implemented
+Status: Planned; plan reviewed 2026-11-07 (one review round, eight findings, all addressed; ten owner decisions recorded); WS1 (`check:review-workflows`, review-policy), WS2 (`check:spec-form`, plan-before-code decision 4) and WS3 (`check:spec-first`, plan-before-code decision 1) implemented
 
 Created: 2026-11-07
 Last-updated: 2026-11-07
@@ -831,6 +831,16 @@ The script, `BASE_SHA`/`PR_BODY` wiring, `edited` added to the
 `pull_request` types, `PR_BODY` added to the `fault-matrix` step's `env`,
 the local `NOT CHECKED` exit 0 (`GITHUB_ACTIONS` unset) against the CI exit 2
 (set, no body), and tests in `tempRepo()` for each mode. Closes `yg7`.
+
+Implemented as specified, with these forms the spec left open. The script
+reads git (shallow, merge base, diff, corpus, commit messages) before the
+body, so a local run refuses where it cannot see the diff. A `PR_BODY`
+given in a local run is read as in CI; only its absence prints `NOT
+CHECKED`. A spec in the diff, not only in a message or the body, counts as
+naming it (`namedSpecs`). `No spec:` must start a line (leading blanks
+allowed) and the text must be on the same line. The step runs on pull
+requests only, with no docs-only guard, and `PR_BODY` is on the
+`fault-matrix` step as well. The `probes.json` row is `unprobed`.
 
 ### 4. `check:plan-review` hardening and `touches-named` (plan-before-code, decisions 2 and 3)
 

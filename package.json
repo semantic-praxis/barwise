@@ -28,6 +28,7 @@
     "check:spec-touches": "npm --prefix barwise run check:spec-touches --",
     "check:spec-form": "npm --prefix barwise run check:spec-form --",
     "check:plan-review": "npm --prefix barwise run check:plan-review --",
+    "check:spec-first": "npm --prefix barwise run check:spec-first --",
     "pr:risk": "npm --prefix barwise run pr:risk --",
     "plan-scope": "npm --prefix barwise run plan-scope --",
     "check:no-nul": "npm --prefix barwise run check:no-nul --",

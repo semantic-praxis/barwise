@@ -6,7 +6,8 @@ Tracking: barwise-ubc, docs/specs/plan-scope-check.spec.md,
 docs/specs/touches-required.spec.md
 Enforced-by: npm run check:plan-review (plan-reviewed),
 npm run check:spec-touches (touches-named),
-npm run check:spec-form (open-decisions-reviewer), none (barwise-ym8.yg7: spec-first),
+npm run check:spec-form (open-decisions-reviewer),
+npm run check:spec-first (spec-first),
 none (barwise-ym8.ogi: plan-reviewed), none (barwise-ym8.8hq: touches-named),
 none (barwise-ym8.l7d: open-decisions-reviewer)
 
@@ -25,7 +26,7 @@ rejected alternatives are in the two specs above.
 1. **A pull request that changes package source names the spec it
    implements, in its body or a commit message, or carries a `No spec:
    <reason>` line.**{#spec-first} A check reads the presence and form of
-   one or the other, never the reason. The spec lives in
+   one or the other, never the reason (`No spec: n/a` passes). The spec lives in
    `barwise/docs/specs/`, written to the `spec-writer` skill's format.
 2. **The plan is reviewed before it is implemented.**{#plan-reviewed} `/code-review`
    and `/pr-review` run on the spec, and its header records the commit
@@ -49,9 +50,22 @@ rejected alternatives are in the two specs above.
   rows 14 and 15) to what a check can read. Decision 1 was "a change
   starts from a spec"; its `No spec:` escape makes the exception
   explicit, which the owner chose over strict enforcement and over
-  retirement. Its check is batch 10 of that spec, beside
-  `check:plan-review`; until it lands, the gap issue in the header
-  stands.
+  retirement.
+- `npm run check:spec-first` (a CI gate on pull requests, beside
+  `check:plan-review`) fails a pull request that changes a
+  `barwise/packages/*/src/` path (three-dot diff, committed state) unless
+  its body or a commit message names a spec in the corpus by file name,
+  its diff changes a spec, or a line starts `No spec:` followed by text. It
+  reads the body from `PR_BODY`, set from the event payload; `edited` is
+  among ci.yml's `pull_request` types so a corrected body is read, and a
+  manual re-run reuses the old payload. Unset `PR_BODY` in CI, a shallow
+  clone or an unresolvable base is exit 2. A local run has no body: with
+  package source changed and no commit message naming a spec, it prints
+  `NOT CHECKED -- no pull request body in a local run; CI reads it` and
+  exits 0, never `OK`, because exit 2 would block every push (the
+  pre-push hook) before a pull request exists. The reason after `No spec:`
+  is never read, so `No spec: n/a` passes; the gate catches forgetting, not
+  a bad reason.
 
 - `npm run check:plan-review` (a CI gate on pull requests to main) fails a
   PR that changes a `Touches:` path of a spec it names, while the spec is
@@ -82,8 +96,6 @@ rejected alternatives are in the two specs above.
   and a decision made silently in a spec's body is held by review (the
   `spec-writer` design gate and `pr-review`); barwise-ym8.l7d stays open
   for that residue.
-- Decision 1 has no gate yet; it is held by review until the gap issue in
-  the header lands one.
 - Gaps in what enforces decision 2, each open:
   - a spec whose Status claims some work is built is not checked, so
     its second workstream onward is unreviewed by the gate, and the

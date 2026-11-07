@@ -85,6 +85,10 @@
     "new": "Touches: -plan.md, .gitattributes, barwise/review-tierz.json,"
   },
   {
+    "decision": "plan-before-code#spec-first",
+    "unprobed": "check:spec-first reads committed state (the three-dot diff and commit messages) and the pull request body from the PR_BODY environment variable, so a working-tree edit cannot reach it; scripts/tests/spec-first.test.mjs plants the reds in temporary repositories"
+  },
+  {
     "decision": "plan-before-code#open-decisions-reviewer",
     "file": "barwise/docs/specs/adr-batch10-enforcers.spec.md",
     "old": "\n## Open decisions (for review)\n",

@@ -146,6 +146,7 @@ const ROOT_DEPENDENT_GATES = [
   "check-lockfile-agrees.mjs",
   "check-git-listing.mjs",
   "check-plan-review.mjs",
+  "check-spec-first.mjs",
   // A test runner whose cases need git: it refused nothing and reported
   // failed cases as a finding until gate-contract-enforced WS1.
   "test-adr-model.mjs",

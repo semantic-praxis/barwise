@@ -5,6 +5,11 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+    # `edited` so a corrected description re-runs check:spec-first, which
+    # reads the body from the event payload. A manual re-run of a job reuses
+    # the original payload and does not see the edit (adr-batch10-enforcers
+    # spec, Open decision 9).
+    types: [opened, synchronize, reopened, edited]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -280,6 +285,21 @@ jobs:
         if: github.event_name == 'pull_request'
         env:
           BASE_SHA: ${{ steps.base.outputs.sha }}
+
+      # A pull request that changes package source (packages/*/src) names the
+      # spec it implements in its body or a commit message, or carries a
+      # `No spec: <reason>` line (plan-before-code#spec-first,
+      # adr-batch10-enforcers.spec.md WS3). The body reaches the script through
+      # `env`, never interpolated into the shell: it is untrusted text. A null
+      # body arrives as an empty string, which names nothing; an unset PR_BODY
+      # refuses (exit 2). Pull requests only, as check:plan-review: it reads
+      # what a pull request adds over its base, and a push to main has neither
+      # base nor body. No docs-only guard: it reads the diff itself.
+      - run: npm run check:spec-first
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_SHA: ${{ steps.base.outputs.sha }}
+          PR_BODY: ${{ github.event.pull_request.body }}
 
       # A NUL byte makes git classify a source file as binary: no diff, no
       # blame, no review, and a patch taken from it loses changes silently.
@@ -645,3 +665,6 @@ jobs:
         if: github.event_name == 'pull_request' && steps.changes.outputs.docs_only != 'true'
         env:
           BASE_SHA: ${{ steps.base.outputs.sha }}
+          # check:spec-first refuses (exit 2) in CI without it, so the matrix's
+          # unfaulted reading of that gate needs the body the step above gets.
+          PR_BODY: ${{ github.event.pull_request.body }}
