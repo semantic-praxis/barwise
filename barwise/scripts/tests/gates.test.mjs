@@ -6084,11 +6084,13 @@ function planRepo() {
     return g("rev-parse", "HEAD");
   };
   /** The spec, with `Plan-reviewed:` naming `reviewed` when given. */
-  const spec = ({ status = "Draft", reviewed, body = "The plan." } = {}) =>
+  const spec = (
+    { status = "Draft", reviewed, body = "The plan.", names = "code-review, pr-review" } = {},
+  ) =>
     writeFileSync(
       join(dir, PLAN_SPEC),
       `# X\n\nStatus: ${status}\nTracking: barwise-x\n`
-        + (reviewed ? `Plan-reviewed: ${reviewed.slice(0, 8)} (code-review, pr-review)\n` : "")
+        + (reviewed ? `Plan-reviewed: ${reviewed.slice(0, 8)} (${names})\n` : "")
         + `Touches: src/a.ts, +src/b.ts\n\n## Plan\n\n${body}\n`,
     );
   const implement = (n) => writeFileSync(join(dir, "src", "a.ts"), `export const a = ${n};\n`);
@@ -6297,6 +6299,119 @@ test("check-plan-review passes a review recorded before the first implementation
         }\\)`,
       ),
     );
+  } finally {
+    rmSync(r.dir, { recursive: true, force: true });
+  }
+});
+
+test("check-plan-review fails a Plan-reviewed: line that names only one review", () => {
+  // Each review alone, and a name only embedded in a longer word.
+  for (const names of ["code-review", "pr-review", "code-review, non-pr-review"]) {
+    const r = planRepo();
+    try {
+      r.spec();
+      const reviewed = r.commit("spec");
+      r.spec({ reviewed, names });
+      r.commit("record the review");
+      r.implement(1);
+      r.commit("implement");
+      const out = r.run();
+      assert.equal(out.status, 1, names + ": " + out.stdout + out.stderr);
+      assert.match(out.stderr, /must name both reviews/);
+    } finally {
+      rmSync(r.dir, { recursive: true, force: true });
+    }
+  }
+});
+
+test("check-plan-review reads review names past the first parenthetical", () => {
+  const r = planRepo();
+  try {
+    r.spec();
+    const reviewed = r.commit("spec");
+    r.spec({ reviewed, names: "re-pointed from 1234567) (code-review, pr-review" });
+    r.commit("record the review");
+    r.implement(1);
+    r.commit("implement");
+    const out = r.run();
+    assert.equal(out.status, 0, out.stdout + out.stderr);
+  } finally {
+    rmSync(r.dir, { recursive: true, force: true });
+  }
+});
+
+test("check-plan-review accepts annotated review names in either order", () => {
+  for (
+    const names of [
+      "code-review, pr-review; re-pointed after WS2",
+      "pr-review x5, code-review x3; note",
+    ]
+  ) {
+    const r = planRepo();
+    try {
+      r.spec();
+      const reviewed = r.commit("spec");
+      r.spec({ reviewed, names });
+      r.commit("record the review");
+      r.implement(1);
+      r.commit("implement");
+      const out = r.run();
+      assert.equal(out.status, 0, names + out.stdout + out.stderr);
+    } finally {
+      rmSync(r.dir, { recursive: true, force: true });
+    }
+  }
+});
+
+test("check-plan-review fails a Plan-reviewed: line added in the implementation commit", () => {
+  // The line names a commit before the code, but was written with it.
+  const r = planRepo();
+  try {
+    r.spec();
+    const reviewed = r.commit("spec");
+    r.implement(1);
+    r.spec({ reviewed });
+    r.commit("implement and record the review");
+    const out = r.run();
+    assert.equal(out.status, 1, out.stdout + out.stderr);
+    assert.match(out.stderr, /line is not in the spec at the parent of/);
+  } finally {
+    rmSync(r.dir, { recursive: true, force: true });
+  }
+});
+
+test("check-plan-review fails a Plan-reviewed: line added after the implementation", () => {
+  const r = planRepo();
+  try {
+    r.spec();
+    const reviewed = r.commit("spec");
+    r.implement(1);
+    r.commit("implement");
+    r.spec({ reviewed });
+    r.commit("record the review late");
+    const out = r.run();
+    assert.equal(out.status, 1, out.stdout + out.stderr);
+    assert.match(out.stderr, /line is not in the spec at the parent of/);
+  } finally {
+    rmSync(r.dir, { recursive: true, force: true });
+  }
+});
+
+test("check-plan-review passes a line re-pointed after implementation to a commit before it", () => {
+  // A rebase rewrites the reviewed commit's id; the line is re-pointed,
+  // not introduced, and still names a commit that precedes the code.
+  const r = planRepo();
+  try {
+    r.spec();
+    const reviewed = r.commit("spec");
+    r.spec({ reviewed });
+    r.commit("record the review");
+    r.implement(1);
+    r.commit("implement");
+    r.spec({ reviewed, names: "code-review, pr-review; re-pointed after rebase" });
+    r.commit("re-point");
+    const out = r.run();
+    assert.equal(out.status, 0, out.stdout + out.stderr);
   } finally {
     rmSync(r.dir, { recursive: true, force: true });
   }
