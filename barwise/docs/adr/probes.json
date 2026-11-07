@@ -85,6 +85,18 @@
     "new": "Touches: -plan.md, .gitattributes, barwise/review-tierz.json,"
   },
   {
+    "decision": "plan-before-code#open-decisions-reviewer",
+    "file": "barwise/docs/specs/adr-batch10-enforcers.spec.md",
+    "old": "\n## Open decisions (for review)\n",
+    "new": "\n## Decisions (for review)\n"
+  },
+  {
+    "decision": "plan-before-code#open-decisions-reviewer",
+    "file": "barwise/docs/specs/adr-batch10-enforcers.spec.md",
+    "old": "**Resolved (owner): an unguarded step**",
+    "new": "**Owner: an unguarded step**"
+  },
+  {
     "decision": "findings-close-by-mechanism#mechanism-closes",
     "file": "barwise/audit-baseline.json",
     "old": "\"literal:04dabcc31485\": {\n      \"status\": \"tracked:barwise-875\"",

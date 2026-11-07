@@ -247,6 +247,15 @@ jobs:
       # every later run; it needs the cutoff commit, which the
       # `fetch-depth: 0` checkout provides (exit 2 without it).
       - run: npm run check:spec-touches
+      # A spec new since a fixed cutoff commit (the same file-name rule as
+      # the step above, a second constant) has an `## Open decisions`
+      # section whose entries each say where they stand, or says only
+      # `None.` (plan-before-code#open-decisions-reviewer,
+      # adr-batch10-enforcers.spec.md WS2). Older specs are exempt. No `if:`
+      # guard: its inputs are Markdown specs, which a docs-only change is
+      # exactly the change to edit, and it needs the cutoff commit, which
+      # the `fetch-depth: 0` checkout provides (exit 2 without it).
+      - run: npm run check:spec-form
       # The schema differs from the latest v* tag's while CURRENT_ORM_VERSION
       # still equals what that tag wrote: the first additive change after a
       # release skipped its bump (schema-versioning#shared-minor). It reads

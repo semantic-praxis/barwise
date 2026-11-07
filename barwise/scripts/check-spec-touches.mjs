@@ -57,16 +57,13 @@ import { join } from "node:path";
 import { opt } from "./lib/args.mjs";
 import { gitAt } from "./lib/git-run.mjs";
 import { matchesPattern, patternFault } from "./lib/review-tiers.mjs";
+import { fileName, nulList, specNamesAtCutoff } from "./lib/spec-cutoff.mjs";
 import {
   inSpecCorpus,
   newSpecVerdict,
-  SPECS_DIR,
   touches,
   TOUCHES_REQUIRED_SINCE,
 } from "./lib/spec-reader.mjs";
-
-const fileName = (p) => p.slice(p.lastIndexOf("/") + 1);
-const nulList = (out) => out.split("\u0000").filter(Boolean);
 
 /**
  * The corpus specs new since the cutoff, each with the rule's verdict on
@@ -77,27 +74,7 @@ function newSpecs(root, specs, current) {
   const git = gitAt(root);
   const given = opt("--cutoff");
   const cutoff = given ?? TOUCHES_REQUIRED_SINCE;
-  // undefined is "no such commit" (exit 1); git failing throws from
-  // commit() with its own message, and gets no fetch advice: fetching
-  // would not mend it.
-  const id = git.commit(cutoff);
-  if (id === undefined) {
-    // A shallow clone can lack any commit, so it is named either way; a
-    // `--cutoff` in a full clone is a bad revision, which no fetch mends.
-    const shallow = git.run(["rev-parse", "--is-shallow-repository"]).trim() === "true";
-    const what = given !== null
-      ? `--cutoff ${given} names no single commit in this clone (unknown, or an ambiguous abbreviation).`
-      : `the cutoff ${cutoff} is not in this clone, so which specs are new cannot be read.`;
-    const fix = shallow
-      ? "\n  This clone is shallow. Fix: git fetch --unshallow"
-      : given === null
-      ? "\n  Fix: git fetch origin main"
-      : "";
-    throw new Error(what + fix);
-  }
-  const atCutoff = nulList(git.run(["ls-tree", "-r", "-z", "--name-only", id]));
-  if (atCutoff.length === 0) throw new Error(`git listed no files at the cutoff ${cutoff}`);
-  const existing = new Set(atCutoff.filter((f) => f.startsWith(SPECS_DIR)).map(fileName));
+  const { id, atCutoff, existing } = specNamesAtCutoff(git, cutoff, given);
   const fresh = specs.filter((s) => !existing.has(fileName(s.id)));
   // What a `-` entry may name: a path tracked at the cutoff, in the current
   // tree, or at any commit between. The cutoff alone ages: a file created
