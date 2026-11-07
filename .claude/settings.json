@@ -47,6 +47,19 @@
           {
             "type": "command",
             "command": "env -u BARWISE_EXIT_DIR node \"$CLAUDE_PROJECT_DIR/barwise/scripts/hooks/python-uv-guard.mjs\""
+          },
+          {
+            "type": "command",
+            "command": "env -u BARWISE_EXIT_DIR node \"$CLAUDE_PROJECT_DIR/barwise/scripts/hooks/merge-guard.mjs\""
+          }
+        ]
+      },
+      {
+        "matcher": "mcp__github__merge_pull_request|mcp__github__enable_pr_auto_merge",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "env -u BARWISE_EXIT_DIR node \"$CLAUDE_PROJECT_DIR/barwise/scripts/hooks/merge-guard.mjs\""
           }
         ]
       }
