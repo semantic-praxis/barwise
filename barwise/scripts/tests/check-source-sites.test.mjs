@@ -283,6 +283,7 @@ test(`model-sdk-boundary sees every import form and subpath ${ADR}`, () => {
     `const m = await import("openai");`,
     `const m = require("openai");`,
     `export { default } from "openai";`,
+    `/// <reference types="openai" />`,
   ];
   for (const code of positives) {
     assert.notDeepEqual(modelSdkImports(code), [], code);
