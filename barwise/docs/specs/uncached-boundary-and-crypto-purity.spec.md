@@ -1,6 +1,6 @@
 # Two gates that can pass without seeing their input
 
-Status: Draft
+Status: Planned; plan reviewed 2026-11-08 (one round, eight findings, all addressed)
 
 Created: 2026-11-08
 Last-updated: 2026-11-08
@@ -56,15 +56,29 @@ replaces a denylist that every Node release can outgrow.
    `packages/*/package.json` outside `llm` the four dependency fields; an
    SDK specifier (`@anthropic-ai/sdk`, `openai`, or a subpath of either)
    in either place is a finding. The vitest file is deleted in the same
-   commit, so the rule has one home. `check:source-sites` already runs
-   in CI with no `if:` and no cache, and already refuses (exit 2) on no
-   source read.
-2. **WS2: `node:crypto` as one set.** In `check:core-purity`, a named
-   import from `node:crypto` (or `crypto`) other than `createHash` is a
-   finding; a default or namespace import of it is a finding; `import
-   type` stays allowed. The four `RANDOM_NAMES` member and qualified
-   rules stay, since they catch the global `crypto.*` and
-   `Math.random` paths an import rule cannot see.
+   commit, so the rule has one home. `check:source-sites` is uncached (a
+   root script, not a package test) and runs in CI on every change but a
+   docs-only one, which cannot add an import or a dependency
+   (`package.json` is never classed docs-only). The script's existing
+   walk filters out `package.json` and `.test.`/`.spec.` files, so the
+   rule has its own pass over the same git listing: it reads every
+   `packages/*/package.json` (a parse failure refuses, exit 2, where the
+   test skipped it) and every source file under `src`, test files
+   included, as the vitest scan did. It reads tracked files only, like
+   the script's other rules; an untracked file is reported by
+   `noteUntrackedInput`, not read.
+2. **WS2: `node:crypto` as one set.** In `check:core-purity`, every
+   reference to `node:crypto` (or `crypto`) binds only `createHash`: a
+   named import, `export { x } from`, `import x = require(...)` or a
+   destructuring `require(...)` of any other name is a finding; a
+   default or namespace import is a finding (today only a binding named
+   `crypto` is caught, through the global-name rule; an alias such as `c`
+   passes); `import type` and type-only specifiers stay allowed, which
+   needs new code, since the walker reads neither `isTypeOnly` flag
+   today. `importedNames` and its index leave `PURITY_RULES` (nothing
+   else reads them). The `RANDOM_NAMES` member and qualified rules stay,
+   since they catch the global `crypto.*` and `Math.random` paths an
+   import rule cannot see.
 3. **The ADR.** `determinism-in-core.md`'s `Enforced-by:` moves
    `one-layer-out` from `tests (one-layer-out)` to
    `npm run check:source-sites (one-layer-out)`, and the sentence naming
@@ -76,22 +90,34 @@ replaces a denylist that every Node release can outgrow.
 
 ### 1. `model-sdk-boundary` in `check:source-sites` (barwise-wrr)
 
-Port the test's reader into the script, add the rule's tests to
-`check-source-sites.test.mjs` (an SDK import, a subpath, a dynamic
-import, a `require`, a re-export, a `.mjs` file, a `package.json`
-dependency; the word `"openai"` in a string is not an import; `llm`
-itself is exempt), delete the vitest file, restate the ADR line, add the
-probe. Plant: an `import Anthropic from "@anthropic-ai/sdk"` in
-`cli/src` turns `npm run check:source-sites` red with no package
-rebuilt. Closes barwise-wrr.
+Port the test's reader into the script and every case the vitest file
+checks into `check-source-sites.test.mjs`, each tagged
+`[adr:determinism-in-core#one-layer-out]`: an SDK import, a subpath, a
+type import of a subpath (`@anthropic-ai/sdk/resources/messages`), a
+dynamic import, a `require`, a re-export, a `.mjs` file, a
+`package.json` dependency in each of the four fields; negatives: the
+word `"openai"` in a string, in a comment, and the package
+`openai-compat` (the prefix guard); `llm` itself is exempt. The test's
+sanity floors become refusals, so a layout change cannot turn the rule
+into a pass over nothing: the rule refuses (exit 2) when `cli`, `mcp`
+or `vscode` has no source file in the listing, or when no
+`package.json` outside `llm` is read. Delete the vitest file, restate
+the ADR's `Enforced-by:` and Consequences sentence, regenerate
+`ARCHITECTURE.md`, add the probe (with `gate: "check:source-sites"`
+and an `old` string that occurs once in its `cli/src` file). Plant: an
+`import Anthropic from "@anthropic-ai/sdk"` in `cli/src` turns
+`npm run check:source-sites` red with no package rebuilt. Closes
+barwise-wrr.
 
 ### 2. `node:crypto` allowlist in `check:core-purity` (barwise-fzd)
 
-Replace `importedNames` for crypto with an allowlist check, add tests
-for `randomFillSync`, `randomFill`, `generateKey`, `webcrypto`, a
-namespace import and a default import (each red), and `createHash` and
-`import type { Hash }` (each green). Plant each with `mutate.mjs`.
-Closes barwise-fzd.
+Replace `importedNames` for crypto with the allowlist, add tests for
+`randomFillSync`, `randomFill`, `generateKey`, `webcrypto`, a namespace
+import and a default import under an alias (`c`), `export {
+randomFillSync } from`, `import c = require(...)` and a destructuring
+`require` (each red), and `createHash`, `import type { Hash }` and
+`import { type Hash, createHash }` (each green). Plant the allowlist and
+the type-only exemption with `mutate.mjs`. Closes barwise-fzd.
 
 ## Alternatives considered
 
@@ -122,9 +148,10 @@ Closes barwise-fzd.
 - **The script must read what the test read.** The tests in WS1 port
   every case the vitest file covered before it is deleted, so nothing it
   caught is dropped; the review compares the two case lists.
-- **Fault matrix.** `check:source-sites` and `check:core-purity` are
-  already matrix gates; no new refusal path is added beyond the existing
-  "no source read" refusal.
+- **Fault matrix.** Whether `check:source-sites` and `check:core-purity`
+  are matrix gates, and whether the new refusals (a missing expected
+  package, an unparseable `package.json`) need matrix entries, is checked
+  in WS1 against `lib/ci-gates.mjs` and the matrix run, not assumed.
 - **A false finding in core.** The allowlist run over today's core
   finds nothing (two `createHash` imports); the plant shows red.
 
