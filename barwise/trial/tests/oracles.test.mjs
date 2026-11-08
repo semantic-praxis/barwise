@@ -457,7 +457,7 @@ test("gradeParity fails on a real difference and ignores path and whitespace noi
   assert.equal(gradeParity("a  \r\nb", "a\nb", "x").status, "pass");
 });
 
-test("evaluateGate: a new failure, a stale row and an unclassified row each fail the gate", () => {
+test("evaluateGate: a new failure, a stale row and an unclassified row each fail the gate [adr:findings-close-by-mechanism#ratchet-both-ways]", () => {
   const results = [
     { customer: "C01", tier: "small", sprint: 1, step: "a", status: "fail", severity: "S1" },
     { customer: "C01", tier: "small", sprint: 1, step: "b", status: "pass" },

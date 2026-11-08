@@ -5,10 +5,11 @@
  *
  * The rule and parser cases need no build. The end-to-end cases run the
  * gate, which imports the built @barwise/core and @barwise/learn, so they
- * register always and skip when either is missing: test:scripts runs before
- * the build in CI and sees them skip, while the gate's own CI step and its
- * probes run after it. The fixture is a copy of the real files, so it is
- * green for the reason the repository is and each plant is red for one.
+ * register always and skip when either is missing: test:scripts runs after
+ * the build in CI, so they run there, and skip on a tree with no build;
+ * the gate's own CI step and its probes run after the build too.
+ * The fixture is a copy of the real files, so it is green for the reason
+ * the repository is and each plant is red for one.
  */
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";

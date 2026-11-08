@@ -131,8 +131,17 @@ export function evaluateGate(results, baseline, {
   };
 }
 
-export function runGate({ tier = "small", write = false } = {}) {
-  const path = resultsPath(tier);
+/**
+ * `baselinePath` and `resultsFile` default to the lane's own paths; a test
+ * passes a temporary directory's.
+ */
+export function runGate({
+  tier = "small",
+  write = false,
+  baselinePath = BASELINE_PATH,
+  resultsFile = resultsPath(tier),
+} = {}) {
+  const path = resultsFile;
   if (!existsSync(path)) {
     console.error(`trial gate: no results for tier ${tier} at ${path}; run trial:offline first`);
     return 2;
@@ -142,12 +151,12 @@ export function runGate({ tier = "small", write = false } = {}) {
     console.error(`trial gate: results file for tier ${tier} is empty; the run recorded nothing`);
     return 2;
   }
-  const baseline = existsSync(BASELINE_PATH)
-    ? JSON.parse(readFileSync(BASELINE_PATH, "utf8"))
+  const baseline = existsSync(baselinePath)
+    ? JSON.parse(readFileSync(baselinePath, "utf8"))
     : { findings: {} };
   const v = evaluateGate(results, baseline);
   const toWrite = [...v.fresh, ...v.freshBlind];
-  if (write && toWrite.length) {
+  if (write) {
     baseline.findings = baseline.findings ?? {};
     const classes = loadCatalog();
     let classified = 0;
@@ -175,11 +184,21 @@ export function runGate({ tier = "small", write = false } = {}) {
           issue: null,
         };
     }
+    writeFileSync(baselinePath, JSON.stringify(sortKeys(baseline), null, 2) + "\n");
+    // The writer is additive (baselines-merge-on-write, decision 2), so it
+    // says what it did in the helper's terms. A kept row is one that is
+    // not still a placeholder; a row no longer open is kept too, since the
+    // gate already fails on it until someone removes it by hand, and is
+    // named so the write report does not hide it.
+    const rows = Object.values(baseline.findings);
+    const unclassified = rows.filter(isTrialRowUnclassified).length;
     console.log(
-      `trial gate: ${classified} of ${toWrite.length} new row(s) matched a catalog class`,
+      `trial gate: ${
+        rows.length - unclassified
+      } verdict(s) kept, ${toWrite.length} new (${classified} matched a catalog class), ${unclassified} still unclassified, ${v.stale.length} no longer open (kept; remove by hand)${
+        v.stale.length ? `: ${v.stale.join(", ")}` : ""
+      }`,
     );
-    writeFileSync(BASELINE_PATH, JSON.stringify(sortKeys(baseline), null, 2) + "\n");
-    console.log(`trial gate: wrote ${toWrite.length} row(s) to ${BASELINE_PATH}`);
   }
   // A found regression is a definite answer and the most actionable one,
   // so it outranks "could not answer": exit 1 wins over exit 2. The first

@@ -11,8 +11,9 @@
  *
  * Every test registers whether or not @barwise/core is built, and skips
  * when it is not, so the count test:scripts holds this file to does not
- * depend on a build. test:scripts runs before the build and sees them
- * skip; test:adr-model runs them after it, and refuses if any skipped.
+ * depend on a build. test:scripts runs after the build in CI, so they run
+ * there; on a tree with no build they skip, and test:adr-model refuses if
+ * any skipped.
  */
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";

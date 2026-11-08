@@ -10,7 +10,7 @@ docs/specs/audit-finding-reader.spec.md
 Enforced-by: npm run audit:specs -- --check (person-classifies),
 npm run check:findings (mechanism-closes, person-classifies),
 tests (ratchet-both-ways, ratchet-in-ci),
-none (barwise-ym8.k4d: ratchet-both-ways), none (barwise-ym8.h0l: person-classifies),
+none (barwise-ym8.h0l: person-classifies),
 none (barwise-ym8.ld2: ratchet-in-ci)
 
 ## Context
@@ -70,19 +70,23 @@ verdict on every row is safe to gate on, when raw detection is not.
   is not a step that can fail CI (run in `barwise/`, not
   continue-on-error, under a guard that runs it on every code change, as
   `adr-judge.mjs` judges a declared gate), when its npm script runs a
-  different file, or when a ratchet has no stale-row case:
+  different file, or when a ratchet has no stale-row case or no
+  new-candidate case:
   - `audit:duplication`, `audit:specs` and `audit:rubric` get a row
-    planted in their real baseline and must fail `--check` naming it;
-    the rubric case needs the built promptlab, so it skips in CI, which
-    runs `test:scripts` before the build (barwise-ym8.k4d, with
-    barwise-ym8.fi5);
-  - `audit:corrections` and `trial:gate` are covered by tests that
-    plant a stale row in a sandbox, which the registry names and checks
-    exist;
+    planted in their real baseline and must fail `--check` naming it,
+    and get their first row deleted and must fail `--check` naming
+    that one; both are restored afterwards. The rubric cases need the
+    built promptlab: `test:scripts` runs after the build in CI, and
+    under `CI` a missing build fails them instead of skipping
+    (barwise-ym8.k4d, barwise-ym8.fi5);
+  - `audit:corrections` is covered by tests that plant a stale row and
+    a new record in a sandbox, `merge-record` by a unit test that a
+    merge with no trailer is a finding, and `trial:gate` by a unit
+    test that `evaluateGate` reports a new, a stale and an
+    unclassified row. Neither of those has a `--check` case that
+    withholds a row. The registry names each test and checks it exists;
   - `trial:gate` alone has no CI step: a run needs `trial:offline`
     results, which no CI job produces (barwise-ym8.ld2).
-- The other half of decision 2, a new candidate with no row, is tested
-  for `audit:corrections` only (barwise-ym8.k4d).
 - Decision 4 beyond the registry:
   - `trial:gate` ratchets `trial-baseline.json`, but only the trial's
     unit tests run in CI. The enterprise-trial spec plans the small

@@ -233,7 +233,7 @@ test("adr-judge: scriptVerdict is the gate-name and meta-gate check, and a rejec
 
 // The schema and RULES state the same rules, and the builder
 // writes only fact types and roles the schema has. Neither needs core, so
-// both run on every tree test:scripts runs on, before the build
+// both run on every tree test:scripts runs on, with or without a build
 // (docs/specs/adr-conformance-model.spec.md, WS3).
 test("adr-model schema: its rule constraints are RULES, and every role the builder writes is in it", async () => {
   const YAML = (await import("yaml")).default;

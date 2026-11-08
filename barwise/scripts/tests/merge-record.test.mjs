@@ -293,7 +293,7 @@ test("either review trailer without the other -> 1", () => {
   });
 });
 
-test("a merge with no trailer at all is a finding, and the report prints the command that files it [adr:merge-delegation#review-before-merge]", () =>
+test("a merge with no trailer at all is a finding, and the report prints the command that files it [adr:merge-delegation#review-before-merge] [adr:findings-close-by-mechanism#ratchet-both-ways]", () =>
   withCutoff((s, since) => {
     const bad = s.merge({ trailers: [] });
     const out = s.local(since);

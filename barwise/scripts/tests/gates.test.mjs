@@ -122,6 +122,29 @@ function skipIfShallow(t) {
   return shallowClone;
 }
 
+/**
+ * A case that needs a built `dist` (the rubric ratchet scores through
+ * promptlab's). Absent, or present and not loadable (`out`, the output of
+ * a run that tried), it skips on a developer's machine and THROWS when `CI`
+ * is set: test:scripts runs after `npm run build` in ci.yml, so a missing
+ * dist there is a broken step order, and a skip would report a pass for a
+ * case that never ran (barwise-ym8.fi5). Returns true when it skipped.
+ */
+function needDist(t, rel, out) {
+  const absent = !existsSync(join(REPO, "barwise", rel));
+  const unloadable = out !== undefined && /dist not found|Cannot find module/.test(out);
+  if (!absent && !unloadable) return false;
+  const why = absent
+    ? `${rel} is not built`
+    : `the build at ${rel} does not load`;
+  // `CI=0` and `CI=false` are a developer saying "not CI"; GitHub sets `true`.
+  if (![undefined, "", "0", "false"].includes(process.env.CI)) {
+    throw new Error(`${why}, and CI is set: run npm run build before test:scripts (ci.yml order)`);
+  }
+  t.skip(`${why}; run npm run build first`);
+  return true;
+}
+
 // --- barwise-989: a gate that cannot see its input must not print PASS ---
 
 /**
@@ -3061,11 +3084,8 @@ const STALE_CASES = {
 
 for (const [source, c] of Object.entries(STALE_CASES).filter(([, x]) => x.row)) {
   const rt = RATCHETS.find((x) => x.source === source);
-  test(`${rt.script} --check fails on a stale baseline row${c.needsDist === undefined ? " [adr:findings-close-by-mechanism#ratchet-both-ways]" : ""}`, (t) => {
-    if (c.needsDist !== undefined && !existsSync(join(REPO, "barwise", c.needsDist))) {
-      t.skip(`${c.needsDist} not built; run npm run build first`);
-      return;
-    }
+  test(`${rt.script} --check fails on a stale baseline row [adr:findings-close-by-mechanism#ratchet-both-ways]`, (t) => {
+    if (c.needsDist !== undefined && needDist(t, c.needsDist)) return;
     if (c.needsHistory && skipIfShallow(t)) return;
     const path = join(REPO, "barwise", FINDING_SOURCE_FILES[source]);
     const before = readFileSync(path, "utf8");
@@ -3079,13 +3099,85 @@ for (const [source, c] of Object.entries(STALE_CASES).filter(([, x]) => x.row)) 
       });
       const out = `${r.stdout}${r.stderr}`;
       // A build that exists but will not load is not the ratchet's verdict.
-      if (c.needsDist !== undefined && /dist not found|Cannot find module/.test(out)) {
-        t.skip("the promptlab build does not load; run npm run build first");
-        return;
-      }
+      if (c.needsDist !== undefined && needDist(t, c.needsDist, out)) return;
       assert.equal(r.status, 1, `expected a finding (1), got ${r.status}:\n${out}`);
       // The stale message names the planted row itself, on one line.
       assert.match(out, c.output);
+    } finally {
+      writeFileSync(path, before);
+    }
+  });
+}
+
+/**
+ * The other half of findings-close-by-mechanism decision 2: a candidate with
+ * no baseline row is a finding. A ratchet either plants it (the first row of
+ * the real baseline, by sorted id, deleted and restored in `finally`, so the
+ * real detector produces the candidate), or names the test that already
+ * shows it, where no `--check` case can withhold a row. A registry test
+ * below holds the keys to RATCHETS.
+ */
+const NEW_CASES = {
+  duplication: {
+    output: (id) => new RegExp(`NEW candidate not in audit-baseline\\.json:\\s+${escapeRe(id)}\\b`),
+  },
+  rubric: {
+    output: (id) =>
+      new RegExp(`NEW non-discriminating check, not in the baseline:\\s+${escapeRe(id)}\\b`),
+    needsDist: "packages/promptlab/dist/index.js",
+  },
+  specs: {
+    needsHistory: true,
+    output: (id) => new RegExp(`^\\s*NEW: ${escapeRe(id)}$`, "m"),
+  },
+  corrections: {
+    testedBy: [
+      "barwise/scripts/tests/gates.test.mjs",
+      "audit-corrections fails on a correction record missing from the baseline",
+    ],
+  },
+  "merge-record": {
+    testedBy: [
+      "barwise/scripts/tests/merge-record.test.mjs",
+      "a merge with no trailer at all is a finding",
+    ],
+  },
+  trial: {
+    // One title covers the new, stale and unclassified halves, so
+    // STALE_CASES.trial names the same test.
+    testedBy: [
+      "barwise/trial/tests/oracles.test.mjs",
+      "evaluateGate: a new failure, a stale row and an unclassified row each fail the gate",
+    ],
+  },
+};
+
+function escapeRe(text) {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+for (const [source, c] of Object.entries(NEW_CASES).filter(([, x]) => x.output)) {
+  const rt = RATCHETS.find((x) => x.source === source);
+  test(`${rt.script} --check fails on a candidate with no baseline row [adr:findings-close-by-mechanism#ratchet-both-ways]`, (t) => {
+    if (c.needsDist !== undefined && needDist(t, c.needsDist)) return;
+    if (c.needsHistory && skipIfShallow(t)) return;
+    const path = join(REPO, "barwise", FINDING_SOURCE_FILES[source]);
+    const before = readFileSync(path, "utf8");
+    try {
+      const json = JSON.parse(before);
+      const rows = json[FINDING_SOURCE_KEYS[source]];
+      const id = Object.keys(rows).sort()[0];
+      assert.ok(id, `${source}: the baseline holds no row to withhold`);
+      delete rows[id];
+      writeFileSync(path, JSON.stringify(json, null, 2) + "\n");
+      const r = spawnSync(process.execPath, [join(REPO, "barwise", rt.script), "--check"], {
+        cwd: REPO,
+        encoding: "utf8",
+      });
+      const out = `${r.stdout}${r.stderr}`;
+      if (c.needsDist !== undefined && needDist(t, c.needsDist, out)) return;
+      assert.equal(r.status, 1, `expected a finding (1), got ${r.status}:\n${out}`);
+      assert.match(out, c.output(id));
     } finally {
       writeFileSync(path, before);
     }
@@ -3107,6 +3199,11 @@ test("every baseline has a registered ratchet, wired into CI with a stale-row ca
     Object.keys(STALE_CASES).sort(),
     RATCHETS.map((rt) => rt.source).sort(),
     "a ratchet has no stale-row case",
+  );
+  assert.deepEqual(
+    Object.keys(NEW_CASES).sort(),
+    RATCHETS.map((rt) => rt.source).sort(),
+    "a ratchet has no new-candidate case",
   );
   const { ciStepOccurrences } = await import("../lib/ci-occurrences.mjs");
   const { stepGates } = await import("../lib/adr-judge.mjs");
@@ -3132,13 +3229,15 @@ test("every baseline has a registered ratchet, wired into CI with a stale-row ca
       `${rt.source}: ${name} does not run ${rt.script}, the script the stale case runs`,
     );
   }
-  for (const [source, c] of Object.entries(STALE_CASES)) {
-    if (!c.testedBy) continue;
-    const [file, title] = c.testedBy;
-    assert.ok(
-      readFileSync(join(REPO, file), "utf8").includes(title),
-      `${source}: its stale-row test "${title}" is not in ${file}`,
-    );
+  for (const [half, cases] of [["stale-row", STALE_CASES], ["new-candidate", NEW_CASES]]) {
+    for (const [source, c] of Object.entries(cases)) {
+      if (!c.testedBy) continue;
+      const [file, title] = c.testedBy;
+      assert.ok(
+        readFileSync(join(REPO, file), "utf8").includes(title),
+        `${source}: its ${half} test "${title}" is not in ${file}`,
+      );
+    }
   }
 });
 
@@ -3377,9 +3476,9 @@ const BASELINE_WRITERS = [
     key: "checks",
     human: ["verdict"],
     placeholder: "TODO",
-    // Reads packages/promptlab/dist, which `npm test` builds before it gets
-    // here. Skipped rather than failed when absent: a test that cannot see its
-    // input must not report either verdict.
+    // Reads packages/promptlab/dist. ci.yml runs test:scripts after the build,
+    // so under CI an absent dist fails (needDist); on a developer's machine it
+    // skips: a test that cannot see its input must not report a pass.
     needsDist: "packages/promptlab/dist/index.js",
   },
   {
@@ -3403,11 +3502,8 @@ const BASELINE_WRITERS = [
 ];
 
 for (const w of BASELINE_WRITERS) {
-  test(`${w.script} rewrites without changing a committed verdict${w.needsDist === undefined ? " [adr:baselines-merge-on-write#merge-not-regenerate]" : ""}`, (t) => {
-    if (w.needsDist !== undefined && !existsSync(join(REPO, "barwise", w.needsDist))) {
-      t.skip(`${w.needsDist} not built; run npm run build first`);
-      return;
-    }
+  test(`${w.script} rewrites without changing a committed verdict [adr:baselines-merge-on-write#merge-not-regenerate]`, (t) => {
+    if (w.needsDist !== undefined && needDist(t, w.needsDist)) return;
     if (w.needsHistory && skipIfShallow(t)) return;
 
     const path = join(REPO, w.file);
@@ -3458,11 +3554,8 @@ for (const w of BASELINE_WRITERS) {
     }
   });
 
-  test(`${w.script} writes rows sorted by id and prints the merge summary${w.needsDist === undefined ? " [adr:baselines-merge-on-write#findings-order]" : ""}`, (t) => {
-    if (w.needsDist !== undefined && !existsSync(join(REPO, "barwise", w.needsDist))) {
-      t.skip(`${w.needsDist} not built; run npm run build first`);
-      return;
-    }
+  test(`${w.script} writes rows sorted by id and prints the merge summary [adr:baselines-merge-on-write#findings-order]`, (t) => {
+    if (w.needsDist !== undefined && needDist(t, w.needsDist)) return;
     if (w.needsHistory && skipIfShallow(t)) return;
     // The order a writer writes, whatever order its baseline held: the
     // committed rows are reversed first so the input is never already the
@@ -3501,6 +3594,49 @@ for (const w of BASELINE_WRITERS) {
     );
   });
 }
+
+test("test:scripts runs after the build whenever a test in this file needs promptlab's dist [adr:baselines-merge-on-write#merge-not-regenerate]", () => {
+  const needing = [...BASELINE_WRITERS, ...Object.values(STALE_CASES), ...Object.values(NEW_CASES)]
+    .filter((c) => c.needsDist !== undefined);
+  assert.ok(needing.length > 0, "no registry entry needs a dist; this order check is vacuous");
+  const steps = ciSteps();
+  const build = steps.findIndex((s) => s.args === "run build");
+  const scripts = steps.findIndex((s) => s.args === "run test:scripts");
+  assert.ok(build >= 0 && scripts >= 0, "ci.yml runs both npm run build and npm run test:scripts");
+  assert.ok(
+    scripts > build,
+    "ci.yml runs test:scripts before npm run build, so the rubric tests see no dist (barwise-ym8.fi5)",
+  );
+});
+
+test("needDist throws under CI and skips otherwise, for an absent dist and one that will not load [adr:baselines-merge-on-write#merge-not-regenerate]", () => {
+  const ci = process.env.CI;
+  const skipped = [];
+  const t = { skip: (why) => skipped.push(why) };
+  try {
+    delete process.env.CI;
+    assert.equal(needDist(t, "packages/none/dist/index.js"), true);
+    assert.equal(skipped.length, 1, "without CI an absent dist skips");
+    assert.equal(needDist(t, "packages/core/package.json", "Cannot find module 'x'"), true);
+    assert.equal(skipped.length, 2, "without CI a dist that will not load skips");
+    assert.equal(needDist(t, "packages/core/package.json", "all fine"), false);
+    for (const off of ["0", "false"]) {
+      process.env.CI = off;
+      assert.equal(needDist(t, "packages/none/dist/index.js"), true, `CI=${off} skips`);
+    }
+    assert.equal(skipped.length, 4, "CI=0 and CI=false skip like an unset CI");
+    process.env.CI = "1";
+    assert.throws(() => needDist(t, "packages/none/dist/index.js"), /CI is set.*npm run build/);
+    assert.throws(
+      () => needDist(t, "packages/core/package.json", "dist not found"),
+      /does not load.*CI is set/,
+    );
+    assert.equal(skipped.length, 4, "under CI nothing is skipped");
+  } finally {
+    if (ci === undefined) delete process.env.CI;
+    else process.env.CI = ci;
+  }
+});
 
 test("audit-corrections --write keeps a classified verdict and its note", () => {
   const dir = correctionRepo({ "probe.spec.md": A_CORRECTION }, {});
@@ -3731,7 +3867,8 @@ test("every baseline has one registered writer, and each merges through baseline
     "trial-baseline.json": {
       script: "barwise/trial/lib/gate.mjs",
       exception: "additive: a run covers some scopes or one tier, and mergeBaselineRows "
-        + "writes only the ids it is given (audit-finding-reader.spec.md, Open decision 4)",
+        + "writes only the ids it is given; it keeps a row no longer open and prints its own "
+        + "summary (baselines-merge-on-write, decision 2; audit-finding-reader.spec.md, Open decision 4)",
     },
   };
   assert.deepEqual(
