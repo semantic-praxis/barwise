@@ -337,7 +337,7 @@ export function isModelSdk(specifier) {
 
 /** The model-SDK specifiers one file references, by TypeScript's reading. */
 export function modelSdkImports(fileText) {
-  // A `/// <reference types="x" />` is listed apart from the imports, and
+  // A triple-slash types reference is listed apart from the imports, and
   // pulls the SDK's types into the program as surely as `import type`.
   const { importedFiles, typeReferenceDirectives } = ts.preProcessFile(fileText, true, true);
   return [...importedFiles, ...typeReferenceDirectives]
