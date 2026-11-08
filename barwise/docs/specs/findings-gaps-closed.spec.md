@@ -4,6 +4,7 @@ Status: Planned; plan reviewed 2026-11-08 (one round, eight findings, all addres
 
 Created: 2026-11-08
 Last-updated: 2026-11-08
+Plan-reviewed: 8cc421c1 (code-review, pr-review)
 Tracking: barwise-ym8.fi5, barwise-ym8.k4d, barwise-ym8.nhy, barwise-eu6, barwise-tko (barwise-ym8.h0l is out of scope: it waits on barwise-ym8.gc9.7fb)
 Touches: .github/workflows/ci.yml,
 barwise/scripts/tests/gates.test.mjs,
