@@ -50,10 +50,10 @@ Architecture:
 
 Process:
 
-- [Baseline writers merge verdicts](adr/baselines-merge-on-write.md) -- 2026-11-06 -- declared: tests (merge-not-regenerate, one-merge-owner, specs-write-on-ask, findings-order, duplication-no-writer); gap: barwise-ym8.fi5 (merge-not-regenerate); gap: barwise-ym8.nhy (findings-order)
+- [Baseline writers merge verdicts](adr/baselines-merge-on-write.md) -- 2026-11-06 -- declared: tests (merge-not-regenerate, one-merge-owner, specs-write-on-ask, findings-order, duplication-no-writer)
 - [Constraint-extraction coverage policy](adr/constraint-coverage-policy.md) -- 2026-08-27 -- declared: check:eval-coverage (two-instances, tiered-types, inventory-outside); gap: barwise-ym8.vq8 (tiered-types)
 - [Credential handling](adr/credential-handling.md) -- 2026-09-12 -- declared: tests (gitleaks-detects, scan-index-and-history, wrapper-contract, pinned-gitleaks)
-- [Findings close by mechanism](adr/findings-close-by-mechanism.md) -- 2026-11-06 -- declared: audit:specs -- --check (person-classifies), check:findings (mechanism-closes, person-classifies), tests (ratchet-both-ways, ratchet-in-ci); gap: barwise-ym8.k4d (ratchet-both-ways); gap: barwise-ym8.h0l (person-classifies); gap: barwise-ym8.ld2 (ratchet-in-ci)
+- [Findings close by mechanism](adr/findings-close-by-mechanism.md) -- 2026-11-06 -- declared: audit:specs -- --check (person-classifies), check:findings (mechanism-closes, person-classifies), tests (ratchet-both-ways, ratchet-in-ci); gap: barwise-ym8.h0l (person-classifies); gap: barwise-ym8.ld2 (ratchet-in-ci)
 - [Gate refusal contract](adr/gate-refusal-contract.md) -- 2026-09-17 -- declared: fault-matrix (three-results, refuse-not-find, cwd-invariant), tests (three-results, refuse-not-find, cwd-invariant, readers-keep-third); gap: barwise-ym8.j31 (three-results); gap: barwise-ym8.rl7 (refuse-not-find); gap: barwise-ym8.aep (readers-keep-third); gap: barwise-ym8.if3 (no-writes)
 - [Merge delegation](adr/merge-delegation.md) -- 2026-10-18 -- declared: check:merge-record (review-before-merge, no-size-exemption, owner-overrides, ask-owner), tests (pinned-merge); gap: barwise-ym8.oof (ask-owner)
 - [Must-agree copies carry a check](adr/must-agree-copies.md) -- 2026-11-06 -- declared: audit:duplication -- --check (every-candidate-verdict), check:parity (registered-sets-identical), check:findings (every-candidate-verdict), tests (registered-sets-identical); gap: barwise-ym8.edf (check-on-copy); gap: barwise-ym8.3tg (share-by-composition); gap: barwise-ym8.8nq (registered-sets-identical)

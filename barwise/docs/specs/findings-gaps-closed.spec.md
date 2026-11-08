@@ -1,6 +1,6 @@
 # Closing the batch 4 findings and baseline gaps
 
-Status: Planned; plan reviewed 2026-11-08 (one round, eight findings, all addressed; four owner decisions recorded)
+Status: Planned; plan reviewed 2026-11-08 (one round, eight findings, all addressed; four owner decisions recorded); WS1, WS2 and WS3 implemented
 
 Created: 2026-11-08
 Last-updated: 2026-11-08

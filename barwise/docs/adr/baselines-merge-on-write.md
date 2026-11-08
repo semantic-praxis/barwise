@@ -7,8 +7,7 @@ barwise-tko, barwise-rh3, barwise-80d,
 docs/specs/baseline-write-preserves-verdicts.spec.md,
 docs/specs/audit-finding-reader.spec.md
 Enforced-by: tests (merge-not-regenerate, one-merge-owner, specs-write-on-ask, findings-order,
-duplication-no-writer), none (barwise-ym8.fi5: merge-not-regenerate),
-none (barwise-ym8.nhy: findings-order)
+duplication-no-writer)
 
 ## Context
 
@@ -42,6 +41,12 @@ note, was decided when barwise-qs8 closed.
    is `trial/lib/gate.mjs --write`, whose write is additive: a run can
    cover some scopes or one tier, and the helper writes only the ids it
    is given, so it would drop the rows of every scope that did not run.
+   It keeps a row that is no longer open (the gate fails on it until
+   someone removes it by hand) and prints its own summary: verdicts
+   kept, new rows, rows still unclassified, and the ids kept although
+   no longer open. The writer of `scripts/tests/expected-counts.json`
+   is outside this rule: it holds derived counts and no verdict, so
+   regenerating it loses nothing.
 3. **`audit:specs` writes only when asked.**{#specs-write-on-ask} A bare invocation reports
    and writes nothing; `--write` writes.
 4. **Row order depends only on the findings.**{#findings-order} Rows are sorted by id,
@@ -77,11 +82,12 @@ note, was decided when barwise-qs8 closed.
     declared exception) and is one the round-trip tests run, and no
     other script anywhere under `scripts/` or `trial/lib/` names a
     baseline in code that writes or moves a file.
-- CI runs `test:scripts` before `npm run build`. The two `audit-rubric`
-  writer tests (round trip, and order and summary) need
-  `packages/promptlab/dist`, so they skip in CI and
-  in the pre-push `ci:local --commit`, which uses a fresh worktree. It
-  runs only where a build already exists (barwise-eu6).
+- CI runs `test:scripts` after `npm run build`, so the `audit-rubric`
+  writer tests (round trip, and order and summary), which need
+  `packages/promptlab/dist`, run there and in the pre-push
+  `ci:local --commit`, which follows `ci.yml`'s order. When `CI` is set
+  and the build is absent they fail instead of skipping, and a test
+  fails if `test:scripts` comes before the build (barwise-eu6).
 - The summary misreports a reopen: `audit-spec-status` counts a
   reopened verdict as kept, on that write and on later ones, while
   `--check` fails on it (barwise-80d). The writers also report rows
@@ -91,19 +97,20 @@ note, was decided when barwise-qs8 closed.
   `audit-corrections`. For `audit-rubric` and `audit-spec-status`
   nothing checks it (barwise-5ij).
 - The trial writer, decision 2's exception, keeps rows no longer
-  detected and never refreshes derived fields (decision 1), and prints
-  no summary (decision 4), so `findings-order` keeps its gap
-  (barwise-ym8.nhy). It sorts its rows and keeps existing verdicts, but
-  no test runs it: its paths are fixed in `trial/lib/paths.mjs`, and a
-  run needs `trial:offline` results (barwise-tko).
+  detected and never refreshes derived fields (decision 1). That
+  exception is held by this prose and by the `WRITERS` reason text in
+  `gates.test.mjs`, which fails if the writer comes to import the
+  helper; nothing fails if it starts regenerating rows. What a test
+  does pin is its summary line, its sort and that it keeps a row no
+  longer open (`trial/tests/gate-write.test.mjs`).
 - Apart from the reopen, a writer refreshes derived fields under a
   kept verdict and reports nothing about it. The spec left this as an
   unresolved Open decision ("Recommend silent refresh for now and a
   count in the summary line"). The code has the silent refresh but no
   count. This is open, not decided here (barwise-rh3).
 - `scripts/tests/expected-counts.json` also has a `--write` writer
-  that does not use the helper. It holds only derived counts and no
-  verdict. No source says whether this rule covers it (barwise-tko).
+  that does not use the helper. Decision 2 states that it is outside
+  the rule.
 - Until they are replaced with links (barwise-5h3; the root `CLAUDE.md` states
   the rule in one line with a link since architecture-index WS5), these places
   also state this rule:
