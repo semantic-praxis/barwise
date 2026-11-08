@@ -137,7 +137,8 @@ function needDist(t, rel, out) {
   const why = absent
     ? `${rel} is not built`
     : `the build at ${rel} does not load`;
-  if (process.env.CI) {
+  // `CI=0` and `CI=false` are a developer saying "not CI"; GitHub sets `true`.
+  if (![undefined, "", "0", "false"].includes(process.env.CI)) {
     throw new Error(`${why}, and CI is set: run npm run build before test:scripts (ci.yml order)`);
   }
   t.skip(`${why}; run npm run build first`);
@@ -3619,13 +3620,18 @@ test("needDist throws under CI and skips otherwise, for an absent dist and one t
     assert.equal(needDist(t, "packages/core/package.json", "Cannot find module 'x'"), true);
     assert.equal(skipped.length, 2, "without CI a dist that will not load skips");
     assert.equal(needDist(t, "packages/core/package.json", "all fine"), false);
+    for (const off of ["0", "false"]) {
+      process.env.CI = off;
+      assert.equal(needDist(t, "packages/none/dist/index.js"), true, `CI=${off} skips`);
+    }
+    assert.equal(skipped.length, 4, "CI=0 and CI=false skip like an unset CI");
     process.env.CI = "1";
     assert.throws(() => needDist(t, "packages/none/dist/index.js"), /CI is set.*npm run build/);
     assert.throws(
       () => needDist(t, "packages/core/package.json", "dist not found"),
       /does not load.*CI is set/,
     );
-    assert.equal(skipped.length, 2, "under CI nothing is skipped");
+    assert.equal(skipped.length, 4, "under CI nothing is skipped");
   } finally {
     if (ci === undefined) delete process.env.CI;
     else process.env.CI = ci;
