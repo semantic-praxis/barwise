@@ -1,5 +1,5 @@
 /**
- * One reader over the five audit baselines (docs/specs/audit-finding-reader.spec.md).
+ * One reader over the six baselines (docs/specs/audit-finding-reader.spec.md).
  *
  * Each ratchet keeps its file, its row key and its vocabulary; an adapter
  * per source maps a row to one shape, so the rules about findings are
@@ -59,6 +59,9 @@ export const isTrialRowUnclassified = (row) =>
 
 /** audit:duplication's and audit:rubric's two verdicts. */
 const BENIGN_OR_TRACKED = new Set(["accepted-benign", "tracked"]);
+
+/** check:merge-record's: the owner answered for a merge, or an issue holds it. */
+const ACCEPTED_OR_TRACKED = new Set(["accepted-by-owner", "tracked"]);
 
 /**
  * Whether a status or verdict says `tracked`, and the issue it names: the
@@ -149,6 +152,23 @@ const SOURCES = [
     },
   },
   {
+    source: "merge-record",
+    file: "merge-record-baseline.json",
+    key: "merges",
+    map(id, row) {
+      const status = verdictOf(this.source, id, row, "status");
+      if (status === null || status.startsWith("TODO")) return { state: "unclassified" };
+      const t = tracked(status);
+      return {
+        state: t ? "open" : "classified",
+        issue: t?.issue,
+        classification: t ? "tracked" : status,
+        vocabulary: ACCEPTED_OR_TRACKED,
+        note: row.note,
+      };
+    },
+  },
+  {
     source: "trial",
     file: "trial-baseline.json",
     key: "findings",
@@ -189,7 +209,7 @@ export function readTrialCatalog(root) {
 }
 
 /**
- * Every row of the five baselines in the common shape, in source order and
+ * Every row of the six baselines in the common shape, in source order and
  * then the file's row order, with the trial catalog they were read
  * against. Throws on an absent or malformed file, or a row its adapter
  * cannot map.
@@ -226,7 +246,7 @@ export const SOURCE_FILES = Object.fromEntries(SOURCES.map((s) => [s.source, s.f
 export const SOURCE_KEYS = Object.fromEntries(SOURCES.map((s) => [s.source, s.key]));
 
 /**
- * The audit ratchets, one per baseline (findings-close-by-mechanism
+ * The ratchets, one per baseline (findings-close-by-mechanism
  * decisions 2 and 4): the script that runs it, and the ci.yml `run:` line
  * that wires it into CI, or why it is not wired (`noCi`). A test in
  * gates.test.mjs requires this list to cover every baseline above, each
@@ -250,6 +270,11 @@ export const RATCHETS = [
     source: "corrections",
     script: "scripts/audit-corrections.mjs",
     ci: "npm run audit:corrections -- --check",
+  },
+  {
+    source: "merge-record",
+    script: "scripts/check-merge-record.mjs",
+    ci: "npm run check:merge-record",
   },
   {
     source: "trial",
