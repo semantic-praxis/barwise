@@ -1,6 +1,6 @@
 # Closing the batch 4 findings and baseline gaps
 
-Status: Draft -- no workstream implemented
+Status: Planned; plan reviewed 2026-11-08 (one round, eight findings, all addressed; four owner decisions recorded)
 
 Created: 2026-11-08
 Last-updated: 2026-11-08
@@ -9,9 +9,13 @@ Touches: .github/workflows/ci.yml,
 barwise/scripts/tests/gates.test.mjs,
 barwise/scripts/tests/adr-model.test.mjs,
 barwise/scripts/tests/check-eval-coverage.test.mjs,
-barwise/scripts/tests/expected-counts.json,
+barwise/scripts/tests/adr-facts.test.mjs,
+barwise/scripts/tests/merge-record.test.mjs,
+barwise/trial/tests/oracles.test.mjs,
+barwise/scripts/lib/ci-gates.mjs,
 barwise/trial/lib/gate.mjs,
 +barwise/trial/tests/gate-write.test.mjs,
+barwise/scripts/tests/expected-counts.json,
 barwise/docs/adr/baselines-merge-on-write.md,
 barwise/docs/adr/findings-close-by-mechanism.md,
 barwise/docs/ARCHITECTURE.md
@@ -35,10 +39,13 @@ In scope:
 - When `test:scripts` runs in CI, the system shall run the rubric writer
   and stale-row tests, or fail naming the missing `dist`; it shall not
   skip them (WS1).
-- When a baseline row is removed while its detector still reports the
-  finding, each of the six ratchets' `--check` shall exit 1 naming that
-  candidate, and a registry test shall fail for a ratchet with no such
-  case (WS2).
+- When a candidate has no baseline row, each of the six ratchets shall
+  treat it as a finding, and a registry test shall fail for a ratchet
+  with no case showing that. For `duplication`, `rubric` and `specs` the
+  case is a `--check` exit 1 after a real row is deleted; for
+  `corrections` it is an existing `--check` case; for `merge-record` and
+  `trial` it is a unit test of the finding the ratchet reports, since
+  neither has a CLI case that withholds a row (WS2).
 - When `trial/lib/gate.mjs --write` runs, it shall print how many
   verdicts it kept, how many rows are new, how many are still
   unclassified and which rows it kept although no longer open (WS3).
@@ -63,7 +70,8 @@ Out of scope:
 | ------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------- | ------------------------------------- |
 | `gates.test.mjs` `BASELINE_WRITERS` rubric entry             | `needsDist`; skips in CI; its two tests drop the `[adr:...]` tag when `needsDist` is set                          | WS1: runs, tag unconditional          |
 | `gates.test.mjs` `STALE_CASES.rubric`                        | same skip, same dropped tag                                                                                       | WS1                                   |
-| `ci.yml` `test:scripts` (line 452) and `npm run build` (468) | scripts tests first, build after                                                                                  | WS1: swap                             |
+| `ci.yml` `test:scripts` (line 452) and `npm run build` (468) | scripts tests first, build after; the comment near line 414 describes that order                                  | WS1: swap, comment corrected          |
+| `adr-facts.test.mjs:236`                                     | comment says the cases run before the build                                                                       | WS1: comment corrected                |
 | `adr-model.test.mjs`, `check-eval-coverage.test.mjs`         | headers say test:scripts "runs before the build and sees them skip"; they skip on absent `core`/`learn` `dist`    | WS1: they now run; comments corrected |
 | `gates.test.mjs` `STALE_CASES` + registry test               | stale half pinned for all six ratchets                                                                            | WS2: add `NEW_CASES`                  |
 | `merge-record.test.mjs:296`, `oracles.test.mjs:460`          | a merge with no trailer is a finding; `evaluateGate` reports `fresh`; neither is tagged or named in a registry    | WS2: named by `testedBy`, tagged      |
@@ -107,8 +115,12 @@ Change (recommended alternative, see Alternatives and Open decision 1):
    running `npm run test:scripts` comes after the step running
    `npm run build`.
 5. Correct the comment on the `BASELINE_WRITERS` rubric entry
-   ("`npm test` builds before it gets here"), and the headers of
-   `adr-model.test.mjs` and `check-eval-coverage.test.mjs`.
+   ("`npm test` builds before it gets here"), the headers of
+   `adr-model.test.mjs` and `check-eval-coverage.test.mjs`, the comment
+   at `adr-facts.test.mjs:236` ("before the build"), and the `ci.yml`
+   comment near line 414 that places `test:scripts` before the build.
+   `lib/ci-gates.mjs` is edited only if the order test needs an export
+   (it reads `ciSteps()` as is).
 6. ADR `baselines-merge-on-write`: drop `none (barwise-ym8.fi5: ...)` and
    the CI-order Consequences bullet; restate that the rubric tests run
    after the build. Edit in place, as `barwise-eu6` asks.
@@ -120,10 +132,12 @@ Plants proving it goes red:
   tests fail instead of skipping (the tests plant this in a child
   process whose `dist` path is overridden; the real `dist` is not
   touched).
-- Run `check:adr-tests` over a `test:scripts` report in which the rubric
-  tests are skipped: it must name the decision untested (today the tag is
-  absent when they skip, so they are never counted; after item 3 a skip
-  leaves the tag missing from the passed set).
+
+No `check:adr-tests` plant: that check refuses only when every tagged
+test of a decision skipped, and `merge-not-regenerate` and
+`ratchet-both-ways` each have other tagged tests that pass, so a skipped
+rubric test cannot turn it red. The guard is `needDist` throwing under
+`CI`, planted above.
 
 Closes `barwise-ym8.fi5` and `barwise-eu6`.
 
@@ -134,24 +148,40 @@ row or a named test, and a registry test requires the keys to equal
 `RATCHETS`. Add `NEW_CASES` beside it with the same shape and the same
 registry assertion. Each plants a candidate with no row:
 
-| Ratchet        | Case                                                                                             | Expected                                                               |
-| -------------- | ------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------- |
-| `duplication`  | Delete one row from `audit-baseline.json` (restored in `finally`); its detector still reports it | exit 1, `NEW candidate not in audit-baseline.json` and the id          |
-| `rubric`       | Delete one row from `rubric-baseline.json` (needs WS1)                                           | exit 1, `NEW non-discriminating check, not in the baseline` and the id |
-| `specs`        | Delete one row from `spec-status-baseline.json`; needs full history                              | exit 1, `NEW: <id>`                                                    |
-| `corrections`  | `testedBy` the existing "fails on a correction record missing from the baseline"                 | named; test exists                                                     |
-| `merge-record` | `testedBy` `merge-record.test.mjs` "a merge with no trailer at all is a finding"                 | named; add the tag                                                     |
-| `trial`        | `testedBy` `oracles.test.mjs` "evaluateGate: a new failure, ..." (its `v1.fresh` assertion)      | named; add the tag                                                     |
+| Ratchet        | Case                                                                                                                                                                                                            | Expected                                                               |
+| -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| `duplication`  | Delete the lexicographically first row of `audit-baseline.json` (today `generated:45f4fbb82790`); measured 0.2 s per `--check`                                                                                  | exit 1, `NEW candidate not in audit-baseline.json` and the id          |
+| `rubric`       | Delete the first row of `rubric-baseline.json` (today `clinic-appointments::must_validate::bf1f8ae6beaf`; needs WS1); measured 0.9 s                                                                            | exit 1, `NEW non-discriminating check, not in the baseline` and the id |
+| `specs`        | Delete the first row of `spec-status-baseline.json` (today `conformance-property.spec.md`); needs full history; measured 1.7 s                                                                                  | exit 1, `NEW: <id>`                                                    |
+| `corrections`  | `testedBy` the existing "fails on a correction record missing from the baseline" (a `--check` case in a sandbox)                                                                                                | named; test exists                                                     |
+| `merge-record` | `testedBy` `merge-record.test.mjs:296` "a merge with no trailer at all is a finding": a bad merge the baseline does not accept is exit 1; the unit-level reading of a candidate with no row, not a row deletion | named; second tag added (see below)                                    |
+| `trial`        | `testedBy` `oracles.test.mjs:460` "evaluateGate: a new failure, ...": `evaluateGate` returns the step in `fresh` when the baseline has no row; a unit test, not a `--check` exit                                | named; tagged                                                          |
 
-A row removed from the real baseline is the uniform plant: the real
-detector produces the candidate, so the case cannot pass for a reason the
-detector does not share. It mirrors the stale cases, which add a row to
-the real file. The registry test also checks each `testedBy` title still
-occurs in its file, as it does for the stale half.
+Each row is chosen by sorting the baseline's keys and taking the first,
+and the test asserts the output names it, so a changed baseline changes
+the planted id without breaking the case. A row removed from the real
+baseline is the uniform plant: the real detector produces the candidate,
+so the case cannot pass for a reason the detector does not share. The
+three scripts take no root argument (unlike `check:findings --root`), so a
+sandbox would need a copied tree and git history; the plants edit the real
+file in place and restore it in `finally`, the same exposure as the stale
+cases (a killed run leaves the file edited; `git checkout` restores it).
+The added time is about 3 s plus a second `--check` for each of the stale
+and new halves already present. The registry test also checks each
+`testedBy` title still occurs in its file, as it does for the stale half.
 
-Plants: for each in-place case, replace the assertion on the exit code
-with the opposite and see it fail; for each `testedBy`, rename the title
-and see the registry test fail. All six tests carry
+**Tags.** The tag reader (`TAG` in `lib/adr-enforcement.mjs`) uses
+`matchAll`, so one title may carry several tags. `merge-record.test.mjs:296`
+keeps its `review-before-merge` tag and gains `ratchet-both-ways`;
+the oracle test at `oracles.test.mjs:460` covers the stale, new and
+unclassified halves in one title and is tagged once, which this spec
+states rather than leaving implied: it is the evidence for both halves of
+`ratchet-both-ways` for `trial`, and `STALE_CASES.trial` and
+`NEW_CASES.trial` therefore name the same test.
+
+Plants: for each in-place case, restore the deleted row's removal (leave
+the baseline whole) and see the case fail; for each `testedBy`, rename the
+title and see the registry test fail. Every case carries
 `[adr:findings-close-by-mechanism#ratchet-both-ways]`. The ADR drops
 `none (barwise-ym8.k4d: ratchet-both-ways)`.
 
@@ -173,17 +203,26 @@ Change (recommended; see Open decision 2):
 
 1. `runGate` takes optional `baselinePath` and `resultsFile` (defaults the
    current constants), so a test can run it in a temp directory.
-2. After the write, print one line in the helper's terms:
-   `trial gate: K verdict(s) kept, N new (C matched a catalog class), U still unclassified, S kept although no longer open`.
-   `K` counts existing rows with a note and an issue, `U` rows with
-   `isTrialRowUnclassified`, `S` the `stale` list. Rows keep their sort by
-   id.
+2. On every `--write`, including one with no new rows (today the print
+   sits inside `if (write && toWrite.length)`), print one line in the
+   helper's terms:
+   `trial gate: K verdict(s) kept, N new (C matched a catalog class), U still unclassified, S no longer open (kept; remove by hand): <ids>`.
+   One predicate, `isTrialRowUnclassified` (already in `findings.mjs`),
+   splits the rows of the written file: `U` are the rows it holds, `K`
+   the rest, so `K + U` equals the rows written, and `N` is the subset of
+   them added this run (`C` of those matched a class). `S` is the `stale`
+   list printed as ids, not a count, since decision 4 requires the writer
+   to say which rows are no longer detected. Rows keep their sort by id.
 3. ADR decision 2 restates the exception: the trial writer is additive,
    keeps rows no longer open (the gate fails on them until removed by
    hand), and prints its own summary. Remove
-   `none (barwise-ym8.nhy: findings-order)`. Add a tagged test in
-   `trial/tests/gate-write.test.mjs` (run by `test:trial`, whose
-   report `check:adr-tests` reads).
+   `none (barwise-ym8.nhy: findings-order)`. The exception stays held by
+   prose: nothing fails if the trial writer starts regenerating rows. What
+   backs it is the summary test and the `WRITERS` reason text in
+   `gates.test.mjs`, which fails if the writer comes to import the helper
+   (a changed route) but not if it changes its own behaviour. Add a
+   tagged test in `trial/tests/gate-write.test.mjs` (run by `test:trial`,
+   whose report `check:adr-tests` reads).
 4. State in the same ADR sentence that `expected-counts.json`'s writer is
    outside the rule: it holds derived counts and no verdict, so
    regenerating it loses nothing (barwise-tko's second question).
@@ -194,7 +233,8 @@ Plants (`gate-write.test.mjs`, temp directory): a results file with one
 new failing step, a baseline holding one classified row (kept), one
 unclassified row and one row in a ran scope that is no longer failing,
 rows written in reverse id order. Asserts: the printed line has all four
-counts; the written file has the stale row still present and every row
+counts and the stale id, and `K + U` equals the rows in the file; the same
+line prints when the run adds no row; the written file has the stale row still present and every row
 sorted by id; the classified row byte-identical. Mutations: drop the
 `console.log`, drop the sort, delete the stale row on write; each turns a
 case red (run with `mutate.mjs`).
@@ -232,6 +272,7 @@ it matches the stale cases and cannot diverge from the real detector.
 ## Open decisions (for review)
 
 1. **How the rubric tests get a built `promptlab` (changes CI step order).**
+   Resolved 2026-11-08 by the owner: A plus C.
    Options: A, B, C, D above. Recommended: A plus C. Move `npm run test:scripts`
    after `npm run build` in `ci.yml` and make the tests refuse, not skip,
    when `CI` is set and `dist` is absent. It is the smallest change that
@@ -240,16 +281,20 @@ it matches the stale cases and cannot diverge from the real detector.
    inside `test:scripts`, which takes extra seconds, and a failing script
    test is now reported after the build rather than before. If the owner
    prefers failing fast before the build, B is the alternative.
-2. **Trial writer: restate the exception or join the helper.** Recommended: B
+2. **Trial writer: restate the exception or join the helper.**
+   Resolved 2026-11-08 by the owner: keep the exception and restate it (B).
+   Recommended: B
    (restate, add summary and test). The helper's per-field placeholder
    cannot express a catalog-classified new row, and deleting rows the gate
    deliberately asks to be removed by hand changes the writer's contract
    for no verdict-safety gain. Choose A only if the owner wants no named
    exceptions in decision 2.
 3. **Is `expected-counts.json`'s writer under `one-merge-owner`?**
+   Resolved 2026-11-08 by the owner: outside the rule.
    Recommended: no; it holds derived counts and no verdict, so
    regeneration loses nothing. Say so in decision 2.
-4. **`h0l`.** Recommended: leave open and untouched until
+4. **`h0l`.** Resolved 2026-11-08 by the owner: leave it.
+   Recommended: leave open and untouched until
    `barwise-ym8.gc9.7fb` has an approved spec; link the two in the
    issue's notes in the commit that lands this spec.
 
@@ -264,13 +309,18 @@ it matches the stale cases and cannot diverge from the real detector.
 - **`CI` in a developer's shell.** A developer with `CI=1` and no build
   gets a failure instead of a skip. That is the intended refusal; the
   message names `npm run build`.
-- **`ci:local` and `CI`.** Whether `ci:local` exports `CI` is checked in
-  WS1; the order swap covers it either way.
+- **`ci:local` and `CI`.** `ci:local` does not set `CI`, so under it
+  `needDist` would skip. Its step list follows `ci.yml`'s order, so the
+  swap puts `test:scripts` after the build there too and `dist` exists.
+  The pre-commit hook does not run `test:scripts`, so it is unaffected.
 - **`check:adr-tests` reading the new tags.** Verified in WS1 against the
   `test:scripts` report that the rubric tests appear as passed, not
   skipped, in a CI-shaped run.
-- **Expected counts.** WS2 and WS3 add tests; regenerate
-  `scripts/tests/expected-counts.json` with `npm run test:scripts -- --write`.
+- **Expected counts.** WS2 adds tests to `gates.test.mjs`, so its count in
+  `scripts/tests/expected-counts.json` changes (regenerate with
+  `npm run test:scripts -- --write`; the file is part of the WS2
+  change). WS3's test lives in `trial/tests`, run by `test:trial`, which
+  does not use that file.
 - **Mechanism closure.** `needDist`, `NEW_CASES`, `gate-write.test.mjs`
   and the order test are created by WS1-WS3; nothing else is invented.
 
