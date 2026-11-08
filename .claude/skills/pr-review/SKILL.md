@@ -236,9 +236,16 @@ claim makes the verdict "cannot tell", not "merge".
   verdict on head <sha>: **<verdict>**.` with the verdict one of
   `merge`, `merge after`, `do not merge`, `cannot tell` or
   `code-review unavailable`; the `steward` skill, section 4b, owns what
-  happens next. The comment is the record a merge is checked against
-  (`docs/adr/merge-delegation.md#review-before-merge`): without it, a
-  review delivered only in the session cannot be told from none. The
+  happens next. Post one for every verdict, `do not merge` and `cannot
+  tell` included, not only the one before the merge: the comment is the
+  record a merge is checked against
+  (`docs/adr/merge-delegation.md#review-before-merge`), and the count of
+  verdicts other than `merge` that licenses asking the owner
+  (`#ask-owner`) reads only what was posted. Without it, a review
+  delivered only in the session cannot be told from none. When
+  `npm run check:merge-record` reports a merge, file the issue with the
+  `node barwise/scripts/beads-crud.mjs create ... --labels merge-record`
+  command it prints. The
   review recommends; the merge decision and its accountability stay
   with the owner, who has delegated it to that agent only after this
   review recommends `merge` on the head being merged.

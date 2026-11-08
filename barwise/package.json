@@ -28,6 +28,7 @@
     "check:spec-form": "node scripts/check-spec-form.mjs",
     "check:plan-review": "node scripts/check-plan-review.mjs",
     "check:spec-first": "node scripts/check-spec-first.mjs",
+    "check:merge-record": "node scripts/check-merge-record.mjs",
     "pr:risk": "node scripts/pr-risk.mjs",
     "plan-scope": "node scripts/plan-scope.mjs",
     "check:no-nul": "node scripts/check-no-nul.mjs",

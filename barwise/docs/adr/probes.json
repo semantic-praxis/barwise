@@ -269,5 +269,21 @@
   {
     "decision": "merge-delegation#pinned-merge",
     "unprobed": "merge-guard is a PreToolUse hook that reads a tool call on stdin and the pull request's comments through gh, not a file in the tree, so a working-tree edit cannot reach it; scripts/tests/merge-guard.test.mjs plants each refusal with a stub gh, and its registration test goes red if the settings entry is removed"
+  },
+  {
+    "decision": "merge-delegation#review-before-merge",
+    "unprobed": "check:merge-record reads committed history (merge parents and trailers) and, on a push, GitHub's comments, neither of which a working-tree edit can reach; the plants are a Reviewed-head naming the first parent, a missing verdict comment, a comment dated after the merge and a 403. scripts/tests/merge-record.test.mjs plants the reds in temporary repositories with a stubbed fetch"
+  },
+  {
+    "decision": "merge-delegation#no-size-exemption",
+    "unprobed": "check:merge-record reads committed history (merge parents and trailers) and, on a push, GitHub's comments, neither of which a working-tree edit can reach; the gate has no path logic, and the tagged test builds a tracker-only, a docs-only and a code merge and requires the same result for each. scripts/tests/merge-record.test.mjs plants the reds in temporary repositories with a stubbed fetch"
+  },
+  {
+    "decision": "merge-delegation#owner-overrides",
+    "unprobed": "check:merge-record reads committed history (merge parents and trailers) and, on a push, GitHub's comments, neither of which a working-tree edit can reach; the plants are an empty Owner-directed trailer, an Owner-directed merge with no verdict comment and the same merge without the trailer. scripts/tests/merge-record.test.mjs plants the reds in temporary repositories with a stubbed fetch"
+  },
+  {
+    "decision": "merge-delegation#ask-owner",
+    "unprobed": "check:merge-record reads committed history (merge parents and trailers) and, on a push, GitHub's comments, neither of which a working-tree edit can reach; the plants are two do-not-merge verdicts before a merge, with and without an Owner-answer between. scripts/tests/merge-record.test.mjs plants the reds in temporary repositories with a stubbed fetch"
   }
 ]

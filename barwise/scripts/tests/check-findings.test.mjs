@@ -19,6 +19,7 @@ const BASELINES = [
   "rubric-baseline.json",
   "spec-status-baseline.json",
   "correction-baseline.json",
+  "merge-record-baseline.json",
   "trial-baseline.json",
 ];
 const CATALOG = "barwise/trial/findings/catalog.json";
@@ -34,10 +35,19 @@ function fixture() {
   const dir = mkdtempSync(join(tmpdir(), "barwise-findings-"));
   for (const rel of [...BASELINES.map((b) => `barwise/${b}`), CATALOG, TRACKER]) {
     mkdirSync(dirname(join(dir, rel)), { recursive: true });
-    writeFileSync(
-      join(dir, rel),
-      execFileSync("git", ["show", `HEAD:${rel}`], { cwd: REPO, maxBuffer: 64 * 1024 * 1024 }),
-    );
+    // A file not yet committed (a baseline's first commit) is read from the
+    // working tree; once committed, HEAD is the source like every other.
+    let content;
+    try {
+      content = execFileSync("git", ["show", `HEAD:${rel}`], {
+        cwd: REPO,
+        maxBuffer: 64 * 1024 * 1024,
+        stdio: ["ignore", "pipe", "ignore"],
+      });
+    } catch {
+      content = readFileSync(join(REPO, rel));
+    }
+    writeFileSync(join(dir, rel), content);
   }
   return dir;
 }
@@ -98,7 +108,7 @@ test("check:findings passes the committed baselines", () => {
     rmSync(dir, { recursive: true, force: true });
   }
   assert.equal(r.status, 0, r.stdout + r.stderr);
-  assert.match(r.stdout, /5 baselines .* OK$/m);
+  assert.match(r.stdout, /6 baselines .* OK$/m);
 });
 
 test("check:findings fails an open row whose issue is closed or missing", () => {
@@ -121,6 +131,36 @@ test("check:findings fails an open row whose issue is closed or missing", () => 
     }),
     /rubric-baseline\.json: .*which is closed/,
   );
+});
+
+test("check:findings reads merge-record-baseline.json: a closed issue, a placeholder and a stray verdict each fail", () => {
+  const SHA = "a".repeat(40);
+  const row = (status) => ({ subject: "Merge PR #1", rules: ["no-record"], status, note: "why" });
+  const closed = issueWith("closed");
+  found(
+    planted(
+      "barwise/merge-record-baseline.json",
+      (j) => (j.merges[SHA] = row(`tracked:${closed}`)),
+    ),
+    new RegExp(
+      `merge-record-baseline\\.json: ${SHA}: names ${
+        closed.replace(/\./g, "\\.")
+      }, which is closed`,
+    ),
+  );
+  found(
+    planted("barwise/merge-record-baseline.json", (j) => (j.merges[SHA] = row("TODO: classify"))),
+    /merge-record-baseline\.json: .*still has its writer's placeholder/,
+  );
+  found(
+    planted("barwise/merge-record-baseline.json", (j) => (j.merges[SHA] = row("fine"))),
+    /merge-record-baseline\.json: .*"fine" is not one of accepted-by-owner, tracked/,
+  );
+  const ok = planted(
+    "barwise/merge-record-baseline.json",
+    (j) => (j.merges[SHA] = row("accepted-by-owner")),
+  );
+  assert.equal(ok.status, 0, ok.stdout + ok.stderr);
 });
 
 test("check:findings keeps a claimed (in_progress) issue live", () => {

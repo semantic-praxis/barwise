@@ -3045,6 +3045,12 @@ const STALE_CASES = {
       "audit-corrections fails on a baseline entry no longer detected",
     ],
   },
+  "merge-record": {
+    testedBy: [
+      "barwise/scripts/tests/merge-record.test.mjs",
+      "a baseline row naming a commit outside the range is stale",
+    ],
+  },
   trial: {
     testedBy: [
       "barwise/trial/tests/oracles.test.mjs",
@@ -3354,6 +3360,14 @@ const BASELINE_WRITERS = [
     file: "barwise/correction-baseline.json",
     key: "records",
     human: ["caught_by", "note"],
+    placeholder: "TODO: classify",
+  },
+  {
+    script: "check-merge-record.mjs",
+    args: ["--write"],
+    file: "barwise/merge-record-baseline.json",
+    key: "merges",
+    human: ["status", "note"],
     placeholder: "TODO: classify",
   },
   {
@@ -3711,6 +3725,7 @@ test("every baseline has one registered writer, and each merges through baseline
   const WRITERS = {
     "audit-baseline.json": { none: "decision 5: edited by hand" },
     "correction-baseline.json": { script: "barwise/scripts/audit-corrections.mjs" },
+    "merge-record-baseline.json": { script: "barwise/scripts/check-merge-record.mjs" },
     "rubric-baseline.json": { script: "barwise/scripts/audit-rubric.mjs" },
     "spec-status-baseline.json": { script: "barwise/scripts/audit-spec-status.mjs" },
     "trial-baseline.json": {
