@@ -60,8 +60,11 @@ const RANDOM_NAMES = ["randomUUID", "randomBytes", "randomInt", "getRandomValues
  * - `dynamicImport`: an `import(...)` call, i.e. in value position;
  * - `globals`: a free name used as a value, or `globalThis.<name>`;
  * - `members`: a property access (or `["name"]`) of that name, on anything;
- * - `qualified`: `Object.member` on that free object name;
- * - `importedNames`: a named import of that name from `node:crypto`.
+ * - `qualified`: `Object.member` on that free object name.
+ *
+ * `node:crypto` is not a rule here: it is one module whose names are mostly
+ * random sources, so `cryptoBindings` allows the one name core needs
+ * (`CRYPTO_ALLOWED`) rather than listing the many it must refuse.
  */
 export const PURITY_RULES = [
   { id: "S-DET-1", name: "node:fs", modules: ["fs"], fix: IO_FIX },
@@ -102,7 +105,6 @@ export const PURITY_RULES = [
     name: "randomness",
     members: RANDOM_NAMES,
     qualified: ["Math.random"],
-    importedNames: RANDOM_NAMES,
     fix: "pass the id or seed in",
   },
   { id: "S-DET-2", name: "global crypto.*", globals: ["crypto"], fix: "pass the id or seed in" },
@@ -118,9 +120,16 @@ const BY_MODULE = indexBy("modules");
 const BY_GLOBAL = indexBy("globals");
 const BY_MEMBER = indexBy("members");
 const BY_QUALIFIED = indexBy("qualified");
-const BY_IMPORTED_NAME = indexBy("importedNames");
 const DYNAMIC_IMPORT = PURITY_RULES.find((r) => r.dynamicImport);
 const CRYPTO_MODULES = new Set(["crypto"]);
+/**
+ * The only `node:crypto` name core may bind. A denylist of the random
+ * exports (`randomFillSync`, `generateKey`, `webcrypto`, ...) is the shape
+ * that let the unlisted ones through; Node adds exports, and core needs one.
+ * Widening this is a one-line change with its reason, when core needs it.
+ */
+const CRYPTO_ALLOWED = new Set(["createHash"]);
+const RANDOMNESS = PURITY_RULES.find((r) => r.name === "randomness");
 const SOURCE = /\.[cm]?[jt]sx?$/;
 const TEST = /\.(test|spec)\.[cm]?[jt]sx?$/;
 
@@ -190,6 +199,48 @@ function isValueReference(id) {
 }
 
 /**
+ * The nodes of a `node:crypto` reference that bind more than `createHash`.
+ * A whole-module binding (default import, namespace import, `import x =
+ * require`, `export *`, a `require` assigned whole) is one finding on the
+ * node; a named binding is judged per specifier, by the name it takes from
+ * the module (`createHash as h` is allowed, `randomFillSync as h` is not).
+ * Type-only forms bind no value and are skipped: `import type`, `export
+ * type`, and a `type` specifier.
+ */
+function cryptoBindings(node) {
+  const importedName = (e) => (e.propertyName ?? e.name).text;
+  const specifiers = (elements) =>
+    elements.filter((e) => !e.isTypeOnly && !CRYPTO_ALLOWED.has(importedName(e)));
+  if (ts.isImportDeclaration(node)) {
+    const clause = node.importClause;
+    if (!clause || clause.isTypeOnly) return [];
+    const named = clause.namedBindings;
+    return [
+      ...(clause.name ? [clause.name] : []),
+      ...(named && ts.isNamespaceImport(named) ? [named] : []),
+      ...(named && ts.isNamedImports(named) ? specifiers(named.elements) : []),
+    ];
+  }
+  if (ts.isExportDeclaration(node)) {
+    if (node.isTypeOnly) return [];
+    const clause = node.exportClause;
+    if (!clause || ts.isNamespaceExport(clause)) return [node];
+    return specifiers(clause.elements);
+  }
+  if (ts.isImportEqualsDeclaration(node)) return node.isTypeOnly ? [] : [node];
+  // `require("node:crypto")`: only `const { createHash } = require(...)` binds
+  // the one allowed name.
+  const target = node.parent;
+  if (ts.isVariableDeclaration(target) && ts.isObjectBindingPattern(target.name)) {
+    return target.name.elements.filter((e) =>
+      e.dotDotDotToken || !ts.isIdentifier(e.propertyName ?? e.name)
+      || !CRYPTO_ALLOWED.has(importedName(e))
+    );
+  }
+  return [node];
+}
+
+/**
  * Every purity finding in one file's text: `[{ rule, line, text, fix }]`,
  * where `rule` is `"<id> <name>"` and `line` is 1-based. One finding per
  * rule and line.
@@ -228,18 +279,18 @@ export function purityFindings(fileText, fileName) {
     if (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) {
       moduleRef(node.moduleSpecifier);
       const from = literalText(node.moduleSpecifier);
-      const named = node.importClause?.namedBindings;
-      if (from && CRYPTO_MODULES.has(moduleBase(from)) && named && ts.isNamedImports(named)) {
-        for (const spec of named.elements) {
-          const rule = BY_IMPORTED_NAME.get((spec.propertyName ?? spec.name).text);
-          if (rule) add(rule, spec);
-        }
+      if (from && CRYPTO_MODULES.has(moduleBase(from))) {
+        for (const bound of cryptoBindings(node)) add(RANDOMNESS, bound);
       }
     } else if (
       ts.isImportEqualsDeclaration(node)
       && ts.isExternalModuleReference(node.moduleReference)
     ) {
       moduleRef(node.moduleReference.expression);
+      const from = literalText(node.moduleReference.expression);
+      if (from && CRYPTO_MODULES.has(moduleBase(from))) {
+        for (const bound of cryptoBindings(node)) add(RANDOMNESS, bound);
+      }
     } else if (ts.isImportTypeNode(node)) {
       if (ts.isLiteralTypeNode(node.argument)) moduleRef(node.argument.literal);
     } else if (ts.isCallExpression(node)) {
@@ -248,6 +299,10 @@ export function purityFindings(fileText, fileName) {
         moduleRef(node.arguments[0]);
       } else if (ts.isIdentifier(node.expression) && node.expression.text === "require") {
         moduleRef(node.arguments[0]);
+        const from = literalText(node.arguments[0]);
+        if (from && CRYPTO_MODULES.has(moduleBase(from))) {
+          for (const bound of cryptoBindings(node)) add(RANDOMNESS, bound);
+        }
       }
     }
 

@@ -6,6 +6,13 @@
     "new": "import { readFileSync } from \"node:fs\";\nexport function diffModels("
   },
   {
+    "decision": "determinism-in-core#one-layer-out",
+    "gate": "check:source-sites",
+    "file": "barwise/packages/cli/src/index.ts",
+    "old": "import { commandNameIn, createProgram } from \"./cli.js\";",
+    "new": "import Anthropic from \"@anthropic-ai/sdk\";\nimport { commandNameIn, createProgram } from \"./cli.js\";\nexport { Anthropic };"
+  },
+  {
     "decision": "connector-packages#connector-owns-io",
     "file": "barwise/packages/core/src/format/registry.ts",
     "old": "export function registerFormat(",

@@ -1,6 +1,6 @@
 # Two gates that can pass without seeing their input
 
-Status: Planned; plan reviewed 2026-11-08 (one round, eight findings, all addressed)
+Status: Planned; plan reviewed 2026-11-08 (one round, eight findings, all addressed); WS1 and WS2 implemented
 
 Created: 2026-11-08
 Last-updated: 2026-11-08

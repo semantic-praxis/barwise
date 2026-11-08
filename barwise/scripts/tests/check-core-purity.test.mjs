@@ -115,6 +115,85 @@ const RED = [
     line: 1,
   },
   {
+    what: "randomFillSync imported from node:crypto",
+    text: 'import { randomFillSync } from "node:crypto";\nexport const f = randomFillSync;\n',
+    rule: /randomness/,
+    line: 1,
+  },
+  {
+    what: "randomFill imported from crypto",
+    text: 'import { randomFill } from "crypto";\nexport const f = randomFill;\n',
+    rule: /randomness/,
+    line: 1,
+  },
+  {
+    what: "generateKey imported from node:crypto",
+    text: 'import { generateKey } from "node:crypto";\nexport const f = generateKey;\n',
+    rule: /randomness/,
+    line: 1,
+  },
+  {
+    what: "webcrypto imported from node:crypto",
+    text: 'import { webcrypto } from "node:crypto";\nexport const w = webcrypto;\n',
+    rule: /randomness/,
+    line: 1,
+  },
+  {
+    what: "a renamed random import (randomFillSync as h)",
+    text: 'import { randomFillSync as h } from "node:crypto";\nexport const f = h;\n',
+    rule: /randomness/,
+    line: 1,
+  },
+  {
+    what: "a namespace import of node:crypto",
+    text: 'import * as c from "node:crypto";\nexport const h = c;\n',
+    rule: /randomness/,
+    line: 1,
+  },
+  {
+    what: "a default import of node:crypto under an alias",
+    text: 'import c from "node:crypto";\nexport const h = c;\n',
+    rule: /randomness/,
+    line: 1,
+  },
+  {
+    what: "export { randomFillSync } from node:crypto",
+    text: 'export { randomFillSync } from "node:crypto";\n',
+    rule: /randomness/,
+    line: 1,
+  },
+  {
+    what: "export * from node:crypto",
+    text: 'export * from "node:crypto";\n',
+    rule: /randomness/,
+    line: 1,
+  },
+  {
+    what: "import c = require(node:crypto)",
+    text: 'import c = require("node:crypto");\nexport const h = c;\n',
+    rule: /randomness/,
+    line: 1,
+  },
+  {
+    what: "a destructuring require of randomFillSync",
+    text: 'const { randomFillSync } = require("node:crypto");\nexport const f = randomFillSync;\n',
+    rule: /randomness/,
+    line: 1,
+  },
+  {
+    what: "a destructuring require beside createHash",
+    text:
+      'const { createHash, randomFillSync } = require("node:crypto");\nexport const f = [createHash, randomFillSync];\n',
+    rule: /randomness/,
+    line: 1,
+  },
+  {
+    what: "a whole-module require of node:crypto",
+    text: 'const c = require("node:crypto");\nexport const h = c;\n',
+    rule: /randomness/,
+    line: 1,
+  },
+  {
     what: "a bare localeCompare",
     text: "export const by = (a: string, b: string) => a.localeCompare(b);\n",
     rule: /process locale/,
@@ -240,6 +319,31 @@ for (const c of RED) {
 }
 
 const GREEN = [
+  {
+    what: "createHash imported from node:crypto",
+    text: 'import { createHash } from "node:crypto";\nexport const h = createHash;\n',
+  },
+  {
+    what: "createHash renamed on import",
+    text: 'import { createHash as h } from "node:crypto";\nexport const x = h;\n',
+  },
+  {
+    what: "import type { Hash } from node:crypto",
+    text: 'import type { Hash } from "node:crypto";\nexport type H = Hash;\n',
+  },
+  {
+    what: "import { type Hash, createHash } from node:crypto",
+    text:
+      'import { type Hash, createHash } from "node:crypto";\nexport const h: Hash = createHash("sha256");\n',
+  },
+  {
+    what: "import type * as c from node:crypto",
+    text: 'import type * as c from "node:crypto";\nexport type H = c.Hash;\n',
+  },
+  {
+    what: "a destructuring require of createHash",
+    text: 'const { createHash } = require("node:crypto");\nexport const h = createHash;\n',
+  },
   { what: "import(...).T in a type", text: 'export type T = import("x").T;\n' },
   { what: "typeof import(...)", text: 'export type M = typeof import("x");\n' },
   {

@@ -3,6 +3,12 @@
  * two rules' scanners on single files, the allowlist comparison, and the
  * gate end to end in a throwaway repository.
  *
+ * The model-sdk-boundary rule ports every case of the vitest it replaced
+ * (llm/tests/modelSdkBoundary.test.ts, barwise-wrr), each tagged with the
+ * decision it holds. Its end-to-end base also stages a source file in each
+ * of cli, mcp and vscode and one package.json, because the rule refuses
+ * without them.
+ *
  * The end-to-end base copies the real files ORM_VERSION_WRITERS lists into
  * the fixture, so the fixture is green for the reason the repository is,
  * and each plant is red for one reason only. Files are staged, because the
@@ -18,6 +24,8 @@ import { fileURLToPath } from "node:url";
 // Importing the gate must not run it.
 import {
   allowlistProblems,
+  manifestSdks,
+  modelSdkImports,
   ORM_VERSION_WRITERS,
   ormVersionSites,
   ossieSchemaRefs,
@@ -176,6 +184,13 @@ function gateIn(files, { base = true } = {}) {
         all[path] = readFileSync(join(REPO, path), "utf8");
       }
     }
+    if (base) {
+      // What model-sdk-boundary needs to see before it will answer.
+      for (const pkg of ["cli", "mcp", "vscode"]) {
+        all[`barwise/packages/${pkg}/src/stub.ts`] = "export const stub = 1;\n";
+      }
+      all["barwise/packages/cli/package.json"] = '{ "name": "@barwise/cli" }\n';
+    }
     Object.assign(all, files);
     for (const [name, text] of Object.entries(all)) {
       if (text === null) continue;
@@ -251,5 +266,157 @@ test("end to end: no tracked package source is a refusal, never OK", () => {
   const r = gateIn({ "barwise/packages/core/README.md": "# core\n" }, { base: false });
   assert.equal(r.status, 2, output(r));
   assert.match(r.stderr, /no tracked source files/);
+  assert.doesNotMatch(output(r), /source sites: OK/);
+});
+
+// --- model-sdk-boundary (determinism-in-core#one-layer-out) ---
+
+const ADR = "[adr:determinism-in-core#one-layer-out]";
+const CLI_FILE = "barwise/packages/cli/src/x.ts";
+
+test(`model-sdk-boundary sees every import form and subpath ${ADR}`, () => {
+  const positives = [
+    `import OpenAI from "openai";`,
+    `import Anthropic from "@anthropic-ai/sdk";`,
+    `import type { Message } from "@anthropic-ai/sdk/resources/messages";`,
+    `import "openai/resources/chat";`,
+    `const m = await import("openai");`,
+    `const m = require("openai");`,
+    `export { default } from "openai";`,
+  ];
+  for (const code of positives) {
+    assert.notDeepEqual(modelSdkImports(code), [], code);
+  }
+  assert.deepEqual(
+    modelSdkImports('import type { Message } from "@anthropic-ai/sdk/resources/messages";'),
+    ["@anthropic-ai/sdk/resources/messages"],
+  );
+});
+
+test(`model-sdk-boundary ignores the word in a string or comment, and openai-compat ${ADR}`, () => {
+  const negatives = [
+    `const provider = z.enum(["anthropic", "openai", "ollama"]);`,
+    `// import OpenAI from "openai";`,
+    `/* const m = require("@anthropic-ai/sdk"); */`,
+    `import compat from "openai-compat";`,
+    `import x from "@anthropic-ai/sdk-extras";`,
+  ];
+  for (const code of negatives) {
+    assert.deepEqual(modelSdkImports(code), [], code);
+  }
+});
+
+test(`model-sdk-boundary reads the four dependency fields and nothing else ${ADR}`, () => {
+  for (
+    const field of ["dependencies", "devDependencies", "peerDependencies", "optionalDependencies"]
+  ) {
+    assert.deepEqual(manifestSdks({ [field]: { openai: "^4" } }), [`${field} lists openai`]);
+  }
+  assert.deepEqual(
+    manifestSdks({
+      dependencies: { "openai-compat": "1", "@barwise/llm": "*" },
+      scripts: { a: "openai" },
+    }),
+    [],
+  );
+  assert.deepEqual(manifestSdks(null), []);
+});
+
+test(`end to end: an SDK import in cli/src exits 1, naming the file and the rule ${ADR}`, () => {
+  const r = gateIn({
+    [CLI_FILE]: 'import Anthropic from "@anthropic-ai/sdk";\nexport default Anthropic;\n',
+  });
+  assert.equal(r.status, 1, output(r));
+  assert.match(r.stderr, /model-sdk-boundary {2}cli\/src\/x\.ts: imports @anthropic-ai\/sdk /);
+});
+
+test(`end to end: a subpath type import, a re-export, a require and a dynamic import each exit 1 ${ADR}`, () => {
+  const forms = {
+    subpath: 'import type { M } from "@anthropic-ai/sdk/resources/messages";\nexport type T = M;\n',
+    reexport: 'export { default } from "openai";\n',
+    require: 'export const o = require("openai");\n',
+    dynamic: 'export const o = () => import("openai");\n',
+  };
+  for (const [what, text] of Object.entries(forms)) {
+    const r = gateIn({ [CLI_FILE]: text });
+    assert.equal(r.status, 1, `${what}: ${output(r)}`);
+    assert.match(r.stderr, /model-sdk-boundary {2}cli\/src\/x\.ts: imports /, what);
+  }
+});
+
+test(`end to end: a .mjs file and a test file under src are read too ${ADR}`, () => {
+  const r = gateIn({
+    "barwise/packages/mcp/src/x.mjs": 'import OpenAI from "openai";\nexport default OpenAI;\n',
+    "barwise/packages/vscode/src/y.test.ts": 'import Anthropic from "@anthropic-ai/sdk";\n',
+  });
+  assert.equal(r.status, 1, output(r));
+  assert.match(r.stderr, /model-sdk-boundary {2}mcp\/src\/x\.mjs: imports openai /);
+  assert.match(
+    r.stderr,
+    /model-sdk-boundary {2}vscode\/src\/y\.test\.ts: imports @anthropic-ai\/sdk /,
+  );
+});
+
+test(`end to end: an SDK in any of four package.json fields exits 1 ${ADR}`, () => {
+  for (
+    const field of ["dependencies", "devDependencies", "peerDependencies", "optionalDependencies"]
+  ) {
+    const r = gateIn({
+      "barwise/packages/mcp/package.json": JSON.stringify({ name: "x", [field]: { openai: "^4" } }),
+    });
+    assert.equal(r.status, 1, `${field}: ${output(r)}`);
+    assert.match(
+      r.stderr,
+      new RegExp(`model-sdk-boundary {2}mcp/package\\.json: ${field} lists openai `),
+    );
+  }
+});
+
+test(`end to end: llm itself, a string, a comment and openai-compat pass ${ADR}`, () => {
+  const r = gateIn({
+    "barwise/packages/llm/src/client.ts":
+      'import Anthropic from "@anthropic-ai/sdk";\nexport default Anthropic;\n',
+    "barwise/packages/llm/package.json":
+      '{ "dependencies": { "@anthropic-ai/sdk": "^0.30.0", "openai": "^4" } }',
+    [CLI_FILE]:
+      'export const p = ["anthropic", "openai"];\n// import OpenAI from "openai";\nimport c from "openai-compat";\nexport default c;\n',
+    "barwise/packages/mcp/package.json": '{ "dependencies": { "openai-compat": "1" } }',
+  });
+  assert.equal(r.status, 0, output(r));
+  assert.match(
+    r.stderr,
+    /model-sdk-boundary: \d+ file\(s\) and 2 package\.json outside llm, no SDK/,
+  );
+});
+
+test(`end to end: a surface with no source is a refusal, never OK ${ADR}`, () => {
+  for (const pkg of ["cli", "mcp", "vscode"]) {
+    // vscode also holds a listed writer, which the base stages: leave it out too.
+    const gone = { [`barwise/packages/${pkg}/src/stub.ts`]: null };
+    if (pkg === "vscode") gone["barwise/packages/vscode/src/commands/projectScaffold.ts"] = null;
+    const r = gateIn(gone);
+    assert.equal(r.status, 2, `${pkg}: ${output(r)}`);
+    assert.match(
+      r.stderr,
+      new RegExp(`model-sdk-boundary: no tracked source file under barwise/packages/${pkg}/src`),
+    );
+    assert.doesNotMatch(output(r), /source sites: OK/);
+  }
+});
+
+test(`end to end: no package.json outside llm is a refusal ${ADR}`, () => {
+  const r = gateIn({
+    "barwise/packages/cli/package.json": null,
+    "barwise/packages/llm/package.json": '{ "dependencies": { "openai": "^4" } }',
+  });
+  assert.equal(r.status, 2, output(r));
+  assert.match(r.stderr, /model-sdk-boundary: no package\.json outside llm/);
+  assert.doesNotMatch(output(r), /source sites: OK/);
+});
+
+test(`end to end: an unparseable package.json is a refusal, not a skip ${ADR}`, () => {
+  const r = gateIn({ "barwise/packages/mcp/package.json": '{ "dependencies": { "openai": ' });
+  assert.equal(r.status, 2, output(r));
+  assert.match(r.stderr, /mcp\/package\.json would not read or parse/);
   assert.doesNotMatch(output(r), /source sites: OK/);
 });
