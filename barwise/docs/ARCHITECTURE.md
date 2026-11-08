@@ -39,7 +39,7 @@ gates skip a docs-only change.
 Architecture:
 
 - [Connector packages](adr/connector-packages.md) -- 2026-11-06 -- declared: purity (connector-owns-io), tests (core-no-interop, format-in-its-connector, explicit-registration); gap: barwise-ym8.iyw (connector-owns-io); gap: barwise-ym8.x9w (format-in-its-connector); gap: barwise-ym8.2n3 (explicit-registration)
-- [Determinism in core](adr/determinism-in-core.md) -- 2026-11-05 -- declared: purity (pure-ops), tests (one-layer-out); gap: barwise-ym8.lxl (pure-ops)
+- [Determinism in core](adr/determinism-in-core.md) -- 2026-11-05 -- declared: purity (pure-ops), check:source-sites (one-layer-out); gap: barwise-ym8.lxl (pure-ops)
 - [Keyless model access](adr/keyless-model-access.md) -- 2026-09-12 -- declared: tests (no-key-in-argv, no-key-in-setting, keyless-defaults, library-takes-key, measurement-key); gap: barwise-ym8.nw4 (no-key-in-setting); gap: barwise-ym8.52o (keyless-defaults); gap: barwise-ym8.esi (measurement-key)
 - [Metamodel evolution policy](adr/metamodel-evolution-policy.md) -- 2026-10-17 -- declared: tests (recompute-derived); gap: barwise-ym8.3ai (recompute-derived)
 - [Ossie interchange](adr/ossie-interchange.md) -- 2026-10-28 -- declared: tests (ontology-layer-only, pinned-version, nothing-lost-silently, readable-iri), depcruise (peer-standard, own-vocabulary), check:source-sites (peer-standard, own-vocabulary)

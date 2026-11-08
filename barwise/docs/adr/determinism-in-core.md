@@ -4,7 +4,7 @@ Scope: architecture
 Date: 2026-11-05
 Tracking: barwise-ubc, barwise-wcg.vlv, docs/specs/iri-identity.spec.md,
 docs/specs/archive/architecture-analysis.spec.md
-Enforced-by: npm run purity (pure-ops), tests (one-layer-out),
+Enforced-by: npm run purity (pure-ops), npm run check:source-sites (one-layer-out),
 none (barwise-ym8.lxl: pure-ops)
 
 ## Context
@@ -53,12 +53,15 @@ spec; the gate is from the archived architecture-analysis spec.
   I/O is `connector-packages.md#connector-owns-io`; core's external
   dependencies are `package-graph-authority.md#core-external-deps`.
   With the tool-layer clause gone, `learn` and `promptlab` need no
-  placement. `llm/tests/modelSdkBoundary.test.ts` holds it
-  (`purity-and-model-boundary.spec.md`): it fails when TypeScript's
-  import list for any `packages/*/src` file outside `llm` names
-  `@anthropic-ai/sdk` or `openai` (subpaths, dynamic imports,
+  placement. The `model-sdk-boundary` rule of
+  `npm run check:source-sites` holds it
+  (`uncached-boundary-and-crypto-purity.spec.md`): it fails when
+  TypeScript's import list for any `packages/*/src` file outside `llm`
+  names `@anthropic-ai/sdk` or `openai` (subpaths, dynamic imports,
   `require` and re-exports included), or a `package.json` outside `llm`
-  lists either. A depcruise rule, the form first planned, cannot see a
+  lists either, and refuses when `cli`, `mcp` or `vscode` has no
+  source to read. It was a vitest in `llm` until turbo's cache replayed
+  its pass over an SDK import added to another package (barwise-wrr). A depcruise rule, the form first planned, cannot see a
   package in `node_modules` under the config's `includeOnly`. A plain
   `fetch` to a provider host stays a gap.
 - `npm run purity` (`barwise/scripts/check-core-purity.mjs`, a CI gate)
@@ -71,7 +74,12 @@ spec; the gate is from the archived architecture-analysis spec.
   in any form, a runtime `import()`, a model SDK, and the identifiers
   `process`, `fetch`, `performance`, `localeCompare`, `Intl`,
   `toLocale*` and the named randomness functions, beside `new Date`,
-  `Date.now`, `Math.random` and the global `crypto`; it refuses when it
+  `Date.now`, `Math.random` and the global `crypto`. A reference to
+  `node:crypto` binds `createHash` and nothing else (a named import,
+  `export ... from`, `import x = require` or destructuring `require` of
+  any other name, or a default or namespace import, is a finding; type-only
+  forms are allowed), so a random export Node adds later is refused
+  without a list to update (barwise-fzd). It refuses when it
   can list no source. Core's four locale-dependent sorts use
   `compareCodeUnits` (barwise-c3z, fixed; a test shows one order under
   sv_SE and en_US for the comparator and query's entity and anchor

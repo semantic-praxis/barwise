@@ -6,6 +6,13 @@
     "new": "import { readFileSync } from \"node:fs\";\nexport function diffModels("
   },
   {
+    "decision": "determinism-in-core#one-layer-out",
+    "gate": "check:source-sites",
+    "file": "barwise/packages/cli/src/index.ts",
+    "old": "import { commandNameIn, createProgram } from \"./cli.js\";",
+    "new": "import Anthropic from \"@anthropic-ai/sdk\";\nimport { commandNameIn, createProgram } from \"./cli.js\";\nexport { Anthropic };"
+  },
+  {
     "decision": "connector-packages#connector-owns-io",
     "file": "barwise/packages/core/src/format/registry.ts",
     "old": "export function registerFormat(",
@@ -265,10 +272,6 @@
     "file": ".github/workflows/ci.yml",
     "old": "      - run: npm run check:review-tiers\n",
     "new": "      - run: npm run check:review-tiers\n      - run: node barwise/scripts/pr-risk.mjs --json | jq -e '.tier == \"routine\"'\n"
-  },
-  {
-    "decision": "merge-delegation#pinned-merge",
-    "unprobed": "merge-guard is a PreToolUse hook that reads a tool call on stdin and the pull request's comments through gh, not a file in the tree, so a working-tree edit cannot reach it; scripts/tests/merge-guard.test.mjs plants each refusal with a stub gh, and its registration test goes red if the settings entry is removed"
   },
   {
     "decision": "merge-delegation#review-before-merge",

@@ -23,6 +23,23 @@
 //   in `packages/*/src` outside `formats/src/ossie/`. dependency-cruiser
 //   cannot see these: its `includeOnly` keeps `packages/*/src`, so an
 //   import of the vendored JSON is dropped before any rule reads it.
+// - `model-sdk-boundary` (determinism-in-core#one-layer-out): a module
+//   reference to `@anthropic-ai/sdk` or `openai` (or a subpath of either)
+//   in any `packages/*/src` file outside `llm`, test files and `.d.ts`
+//   included, or either listed in a `packages/*/package.json` outside
+//   `llm` under dependencies, devDependencies, peerDependencies or
+//   optionalDependencies. It was a vitest in `llm`, which turbo cached on
+//   `llm`'s own hash: an SDK import added to `cli/src` replayed the cached
+//   pass (barwise-wrr). It reads through TypeScript's `preProcessFile`, which
+//   lists every module a file references -- static and dynamic imports,
+//   `export ... from`, `require`, type imports -- and never a word in a
+//   string or comment, so the provider name `"openai"` in a schema enum is
+//   not an import. A plain `fetch` to a provider's host is not seen, and
+//   stays the gap the ADR names. It has its own pass over the listing: the
+//   walk above drops `package.json` and test files, which this rule needs.
+//   It refuses when `cli`, `mcp` or `vscode` has no source file in the
+//   listing, or when no `package.json` outside `llm` was read, so a layout
+//   change cannot turn it into a pass over nothing.
 //
 // What a parse cannot see is review's, and the ADRs say so: a computed key
 // built by concatenation, an `Object.assign` or `defineProperty` from a
@@ -36,7 +53,8 @@
 // draft, is a node like any other.
 //
 // Exit 0 no findings, 1 findings, 2 could not answer (git failed, no
-// tracked package source to read, or a listed file would not read).
+// tracked package source to read, a listed file would not read, a package
+// the SDK rule expects has no source, or a package.json would not parse).
 //
 // Usage: node barwise/scripts/check-source-sites.mjs
 
@@ -54,6 +72,22 @@ const SOURCE = /\.[cm]?[jt]sx?$/;
 const TEST = /\.(test|spec)\.[cm]?[jt]sx?$/;
 /** `barwise/packages/<pkg>/src/...` and nothing else under packages/. */
 const PACKAGE_SOURCE = /^barwise\/packages\/[^/]+\/src\//;
+/** `barwise/packages/<pkg>/package.json`, capturing `<pkg>`. */
+const PACKAGE_MANIFEST = /^barwise\/packages\/([^/]+)\/package\.json$/;
+/** `barwise/packages/<pkg>/src/...`, capturing `<pkg>`. */
+const PACKAGE_SRC_OF = /^barwise\/packages\/([^/]+)\/src\//;
+
+/** The one package allowed to import a model SDK. */
+export const SDK_HOME = "llm";
+export const MODEL_SDKS = ["@anthropic-ai/sdk", "openai"];
+const DEPENDENCY_FIELDS = [
+  "dependencies",
+  "devDependencies",
+  "peerDependencies",
+  "optionalDependencies",
+];
+/** Surfaces the rule must see source in, or it refuses: a floor, not a list to scan. */
+const EXPECTED_SURFACES = ["cli", "mcp", "vscode"];
 
 /**
  * Every place allowed to set `orm_version`, keyed by (file under
@@ -296,6 +330,34 @@ export function ossieSchemaRefs(fileText, fileName) {
   return refs;
 }
 
+/** `openai` and `openai/resources/x` are the SDK; `openai-compat` is not. */
+export function isModelSdk(specifier) {
+  return MODEL_SDKS.some((sdk) => specifier === sdk || specifier.startsWith(`${sdk}/`));
+}
+
+/** The model-SDK specifiers one file references, by TypeScript's reading. */
+export function modelSdkImports(fileText) {
+  // A triple-slash types reference is listed apart from the imports, and
+  // pulls the SDK's types into the program as surely as `import type`.
+  const { importedFiles, typeReferenceDirectives } = ts.preProcessFile(fileText, true, true);
+  return [...importedFiles, ...typeReferenceDirectives]
+    .map((ref) => ref.fileName)
+    .filter(isModelSdk);
+}
+
+/** The model SDKs a parsed package.json lists, as `<field> lists <name>`. */
+export function manifestSdks(manifest) {
+  const found = [];
+  for (const field of DEPENDENCY_FIELDS) {
+    const deps = manifest?.[field];
+    if (deps === null || typeof deps !== "object") continue;
+    for (const name of Object.keys(deps)) {
+      if (isModelSdk(name)) found.push(`${field} lists ${name}`);
+    }
+  }
+  return found;
+}
+
 const groupKey = (file, fn, form) => `${file} ${fn} ${form}`;
 
 /**
@@ -383,7 +445,35 @@ function main() {
   if (files.length === 0) {
     refuse(`no tracked source files under ${pathspec}/*/src.`);
   }
-  noteUntrackedInput({ pathspec, suffix: "", include: isSource, gate: "source sites" });
+  const listed = listing.split("\0").filter(Boolean);
+  const sdkSources = listed.filter((f) => {
+    const pkg = PACKAGE_SRC_OF.exec(f)?.[1];
+    return pkg !== undefined && pkg !== SDK_HOME && SOURCE.test(f);
+  });
+  const sdkManifests = listed.filter((f) => {
+    const pkg = PACKAGE_MANIFEST.exec(f)?.[1];
+    return pkg !== undefined && pkg !== SDK_HOME;
+  });
+  for (const surface of EXPECTED_SURFACES) {
+    if (!sdkSources.some((f) => PACKAGE_SRC_OF.exec(f)[1] === surface)) {
+      refuse(
+        `model-sdk-boundary: no tracked source file under ${PACKAGES}${surface}/src. `
+          + "The rule would pass over a package it exists to watch.",
+      );
+    }
+  }
+  if (sdkManifests.length === 0) {
+    refuse(`model-sdk-boundary: no package.json outside ${SDK_HOME} under ${pathspec}/*.`);
+  }
+  noteUntrackedInput({
+    pathspec,
+    suffix: "",
+    include: (f) =>
+      isSource(f)
+      || (PACKAGE_SRC_OF.test(f) && SOURCE.test(f))
+      || PACKAGE_MANIFEST.test(f),
+    gate: "source sites",
+  });
 
   const sites = [];
   const refs = [];
@@ -401,7 +491,35 @@ function main() {
     }
   }
 
+  const sdkFindings = [];
+  for (const file of sdkSources) {
+    let text;
+    try {
+      text = readFileSync(resolve(REPO_ROOT, file), "utf8");
+    } catch (error) {
+      refuse(`${file} is tracked but would not read (${String(error.message ?? error)}).`);
+    }
+    for (const specifier of modelSdkImports(text)) {
+      sdkFindings.push(`${file.slice(PACKAGES.length)}: imports ${specifier}`);
+    }
+  }
+  for (const file of sdkManifests) {
+    let manifest;
+    try {
+      manifest = JSON.parse(readFileSync(resolve(REPO_ROOT, file), "utf8"));
+    } catch (error) {
+      refuse(`${file} would not read or parse (${String(error.message ?? error)}).`);
+    }
+    for (const found of manifestSdks(manifest)) {
+      sdkFindings.push(`${file.slice(PACKAGES.length)}: ${found}`);
+    }
+  }
+
   const findings = [
+    ...sdkFindings.map((f) =>
+      `model-sdk-boundary  ${f} -- only @barwise/llm imports a model SDK, or lists one `
+      + "(determinism-in-core#one-layer-out); reach a model through its LlmClient"
+    ),
     ...writerFindings(sites).map((f) => `orm-version-writers  ${f}`),
     ...refs.map((r) =>
       `ossie-schema-refs  ${r.file}:${r.line} (${r.form}) ${r.text} -- only ${OSSIE_HOME} `
@@ -412,7 +530,8 @@ function main() {
     console.warn(
       `source sites: OK -- ${files.length} file(s); orm-version-writers: ${sites.length} site(s) `
         + `in ${ORM_VERSION_WRITERS.length} listed group(s); ossie-schema-refs: none outside `
-        + `${OSSIE_HOME}.`,
+        + `${OSSIE_HOME}; model-sdk-boundary: ${sdkSources.length} file(s) and `
+        + `${sdkManifests.length} package.json outside ${SDK_HOME}, no SDK.`,
     );
     process.exit(0);
   }
