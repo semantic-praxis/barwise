@@ -5,8 +5,10 @@ Date: 2026-10-25
 Tracking: barwise-ubc, docs/specs/plan-scope-check.spec.md,
 docs/specs/touches-required.spec.md
 Enforced-by: npm run check:plan-review (plan-reviewed),
-npm run check:spec-touches (touches-named), none (barwise-ym8.yg7: spec-first),
-none (barwise-ym8.ogi: plan-reviewed), none (barwise-ym8.8hq: touches-named),
+npm run check:spec-touches (touches-named),
+npm run check:spec-form (open-decisions-reviewer),
+npm run check:spec-first (spec-first),
+none (barwise-ym8.ogi: plan-reviewed),
 none (barwise-ym8.l7d: open-decisions-reviewer)
 
 ## Context
@@ -24,19 +26,20 @@ rejected alternatives are in the two specs above.
 1. **A pull request that changes package source names the spec it
    implements, in its body or a commit message, or carries a `No spec:
    <reason>` line.**{#spec-first} A check reads the presence and form of
-   one or the other, never the reason. The spec lives in
+   one or the other, never the reason (`No spec: n/a` passes). The spec lives in
    `barwise/docs/specs/`, written to the `spec-writer` skill's format.
 2. **The plan is reviewed before it is implemented.**{#plan-reviewed} `/code-review`
    and `/pr-review` run on the spec, and its header records the commit
    they read as `Plan-reviewed: <commit> (code-review, pr-review)`,
    committed before any implementation commit. The line vouches for the
-   spec's body as it stood at that commit; a plan edited afterwards
-   needs the review again.
-3. **A plan names what it will touch.**{#touches-named} A spec's `Touches:` header
-   lists the paths it changes: unmarked for files that must be tracked,
-   `+` for files it creates, `-` for files it deletes. A new spec must
-   carry at least one unmarked or `-` entry that resolves to a path
-   outside `barwise/docs/specs/`; `+` entries alone do not count.
+   spec's body as it stood at that commit; a plan edited before
+   implementation begins needs the review again.
+3. **A new spec's `Touches:` names at least one tracked path outside the
+   specs directory.**{#touches-named} The header marks files that must be
+   tracked unmarked, files it creates with `+`, and files it deletes
+   with `-`; a new spec must carry at least one unmarked or `-` entry
+   that resolves to a path outside `barwise/docs/specs/`, and `+`
+   entries alone do not count.
 4. **Every spec has an Open decisions section, and each entry gives its
    options, the trade-off and a recommended default.**{#open-decisions-reviewer}
    The reviewer settles them; a spec does not decide one silently
@@ -48,36 +51,67 @@ rejected alternatives are in the two specs above.
   rows 14 and 15) to what a check can read. Decision 1 was "a change
   starts from a spec"; its `No spec:` escape makes the exception
   explicit, which the owner chose over strict enforcement and over
-  retirement. Its check is batch 10 of that spec, beside
-  `check:plan-review`; until it lands, the gap issue in the header
-  stands.
+  retirement.
+- `npm run check:spec-first` (a CI gate on pull requests, beside
+  `check:plan-review`) fails a pull request that changes a
+  `barwise/packages/*/src/` path (three-dot diff, committed state) unless
+  its body or a commit message names a spec in the corpus by file name,
+  its diff changes a spec, or a line starts `No spec:` followed by text. It
+  reads the body from `PR_BODY`, set from the event payload; `edited` is
+  among ci.yml's `pull_request` types so a corrected body is read, and a
+  manual re-run reuses the old payload. Unset `PR_BODY` in CI, a shallow
+  clone or an unresolvable base is exit 2. A local run has no body: with
+  package source changed and no commit message naming a spec, it prints
+  `NOT CHECKED -- no pull request body in a local run; CI reads it` and
+  exits 0, never `OK`, because exit 2 would block every push (the
+  pre-push hook) before a pull request exists. The reason after `No spec:`
+  is never read, so `No spec: n/a` passes; the gate catches forgetting, not
+  a bad reason.
 
 - `npm run check:plan-review` (a CI gate on pull requests to main) fails a
   PR that changes a `Touches:` path of a spec it names, while the spec is
   new or claims nothing is built, unless the `Plan-reviewed:` commit
-  precedes every implementing commit and its body matches the plan as
-  implementation began.
+  precedes every implementing commit, the commit that added the line
+  also precedes them (a re-point of a standing line, as after a rebase,
+  is not an addition), its parenthetical contains both `code-review`
+  and `pr-review` (annotations allowed), and its body matches the plan
+  as implementation began. A plan edited after implementation begins is
+  not compared again: specs fold implementation notes in as workstreams
+  land.
 - `npm run check:spec-touches` (a CI gate on every event) fails a new
   spec unless its `Touches:` has an unmarked or `-` entry that resolves
   to a path outside `barwise/docs/specs/`; `+` entries alone never
   count. A spec is new when its file name was absent at the fixed
   cutoff commit, so a spec that lands by any route is checked.
+- That a `Touches:` list is the paths actually changed is review's,
+  held by the `plan-scope` report and not gated: 59 of 101 spec-naming
+  merges changed a path outside `Touches:`, mostly baselines, lockfiles,
+  barrels and generated docs, so a gate would measure how thoroughly a
+  plan listed, not a defect (owner, 2026-11-07; barwise-ym8.8hq).
 - `npm run plan-scope` reports a branch's files outside its named plan
   and its size among recent PRs. It never fails, and it runs only when
   an author or reviewer runs it (`pr-creation`, `pr-review`): size and
   "outside the plan" are shadows of review cost, and a gate on them
   would be gamed.
-- Decisions 1 and 4 have no gate. They are held by review: the
-  `spec-writer` design gate and `pr-review`.
+- `npm run check:spec-form` (a CI gate on every event, no `if:` guard)
+  fails a spec new since a fixed cutoff commit unless it has an
+  `## Open decisions` heading and each top-level entry says one of
+  "recommend", "resolved", "taken as", "decided" or "default"; a section
+  that says only `None.` is accepted, since the template tells an author
+  to drop sections that do not apply. A spec is new by the same file-name
+  rule as `check:spec-touches`, against its own constant
+  (`OPEN_DECISIONS_REQUIRED_SINCE`). Specs present at the cutoff are
+  exempt (owner, 2026-11-07), not conforming: 75 of 201 lacked the
+  heading, and sweeping them is barwise-1007's. The gate holds the section
+  and the default. The options and the trade-off are not machine-readable,
+  and a decision made silently in a spec's body is held by review (the
+  `spec-writer` design gate and `pr-review`); barwise-ym8.l7d stays open
+  for that residue.
 - Gaps in what enforces decision 2, each open:
   - a spec whose Status claims some work is built is not checked, so
     its second workstream onward is unreviewed by the gate, and the
     gate fires only where the diff overlaps the declared `Touches:`
     (barwise-x3l);
-  - the `Plan-reviewed:` line is read at HEAD, so it can be added after
-    the implementation; the review names in it are not checked; and
-    plan edits made after implementation begins are never compared
-    (barwise-wzl);
   - the gate runs only on pull requests to main, and holds only while
     PRs merge with a merge commit: a squash or a rebase after review
     loses the named commit (barwise-z4h).

@@ -147,9 +147,12 @@ merged. This is the one permission rule in this file, because it is a
 delegation the owner made for this repo, which no generic rule can know.
 
 - **Review the current head, post the verdict, then merge that SHA.**
-  Run the `pr-review` skill, and before merging post its verdict as a PR
-  comment whose first line names the head SHA and the verdict
-  (`pr-review` section 6). On `merge`, merge with the reviewed SHA
+  Run the `pr-review` skill, and post its verdict as a PR comment whose
+  first line names the head SHA and the verdict (`pr-review` section 6)
+  after every review, not only the one before the merge: the count behind
+  "two verdicts other than `merge`" below reads posted comments, and a
+  verdict kept in the session is a verdict the record cannot count. On
+  `merge`, merge with the reviewed SHA
   pinned (the GitHub MCP merge's `expectedHeadSha`, or `gh pr merge
   --match-head-commit`), so a commit pushed after the review is refused
   rather than merged, and put `Reviewed-head: <sha>` and `Review: merge`
@@ -169,9 +172,17 @@ delegation the owner made for this repo, which no generic rule can know.
 - **No exemption by size.** Tracker-only and docs-only PRs, including
   section 5's follow-up, get the verdict comment and the trailers too;
   PR #679 only closed two issues and merged without a review, which is
-  how this rule came to be written down. Nothing mechanical enforces it
-  yet: the gate that reads the trailers is `adr-refactor.spec.md`'s
-  batch 10 (barwise-zdd). The rule is
+  how this rule came to be written down. The `merge-guard` hook refuses
+  an unpinned or unreviewed merge call before it happens, and
+  `npm run check:merge-record` reads the merge afterwards (a CI step
+  on every event for the trailers; on a push to `main` it also reads
+  the verdict comment). When it reports a merge, it prints the
+  `node barwise/scripts/beads-crud.mjs create ... --labels merge-record`
+  command that files the issue; run it, and let the owner decide whether
+  to revert. A merge cannot be amended, so the owner's acknowledgement is
+  a row in `barwise/merge-record-baseline.json`
+  (`npm run check:merge-record -- --write`, then `accepted-by-owner` or
+  `tracked:<issue>` and a note). The rule is
   `docs/adr/merge-delegation.md`.
 
 ## 5. After the PR merges

@@ -5,6 +5,11 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+    # `edited` so a corrected description re-runs check:spec-first, which
+    # reads the body from the event payload. A manual re-run of a job reuses
+    # the original payload and does not see the edit (adr-batch10-enforcers
+    # spec, Open decision 9).
+    types: [opened, synchronize, reopened, edited]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -13,6 +18,14 @@ concurrency:
 jobs:
   ci:
     runs-on: ubuntu-latest
+    # Explicit rather than the repository default, which a session cannot
+    # read: check:merge-record's push-time API half reads issue comments and
+    # the pull requests of merge commits and nothing else needs more than
+    # checkout (adr-batch10-enforcers.spec.md, WS6).
+    permissions:
+      contents: read
+      issues: read
+      pull-requests: read
     # The Node version comes from .nvmrc, not from a matrix. It used to be a
     # single-value matrix, which put the version in the status check's name
     # ("ci (22)") and so made every upgrade also a branch-protection edit --
@@ -206,6 +219,15 @@ jobs:
       - run: npm run check:depcruise-gate
         if: steps.changes.outputs.docs_only != 'true'
 
+      # Rules over package source that cross package boundaries, which a
+      # package's vitest cannot hold because turbo caches it against that
+      # package alone: who sets orm_version (schema-versioning#version-signal)
+      # and who names the vendored Ossie schema, which depcruise's includeOnly
+      # cannot see (ossie-interchange#peer-standard, #own-vocabulary).
+      # Source only, so it runs before the build (adr-batch9-enforcers WS3).
+      - run: npm run check:source-sites
+        if: steps.changes.outputs.docs_only != 'true'
+
       # Declared must-agree copies (parity.manifest.json) stay
       # byte-identical; editing one copy without its partners fails
       # here instead of drifting silently (barwise-868).
@@ -220,6 +242,14 @@ jobs:
       # read, because "every row is stale" is what an unreadable checklist
       # would otherwise look like.
       - run: npm run check:review-tiers
+      # The workflows that carry review-policy.md's decisions: REVIEW.md's
+      # lane table against barwise/review-lanes.json and this file's `on:`,
+      # the review-request job running or declared paused against an open
+      # issue, nothing in the tree waiting on that reviewer, and the declared
+      # readers of the review tier. No `if:` guard: its inputs are workflows,
+      # scripts and REVIEW.md, and a REVIEW.md edit alone is docs-only to
+      # changed-class (adr-batch10-enforcers.spec.md, WS1).
+      - run: npm run check:review-workflows
       # A spec's Touches: header is its declared plan. An unmarked entry
       # that names nothing tracked is a plan that rotted, the way a
       # review-tiers glob routed nothing for five weeks (barwise-fs0).
@@ -230,6 +260,23 @@ jobs:
       # every later run; it needs the cutoff commit, which the
       # `fetch-depth: 0` checkout provides (exit 2 without it).
       - run: npm run check:spec-touches
+      # A spec new since a fixed cutoff commit (the same file-name rule as
+      # the step above, a second constant) has an `## Open decisions`
+      # section whose entries each say where they stand, or says only
+      # `None.` (plan-before-code#open-decisions-reviewer,
+      # adr-batch10-enforcers.spec.md WS2). Older specs are exempt. No `if:`
+      # guard: its inputs are Markdown specs, which a docs-only change is
+      # exactly the change to edit, and it needs the cutoff commit, which
+      # the `fetch-depth: 0` checkout provides (exit 2 without it).
+      - run: npm run check:spec-form
+      # The schema differs from the latest v* tag's while CURRENT_ORM_VERSION
+      # still equals what that tag wrote: the first additive change after a
+      # release skipped its bump (schema-versioning#shared-minor). It reads
+      # `git describe` and `git show <tag>:<path>`, so the `fetch-depth: 0`
+      # checkout above must bring tags; a shallow clone or no reachable v* tag
+      # refuses (exit 2). No `if:`: a docs-only change cannot move it, and a
+      # step that sometimes skips is a gate that sometimes cannot answer.
+      - run: npm run check:schema-bump
       # A spec's plan is reviewed (/code-review, /pr-review) before its
       # implementation is committed, recorded as `Plan-reviewed: <commit>`
       # in its header (plan-scope-check.spec.md, WS6). Wired like
@@ -246,6 +293,35 @@ jobs:
         if: github.event_name == 'pull_request'
         env:
           BASE_SHA: ${{ steps.base.outputs.sha }}
+
+      # A pull request that changes package source (packages/*/src) names the
+      # spec it implements in its body or a commit message, or carries a
+      # `No spec: <reason>` line (plan-before-code#spec-first,
+      # adr-batch10-enforcers.spec.md WS3). The body reaches the script through
+      # `env`, never interpolated into the shell: it is untrusted text. A null
+      # body arrives as an empty string, which names nothing; an unset PR_BODY
+      # refuses (exit 2). Pull requests only, as check:plan-review: it reads
+      # what a pull request adds over its base, and a push to main has neither
+      # base nor body. No docs-only guard: it reads the diff itself.
+      - run: npm run check:spec-first
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_SHA: ${{ steps.base.outputs.sha }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+
+      # Every merge to main since the cutoff leaves the record merge-delegation
+      # asks for (merge-delegation decisions 1, 3, 4 and 5;
+      # adr-batch10-enforcers.spec.md WS6). The git half (parents and
+      # trailers, no network) runs on every event, from BASE_SHA on a pull
+      # request and HEAD on a push. The API half (the verdict comment) runs
+      # only on a push to main and reads GitHub with GITHUB_TOKEN; the script
+      # checks GITHUB_EVENT_NAME itself, so the step has no `if:` and the
+      # architecture judge and ci:local need no push-only atom. No docs-only
+      # guard: it reads history, not the diff. BASE_SHA is empty on a push.
+      - run: npm run check:merge-record
+        env:
+          BASE_SHA: ${{ steps.base.outputs.sha }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       # A NUL byte makes git classify a source file as binary: no diff, no
       # blame, no review, and a patch taken from it loses changes silently.
@@ -390,6 +466,15 @@ jobs:
         if: steps.changes.outputs.docs_only != 'true'
 
       - run: npm run build
+        if: steps.changes.outputs.docs_only != 'true'
+
+      # constraint-coverage-policy: the inventory's rows against the eval
+      # suite and the ADR's tiers. Uncached, because its inputs (promptlab's
+      # evals/, the ADR, the inventory spec) are outside any package's turbo
+      # key; after the build, because it imports core and learn and refuses
+      # without them. The inventory spec is in GATE_INPUT, so a change to it
+      # alone is not docs-only (adr-batch9-enforcers WS5).
+      - run: npm run check:eval-coverage
         if: steps.changes.outputs.docs_only != 'true'
 
       # Each matrix row against what the CLI, the MCP server and the VS Code
@@ -602,3 +687,6 @@ jobs:
         if: github.event_name == 'pull_request' && steps.changes.outputs.docs_only != 'true'
         env:
           BASE_SHA: ${{ steps.base.outputs.sha }}
+          # check:spec-first refuses (exit 2) in CI without it, so the matrix's
+          # unfaulted reading of that gate needs the body the step above gets.
+          PR_BODY: ${{ github.event.pull_request.body }}

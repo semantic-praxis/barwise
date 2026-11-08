@@ -5,10 +5,9 @@ Date: 2026-10-28
 Tracking: barwise-pf2.4, barwise-pf2, barwise-wcg,
 docs/specs/ossie-ontology-format.spec.md,
 docs/specs/iri-identity.spec.md
-Enforced-by: tests (ontology-layer-only, pinned-version, nothing-lost-silently),
-none (barwise-ym8.zec: peer-standard), none (barwise-ym8.k74: ontology-layer-only),
-none (barwise-ym8.oor: pinned-version), none (barwise-ym8.zkd: nothing-lost-silently),
-none (barwise-ym8.m1l: readable-iri), none (barwise-ym8.yc6: own-vocabulary)
+Enforced-by: tests (ontology-layer-only, pinned-version, nothing-lost-silently, readable-iri),
+npm run depcruise (peer-standard, own-vocabulary),
+npm run check:source-sites (peer-standard, own-vocabulary)
 
 ## Context
 
@@ -104,10 +103,13 @@ renames its terms to match the other (row 13 moved that clause here).
    descriptor.**{#own-vocabulary} That is its importer,
    `mapOssieToOrm.ts`, and its exporter, `writeOssie.ts`; the
    construct-by-construct translation is the spec's Scope. Decisions 1
-   and 6 share one check, batch 9 of `adr-refactor.spec.md`: a depcruise
-   rule that only `formats/src/ossie/` imports Ossie's types, its
-   vendored schema, `mapOssieToOrm` or `writeOssie`. "Core names
-   nothing Ossie-specific" is a report, not a gate.
+   and 6 share their checks (`adr-batch9-enforcers.spec.md`, WS3): no
+   module outside `formats/src/ossie/` and the package's two entry files
+   (`index.ts`, `registration.ts`) imports an Ossie module, the entry
+   files import only `OssieExportFormat`, `OssieImportFormat` and
+   `OssieTypes` from it, and no source outside `formats/src/ossie/`
+   names the vendored schema. "Core names nothing Ossie-specific" is a
+   report, not a gate.
 
 ## Consequences
 
@@ -123,7 +125,16 @@ renames its terms to match the other (row 13 moved that clause here).
   `parseOssie`'s own checks (an upstream `multiplicity` value other than
   `ManyToOne` or `OneToOne` fails the import). A changed type or enum on any
   other field, a changed meaning, or a removed field, under the same string,
-  passes; for those the commit pin holds only for the tests.
+  passes; for those the commit pin holds only for the tests. The pin itself
+  is recorded: `formats/schemas/ossie/pin.json` names the commit and each
+  vendored file's git blob id, and `formats/tests/OssiePin.test.ts`
+  recomputes each id from the bytes, fails on a vendored file the record
+  leaves out, and requires the schema README to name the same commit (a
+  README-only change is not docs-only, `scripts/lib/changed-class.mjs`).
+  The unknown-field test below is tagged too: it fails if the importer
+  validates against anything but the pinned schema. That the recorded ids
+  are upstream's at `01a5488d` is checked by hand in an apache/ossie
+  clone, not by a test.
 - Decision 4 is tested on the pinned example and on unit cases.
   `OssieExportFormat.test.ts` imports `flights.ontology.yaml`, exports it,
   and compares the result construct by construct, excluding only what the
@@ -140,7 +151,20 @@ renames its terms to match the other (row 13 moved that clause here).
   read back, and three review rounds on PR #762 each found a prediction
   that was wrong; it now also reads the written document back and adds a
   loss line for any difference no prediction named (`verifyOssie.ts`,
-  barwise-5bv).
+  barwise-5bv). The read-back tests in `OssieVerify.test.ts` that expect
+  a line only the read-back writes, or its refusal line, are tagged, so an
+  exporter that stops reading back fails them. A property test over
+  generated models reaches constructs the example and the unit cases lack
+  (`formats/tests/OssieNothingLost.property.test.ts`, tagged). It exports
+  each model from core's arbitrary, reads the document back, and requires
+  a loss line naming every element whose serialized YAML differs from the
+  source's, so a field `diffModels` does not compare is not a blind spot.
+  Its first run found diagram layouts dropped with no line, now reported.
+  It names an element, not a field: a line about a fact type covers every
+  difference on that fact type, and the alignment of the read-back to the
+  source ids is `verifyOssie`'s own. A self-check fails the test unless
+  a generated model has a deontic mandatory on a first role, the shape
+  only the read-back names.
 - The model's name is the one exception decision 4 does not report: a
   caller-supplied name replaces the document's `name` without a warning,
   and the CLI always supplies one (`--name`, defaulting to the file name),
@@ -151,10 +175,17 @@ renames its terms to match the other (row 13 moved that clause here).
   report (barwise-wc0). A loss that is not a constraint -- a semiderived
   rule, a dropped note, an unmapped data type -- appears only in the
   block, because `ExportResult` has no warnings field (decision 1).
-- Decision 2 is partly tested: the same import test pins that an embedded
-  `ontology_mappings` block is dropped with a warning. Nothing stops a
-  change from adding mapping-document support elsewhere; that, and
-  decision 1's "core holds nothing specific to Ossie", are review-only.
+- Decision 2 is tested both ways. The import tests pin that an embedded
+  `ontology_mappings` block is dropped with a warning, and that one holding
+  a core-layer `semantic_model` (a dataset, its fields, a metric) adds no
+  element named after any of them: the pinned schema closes the top level,
+  so that is the one place core-layer content fits in an ontology document.
+  `OssieExportFormat.test.ts` holds the example's export and a built
+  model's to the top-level keys `version`, `name`, `description`,
+  `requires`, `ontology` and `prefixes`, with no `ontology_mappings`,
+  which the schema would accept. Mapping-document support written outside
+  the descriptor without importing it, and decision 1's "core holds
+  nothing specific to Ossie", are review-only (owner, 2026-11-06).
   Core's two mentions of Ossie today are comments naming it as one
   consumer of shared, format-neutral helpers
   (`annotation/constraintSpec.ts`, `isUniqueAlone` in
@@ -175,9 +206,29 @@ renames its terms to match the other (row 13 moved that clause here).
   With identity built from names, a rename changes an element's IRI:
   diff reports a content pair whose names differ as a possible rename,
   and merge never pairs one, adding it instead (iri-identity decision 8).
-- Decision 6 has no gate; that barwise keeps its ORM 2 terms is held by
-  review. The translation is tested construct by construct in
-  `OssieImportFormat.test.ts` and `OssieExportFormat.test.ts`. It is
+  Readable ids are held by tagged tests: a model built with no ids takes
+  `localName(name)` ids and draws no `structural/id-not-from-name`
+  warning, and that warning names an id its name does not give (core
+  `idsAndImports.test.ts`); every registered importer's ids follow the
+  naming rule (`cli/tests/importerIds.test.ts`). The 4.0 decoder checks
+  only an id's shape, which a UUID passes, so those tests hold "readable".
+- Decisions 1 and 6 are gated twice. `npm run depcruise` carries two
+  rules in `.dependency-cruiser.cjs`: `ossie-only-in-descriptor` (no
+  edge into `formats/src/ossie/` except from it, `index.ts` and
+  `registration.ts`) and `ossie-entry-points` (from those two files,
+  edges only to `OssieExportFormat.ts`, `OssieImportFormat.ts` and
+  `OssieTypes.ts`; keyed on the target file, so an aliased re-export of
+  `parseOssie` or `mapOssieToOrm` still fails). Depcruise cannot see the
+  vendored schema, which its `includeOnly` drops, so `npm run
+  check:source-sites` (rule `ossie-schema-refs`) fails any module
+  reference or string naming `schemas/ossie` in `packages/*/src`
+  outside `formats/src/ossie/`. Both run in CI before the build, on the
+  `docs_only` guard. Review-only, by the owner's choice (2026-11-06): an
+  Ossie reader or mapping-document support written from scratch that
+  imports nothing of the descriptor, a re-export routed through one of the
+  three entry modules, a path to the schema built from pieces, and that
+  barwise keeps its ORM 2 terms. The translation is tested construct by
+  construct in `OssieImportFormat.test.ts` and `OssieExportFormat.test.ts`. It is
   written twice in code, once per direction, and the exporter's copy
   predicts the importer's (barwise-5bv, above).
 - These places also state a rule here: `docs/CLI.md` (the version pin and

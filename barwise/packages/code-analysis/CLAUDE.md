@@ -7,12 +7,11 @@ machines, and annotation-based constraints.
 
 ## Dependency Rule
 
-This package depends on `@barwise/core` for model types and the
-`ImportFormat` interface. It does NOT depend on `@barwise/llm` -- the
-LLM client is injected via `enrich()`, same pattern as other formats.
-
-Allowed runtime dependencies: `@barwise/core`. No others without
-discussion. The package uses `node:child_process` for spawning language
+Internal dependencies are the Upstream rows of `## Dependencies`
+below, checked against `INTENDED` by `npm run check:architecture`. The
+LLM client is injected via `enrich()`, same pattern as other formats,
+so no LLM package is a dependency. No external runtime dependency
+without discussion. The package uses `node:child_process` for spawning language
 servers and `node:fs` for file discovery.
 
 ## Package Layout

@@ -8,7 +8,7 @@ docs/specs/archive/schema-versioning.spec.md,
 docs/specs/diagram-references-by-id.spec.md,
 docs/specs/orm-format-3.spec.md
 Enforced-by: tests (version-signal, minor-and-major, load-forward),
-none (barwise-ym8.4i2: version-signal), none (barwise-ym8.8l3: shared-minor),
+npm run check:source-sites (version-signal), npm run check:schema-bump (shared-minor),
 none (barwise-ym8.yfi: load-forward)
 
 ## Context
@@ -57,7 +57,9 @@ which a check can hold (`docs/specs/adr-batch9-enforcers.spec.md`).
    additive change after a released version performs the bump; every
    later additive change before the next release adds its construct to
    the already-bumped schema without touching the version -- not one
-   bump per construct or per pull request.
+   bump per construct or per pull request. A version is released when a
+   `v*` git tag names it (owner, 2026-11-06); the moving `edge`
+   pre-release is not a release.
 4. **Older files load at the current version; a surface writes them
    back only when it writes an edit.**{#load-forward} A migration brings an older file
    forward on load, either as a step on the raw document
@@ -81,13 +83,26 @@ which a check can hold (`docs/specs/adr-batch9-enforcers.spec.md`).
   source) and the editor's new-model scaffold (vscode's
   `projectScaffold.test.ts`) both state `CURRENT_ORM_VERSION`;
   `tested-in.json` names all three files, so each must carry a passing
-  tagged test. Any other
-  writer that bypasses the serializer is unchecked until
-  `check:source-sites` lands (barwise-ym8.4i2;
-  `adr-batch9-enforcers.spec.md` WS3). It runs in CI through
+  tagged test. These run in CI through
   `npm run test:coverage` (`if: steps.changes.outputs.docs_only !=
   'true'`, so skipped on a docs-only pull request and, like any step,
-  once an earlier step fails). A file at the same version that uses a
+  once an earlier step fails). Any other writer is held by `npm run
+  check:source-sites`, rule `orm-version-writers`
+  (`scripts/check-source-sites.mjs`, `adr-batch9-enforcers.spec.md`
+  WS3), uncached and run in CI before the build on the same guard. It
+  parses every tracked `packages/*/src` file and counts each site that
+  sets `orm_version` (an object key, an assignment to `.orm_version` or
+  `["orm_version"]`, or string or template text holding `orm_version:`)
+  per file, enclosing function and form, against `ORM_VERSION_WRITERS`:
+  the decoders' literals, two in-memory 3.0 documents never written
+  (`document40Configs`, `verifyOssie`'s `document30`), the two
+  migration restamps, the serializer, and the two writers above. An
+  unlisted site, an extra one in a listed group, and a row with fewer sites
+  than listed are each a finding. Review-only, because a parse cannot see
+  them: a computed key built by concatenation, an `Object.assign` or
+  `defineProperty` from a variable key, a document copied by spread from a
+  source other than the serializer, and YAML assembled from fragments that
+  never hold `orm_version:` whole. A file at the same version that uses a
   construct the reader lacks still fails at the decoder; decision 1 does
   not cover that.
 - Decision 2 is held by tagged tests in core's `schemaVersion.test.ts`.
@@ -122,29 +137,61 @@ which a check can hold (`docs/specs/adr-batch9-enforcers.spec.md`).
   minor bump that forgets its step fails. A step that skips a minor (3.0 to
   3.2) passes that test and fails the shape test above. The serializer's
   own path through a real minor first runs at that bump.
-- Decision 3 has no gate: a change to `orm-model.schema.json` that
-  leaves `CURRENT_ORM_VERSION` equal to the last tagged release's passes
-  CI (barwise-vvg, which waits on barwise-6om for what "released"
-  means).
-- Decision 3 is silent on what counts as released and on what happens
-  inside an unreleased major. v1.7.0 wrote 1.1; 2.0 and 3.0 landed after
-  it only in the moving `edge` pre-release, and v2.0.0 is the first
-  release since, writing 4.0. `join_ring` (#746) and
-  the external-uniqueness preferred identifier (#767), both additive,
-  joined 3.0 after #708 with no minor bump, so an earlier 3.0 `edge`
-  build refuses such a file at the schema rather than with "newer
-  barwise". `diagram-empty-view.spec.md` changed what `elements: []`
-  means inside 2.0 with no bump, a structural change an older 2.0 reader
-  misreads, and accepted that exposure in its PR. Whether either is
-  allowed is open (barwise-6om).
+- Decision 3 is held by `npm run check:schema-bump`
+  (`scripts/check-schema-bump.mjs`). It finds the latest `v*` tag
+  reachable from HEAD, reads that tag's `orm-model.schema.json` and
+  `CURRENT_ORM_VERSION`, and exits 1 when the schema differs (ignoring
+  `description`, `title` and `$comment`) while the version equals the one
+  the tag wrote. It exits 2, not 0, when no `v*` tag is reachable or the
+  tag's files cannot be read, so a shallow clone refuses. It does not judge
+  additive versus structural, and it checks only the first half of the
+  decision: that a change after a release bumped. Whether a second
+  additive change shares the bump, rather than bumping again, is not
+  checked. It cannot fail while the last tag wrote a version the build has
+  since left: v1.7.0 wrote 1.1 and this build writes 4.0, so it starts to
+  bite at the next `v*` tag.
+- Decision 3 is silent on what happens inside an unreleased major. v1.7.0
+  is the newest `v*` tag and wrote 1.1; 2.0, 3.0 and 4.0 landed after it
+  only in the moving `edge` pre-release, and no tag has written 4.0 yet.
+  `join_ring` (#746) and the external-uniqueness preferred identifier
+  (#767), both additive, joined 3.0 after #708 with no minor bump, so an
+  earlier 3.0 `edge` build refuses such a file at the schema rather than
+  with "newer barwise". `diagram-empty-view.spec.md` changed what
+  `elements: []` means inside 2.0 with no bump, a structural change an
+  older 2.0 reader misreads, and accepted that exposure in its PR. Those
+  predate a tag that wrote them, so the gate does not reach them; under
+  decision 3 as now defined, a change inside a major no tag has written is
+  allowed (barwise-6om).
 - Decision 4's load and write paths are tested: the 1.0 forward load in
   `SchemaVersioning.test.ts`, the 2.0 reader and `migrate` in
   `format30.test.ts`, the command in `cli/tests/commands/migrate.test.ts`,
   and `merge.test.ts` asserting `barwise merge` succeeds on two 1.0
   inputs, prints the merge at the current version, and leaves both inputs
-  untouched, all under `test:coverage`. No general check covers other
-  commands; the capability matrix's `migrate` and `merge` rows record by
-  hand which surfaces write files.
+  untouched, all under `test:coverage`. Two tests cover the rest of the
+  CLI and MCP surfaces (`cli/tests/loadForward.test.ts`,
+  `mcp/tests/loadForward.test.ts`, both named in `tested-in.json`). Each
+  reads its surface's registration (the commander tree `createProgram`
+  builds; the server's `listTools`) and requires a row for every command
+  or tool, so a new one fails until it is declared. A row either runs the
+  command on a copy of a 3.0 file, which must succeed, print something and
+  leave the file's bytes unchanged, or is a skip with its reason: a model
+  API key, a source repository, a foreign format, no model file. The
+  editing commands are an explicit list with a reason each (CLI `migrate`
+  and `rename`; MCP `merge_models` and `rename_element`), and each must
+  still change the file and stamp the current version. Success is checked
+  before bytes, since a command that refused the file leaves it unchanged
+  too; the MCP check also reads an `error` key in a tool's JSON, which
+  `rename_element` uses without `isError`. Three findings shape the
+  rows. Both `rename` and `rename_element` refuse a 3.0 file and name
+  `barwise migrate` rather than loading it forward, so their edit is
+  tested on a file already at the current version and the refusal is
+  pinned separately. MCP `split_model` writes a new project to `outDir`
+  and never its source, so it is held read-only on the source. `gym
+  check` is skipped because its verdict is its exit code and the only
+  passing answer is a 4.0 file. Still open for decision 4 (barwise-ym8.yfi):
+  VS Code's open and save path, which has no headless harness here, and
+  the language-model tools, which reach the MCP code but are not run by
+  these tests.
 - Migration loses what the serializer or a lenient load does not carry:
   `barwise migrate` drops YAML comments because it writes from the model
   (barwise-ok6), and a 2.0 merge fragment's `is_preferred` flags are

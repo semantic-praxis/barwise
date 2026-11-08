@@ -923,6 +923,48 @@ ontology:
     ]);
     expect(confidence).toBe("medium");
   });
+
+  it("reads nothing of a core-layer semantic model inside an embedded mapping [adr:ossie-interchange#ontology-layer-only]", () => {
+    // The ontology schema closes its top level, so core-layer content (a
+    // dataset, its fields, a metric) can reach an ontology document only
+    // here, under ontology_mappings[].semantic_model. The block above holds
+    // none, so it cannot tell a dropped semantic model from a read one.
+    const { model, warnings } = load(`
+ontology_mappings:
+  - name: sales_map
+    semantic_model:
+      version: 0.2.0.dev0
+      name: sales
+      datasets:
+        - name: Shipment
+          source: db.public.shipments
+          primary_key: [ shipment_id ]
+          fields:
+            - name: shipment_id
+              expression: { dialects: [ { dialect: ANSI_SQL, expression: shipment_id } ] }
+            - name: Weight
+              expression: { dialects: [ { dialect: ANSI_SQL, expression: weight_kg } ] }
+      metrics:
+        - name: TotalWeight
+          expression: { dialects: [ { dialect: ANSI_SQL, expression: SUM(Shipment.Weight) } ] }
+    concept_mappings: []
+ontology:
+  - { concept: Code, type: ValueType, extends: [ String ] }
+`);
+    expect(warnings).toEqual([
+      "ontology_mappings: embedded mappings (deprecated in Ossie) are not imported; dropped.",
+    ]);
+    const names = [
+      model.name,
+      ...model.objectTypes.map((o) => o.name),
+      ...model.factTypes.flatMap((f) => [f.name, ...f.roles.map((r) => r.name)]),
+    ].map((n) => n.toLowerCase());
+    for (const core of ["sales_map", "sales", "shipment", "shipment_id", "weight", "totalweight"]) {
+      expect(names.filter((n) => n.includes(core)), core).toEqual([]);
+    }
+    expect(model.objectTypes.map((o) => o.name)).toEqual(["Code"]);
+    expect(model.factTypes).toEqual([]);
+  });
 });
 
 describe("Ossie import: fields the pinned schema does not define", () => {
@@ -931,7 +973,7 @@ describe("Ossie import: fields the pinned schema does not define", () => {
   const unknown = (path: string) =>
     `${path}: the Ossie 0.2.0.dev0 schema defines no such field; ignored.`;
 
-  it("names one at the top level, in a concept, a relationship and a role [adr:ossie-interchange#nothing-lost-silently]", () => {
+  it("names one at the top level, in a concept, a relationship and a role [adr:ossie-interchange#nothing-lost-silently] [adr:ossie-interchange#pinned-version]", () => {
     const { model, warnings, confidence } = load(`
 colour: blue
 ontology:

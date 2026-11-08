@@ -1,6 +1,6 @@
 # Batch 9: schema, Ossie, eval-coverage and package-graph decisions enforced
 
-Status: Planned; plan reviewed 2026-11-06 (one code-review round, ten findings, all addressed in the revision); WS1 (`recompute-derived`) implemented; WS2 (schema-versioning tests, `minor-and-major` restated) implemented; WS3-WS8 not started
+Status: Planned; plan reviewed 2026-11-06 (one code-review round, ten findings, all addressed in the revision); WS1 (`recompute-derived`) implemented; WS2 (schema-versioning tests, `minor-and-major` restated) implemented; WS3 (`check:source-sites`, ossie-interchange) implemented; WS4 (package-graph-authority) implemented; WS5 (`check:eval-coverage`, constraint-coverage-policy) implemented; WS7 (`check:schema-bump`, schema-versioning#shared-minor) implemented; WS6 (load-forward) implemented for the CLI and MCP, VS Code still open (barwise-ym8.yfi narrows, does not close); WS8 (`nothing-lost-silently` property test) implemented
 
 Created: 2026-11-06
 Last-updated: 2026-11-06
@@ -460,7 +460,7 @@ example and unit cases. Enforcer, in two steps:
    constraintSpecs: [] }` instead of calling `verifyOssie`. The test's
    `verified(...)` then returns `[]` against an expected one-line array,
    so it fails. This needs no generated input.
-2. Provisional (WS8): a property test running `OssieExportFormat.export`
+2. Built (WS8): a property test running `OssieExportFormat.export`
    over core's model arbitrary. For every element whose serialized form
    differs between the source and the re-imported, id-aligned model, a
    loss line must name it. The oracle compares serialized YAML, not
@@ -473,8 +473,8 @@ example and unit cases. Enforcer, in two steps:
    across its runs, at least one generated model has a deontic
    mandatory on a fact type's first role, or the test fails. That keeps
    the property from passing a corpus that cannot distinguish.
-   Unverified: that `RUNS = 250` at `SEED` produces one. If it does not,
-   the self-check fails first and the arbitrary is widened.
+   Verified: `RUNS = 250` at `SEED` produces one, and the first run found
+   diagram layouts dropped with no loss line (now reported).
 
 Wording: unchanged. Gap: zkd narrows with (1) and closes with (2). The
 missing `ExportResult.warnings` and the caller-supplied name are
@@ -682,6 +682,15 @@ inventory. vq8 is narrowed in the tracker PR. 5yl and k6g close.
 The CLI and MCP surface tests with their self-checks, and the
 `tested-in.json` row. VS Code gets its own design pass once its seams
 are measured.
+
+Built for the CLI and MCP. Measured differences from the plan above:
+`rename` and `rename_element` refuse a 3.0 file (naming `barwise
+migrate`), so their editing is shown on a current-version file and the
+refusal is pinned in its own test; MCP `split_model` never writes its
+source, so it is held read-only like the rest; `gym check` is skipped,
+since the only passing answer is a 4.0 reference. The MCP success check
+reads an `error` key in the JSON, which `rename_element` returns
+without `isError`. VS Code remains open under barwise-ym8.yfi.
 
 ### 7. `check:schema-bump`
 

@@ -71,7 +71,7 @@ note, was decided when barwise-qs8 closed.
   - that `audit-duplication.mjs` contains no `writeFileSync`, and that
     running `--check` leaves its baseline's bytes and modification
     time, and the tree's git status, alone;
-  - a registry of the five baselines, keyed to the ones
+  - a registry of the baselines, keyed to the ones
     `scripts/lib/findings.mjs` reads: each writer imports and calls
     `readExistingRows` and `mergeBaselineRows` (the trial gate is the
     declared exception) and is one the round-trip tests run, and no

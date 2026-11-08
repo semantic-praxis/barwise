@@ -1,0 +1,4 @@
+{
+  "$comment": "Merges the owner has answered for, from scripts/check-merge-record.mjs (npm run check:merge-record; CI runs it). A merge cannot be amended, so a finding on history stays until acknowledged here: status is `accepted-by-owner` or `tracked:<issue>`, and note says why a reader can follow. `--write` adds a placeholder row for a new finding; check:findings refuses a placeholder and an open row whose issue is closed. docs/adr/merge-delegation.md.",
+  "merges": {}
+}

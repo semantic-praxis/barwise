@@ -14,6 +14,13 @@
  * the entry's own script and `-- <args>`, so a probe runs what the header
  * declares and CI runs.
  *
+ * A probe may add `gate`, a script name (`depcruise`): it then runs against
+ * that entry alone. A decision held by two gates that read different
+ * inputs (a source import for one, a CLAUDE.md row for the other) cannot
+ * have one edit both see, and without `gate` each row would read MISSED
+ * under the gate that does not look there. Without it a row runs against
+ * every entry, so a decision whose gates share an input needs no field.
+ *
  * A row is either a probe, `{ decision, file, old, new }`, or a decision
  * left unprobed with its reason, `{ decision, unprobed }`: a gate that
  * reads committed state (check:plan-review) never sees a working-tree
@@ -67,7 +74,8 @@ export function readRows(text) {
   for (const [i, r] of rows.entries()) {
     const probe = r !== null && typeof r === "object"
       && isText(r.decision) && isText(r.file) && typeof r.old === "string"
-      && r.old !== "" && typeof r.new === "string" && r.unprobed === undefined;
+      && r.old !== "" && typeof r.new === "string" && r.unprobed === undefined
+      && (r.gate === undefined || isText(r.gate));
     const unprobed = r !== null && typeof r === "object"
       && isText(r.decision) && isText(r.unprobed) && r.file === undefined;
     if (!probe && !unprobed) {
@@ -116,6 +124,10 @@ export function rowFindings(rows, { ids, gates }) {
       out.push(`${r.decision}: no npm entry of its ADR lists it, so there is no gate to probe`);
     } else if (r.file !== undefined && unprobed.has(r.decision)) {
       out.push(`${r.decision}: has a probe and an unprobed row; keep one`);
+    } else if (r.gate !== undefined && !gates.get(r.decision).some((g) => g.script === r.gate)) {
+      out.push(
+        `${r.decision}: no npm entry running ${r.gate} lists it, so the row's gate is not one`,
+      );
     }
   }
   return out;
@@ -202,6 +214,7 @@ async function main() {
       refuse(`git status failed for ${p.file} (${err instanceof Error ? err.message : err})`);
     }
     for (const gate of declared.gates.get(p.decision)) {
+      if (p.gate !== undefined && gate.script !== p.gate) continue;
       const label = `${p.decision} by "${gate.text}"`;
       if (dirty) {
         refused.push(`${label}: ${p.file} has uncommitted changes`);

@@ -30,7 +30,19 @@ const DOCS_ONLY = /\.md$|^\.beads\//;
  * the tests have run (docs/specs/executable-adrs.spec.md, WS2). ADRs change
  * rarely, so a full CI run for one costs little.
  */
-const GATE_INPUT = /^barwise\/docs\/adr\/(?!(?:.*\/)?README\.md$)/;
+const GATE_INPUT = new RegExp(
+  [
+    /^barwise\/docs\/adr\/(?!(?:.*\/)?README\.md$)/.source,
+    // The vendored Ossie schema's README names the upstream commit, and a
+    // formats test holds it to `schemas/ossie/pin.json`; docs-only would
+    // skip that test on a README-only change (adr-batch9-enforcers WS3).
+    /^barwise\/packages\/formats\/schemas\/ossie\/README\.md$/.source,
+    // The coverage inventory is a gate input of check:eval-coverage, which
+    // needs the build (it imports core and learn); docs-only would skip
+    // both on an inventory-only change (adr-batch9-enforcers WS5).
+    /^barwise\/docs\/specs\/constraint-extraction-coverage\.spec\.md$/.source,
+  ].join("|"),
+);
 
 /**
  * The optimizer lane runs when it is touched, or when the CLI it shells out

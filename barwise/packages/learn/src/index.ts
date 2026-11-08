@@ -20,6 +20,7 @@ export {
 } from "./exercise/types.js";
 
 // Evaluator
+export { referenceConstraint } from "./evaluate/checks/forbidsPopulation.js";
 export { evaluateCandidate } from "./evaluate/evaluateCandidate.js";
 export type { CheckResult, GymReport } from "./evaluate/GymReport.js";
 

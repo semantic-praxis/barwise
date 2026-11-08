@@ -315,7 +315,7 @@ describe("importer ids come from the model's naming rules", () => {
   });
 
   for (const name of Object.keys(FIXTURES)) {
-    it(`${name}: every element id is the one its rule gives, and none repeats`, async () => {
+    it(`${name}: every element id is the one its rule gives, and none repeats [adr:ossie-interchange#readable-iri]`, async () => {
       const model = await FIXTURES[name]!();
       const ids = allIds(model);
       expect(ids.length, `${name} produced no elements`).toBeGreaterThan(0);

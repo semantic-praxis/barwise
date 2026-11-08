@@ -6,6 +6,13 @@
     "new": "import { readFileSync } from \"node:fs\";\nexport function diffModels("
   },
   {
+    "decision": "determinism-in-core#one-layer-out",
+    "gate": "check:source-sites",
+    "file": "barwise/packages/cli/src/index.ts",
+    "old": "import { commandNameIn, createProgram } from \"./cli.js\";",
+    "new": "import Anthropic from \"@anthropic-ai/sdk\";\nimport { commandNameIn, createProgram } from \"./cli.js\";\nexport { Anthropic };"
+  },
+  {
     "decision": "connector-packages#connector-owns-io",
     "file": "barwise/packages/core/src/format/registry.ts",
     "old": "export function registerFormat(",
@@ -13,9 +20,24 @@
   },
   {
     "decision": "package-graph-authority#intended-is-graph",
+    "gate": "depcruise",
     "file": "barwise/packages/diagram/src/index.ts",
     "old": "// Graph types and conversion.",
     "new": "import \"@barwise/llm\";\n// Graph types and conversion."
+  },
+  {
+    "decision": "package-graph-authority#intended-is-graph",
+    "gate": "check:architecture",
+    "file": "barwise/scripts/arch-triage.mjs",
+    "old": "const PACKAGES = Object.keys(INTENDED);",
+    "new": "const COPY = { \"promptlab\": [\"core\"] };\nconst PACKAGES = Object.keys(INTENDED);"
+  },
+  {
+    "decision": "package-graph-authority#intended-is-graph",
+    "gate": "check:architecture",
+    "file": "barwise/packages/diagram/CLAUDE.md",
+    "old": "| Upstream   | `@barwise/core`       |",
+    "new": "| Upstream   | `@barwise/llm`        | not allowed |\n| Upstream   | `@barwise/core`       |"
   },
   {
     "decision": "package-graph-authority#claude-md-rendering",
@@ -28,6 +50,12 @@
     "file": "barwise/packages/core/package.json",
     "old": "\"dependencies\": {\n    \"ajv\"",
     "new": "\"dependencies\": {\n    \"z3-solver\": \"^4.13.0\",\n    \"ajv\""
+  },
+  {
+    "decision": "package-graph-authority#core-external-deps",
+    "file": "barwise/packages/core/src/index.ts",
+    "old": "// Model\nexport {",
+    "new": "import \"fast-check\";\n// Model\nexport {"
   },
   {
     "decision": "package-graph-authority#runtime-deps-within",
@@ -55,13 +83,29 @@
   },
   {
     "decision": "plan-before-code#plan-reviewed",
-    "unprobed": "check:plan-review reads committed state only (its header: \"Committed state only, read through git\"), so a working-tree edit cannot reach it"
+    "unprobed": "check:plan-review reads committed state only (its header: \"Committed state only, read through git\"), so a working-tree edit cannot reach it; the line-introduction and review-names plants are temporary repositories in scripts/tests/gates.test.mjs"
   },
   {
     "decision": "plan-before-code#touches-named",
     "file": "barwise/docs/specs/plan-scope-check.spec.md",
     "old": "Touches: -plan.md, .gitattributes, barwise/review-tiers.json,",
     "new": "Touches: -plan.md, .gitattributes, barwise/review-tierz.json,"
+  },
+  {
+    "decision": "plan-before-code#spec-first",
+    "unprobed": "check:spec-first reads committed state (the three-dot diff and commit messages) and the pull request body from the PR_BODY environment variable, so a working-tree edit cannot reach it; scripts/tests/spec-first.test.mjs plants the reds in temporary repositories"
+  },
+  {
+    "decision": "plan-before-code#open-decisions-reviewer",
+    "file": "barwise/docs/specs/adr-batch10-enforcers.spec.md",
+    "old": "\n## Open decisions (for review)\n",
+    "new": "\n## Decisions (for review)\n"
+  },
+  {
+    "decision": "plan-before-code#open-decisions-reviewer",
+    "file": "barwise/docs/specs/adr-batch10-enforcers.spec.md",
+    "old": "**Resolved (owner): an unguarded step**",
+    "new": "**Owner: an unguarded step**"
   },
   {
     "decision": "findings-close-by-mechanism#mechanism-closes",
@@ -150,5 +194,99 @@
     "file": "barwise/scripts/check-no-nul.mjs",
     "old": "const tracked = trackedFiles();",
     "new": "const tracked = trackedFiles();\nreadFileSync(\"turbo.json\");"
+  },
+  {
+    "decision": "schema-versioning#shared-minor",
+    "file": "barwise/packages/core/src/serialization/schemaVersion.ts",
+    "old": "export const CURRENT_ORM_VERSION = \"4.0\";",
+    "new": "export const CURRENT_ORM_VERSION = \"1.1\";"
+  },
+  {
+    "decision": "schema-versioning#version-signal",
+    "file": "barwise/packages/cli/src/commands/verbalize.ts",
+    "old": "import type { OrmModel } from \"@barwise/core\";",
+    "new": "import type { OrmModel } from \"@barwise/core\";\nexport const doc = { orm_version: \"3.0\", model: {} };"
+  },
+  {
+    "decision": "ossie-interchange#peer-standard",
+    "file": "barwise/packages/formats/src/avro/AvroExportFormat.ts",
+    "old": "\nimport {\n  type ExportFormatAdapter,",
+    "new": "\nimport \"../ossie/mapOssieToOrm.js\";\nimport \"../../schemas/ossie/ontology.json\";\nimport {\n  type ExportFormatAdapter,"
+  },
+  {
+    "decision": "ossie-interchange#own-vocabulary",
+    "file": "barwise/packages/formats/src/index.ts",
+    "old": "export { OssieExportFormat } from \"./ossie/OssieExportFormat.js\";",
+    "new": "export { OssieExportFormat } from \"./ossie/OssieExportFormat.js\";\nexport { parseOssie as parse } from \"./ossie/parseOssie.js\";\nexport const OSSIE_SCHEMA = \"../schemas/ossie/ontology.json\";"
+  },
+  {
+    "decision": "constraint-coverage-policy#two-instances",
+    "file": "barwise/docs/specs/constraint-extraction-coverage.spec.md",
+    "old": "| 0                       | no      | project-staffing, incident-response |",
+    "new": "| 0                       | yes     | project-staffing, incident-response |"
+  },
+  {
+    "decision": "constraint-coverage-policy#tiered-types",
+    "file": "barwise/packages/promptlab/evals/project-staffing.reference.orm.yaml",
+    "old": "ring_type: acyclic\n          id: No_Employee_mentors",
+    "new": "ring_type: transitive\n          id: No_Employee_mentors"
+  },
+  {
+    "decision": "constraint-coverage-policy#inventory-outside",
+    "file": "barwise/docs/specs/constraint-extraction-coverage.spec.md",
+    "old": "| 2               | 1                         |",
+    "new": "| 2               | 2                         |"
+  },
+  {
+    "decision": "review-policy#review-md-owns-lanes",
+    "file": "REVIEW.md",
+    "old": "Push to `main`; pull request into `main`",
+    "new": "Every push"
+  },
+  {
+    "decision": "review-policy#review-md-owns-lanes",
+    "file": "REVIEW.md",
+    "old": "| Copilot review (`copilot-review.yml`)",
+    "new": "| Copilot reviewer (`copilot-review.yml`)"
+  },
+  {
+    "decision": "review-policy#copilot-requested",
+    "file": ".github/workflows/copilot-review.yml",
+    "old": "PAUSED 2026-10-19 by the owner",
+    "new": "Paused"
+  },
+  {
+    "decision": "review-policy#copilot-never-blocks",
+    "file": ".github/workflows/ci.yml",
+    "old": "on:\n  push:\n    branches: [main]",
+    "new": "on:\n  workflow_run:\n    workflows: [Copilot review]\n    types: [completed]\n  push:\n    branches: [main]"
+  },
+  {
+    "decision": "review-policy#tier-informs",
+    "file": "barwise/scripts/check-pins.mjs",
+    "old": "import { parse } from \"yaml\";",
+    "new": "import { classify } from \"./lib/review-tiers.mjs\";\nimport { parse } from \"yaml\";"
+  },
+  {
+    "decision": "review-policy#tier-informs",
+    "file": ".github/workflows/ci.yml",
+    "old": "      - run: npm run check:review-tiers\n",
+    "new": "      - run: npm run check:review-tiers\n      - run: node barwise/scripts/pr-risk.mjs --json | jq -e '.tier == \"routine\"'\n"
+  },
+  {
+    "decision": "merge-delegation#review-before-merge",
+    "unprobed": "check:merge-record reads committed history (merge parents and trailers) and, on a push, GitHub's comments, neither of which a working-tree edit can reach; the plants are a Reviewed-head naming the first parent, a missing verdict comment, a comment dated after the merge and a 403. scripts/tests/merge-record.test.mjs plants the reds in temporary repositories with a stubbed fetch"
+  },
+  {
+    "decision": "merge-delegation#no-size-exemption",
+    "unprobed": "check:merge-record reads committed history (merge parents and trailers) and, on a push, GitHub's comments, neither of which a working-tree edit can reach; the gate has no path logic, and the tagged test builds a tracker-only, a docs-only and a code merge and requires the same result for each. scripts/tests/merge-record.test.mjs plants the reds in temporary repositories with a stubbed fetch"
+  },
+  {
+    "decision": "merge-delegation#owner-overrides",
+    "unprobed": "check:merge-record reads committed history (merge parents and trailers) and, on a push, GitHub's comments, neither of which a working-tree edit can reach; the plants are an empty Owner-directed trailer, an Owner-directed merge with no verdict comment and the same merge without the trailer. scripts/tests/merge-record.test.mjs plants the reds in temporary repositories with a stubbed fetch"
+  },
+  {
+    "decision": "merge-delegation#ask-owner",
+    "unprobed": "check:merge-record reads committed history (merge parents and trailers) and, on a push, GitHub's comments, neither of which a working-tree edit can reach; the plants are two do-not-merge verdicts before a merge, with and without an Owner-answer between. scripts/tests/merge-record.test.mjs plants the reds in temporary repositories with a stubbed fetch"
   }
 ]

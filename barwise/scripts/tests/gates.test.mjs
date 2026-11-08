@@ -139,12 +139,14 @@ const ROOT_DEPENDENT_GATES = [
   "check-python-uv.mjs",
   "check-book-citations.mjs",
   "check-core-purity.mjs",
+  "check-source-sites.mjs",
   "check-file-size.mjs",
   "check-secrets.mjs",
   "audit-corrections.mjs",
   "check-lockfile-agrees.mjs",
   "check-git-listing.mjs",
   "check-plan-review.mjs",
+  "check-spec-first.mjs",
   // A test runner whose cases need git: it refused nothing and reported
   // failed cases as a finding until gate-contract-enforced WS1.
   "test-adr-model.mjs",
@@ -3043,6 +3045,12 @@ const STALE_CASES = {
       "audit-corrections fails on a baseline entry no longer detected",
     ],
   },
+  "merge-record": {
+    testedBy: [
+      "barwise/scripts/tests/merge-record.test.mjs",
+      "a baseline row naming a commit outside the range is stale",
+    ],
+  },
   trial: {
     testedBy: [
       "barwise/trial/tests/oracles.test.mjs",
@@ -3352,6 +3360,14 @@ const BASELINE_WRITERS = [
     file: "barwise/correction-baseline.json",
     key: "records",
     human: ["caught_by", "note"],
+    placeholder: "TODO: classify",
+  },
+  {
+    script: "check-merge-record.mjs",
+    args: ["--write"],
+    file: "barwise/merge-record-baseline.json",
+    key: "merges",
+    human: ["status", "note"],
     placeholder: "TODO: classify",
   },
   {
@@ -3709,6 +3725,7 @@ test("every baseline has one registered writer, and each merges through baseline
   const WRITERS = {
     "audit-baseline.json": { none: "decision 5: edited by hand" },
     "correction-baseline.json": { script: "barwise/scripts/audit-corrections.mjs" },
+    "merge-record-baseline.json": { script: "barwise/scripts/check-merge-record.mjs" },
     "rubric-baseline.json": { script: "barwise/scripts/audit-rubric.mjs" },
     "spec-status-baseline.json": { script: "barwise/scripts/audit-spec-status.mjs" },
     "trial-baseline.json": {
@@ -6082,11 +6099,13 @@ function planRepo() {
     return g("rev-parse", "HEAD");
   };
   /** The spec, with `Plan-reviewed:` naming `reviewed` when given. */
-  const spec = ({ status = "Draft", reviewed, body = "The plan." } = {}) =>
+  const spec = (
+    { status = "Draft", reviewed, body = "The plan.", names = "code-review, pr-review" } = {},
+  ) =>
     writeFileSync(
       join(dir, PLAN_SPEC),
       `# X\n\nStatus: ${status}\nTracking: barwise-x\n`
-        + (reviewed ? `Plan-reviewed: ${reviewed.slice(0, 8)} (code-review, pr-review)\n` : "")
+        + (reviewed ? `Plan-reviewed: ${reviewed.slice(0, 8)} (${names})\n` : "")
         + `Touches: src/a.ts, +src/b.ts\n\n## Plan\n\n${body}\n`,
     );
   const implement = (n) => writeFileSync(join(dir, "src", "a.ts"), `export const a = ${n};\n`);
@@ -6300,6 +6319,119 @@ test("check-plan-review passes a review recorded before the first implementation
   }
 });
 
+test("check-plan-review fails a Plan-reviewed: line that names only one review", () => {
+  // Each review alone, and a name only embedded in a longer word.
+  for (const names of ["code-review", "pr-review", "code-review, non-pr-review"]) {
+    const r = planRepo();
+    try {
+      r.spec();
+      const reviewed = r.commit("spec");
+      r.spec({ reviewed, names });
+      r.commit("record the review");
+      r.implement(1);
+      r.commit("implement");
+      const out = r.run();
+      assert.equal(out.status, 1, names + ": " + out.stdout + out.stderr);
+      assert.match(out.stderr, /must name both reviews/);
+    } finally {
+      rmSync(r.dir, { recursive: true, force: true });
+    }
+  }
+});
+
+test("check-plan-review reads review names past the first parenthetical", () => {
+  const r = planRepo();
+  try {
+    r.spec();
+    const reviewed = r.commit("spec");
+    r.spec({ reviewed, names: "re-pointed from 1234567) (code-review, pr-review" });
+    r.commit("record the review");
+    r.implement(1);
+    r.commit("implement");
+    const out = r.run();
+    assert.equal(out.status, 0, out.stdout + out.stderr);
+  } finally {
+    rmSync(r.dir, { recursive: true, force: true });
+  }
+});
+
+test("check-plan-review accepts annotated review names in either order", () => {
+  for (
+    const names of [
+      "code-review, pr-review; re-pointed after WS2",
+      "pr-review x5, code-review x3; note",
+    ]
+  ) {
+    const r = planRepo();
+    try {
+      r.spec();
+      const reviewed = r.commit("spec");
+      r.spec({ reviewed, names });
+      r.commit("record the review");
+      r.implement(1);
+      r.commit("implement");
+      const out = r.run();
+      assert.equal(out.status, 0, names + out.stdout + out.stderr);
+    } finally {
+      rmSync(r.dir, { recursive: true, force: true });
+    }
+  }
+});
+
+test("check-plan-review fails a Plan-reviewed: line added in the implementation commit", () => {
+  // The line names a commit before the code, but was written with it.
+  const r = planRepo();
+  try {
+    r.spec();
+    const reviewed = r.commit("spec");
+    r.implement(1);
+    r.spec({ reviewed });
+    r.commit("implement and record the review");
+    const out = r.run();
+    assert.equal(out.status, 1, out.stdout + out.stderr);
+    assert.match(out.stderr, /line is not in the spec at the parent of/);
+  } finally {
+    rmSync(r.dir, { recursive: true, force: true });
+  }
+});
+
+test("check-plan-review fails a Plan-reviewed: line added after the implementation", () => {
+  const r = planRepo();
+  try {
+    r.spec();
+    const reviewed = r.commit("spec");
+    r.implement(1);
+    r.commit("implement");
+    r.spec({ reviewed });
+    r.commit("record the review late");
+    const out = r.run();
+    assert.equal(out.status, 1, out.stdout + out.stderr);
+    assert.match(out.stderr, /line is not in the spec at the parent of/);
+  } finally {
+    rmSync(r.dir, { recursive: true, force: true });
+  }
+});
+
+test("check-plan-review passes a line re-pointed after implementation to a commit before it", () => {
+  // A rebase rewrites the reviewed commit's id; the line is re-pointed,
+  // not introduced, and still names a commit that precedes the code.
+  const r = planRepo();
+  try {
+    r.spec();
+    const reviewed = r.commit("spec");
+    r.spec({ reviewed });
+    r.commit("record the review");
+    r.implement(1);
+    r.commit("implement");
+    r.spec({ reviewed, names: "code-review, pr-review; re-pointed after rebase" });
+    r.commit("re-point");
+    const out = r.run();
+    assert.equal(out.status, 0, out.stdout + out.stderr);
+  } finally {
+    rmSync(r.dir, { recursive: true, force: true });
+  }
+});
+
 test("check-plan-review leaves a spec whose Status at the base claims work is built", () => {
   // Named by a commit message, and changing its Touches:, but the rule
   // applies to implementation after it lands, not to later workstreams.
@@ -6448,6 +6580,7 @@ function touchesRepo() {
       join("lib", "args.mjs"),
       join("lib", "git-run.mjs"),
       join("lib", "review-tiers.mjs"),
+      join("lib", "spec-cutoff.mjs"),
       join("lib", "spec-reader.mjs"),
       join("lib", "tracked.mjs"),
     ]
@@ -7451,8 +7584,30 @@ function architectureRepo() {
     if (existsSync(join(REPO, rel))) {
       copy(rel);
       manifests += 1;
+      copy(`barwise/packages/${pkg}/CLAUDE.md`);
     }
   }
+  // What the graph-copy and core-import scans read: the scripts that could
+  // keep a copy of the graph (the tests excepted, as the gate excepts
+  // them) and core's source. Written in bulk and added once: it is some
+  // two hundred files.
+  const tracked = execFileSync("git", [
+    "ls-files",
+    "-z",
+    "barwise/scripts/",
+    "barwise/packages/core/src/",
+  ], {
+    cwd: REPO,
+    encoding: "utf8",
+  }).split("\0").filter((f) =>
+    f !== "" && !f.startsWith("barwise/scripts/tests/")
+    && (f.startsWith("barwise/packages/core/src/") || /\.(mjs|cjs|js)$/.test(f))
+  );
+  for (const rel of tracked) {
+    mkdirSync(dirname(join(dir, rel)), { recursive: true });
+    writeFileSync(join(dir, rel), readFileSync(join(REPO, rel)));
+  }
+  execFileSync("git", ["add", "--", ...tracked], { cwd: dir });
   // The rewritten headers render differently in the index, so the copied
   // section is regenerated from them, as stageAdr() does for one ADR.
   {
@@ -7650,6 +7805,55 @@ const ARCH_DISAGREEMENTS = [
     `"yaml": "npm:z3-solver@^`,
     /packages\/core: dependencies has yaml as "npm:z3-solver@\^/,
   ],
+  // The graph copied into a script as an adjacency entry
+  // (package-graph-authority#intended-is-graph); the same entry written
+  // with manifest names, or under a quoted key, is found as well.
+  [
+    "barwise/scripts/arch-triage.mjs",
+    "const PACKAGES = Object.keys(INTENDED);",
+    'const COPY = { "promptlab": ["core"] };\nconst PACKAGES = Object.keys(INTENDED);',
+    /arch-triage\.mjs:\d+: "promptlab": \["core"\] is a copy of an INTENDED entry/,
+  ],
+  [
+    "barwise/scripts/arch-triage.mjs",
+    "const PACKAGES = Object.keys(INTENDED);",
+    'const COPY = { cli: ["@barwise/core", "@barwise/llm"] };\nconst PACKAGES = Object.keys(INTENDED);',
+    /arch-triage\.mjs:\d+: "cli": \["@barwise\/core", "@barwise\/llm"\] is a copy/,
+  ],
+  // A package CLAUDE.md Upstream row INTENDED does not allow, one it lacks,
+  // and one that names no package.
+  [
+    "barwise/packages/diagram/CLAUDE.md",
+    "| Upstream   | `@barwise/core`       |",
+    "| Upstream   | `@barwise/llm`        | x |\n| Upstream   | `@barwise/core`       |",
+    /packages\/diagram\/CLAUDE\.md: Upstream llm, INTENDED does not allow diagram -> llm/,
+  ],
+  [
+    "barwise/packages/diagram/CLAUDE.md",
+    "| Upstream   | `@barwise/core`       |",
+    "| Downstream | `@barwise/core`       |",
+    /INTENDED has diagram -> core, packages\/diagram\/CLAUDE\.md has no Upstream row/,
+  ],
+  [
+    "barwise/packages/diagram/CLAUDE.md",
+    "| Upstream   | `@barwise/core`       |",
+    "| Upstream   | `@barwise/core`       | x |\n| Upstream   | `@barwise/ghost`      |",
+    /packages\/diagram\/CLAUDE\.md: Upstream @barwise\/ghost is not a package in INTENDED/,
+  ],
+  // Core imports a package its runtime fields do not declare, bare or
+  // type-only; a node: or relative import is purity's.
+  [
+    "barwise/packages/core/src/index.ts",
+    "// Model\nexport {",
+    'import "fast-check";\n// Model\nexport {',
+    /packages\/core\/src\/index\.ts: imports fast-check, which is not in packages\/core's/,
+  ],
+  [
+    "barwise/packages/core/src/index.ts",
+    "// Model\nexport {",
+    'import type { Arbitrary } from "fast-check/lib/types";\n// Model\nexport {',
+    /imports fast-check, which is not in/,
+  ],
 ];
 
 test("check:architecture passes the real graph and catches each planted disagreement", () => {
@@ -7744,6 +7948,46 @@ test("check:architecture passes the real graph and catches each planted disagree
     const gone = runArch(dir);
     assert.equal(gone.status, 1, gone.stderr);
     assert.match(gone.stderr, /INTENDED has learn, which is not a package under packages\//);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("check:architecture reads package CLAUDE.md tables and script literals only where they state the graph", () => {
+  const { dir } = architectureRepo();
+  const LLM = "barwise/packages/llm/CLAUDE.md";
+  try {
+    // Not an entry: an array that also holds a non-package, an empty one,
+    // and the same shape in a test, whose fixtures state graphs on purpose.
+    for (
+      const edit of [
+        (x) =>
+          x.replace(
+            "const PACKAGES",
+            'const A = { core: ["ajv", "core"], cli: [] };\nconst PACKAGES',
+          ),
+      ]
+    ) {
+      const ok = archPlanted(dir, "barwise/scripts/arch-triage.mjs", edit);
+      assert.equal(ok.status, 0, ok.stdout + ok.stderr);
+    }
+    stage(dir, "barwise/scripts/tests/fixture-graph.test.mjs", 'const G = { "cli": ["core"] };\n');
+    // An external Upstream row (diagram-ui's react) is ignored; a heading
+    // with no table, and an Upstream cell that is no name, are findings.
+    const noTable = archPlanted(dir, LLM, (x) => x.replace(/^\| Direction/m, "| Heading"));
+    assert.equal(noTable.status, 1, noTable.stderr);
+    assert.match(noTable.stderr, /packages\/llm\/CLAUDE\.md: has no "## Dependencies" table/);
+    const bad = archPlanted(
+      dir,
+      LLM,
+      (x) => x.replace(/^(\| Upstream\s*\| )`@barwise\/core`/m, "$1core"),
+    );
+    assert.equal(bad.status, 1, bad.stderr);
+    assert.match(bad.stderr, /Upstream row "core" is not a backticked name/);
+    // A package CLAUDE.md that cannot be read is a refusal, not "no rows".
+    rmSync(join(dir, LLM));
+    const gone = runArch(dir);
+    assert.equal(gone.status, 2, gone.stdout + gone.stderr);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -8051,12 +8295,17 @@ test("check:architecture checks each ADR's shape", () => {
   }
 });
 
+// A package CLAUDE.md that states no internal dependency, as core's does:
+// a stub in these tests must keep it, or the table check reports the stub.
+const CORE_DEPS =
+  "\n## Dependencies\n\n| Direction | Package | What is used |\n| --- | --- | --- |\n| Upstream | none | x |\n";
+
 test("check:architecture resolves each ADR reference in the files that act on it", () => {
   const { dir } = architectureRepo();
   try {
     stageAdr(dir, "a-concern", ADR_OK);
     // Live references in both forms, from each kind of citing file.
-    stage(dir, "barwise/packages/core/CLAUDE.md", "See ADR `a-concern`.\n");
+    stage(dir, "barwise/packages/core/CLAUDE.md", `See ADR \`a-concern\`.\n${CORE_DEPS}`);
     stage(dir, "barwise/packages/core/src/x.ts", "// docs/adr/a-concern.md\n");
     // A spec may cite an ADR it plans as a `+` Touches: entry.
     stage(
@@ -8076,7 +8325,11 @@ test("check:architecture resolves each ADR reference in the files that act on it
     );
     stage(dir, "barwise/docs/specs/archive/old.spec.md", "# O\n\nADR `gone`\n");
     stage(dir, "barwise/docs/review-2026-08-27.md", "docs/adr/gone.md\n");
-    stage(dir, "barwise/packages/core/CLAUDE.md", "See ADR `a-concern`. ADR 0001 too.\n");
+    stage(
+      dir,
+      "barwise/packages/core/CLAUDE.md",
+      `See ADR \`a-concern\`. ADR 0001 too.\n${CORE_DEPS}`,
+    );
     execFileSync("git", ["commit", "-qm", "refs"], { cwd: dir });
     const ok = runArch(dir);
     assert.equal(ok.status, 0, ok.stdout + ok.stderr);

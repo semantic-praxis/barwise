@@ -4,9 +4,9 @@ Scope: process
 Date: 2026-10-18
 Tracking: barwise-zdd, barwise-4q0, barwise-raw, docs/specs/steward-skill.spec.md,
 docs/specs/pr-skills.spec.md
-Enforced-by: none (barwise-ym8.2ds: review-before-merge),
-none (barwise-ym8.vl9: pinned-merge), none (barwise-ym8.2vy: no-size-exemption),
-none (barwise-ym8.oof: ask-owner), none (barwise-ym8.n0m: owner-overrides)
+Enforced-by: npm run check:merge-record (review-before-merge,
+no-size-exemption, owner-overrides, ask-owner), tests (pinned-merge),
+none (barwise-ym8.oof: ask-owner)
 
 ## Context
 
@@ -46,8 +46,7 @@ run on which changes is a separate decision, owned by the root
    count.
 5. **When the owner says to merge a pull request, the agent merges it
    with an `Owner-directed:` trailer in place of the review
-   trailers.**{#owner-overrides} A reviewer who is not the driving agent
-   recommends, and never approves or merges.
+   trailers.**{#owner-overrides}
 
 ## Consequences
 
@@ -56,20 +55,44 @@ run on which changes is a separate decision, owned by the root
   verdict comment, the merge commit's trailers, and the
   `Owner-answer:` comment. Before that, decision 1 asked for the
   review in the session and decision 2 for a comment after the merge,
-  so whether the review ran could not be read from the record. The gate
-  that reads it, on every push to `main`, is batch 10 of that spec; an
-  independent re-run of `pr-review` on sampled merged heads is its
-  audit, reported and never gated. Until the gate lands, the gap issues
-  in the header stand.
-- Nothing mechanical enforces decisions 1, 3 or 4 (barwise-zdd). No
-  hook inspects a merge: the GitHub MCP merge tool matches no hook in
-  `.claude/settings.json`, and `gh pr merge` passes through the Bash
-  hooks, which do not look at merges. A session that never loads
-  `steward` can merge without the review, as #679 did before section 4b
-  existed.
+  so whether the review ran could not be read from the record. An
+  independent re-run of `pr-review` on sampled merged heads is the
+  audit, reported and never gated.
+- `npm run check:merge-record` reads that record (batch 10 of that
+  spec). Its git half reads every first-parent merge from the merge of
+  PR #956 (the first whose comment spelling the gate reads) on every CI
+  event: two parents; `Reviewed-head` equal to the second parent and
+  `Review: merge`; or an `Owner-directed:` trailer with text, with
+  which the review trailers are optional and, if present, still hold. A
+  merge with none of the three is a finding, so the owner's own manual
+  merges need a row in `barwise/merge-record-baseline.json`
+  (`accepted-by-owner` or `tracked:<issue>`, with a note), because a
+  merge cannot be amended. Its API half runs on pushes to `main` only
+  and is detective: for the last 30 merges without `Owner-directed:`
+  it requires a verdict comment naming the merged head, dated at or
+  before the merge, saying `merge`, and no two non-`merge` verdicts
+  after the last `Owner-answer:`. Every verdict is posted, not only the
+  one before the merge, or that count sees none. It cannot read what a
+  comment said at the merge, since the API keeps no edit history: a
+  comment edited after the merge is reported in the job summary and is
+  not a finding. A 403, a rate limit or an unreachable API is exit 2,
+  never a finding.
+- The `merge-guard` hook is the preventive half (decision 2, tested):
+  it refuses a merge call with no head pin, a method other than
+  `merge`, auto-merge, or no `merge` verdict comment on the pinned
+  head, in a session that loads `.claude/settings.json`. A session that
+  never loads project hooks or `steward` can still merge without the
+  review, as #679 did before section 4b existed; the git half is what
+  sees it afterwards.
 - Decision 2's pin holds only when the agent passes the SHA; GitHub then
-  refuses a merge whose head has moved. Nothing requires the pin
-  (barwise-zdd).
+  refuses a merge whose head has moved. The hook requires the pin; a
+  moved head shows afterwards as `Reviewed-head` not equal to the second
+  parent.
+- A reviewer who is not the driving agent recommends, and never approves
+  or merges. Nothing can check this: every action shows the owner's
+  login (barwise-4q0), so no gate tells the reviewer's merge from the
+  owner's. It moved here from decision 5, which keeps the
+  `Owner-directed:` sentence the record can show.
 - An agent's merge cannot be told from the owner's: a session acts as
   the owner, so every merge shows the owner's login, and the owner may
   merge without the comment decision 1 asks of the agent. The trailers

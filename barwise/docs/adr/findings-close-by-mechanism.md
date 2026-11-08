@@ -29,7 +29,7 @@ verdict on every row is safe to gate on, when raw detection is not.
 1. **A finding an audit ratchet records is held by its baseline row.**{#mechanism-closes}
    Every open finding (`tracked:<issue>`, or a trial row's `issue`)
    names a beads issue that exists and is not closed, and a closed issue
-   keeps no open finding. The five baselines keep their files and
+   keeps no open finding. The baselines keep their files and
    vocabularies; `scripts/lib/findings.mjs` reads every row as
    `{ id, source, state, issue, classification, note }` so the rule is
    checked once, by `check:findings`, which also holds the trial
@@ -97,7 +97,7 @@ verdict on every row is safe to gate on, when raw detection is not.
     here.
 - `findings-close-by-mechanism.md#mechanism-closes` and
   `findings-close-by-mechanism.md#person-classifies` are held by
-  `check:findings` (a CI step with no `if:`), over all five baselines
+  `check:findings` (a CI step with no `if:`), over every registered baseline
   and the trial catalog:
   - an open row naming an issue that is missing or closed fails; an
     `in_progress` issue counts as live, as `adr-judge.mjs` decides for

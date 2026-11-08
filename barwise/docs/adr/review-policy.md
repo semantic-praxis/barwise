@@ -3,12 +3,12 @@
 Scope: process
 Date: 2026-10-24
 Tracking: barwise-ilb, barwise-1040, barwise-1050, barwise-953,
-barwise-nm8, barwise-16u, barwise-j9d, barwise-m9q, barwise-gin,
+barwise-nm8, barwise-16u, barwise-m9q, barwise-gin,
 docs/specs/tiered-pr-review.spec.md, docs/specs/review-md.spec.md,
 docs/specs/review-routing.spec.md
-Enforced-by: tests (copilot-requested, tier-informs),
-none (barwise-ym8.7y6: copilot-requested), none (barwise-ym8.8ya: copilot-never-blocks),
-none (barwise-ym8.f9u: review-md-owns-lanes), none (barwise-ym8.ehz: tier-informs)
+Enforced-by: tests (copilot-requested, tier-informs, review-md-owns-lanes),
+npm run check:review-workflows (review-md-owns-lanes, copilot-requested, copilot-never-blocks, tier-informs),
+none (barwise-ym8.8ya: copilot-never-blocks)
 
 ## Context
 
@@ -58,11 +58,32 @@ condition, is a separate decision (`steward` section 4b).
   `/pr-review`, which runs `/code-review` itself, on the head being
   merged; the Claude Code Review service on every pull request once an
   Owner enables it. A review does not report what CI enforces, which is
-  judgment and audit material, not a gate. `REVIEW.md`'s CI row says
-  "Every push", which the restated decision makes a violation; the
-  pull request that lands its gate corrects the row, so the gate's
-  first run is seen to find it.
+  judgment and audit material, not a gate. `REVIEW.md`'s CI row said
+  "Every push" and its table had no Copilot row (barwise-j9d); the pull
+  request that landed `check:review-workflows` corrected both, after the
+  gate's first run found them.
 
+- `npm run check:review-workflows` (a `ci.yml` step with no `if:` guard,
+  `scripts/check-review-workflows.mjs`, rules named for the decisions
+  they hold) reads `.github/workflows/*.yml`, `REVIEW.md`,
+  `barwise/review-lanes.json`, the scripts and the tracker, and exits 2
+  when an input cannot be read. `review-md-owns-lanes`: the table and
+  `review-lanes.json` name the same lanes, every lane's source exists,
+  every workflow file is a lane's source or a declared non-lane, and the
+  CI row's When cell equals the phrases derived from `ci.yml`'s `on:`
+  block; other lanes' triggers are not compared with `on:`, because the
+  Copilot workflow lists `pull_request_target` while its job runs only
+  on dispatch. `copilot-requested`: the `request` job admits a
+  non-draft pull request, or the file carries a `PAUSED <date>` note
+  directly above the job's `if:` that names an open tracker issue; a
+  declared pause is green, and closing the issue with the job still
+  dispatch-only is red. `copilot-never-blocks`: no other workflow
+  mentions Copilot, none triggers on it with `workflow_run`, and no
+  script names it. `tier-informs`: the readers of the tier are the
+  declared list in `review-lanes.json`, found by code (imports and
+  string literals in scripts, `run:` and `with:` in workflows, script
+  values in `package.json`), a helper-only reader may take only
+  `matchesPattern` and `patternFault`, and `.tier` is only printed.
 - `npm run check:review-tiers` (a `ci.yml` step with no `if:` guard)
   keeps the routing table in step. It fails on a checklist heading or
   REVIEW.md title with no row, a row naming one that no longer exists, a
@@ -78,22 +99,29 @@ condition, is a separate decision (`steward` section 4b).
   request job runs only on a manual dispatch, so neither
   `review-policy.md#copilot-requested` nor
   `review-policy.md#copilot-never-blocks`'s re-ask on the next push is
-  carried out until someone restores its `if:` (barwise-ilb). Two
+  carried out until someone restores its `if:` (barwise-ilb);
+  `check:review-workflows` states the pause and goes red when the issue
+  closes with the job still paused. Two
   exceptions to `review-policy.md#copilot-requested` have no deciding
   source: drafts are skipped until marked ready, and a failed
   read of the reviews or the request events stops the job red without
   requesting (barwise-m9q). Copilot reads hand-written modelling guidance, not the
   checklist (barwise-1040).
-- `review-policy.md#copilot-never-blocks` has no gate, by design:
-  nothing reads a Copilot verdict.
-- `review-policy.md#review-md-owns-lanes` has no gate. `pr-creation`
-  and `pr-review` hold it, and
-  nothing records that `/code-review` or `/security-review` ran
-  (barwise-953). A stacked pull request gets no CI until `main` is
-  merged into it after its parent merges (`steward` section 4a). `pr-risk` does not
-  route the `/security-review` triggers (barwise-16u), and REVIEW.md's
-  lane table omits the Copilot lane (barwise-j9d).
-- `review-policy.md#tier-informs`: nothing records that `pr-risk` ran on
+- `review-policy.md#copilot-never-blocks` holds that nothing in the tree
+  waits on Copilot, and cannot hold that no required status or ruleset in
+  repository settings does: that is invisible to a session
+  (barwise-raw, barwise-ym8.8ya). The workflow fails its own run by
+  design when a request does not land, so "cannot fail a run" is not the
+  rule.
+- `review-policy.md#review-md-owns-lanes` is held for the table and the CI
+  row's trigger; that anyone runs a lane is not. `pr-creation` and
+  `pr-review` hold the practice, and nothing records that `/code-review`
+  or `/security-review` ran (barwise-953). A stacked pull request gets no
+  CI until `main` is merged into it after its parent merges (`steward`
+  section 4a). `pr-risk` does not route the `/security-review` triggers
+  (barwise-16u).
+- `review-policy.md#tier-informs` holds that nothing else keys on the
+  tier. It does not hold the rest: nothing records that `pr-risk` ran on
   the reviewed head or
   that its groups were run (barwise-953). Printing the routing in CI was
   deferred by the owner on 2026-10-24 until reviewers are shown to use

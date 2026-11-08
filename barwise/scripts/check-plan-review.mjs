@@ -37,6 +37,17 @@
  * amendment one commit later passed (#721, measured). The parent is the
  * reading under which the two agree.
  *
+ * Two further holds (plan-before-code, decision 2; barwise-wzl). The line
+ * must already be in the spec at the parent of each commit where
+ * implementation began: a line added alongside or after the code can name
+ * an earlier commit and still have been written after the fact. A
+ * re-point of a standing line (after a rebase, say) keeps it there, so it
+ * is judged only by rule (1) above. And the value after the commit must
+ * contain both words `code-review` and `pr-review`, in any order with
+ * anything else around them: eight specs annotate it (`; re-pointed ...`,
+ * `x5`), so an exact match rejects real ones. This is a form check; it does not show the
+ * reviews ran.
+ *
  * WHAT IT CANNOT PROVE: that the reviews ran well. It ties the claim to a
  * named commit and a body a later reader can compare.
  *
@@ -192,6 +203,16 @@ for (const spec of named) {
     failures.push(`${id}: no Plan-reviewed: line; ${at}.`);
     continue;
   }
+  const names = line.replace(/^\S+/, "");
+  if (
+    !/(?<![\w-])code-review(?![\w-])/.test(names) || !/(?<![\w-])pr-review(?![\w-])/.test(names)
+  ) {
+    failures.push(
+      `${id}: Plan-reviewed: "${line}" must name both reviews, \`code-review\` and \`pr-review\`, `
+        + `in a parenthetical; ${at}.`,
+    );
+    continue;
+  }
   const sha = /^([0-9a-f]{7,40})\b/.exec(line)?.[1];
   const reviewed = sha && resolveCommit(sha);
   if (!reviewed) {
@@ -227,6 +248,23 @@ for (const spec of named) {
   const starts = changing.filter((c) =>
     !changing.some((d) => d !== c && gitAnswers(["merge-base", "--is-ancestor", d, c]))
   );
+  // The line itself must stand at the parent of each start, on that
+  // start's own lineage: a line added alongside or after the code can name
+  // an earlier commit and still have been written after the fact. Read per
+  // lineage rather than by walking the spec's flattened log, where a stale
+  // side line sorted late reads as a removal. A spec missing at a parent is
+  // the drift check's below.
+  const unrecorded = starts.find((c) =>
+    holds(`${c}^`, spec) && header(read(`${c}^`, spec), "Plan-reviewed") === undefined
+  );
+  if (unrecorded !== undefined) {
+    failures.push(
+      `${id}: the Plan-reviewed: line is not in the spec at the parent of ${
+        short(unrecorded)
+      }, where implementation began (the ${at}); a review recorded after the code began is not before it.`,
+    );
+    continue;
+  }
   const plan = specBody(read(reviewed, spec));
   const drifted = starts.find((c) =>
     !holds(`${c}^`, spec) || specBody(read(`${c}^`, spec)) !== plan

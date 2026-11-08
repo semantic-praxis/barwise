@@ -5,7 +5,7 @@
  * docs/adr/findings-close-by-mechanism.md#mechanism-closes and
  * #person-classifies; docs/adr/must-agree-copies.md#every-candidate-verdict).
  *
- * scripts/lib/findings.mjs reads the five baselines into one shape. This
+ * scripts/lib/findings.mjs reads the six baselines into one shape. This
  * gate holds three rules over them:
  *   - an `open` row names an issue the tracker has and has not closed, so a
  *     finding cannot point at a fixed issue and read as handled;

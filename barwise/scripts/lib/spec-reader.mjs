@@ -273,3 +273,99 @@ export function namedPaths(text, exists, opts = {}) {
   }
   return [...out];
 }
+
+/**
+ * The commit the open-decisions rule is judged against
+ * (plan-before-code#open-decisions-reviewer, adr-batch10-enforcers.spec.md
+ * WS2): a corpus spec whose file name is absent from barwise/docs/specs/ in
+ * this commit's tree is new, and must carry an `## Open decisions` section
+ * the form below accepts. The tip of `main` when the rule was drafted
+ * (#1000's merge), fixed for the reason `TOUCHES_REQUIRED_SINCE` is: a
+ * moving base exempts whatever it has already absorbed. Specs older than
+ * this are exempt (the owner's decision), not conforming: 75 of 201 lacked
+ * the heading, and sweeping them is barwise-1007's.
+ */
+export const OPEN_DECISIONS_REQUIRED_SINCE = "d522e899b585ae19bc7159f74fa1d7b47f6f8226";
+
+/**
+ * What an entry of an Open decisions section must say somewhere: that it
+ * was settled ("resolved", "decided", "taken as") or what the default is
+ * ("recommend", "default"). A shadow of "gives a recommended default", not
+ * the property: the gate holds that the cue is present, and a reviewer
+ * holds that it is true.
+ */
+// Whole words only, and never inside a code span (code review: "undecided",
+// "unresolved" and `default` all passed as a substring match).
+export const DECISION_CUE = /\b(?:recommend(?:s|ed|ation)?|resolved|taken as|decided|default)\b/i;
+const withoutCodeSpans = (text) => text.replace(/`[^`\n]*`/g, "");
+
+/**
+ * A spec's Open decisions section, read outside code fences: `undefined`
+ * when there is no `## Open decisions` heading (a suffix such as
+ * "(for review)" is part of the heading, not a different one), otherwise
+ * `{ entries, prose }`. An entry is a top-level list item (`- ` or `N. `
+ * at column 0) with the lines up to the next such item, so a nested bullet
+ * or a second paragraph is part of the entry it follows. `prose` is the
+ * section's text outside any entry, which is how "None." is told from a
+ * section that only introduces nothing.
+ */
+export function openDecisions(text) {
+  const lines = text.split("\n");
+  let fenced = false;
+  let inSection = false;
+  let found = false;
+  const entries = [];
+  const prose = [];
+  for (const line of lines) {
+    if (/^\s*(```|~~~)/.test(line)) {
+      fenced = !fenced;
+      if (inSection) {
+        if (entries.length) entries[entries.length - 1] += `\n${line}`;
+        else prose.push(line);
+      }
+      continue;
+    }
+    if (!fenced && line.startsWith("## ")) {
+      if (inSection) break;
+      if (/^## Open decisions(\s|$)/i.test(line)) {
+        inSection = true;
+        found = true;
+      }
+      continue;
+    }
+    if (!inSection) continue;
+    // A top-level item with any marker, and a ### question, is an entry of
+    // its own (code review: a `*` bullet or a ### block folded into the item
+    // above). A nested bullet stays with its parent: options and the
+    // recommendation are written as sub-bullets under one question.
+    if (!fenced && /^([-*+] |\d+\. |#{3,} )/.test(line)) entries.push(line);
+    else if (entries.length) entries[entries.length - 1] += `\n${line}`;
+    else prose.push(line);
+  }
+  return found ? { entries, prose: prose.join("\n").trim() } : undefined;
+}
+
+/**
+ * The findings on one spec under the open-decisions rule, as strings;
+ * empty when it conforms. "None." alone is accepted: the template tells an
+ * author to drop sections that do not apply, so refusing an empty one
+ * would contradict it. Anything else without an entry is a finding, since
+ * a section of prose is where a decision gets made silently.
+ */
+export function openDecisionsFindings(text) {
+  const section = openDecisions(text);
+  if (section === undefined) return ["has no `## Open decisions` heading"];
+  const { entries, prose } = section;
+  if (entries.length === 0) {
+    return /^None\.?$/i.test(prose) ? [] : [
+      prose === ""
+        ? "`## Open decisions` has no entry (write the entries, or say only `None.`)"
+        : "`## Open decisions` has no list entry and does not say only `None.`",
+    ];
+  }
+  return entries.filter((e) => !DECISION_CUE.test(withoutCodeSpans(e))).map((e) =>
+    `an Open decisions entry names no recommendation or resolution (needs one of: recommend, resolved, taken as, decided, default): ${
+      e.split("\n")[0].slice(0, 80)
+    }`
+  );
+}
