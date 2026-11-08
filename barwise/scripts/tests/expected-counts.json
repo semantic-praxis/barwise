@@ -25,7 +25,7 @@
     "masked-exit.test.mjs": 28,
     "measure-comparison.test.mjs": 42,
     "merge-guard.test.mjs": 35,
-    "merge-record.test.mjs": 39,
+    "merge-record.test.mjs": 41,
     "plan-scope.test.mjs": 8,
     "pushed-tree.test.mjs": 12,
     "python-uv-guard.test.mjs": 33,

@@ -269,10 +269,24 @@ async function pullFor(fetchImpl, { apiUrl, repo, sha, headers }) {
     what,
   );
   if (!Array.isArray(body)) throw new Refusal(`${what}: expected a list`);
-  if (body.length > 1) {
+  // The endpoint lists every pull request whose history holds the commit,
+  // so a stacked PR can appear beside the one merged; the one GitHub
+  // recorded as producing this merge commit is the answer.
+  const own = body.filter((p) => p.merge_commit_sha === sha);
+  const pick = own.length === 1
+    ? own[0]
+    : own.length === 0 && body.length === 1
+    ? body[0]
+    : undefined;
+  if (body.length === 0) {
+    // The index lags a fresh push; a merge that never had a pull request
+    // is accepted by a baseline row, not guessed at here.
+    throw new Refusal(`${what}: GitHub lists no pull request for it (the index can lag a push)`);
+  }
+  if (pick === undefined) {
     throw new Refusal(`${what}: ${body.length} pull requests contain it, so the head is ambiguous`);
   }
-  return body[0]?.number;
+  return pick.number;
 }
 
 /**
@@ -306,6 +320,9 @@ const seconds = (iso, what) => {
 };
 
 /** A comment's verdict line, or null when its first line is not one. */
+/** Comment author_association values that carry write access. */
+const WRITERS = new Set(["OWNER", "MEMBER", "COLLABORATOR"]);
+
 export function parseVerdict(body) {
   const m = VERDICT_LINE.exec(String(body ?? "").split("\n")[0].trim());
   return m ? { head: m[1].toLowerCase(), verdict: m[2].toLowerCase() } : null;
@@ -349,7 +366,11 @@ export function judgeComments(merge, number, comments) {
   const add = (rule, why) => found.push({ rule, why });
   const where = number === undefined ? "its pull request" : `#${number}`;
 
-  const named = parsed.filter((p) => p.v && head.startsWith(p.v.head));
+  // Anyone can comment on a public repository; only a verdict from someone
+  // with write access speaks for the review the merge relied on.
+  const named = parsed.filter((p) =>
+    p.v && head.startsWith(p.v.head) && WRITERS.has(p.c.author_association)
+  );
   const before = named.filter((p) => p.at <= mergedAt);
   if (before.length === 0) {
     add(

@@ -25,6 +25,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { judgeComments } from "../lib/merge-record.mjs";
 
 const SCRIPTS = join(dirname(fileURLToPath(import.meta.url)), "..");
 const REPO = "o/r";
@@ -234,6 +235,7 @@ const comment = (body, at, over = {}) => ({
   id: nextId++,
   created_at: at,
   updated_at: at,
+  author_association: "OWNER",
   body,
   ...over,
 });
@@ -641,14 +643,37 @@ test("a commit in two pull requests is an ambiguous head -> 2", () =>
     assert.match(out.stderr, /ambiguous/);
   }));
 
-test("a merge no pull request contains has no verdict comment -> 1", () =>
+test("a merge no pull request is listed for refuses -> 2, since the index can lag a push", () =>
   withReviewed((s, since, m) => {
     coverCutoff(s, since);
     s.stub.pulls(m, []);
     const out = s.push(since);
-    assert.equal(out.status, 1, out.stdout + out.stderr);
-    assert.match(out.stderr, /no-verdict-comment/);
+    assert.equal(out.status, 2, out.stdout + out.stderr);
+    assert.match(out.stderr, /no pull request/);
   }));
+
+test("of two pull requests holding a merge, the one GitHub merged it from is read", () =>
+  withReviewed((s, since, m) => {
+    coverCutoff(s, since);
+    s.stub.raw(`/repos/${REPO}/commits/${m.sha}/pulls`, {
+      body: [{ number: 99 }, { number: m.n, merge_commit_sha: m.sha }],
+    });
+    s.stub.comments(m.n, [comment(verdict(m.head), stamp(48))]);
+    const out = s.push(since);
+    assert.equal(out.status, 0, out.stdout + out.stderr);
+  }));
+
+test("a verdict from a commenter without write access does not count -> 1", () => {
+  const head = "a".repeat(40);
+  const merge = { sha: "b".repeat(40), parents: ["c".repeat(40), head], committed: 2_000_000_000 };
+  const at = new Date(1_999_999_990_000).toISOString();
+  const by = (association) =>
+    judgeComments(merge, 7, [comment(verdict(head), at, { author_association: association })])
+      .found.map((f) => f.rule);
+  assert.deepEqual(by("OWNER"), []);
+  assert.deepEqual(by("NONE"), ["no-verdict-comment"]);
+  assert.deepEqual(by("CONTRIBUTOR"), ["no-verdict-comment"]);
+});
 
 test("comments on a second page are read; pagination that never ends -> 2", () =>
   withReviewed((s, since, m) => {
