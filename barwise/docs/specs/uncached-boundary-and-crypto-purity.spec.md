@@ -4,6 +4,7 @@ Status: Planned; plan reviewed 2026-11-08 (one round, eight findings, all addres
 
 Created: 2026-11-08
 Last-updated: 2026-11-08
+Plan-reviewed: acefbc5b (code-review, pr-review)
 Tracking: barwise-wrr, barwise-fzd
 Touches: barwise/docs/adr/determinism-in-core.md,
 barwise/docs/adr/probes.json, barwise/docs/ARCHITECTURE.md,
