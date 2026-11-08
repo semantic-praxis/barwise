@@ -562,8 +562,9 @@ workstream delivers the query and a report.
   practice and should join the audit's `WIRING` list (barwise-tpi).
   Until those gates are fixed, a Draft spec re-edited after merging main
   passes; one that merges main and is not re-edited goes red at the
-  merge ref. This spec's own PR paid that three times in two days, a
-  merge, an edit and a CI run each.
+  merge ref. This spec's own PR paid that four times in four days (a
+  merge, an edit and a CI run each); twelve more `probes.json` commits
+  arrived with ADR batches 9 and 10 on 2026-11-07 and 2026-11-08.
 
 ## Non-goals
 
