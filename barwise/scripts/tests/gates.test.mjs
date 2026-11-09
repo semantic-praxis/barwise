@@ -44,7 +44,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
+import { delimiter, dirname, join, resolve } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { decisionIds, parseEnforcedBy } from "../lib/adr-enforcement.mjs";
@@ -2649,7 +2649,7 @@ test("BARWISE_COVERAGE_DIR survives Turborepo and redirects a real package's cov
 // `docs/specs/gate-refusal-contract.spec.md`.
 
 const fm = await import(pathToFileURL(join(SCRIPTS, "fault-matrix.mjs")).href);
-const { ciGates, ciSteps, shouldRun, MATRIX_EXCEPTIONS } = await import(
+const { ciGates, ciSteps, shouldRun, MATRIX_EXCEPTIONS, TOOL_EXCEPTIONS } = await import(
   pathToFileURL(join(SCRIPTS, "lib", "ci-gates.mjs")).href
 );
 
@@ -2857,6 +2857,167 @@ test("the fault matrix runs last in CI, on pull requests that are not docs-only,
   const workflow = readFileSync(join(REPO, ".github", "workflows", "ci.yml"), "utf-8");
   const block = workflow.slice(workflow.indexOf("run: npm run fault-matrix"));
   assert.match(block, /BASE_SHA: \$\{\{ steps\.base\.outputs\.sha \}\}/);
+});
+
+// --- fault-matrix-axes WS1: the tool axis -----------------------------------
+//
+// The axis deletes one wrapper from a PATH of logging wrappers and reruns
+// the gate. These cases drive it with fixture gates and a fixture tool,
+// because no real gate continues without a tool: the verdict that matters,
+// FALSE GREEN, is again the one a live run cannot produce.
+
+/** A fixture tool on its own bin directory, a farm over it, and gates to run. */
+function toolFixture(gates) {
+  const dir = mkdtempSync(join(tmpdir(), "barwise-toolaxis-"));
+  const bin = join(dir, "bin");
+  mkdirSync(bin);
+  writeFileSync(join(bin, "fixturetool"), "#!/bin/sh\nexit 0\n");
+  chmodSync(join(bin, "fixturetool"), 0o755);
+  const made = {};
+  for (const [name, source] of Object.entries(gates)) {
+    made[name] = { script: `fixture/${name}.mjs`, file: join(dir, `${name}.mjs`), args: [] };
+    writeFileSync(made[name].file, source);
+  }
+  writeFileSync(
+    join(dir, "package.json"),
+    JSON.stringify({ scripts: { probe: "env > /dev/null" } }),
+  );
+  const farm = fm.buildFarm({ path: `${bin}${delimiter}${process.env.PATH}` });
+  return {
+    dir,
+    farm,
+    gates: made,
+    cleanup() {
+      rmSync(dir, { recursive: true, force: true });
+      rmSync(farm.dir, { recursive: true, force: true });
+    },
+  };
+}
+
+/** A fixture gate that calls `fixturetool` and exits `whenMissing` if it is gone. */
+const callsTool = (whenMissing) =>
+  `import { spawnSync } from "node:child_process";\n`
+  + `const r = spawnSync("fixturetool");\n`
+  + `process.exit(r.error?.code === "ENOENT" ? ${whenMissing} : 0);\n`;
+
+const verdictOf = (reading, record) =>
+  fm.classify({ kind: "instrumented", baseline: record.status, ...reading }).verdict;
+
+test("tool axis: a gate that carries on without its tool is a false green, a crash and a refusal are read as such", () => {
+  const fx = toolFixture({
+    greedy: callsTool(0),
+    crashes: callsTool(1),
+    refuses: callsTool(2),
+    never: "process.exit(0);\n",
+  });
+  try {
+    const verdicts = {};
+    for (const [name, gate] of Object.entries(fx.gates)) {
+      const a = fm.toolAxis(gate, fx.farm);
+      assert.equal(a.record.status, 0, `${name} must pass unperturbed on the farm`);
+      verdicts[name] = a.readings.map((r) => [r.axis, verdictOf(r, a.record)]);
+    }
+    assert.deepEqual(verdicts.greedy, [["tool-fixturetool", "FALSE GREEN"]]);
+    assert.deepEqual(verdicts.crashes, [["tool-fixturetool", "CRASHED"]]);
+    assert.deepEqual(verdicts.refuses, [["tool-fixturetool", "REFUSED"]]);
+    // A gate that never calls the tool has no reading to take: nothing
+    // is perturbed, so nothing can be scored as having ignored it.
+    assert.deepEqual(verdicts.never, []);
+  } finally {
+    fx.cleanup();
+  }
+});
+
+test("tool axis: a tool probed only by `command -v` is invisible to the wrappers and is listed by the source grep", () => {
+  // The wrapper logs on exec. A probe that never execs leaves the axis
+  // with nothing to perturb, so the gate reads as reaching no tool even
+  // though it would answer wrongly with the tool gone; the grep is the
+  // listing that says so, and is not a gate.
+  const source = `import { spawnSync } from "node:child_process";\n`
+    + `const r = spawnSync("sh", ["-c", "command -v fixturetool"]);\n`
+    + `process.exit(0);\n`;
+  const fx = toolFixture({ probes: source });
+  try {
+    const a = fm.toolAxis(fx.gates.probes, fx.farm);
+    assert.equal(a.record.status, 0);
+    assert.deepEqual([...a.raw.keys()], [], "an exec-less probe is not a reach");
+    assert.deepEqual(a.readings, []);
+    assert.deepEqual(fm.unseenToolReach(fx.gates.probes.file), ["command -v"]);
+    assert.deepEqual(fm.unseenToolReach(join(SCRIPTS, "check-no-nul.mjs")), []);
+  } finally {
+    fx.cleanup();
+  }
+});
+
+test("tool axis: only the gate's own calls count, so a tool npm calls beneath it is not perturbed", () => {
+  // npm runs its script through `sh -c`, and the script calls `env`. Deleting
+  // `env` crashes npm, not the gate: counted, it would read as a CRASHED
+  // finding about a tool the gate never chose. Remove the parent-pid
+  // filter in reachedTools and `env` appears here.
+  const source = `import { spawnSync } from "node:child_process";\n`
+    + `const r = spawnSync("npm", ["run", "--silent", "probe"], { cwd: ${
+      JSON.stringify("__DIR__")
+    } });\n`
+    + `process.exit(r.status);\n`;
+  const fx = toolFixture({});
+  try {
+    const gate = { script: "fixture/via-npm.mjs", file: join(fx.dir, "via-npm.mjs"), args: [] };
+    writeFileSync(gate.file, source.replace("__DIR__", fx.dir));
+    const a = fm.toolAxis(gate, fx.farm);
+    assert.equal(a.record.status, 0, `${a.record.stdout}${a.record.stderr}`);
+    assert.deepEqual([...a.raw.keys()], ["npm"]);
+    assert.ok(
+      fm.readFarmLog(fx.farm).some((e) => e.name === "env"),
+      "the fixture must really make the transitive call, or this proves nothing",
+    );
+  } finally {
+    fx.cleanup();
+  }
+});
+
+test("tool axis: reachedTools keeps the gate's own non-base calls and drops the rest", () => {
+  const log = [
+    { ppid: 10, name: "shellcheck" },
+    { ppid: 10, name: "shellcheck" },
+    { ppid: 10, name: "git" },
+    { ppid: 10, name: "node" },
+    { ppid: 10, name: "sh" },
+    { ppid: 99, name: "env" },
+  ];
+  assert.deepEqual([...fm.reachedTools(log, 10)], [["shellcheck", 2]]);
+});
+
+test("tool axis: a farm whose git wrapper logs nothing is refused, not read as a clean matrix", () => {
+  // A wrapper that cannot log is the instrument being blind, and blind
+  // reads as "no gate reaches any tool": every row INDEPENDENT.
+  const dir = mkdtempSync(join(tmpdir(), "barwise-blindfarm-"));
+  try {
+    const real = execFileSync("sh", ["-c", "command -v git"], { encoding: "utf8" }).trim();
+    writeFileSync(join(dir, "git"), `#!/bin/sh\nexec ${JSON.stringify(real)} "$@"\n`);
+    chmodSync(join(dir, "git"), 0o755);
+    const farm = { dir, log: join(dir, ".calls.log"), names: new Set(["git"]) };
+    writeFileSync(farm.log, "");
+    assert.throws(() => fm.farmCanary(farm), /instrument is blind/);
+    const working = fm.buildFarm();
+    try {
+      fm.farmCanary(working);
+    } finally {
+      rmSync(working.dir, { recursive: true, force: true });
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("tool axis: a TOOL_EXCEPTIONS name no gate reaches is stale, and every entry carries its reason", () => {
+  assert.deepEqual(
+    fm.staleToolExceptions({ ghost: "reason", npm: "reason" }, [new Map([["npm", 1]])]),
+    ["ghost"],
+  );
+  assert.deepEqual(fm.staleToolExceptions({}, [new Map([["npm", 1]])]), []);
+  for (const [name, reason] of Object.entries(TOOL_EXCEPTIONS)) {
+    assert.ok(reason.length > 20, `${name} needs its reason`);
+  }
 });
 
 // --- barwise-984: an id names one issue, and created_at says which ---------

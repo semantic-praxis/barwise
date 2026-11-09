@@ -19,7 +19,7 @@
     "check-source-sites.test.mjs": 28,
     "ci-conditions.test.mjs": 21,
     "credential-handling.test.mjs": 7,
-    "gates.test.mjs": 357,
+    "gates.test.mjs": 363,
     "generated-marks.test.mjs": 4,
     "install-uv.test.mjs": 6,
     "masked-exit.test.mjs": 28,

@@ -58,11 +58,22 @@
  * carries.
  */
 import { spawnSync } from "node:child_process";
-import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  accessSync,
+  chmodSync,
+  constants,
+  existsSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
+import { delimiter, dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { ciGates, MATRIX_EXCEPTIONS } from "./lib/ci-gates.mjs";
+import { ciGates, MATRIX_EXCEPTIONS, TOOL_EXCEPTIONS } from "./lib/ci-gates.mjs";
 
 const SCRIPTS = resolve(dirname(fileURLToPath(import.meta.url)));
 const NPM_ROOT = resolve(SCRIPTS, "..");
@@ -229,8 +240,13 @@ function dirtySet() {
   return r.stdout;
 }
 
-function run(gate, { cwd = NPM_ROOT, env = process.env, node = process.execPath }) {
-  return spawnSync(node, [join(SCRIPTS, gate.script.replace(/^scripts\//, "")), ...gate.args], {
+/**
+ * `gate.file` is an absolute path for a gate that does not live in
+ * `scripts/` (a test fixture); a real gate is found from `gate.script`.
+ */
+export function run(gate, { cwd = NPM_ROOT, env = process.env, node = process.execPath }) {
+  const file = gate.file ?? join(SCRIPTS, gate.script.replace(/^scripts\//, ""));
+  return spawnSync(node, [file, ...gate.args], {
     cwd,
     env,
     encoding: "utf8",
@@ -289,6 +305,214 @@ function withGitShim(gate, mode) {
   }
 }
 
+// --- the tool axis ----------------------------------------------------
+//
+// docs/specs/fault-matrix-axes.spec.md, WS1. The git shim above logs a
+// lookup of a name it holds; it cannot log the lookup of a name it does
+// not, so a "tool is missing" fault cannot be injected by removing a
+// directory from PATH and counting. The answer is to hold EVERY name:
+// the farm is a directory with one logging wrapper per executable on the
+// real PATH. The unperturbed run is the record pass (it says which names
+// the gate reached for), and each reached name is then deleted from the
+// farm for one rerun, which is a real ENOENT rather than a simulated one.
+
+/**
+ * Names the farm holds but the tool axis never perturbs: `node` and `sh`
+ * (the wrappers and every gate need them) and `git` (it has its own axes).
+ */
+const FARM_BASE = new Set(["node", "sh", "git"]);
+
+const shq = (s) => `'${String(s).replaceAll("'", `'\\''`)}'`;
+
+/**
+ * Every executable on `path`, first directory winning, as `Map<name, file>`.
+ */
+function executablesOn(path) {
+  const found = new Map();
+  for (const raw of path.split(delimiter)) {
+    if (raw === "") continue;
+    // A relative entry ("." or node_modules/.bin) would be exec'd relative
+    // to whatever cwd a gate runs in; resolve it once, here.
+    const dir = resolve(raw);
+    let entries;
+    try {
+      entries = readdirSync(dir);
+    } catch {
+      continue;
+    }
+    for (const name of entries) {
+      if (found.has(name)) continue;
+      const file = join(dir, name);
+      try {
+        if (!statSync(file).isFile()) continue;
+        accessSync(file, constants.X_OK);
+      } catch {
+        continue;
+      }
+      found.set(name, file);
+    }
+  }
+  return found;
+}
+
+/**
+ * Build the farm: `{ dir, log, names }`. Each wrapper appends
+ * `<parent pid> <name>` to one log with a single `printf`, which O_APPEND
+ * keeps whole under concurrent writers, and then `exec`s the real binary.
+ * The parent pid is what lets the matrix tell the gate's own call from the
+ * transitive ones npm and npx make (see `reachedTools`).
+ */
+export function buildFarm({ path = process.env.PATH ?? "" } = {}) {
+  const dir = mkdtempSync(join(tmpdir(), "barwise-farm-"));
+  const log = join(dir, ".calls.log");
+  writeFileSync(log, "");
+  const names = executablesOn(path);
+  for (const [name, real] of names) {
+    const wrapper = join(dir, name);
+    writeFileSync(
+      wrapper,
+      `#!/bin/sh\nprintf '%s %s\\n' "$PPID" ${shq(name)} >> ${shq(log)}\nexec ${shq(real)} "$@"\n`,
+    );
+    chmodSync(wrapper, 0o755);
+  }
+  return { dir, log, names: new Set(names.keys()) };
+}
+
+/** The log as `[{ ppid, name }]`, in call order. */
+export function readFarmLog(farm) {
+  return readFileSync(farm.log, "utf8").split("\n").filter(Boolean).map((line) => {
+    const [ppid, ...rest] = line.split(" ");
+    return { ppid: Number(ppid), name: rest.join(" ") };
+  });
+}
+
+/**
+ * The instrument must be able to say it is blind. A wrapper that logs
+ * nothing (a shell that cannot write the log, a `git` the farm failed to
+ * hold) reads as "no gate reaches any tool", every row INDEPENDENT, and
+ * the axis would report a clean matrix over nothing. So: call `git` through
+ * the farm and require this process to be named as its parent.
+ */
+export function farmCanary(farm) {
+  writeFileSync(farm.log, "");
+  const r = spawnSync("git", ["--version"], { env: { ...process.env, PATH: farm.dir } });
+  if (r.error || r.status !== 0) {
+    refuse(
+      `the tool axis cannot call git through its wrapper farm: ${
+        r.error?.message ?? `exit ${r.status}`
+      }`,
+    );
+  }
+  if (!readFarmLog(farm).some((e) => e.name === "git" && e.ppid === process.pid)) {
+    refuse(
+      "the tool axis' wrapper farm did not log a call to git made by this process,\n"
+        + "  so it would read every gate as reaching no tool. The instrument is blind.",
+    );
+  }
+  writeFileSync(farm.log, "");
+}
+
+/**
+ * The names a gate reached for itself: calls whose PARENT is the gate's
+ * own process, less `FARM_BASE`, as `Map<name, count>`. Calls with any
+ * other parent are transitive (npm calling `env`, `uname`, `dirname`):
+ * deleting one of those crashes npm, not the gate, and would read as a
+ * false finding. What still slips through goes on `TOOL_EXCEPTIONS`.
+ */
+export function reachedTools(entries, pid) {
+  const reached = new Map();
+  for (const { ppid, name } of entries) {
+    if (ppid !== pid || FARM_BASE.has(name)) continue;
+    reached.set(name, (reached.get(name) ?? 0) + 1);
+  }
+  return reached;
+}
+
+/** `TOOL_EXCEPTIONS` names that no gate reached: a stale declaration. */
+export function staleToolExceptions(exceptions, reachedByGate) {
+  const seen = new Set();
+  for (const names of reachedByGate) for (const n of names.keys()) seen.add(n);
+  return Object.keys(exceptions).filter((n) => !seen.has(n));
+}
+
+/** The farm's directory as the whole PATH: a name not in it does not exist. */
+const farmEnv = (farm) => ({ ...process.env, PATH: farm.dir });
+
+/**
+ * Delete `name`'s wrapper for the duration of `fn`, then put it back.
+ * The farm is shared by every gate, so the restore is in a `finally`.
+ */
+function withoutWrapper(farm, name, fn) {
+  const wrapper = join(farm.dir, name);
+  const body = readFileSync(wrapper, "utf8");
+  rmSync(wrapper);
+  try {
+    return fn();
+  } finally {
+    writeFileSync(wrapper, body);
+    chmodSync(wrapper, 0o755);
+  }
+}
+
+/**
+ * The tool axis for one gate. The record pass is the gate's unperturbed
+ * run on the farm, so it doubles as the baseline: a gate the farm itself
+ * breaks fails unperturbed and reads UNREADABLE, not as a finding. Then one
+ * rerun per counted name with that wrapper deleted.
+ *
+ * Returns `{ record, raw, counted, readings }`; `raw` is every name reached
+ * before `TOOL_EXCEPTIONS`, `counted` the names perturbed, and `readings`
+ * the `{ axis, exit, touched }` of each rerun. Nothing is perturbed when the
+ * record pass is not 0.
+ */
+export function toolAxis(gate, farm, { cwd } = {}) {
+  writeFileSync(farm.log, "");
+  const record = run(gate, { env: farmEnv(farm), cwd });
+  const raw = reachedTools(readFarmLog(farm), record.pid);
+  const counted = new Map([...raw].filter(([n]) => !Object.hasOwn(TOOL_EXCEPTIONS, n)));
+  const readings = [];
+  if (record.status === 0) {
+    for (const [name, touched] of counted) {
+      if (!farm.names.has(name)) continue;
+      const exit = withoutWrapper(farm, name, () => run(gate, { env: farmEnv(farm), cwd }).status);
+      readings.push({ axis: `tool-${name}`, exit, touched });
+    }
+  }
+  return { record, raw, counted, readings };
+}
+
+/**
+ * The gates' tool reach that the wrapper cannot see: a probe that never
+ * execs (`command -v`, `which`) and a tool named by absolute path. Over the
+ * gate's source and the relative modules it imports. A LISTING for the
+ * report's footer, not a gate: a hit does not say the gate is wrong, only
+ * that INDEPENDENT on that gate is weaker than it looks (the shadow, not
+ * the property).
+ */
+const UNSEEN_REACH = [
+  ["command -v", /command -v/],
+  ["which", /["'`]which\b/],
+  ["absolute tool path", /["'`]\/(?:usr|bin|sbin|opt)\//],
+  ["node_modules/.bin", /node_modules[/"',\s]+\.bin/],
+];
+
+export function unseenToolReach(file, seen = new Set()) {
+  if (seen.has(file)) return [];
+  seen.add(file);
+  let text;
+  try {
+    text = readFileSync(file, "utf8");
+  } catch {
+    return [];
+  }
+  const code = text.split("\n").filter((l) => !/^\s*(\/\/|\/?\*)/.test(l)).join("\n");
+  const hits = UNSEEN_REACH.filter(([, re]) => re.test(code)).map(([label]) => label);
+  for (const m of code.matchAll(/(?:from\s+|import\()\s*["'](\.{1,2}\/[^"']+\.mjs)["']/g)) {
+    hits.push(...unseenToolReach(resolve(dirname(file), m[1]), seen));
+  }
+  return [...new Set(hits)];
+}
+
 // --- the axes ---------------------------------------------------------
 
 /**
@@ -345,17 +569,37 @@ function main() {
   }
 
   const rows = [];
+  const reached = [];
   const width = Math.max(...gates.map((g) => g.script.length));
 
   console.log(
     `fault-matrix: ${gates.length} node gates from ci.yml, `
-      + `${altNode === undefined ? 4 : 5} axes, on ${process.version}.\n`,
+      + `${altNode === undefined ? 5 : 6} axes, on ${process.version}.\n`,
   );
 
   const treeBefore = dirtySet();
 
+  // The farm is built and its canary passed before any gate runs: a blind
+  // instrument refuses the run rather than reading every gate as independent.
+  const farm = buildFarm();
+  const removeFarm = () => rmSync(farm.dir, { recursive: true, force: true });
+  process.on("exit", removeFarm);
+  // A CI cancel or Ctrl-C skips "exit" handlers; remove the farm there too.
+  for (const sig of ["SIGINT", "SIGTERM"]) {
+    process.once(sig, () => {
+      removeFarm();
+      process.exit(2);
+    });
+  }
+  farmCanary(farm);
+  const reachedByGate = [];
+  const unseen = [];
+
   for (const gate of gates) {
-    const base = run(gate, {});
+    // The unperturbed run is the tool axis' record pass, on the farm, so a
+    // gate the farm breaks reads UNREADABLE instead of as a finding.
+    const tools = toolAxis(gate, farm);
+    const base = tools.record;
     const baseline = base.status;
     const line = [`  ${gate.script.padEnd(width)}`];
 
@@ -365,6 +609,9 @@ function main() {
       line.push(`${axis}=${c.verdict}`);
     };
 
+    // Counted before the readable check: a TOOL_EXCEPTIONS name reached only
+    // by a gate that is UNREADABLE today is not stale.
+    reachedByGate.push(tools.raw);
     if (baseline !== 0) {
       // One row, not five: every axis reading would be about whatever is
       // already failing. Saying so once is the honest report.
@@ -377,6 +624,11 @@ function main() {
       const r = withGitShim(gate, mode);
       record(`git-${mode}`, "instrumented", r.exit, r.touched);
     }
+
+    for (const t of tools.readings) record(t.axis, "instrumented", t.exit, t.touched);
+    const blind = unseenToolReach(join(SCRIPTS, gate.script.replace(/^scripts\//, "")));
+    if (blind.length > 0) unseen.push([gate.script, blind]);
+    reached.push([gate.script, [...tools.counted.keys()]]);
 
     // Every cwd, not the first that differs: `audit-gate` gave the same
     // reading from two of three and a different one from `packages/core`,
@@ -403,17 +655,65 @@ function main() {
     console.log(line.join("  "));
   }
 
+  // A stale TOOL_EXCEPTIONS name is judged only on a full run: under --only
+  // the gate that reaches it may simply not have been selected.
+  if (only === undefined) {
+    for (const name of staleToolExceptions(TOOL_EXCEPTIONS, reachedByGate)) {
+      rows.push({
+        gate: "scripts/lib/ci-gates.mjs",
+        axis: `tool-${name}`,
+        kind: "instrumented",
+        verdict: "STALE EXCEPTION",
+        ok: false,
+        refused: false,
+      });
+    }
+  }
+
   const findings = rows.filter((r) => !r.ok && !r.refused);
   const unreadable = rows.filter((r) => r.refused);
+
+  console.log("\nPer axis (tool-<name> readings are one axis, `tool`):");
+  const axes = new Map();
+  for (const r of rows) {
+    const axis = r.axis.startsWith("tool-") ? "tool" : r.axis;
+    const counts = axes.get(axis) ?? new Map();
+    counts.set(r.verdict, (counts.get(r.verdict) ?? 0) + 1);
+    axes.set(axis, counts);
+  }
+  for (const [axis, counts] of axes) {
+    const total = [...counts.values()].reduce((a, b) => a + b, 0);
+    const detail = [...counts].map(([v, n]) => `${n} ${v}`).join(", ");
+    console.log(`  ${axis.padEnd(12)} ${String(total).padStart(3)} readings: ${detail}`);
+  }
+
+  // Printed every run so a set that shrinks (a wrapper that stopped
+  // logging, a gate that stopped calling a tool) shows as a diff here
+  // rather than as the silent absence of a row.
+  const withTools = reached.filter(([, names]) => names.length > 0);
+  console.log("\nTools reached by the record pass (parent = the gate's own process):");
+  for (const [script, names] of withTools) {
+    console.log(`  ${script.padEnd(width)}  ${names.join(", ")}`);
+  }
+  console.log(
+    `  reached-tool set: ${
+      [...new Set(withTools.flatMap(([, n]) => n))].sort().join(", ") || "(none)"
+    }; `
+      + `${reached.length - withTools.length} gate(s) reach none.`,
+  );
 
   console.log(
     `\n${rows.length} readings, ${findings.length} findings, ${unreadable.length} unreadable.`,
   );
   for (const f of findings) {
     const detail = f.cwdExits === undefined
-      ? `exit ${f.exit}, git calls ${f.touched ?? "n/a"}`
+      ? `exit ${f.exit}, ${f.axis.startsWith("tool-") ? "tool" : "git"} calls ${f.touched ?? "n/a"}`
       : Object.entries(f.cwdExits).map(([where, e]) => `${where}=${e}`).join(", ");
-    console.log(`  FINDING   ${f.gate} under ${f.axis}: ${f.verdict} (${detail})`);
+    console.log(
+      f.verdict === "STALE EXCEPTION"
+        ? `  FINDING   TOOL_EXCEPTIONS names ${f.axis.slice(5)}, which no gate reached`
+        : `  FINDING   ${f.gate} under ${f.axis}: ${f.verdict} (${detail})`,
+    );
   }
   for (const u of unreadable) {
     console.log(
@@ -422,8 +722,19 @@ function main() {
   }
   console.log(
     "\nNot run: the stale-lock axis (it would have to write to uv.lock, and this\n"
-      + "  harness only reads) and, without --node, the wrong-Node-major axis.",
+      + "  harness only reads) and, without --node, the wrong-Node-major axis.\n"
+      + "  A missing manifest or lockfile is each gate's own precondition and is not\n"
+      + "  perturbed here (gate-refusal-contract, decision 2).\n"
+      + "  Tools unseen by the tool axis: one reached by absolute path (dprint under\n"
+      + "  fmt:check), one probed without an exec (command -v, which), and one a\n"
+      + "  shell starts beneath the gate. A reading of INDEPENDENT does not cover them.",
   );
+  if (unseen.length > 0) {
+    console.log("  Gates whose source probes or names a tool the wrappers cannot see:");
+    for (const [script, labels] of unseen) {
+      console.log(`    ${script.padEnd(width)}  ${labels.join(", ")}`);
+    }
+  }
 
   if (jsonPath !== undefined) {
     writeFileSync(
