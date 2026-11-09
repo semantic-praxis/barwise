@@ -329,8 +329,11 @@ const shq = (s) => `'${String(s).replaceAll("'", `'\\''`)}'`;
  */
 function executablesOn(path) {
   const found = new Map();
-  for (const dir of path.split(delimiter)) {
-    if (dir === "") continue;
+  for (const raw of path.split(delimiter)) {
+    if (raw === "") continue;
+    // A relative entry ("." or node_modules/.bin) would be exec'd relative
+    // to whatever cwd a gate runs in; resolve it once, here.
+    const dir = resolve(raw);
     let entries;
     try {
       entries = readdirSync(dir);
@@ -579,7 +582,15 @@ function main() {
   // The farm is built and its canary passed before any gate runs: a blind
   // instrument refuses the run rather than reading every gate as independent.
   const farm = buildFarm();
-  process.on("exit", () => rmSync(farm.dir, { recursive: true, force: true }));
+  const removeFarm = () => rmSync(farm.dir, { recursive: true, force: true });
+  process.on("exit", removeFarm);
+  // A CI cancel or Ctrl-C skips "exit" handlers; remove the farm there too.
+  for (const sig of ["SIGINT", "SIGTERM"]) {
+    process.once(sig, () => {
+      removeFarm();
+      process.exit(2);
+    });
+  }
   farmCanary(farm);
   const reachedByGate = [];
   const unseen = [];
@@ -598,6 +609,9 @@ function main() {
       line.push(`${axis}=${c.verdict}`);
     };
 
+    // Counted before the readable check: a TOOL_EXCEPTIONS name reached only
+    // by a gate that is UNREADABLE today is not stale.
+    reachedByGate.push(tools.raw);
     if (baseline !== 0) {
       // One row, not five: every axis reading would be about whatever is
       // already failing. Saying so once is the honest report.
@@ -611,7 +625,6 @@ function main() {
       record(`git-${mode}`, "instrumented", r.exit, r.touched);
     }
 
-    reachedByGate.push(tools.raw);
     for (const t of tools.readings) record(t.axis, "instrumented", t.exit, t.touched);
     const blind = unseenToolReach(join(SCRIPTS, gate.script.replace(/^scripts\//, "")));
     if (blind.length > 0) unseen.push([gate.script, blind]);

@@ -66,7 +66,8 @@ corrections made during grounding are in the spec above.
   `ci.yml` step whose npm script contains a `node scripts/<name>.mjs`
   segment, also inside an `&&` chain, under `git` empty, `git`
   absent, a shallow answer, each tool its own process execs gone from
-  PATH, and three working directories, in about two minutes. A gate that
+  PATH (`node` and the shell are not perturbed; `git` has its own
+  axes), and three working directories, in under three minutes. A gate that
   exits 0 having called a broken `git` or a missing tool (FALSE GREEN),
   exits 1 on it (CRASHED), or answers differently by directory
   (READING MOVED) is a finding; a gate whose unperturbed run is not 0 is
