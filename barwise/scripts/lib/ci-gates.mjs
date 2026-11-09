@@ -36,6 +36,18 @@ export const MATRIX_EXCEPTIONS = Object.freeze({
     "npm audit calls the registry, so one registry error across the cwd axis's runs reads as a moved reading on a change that did not cause it; it stays in the on-demand run",
 });
 
+/**
+ * Tools the fault matrix's tool axis does not remove, each with why
+ * (docs/specs/fault-matrix-axes.spec.md, WS1). The axis perturbs every
+ * name a gate's own process execs; a name here is one that gets through
+ * its parent-pid rule although the gate is not what depends on it (a
+ * transitive call that npm or npx makes on the gate's behalf). Empty
+ * because none has been needed; `gates.test.mjs` fails on a name here that
+ * no gate reaches, so an entry cannot outlive its reason, and the matrix
+ * reports one the same way on a full run.
+ */
+export const TOOL_EXCEPTIONS = Object.freeze({});
+
 /** `npm ci` installs rather than checks. Everything else CI runs, this runs. */
 const SKIP = [/^ci$/];
 

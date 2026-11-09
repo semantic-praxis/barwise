@@ -7,7 +7,7 @@ barwise-1019, barwise-ydl, barwise-shq, barwise-vt2, barwise-w43,
 docs/specs/gate-refusal-contract.spec.md
 Enforced-by: npm run fault-matrix (three-results, refuse-not-find, cwd-invariant),
 tests (three-results, refuse-not-find, cwd-invariant, readers-keep-third),
-none (barwise-ym8.j31: three-results), none (barwise-ym8.rl7: refuse-not-find),
+none (barwise-ym8.j31: three-results),
 none (barwise-ym8.aep: readers-keep-third),
 none (barwise-ym8.if3: no-writes)
 
@@ -29,9 +29,10 @@ corrections made during grounding are in the spec above.
    never prints PASS.
 2. **A gate refuses when it cannot see its input, and never uses its
    finding code for that.**{#refuse-not-find} That covers `git` failing or printing
-   nothing, an empty tracked-file listing, a missing tool, a missing
-   manifest or lockfile, and a shallow clone when the gate reads
-   history. Each gate names its own preconditions.
+   nothing, an empty tracked-file listing, a missing tool and a shallow
+   clone when the gate reads history, each pinned by the matrix. A missing
+   manifest or lockfile is each gate's own precondition, named in the gate
+   and tested by its own tests; the matrix does not perturb it.
 3. **A gate gives the same reading from the repository root,
    `barwise/` and a package directory**{#cwd-invariant}, the three directories the
    spec requires and measures. No caller has to pass a root.
@@ -64,17 +65,37 @@ corrections made during grounding are in the spec above.
   `gate-contract-enforced.spec.md`, owner 2026-11-06). It runs each
   `ci.yml` step whose npm script contains a `node scripts/<name>.mjs`
   segment, also inside an `&&` chain, under `git` empty, `git`
-  absent, a shallow answer and three working directories, in about two
-  minutes. A gate that exits 0 having called a broken `git` (FALSE
-  GREEN), exits 1 on it (CRASHED), or answers differently by directory
+  absent, a shallow answer, each tool its own process execs gone from
+  PATH, and three working directories, in about two minutes. A gate that
+  exits 0 having called a broken `git` or a missing tool (FALSE GREEN),
+  exits 1 on it (CRASHED), or answers differently by directory
   (READING MOVED) is a finding; a gate whose unperturbed run is not 0 is
   a refusal. It also refuses when a gate changes
   `git status --porcelain` and when a script chains two node gates. It
   reads exit codes only: it does not check a refusal's message, has no
-  missing-tool, manifest or lockfile axis, and does not see a write
-  undone before the gate exits (the spec's WS3). Its verdicts are pinned
+  manifest or lockfile axis, and does not see a write undone before the
+  gate exits (`fault-matrix-axes.spec.md`, WS2). Its verdicts are pinned
   against `classify` in `gates.test.mjs`, and a probe per decision
   plants a gate that breaks it.
+- The tool axis (`fault-matrix-axes.spec.md`, WS1) puts one logging wrapper
+  per executable on the real PATH in a directory, runs each gate once on
+  that PATH alone (the record pass, which is also its baseline), and
+  reruns it once per tool the record pass saw the gate's own process exec,
+  with that wrapper deleted. A call counts only when its parent is the gate
+  (npm calling `env` beneath it does not), and a name that slips through
+  goes on `TOOL_EXCEPTIONS` in `scripts/lib/ci-gates.mjs`, which the matrix
+  reports as a finding once no gate reaches it. The set each gate reached
+  is printed on every run. A canary refuses the run when the wrappers cannot
+  log. A tool probed without an exec (`command -v`, `which`), one named by
+  absolute path (`dprint` under `fmt:check`) and one a shell starts
+  beneath the gate are not seen, so INDEPENDENT does not cover them; the
+  report lists the gates whose source does either of the first two. CI
+  installs `uv` (`scripts/install-uv.sh`) and `gitleaks`
+  (`scripts/install-gitleaks.sh`) in steps of its own, `npm` and `npx`
+  come with Node, and `shellcheck` is installed by no step: it is there
+  because the `ubuntu-latest` runner image carries it. A tool absent on a
+  runner makes the unperturbed gate refuse and the row UNREADABLE, which
+  is the right answer.
 - The matrix never runs itself, and leaves out the node gates named in
   `MATRIX_EXCEPTIONS` (`scripts/lib/ci-gates.mjs`), each with its
   reason; `fault-matrix -- --all` runs them on demand. A test fails on a
@@ -107,7 +128,8 @@ corrections made during grounding are in the spec above.
   and deleted it in a `finally`, so a killed run left it in the tree; it
   now probes a temporary mirror of the cruise root, and a test polls the
   tree while the gate runs (barwise-w43). Decision 5 stays a gap: nothing
-  in CI watches every gate for such a write (the spec's WS3).
+  in CI watches every gate for such a write (`fault-matrix-axes.spec.md`,
+  WS2).
 - Other open gaps: the trial gate reports PASS over results older than
   its inputs (barwise-e0q); `ci:local` passes on a Node `.nvmrc` does
   not pin (barwise-1045); nothing reports unwired git hooks

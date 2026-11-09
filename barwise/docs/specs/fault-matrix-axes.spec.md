@@ -1,7 +1,7 @@
 # The fault matrix's missing axes: tool, writes, and what to do about manifests
 
 Status: Planned; plan reviewed 2026-11-09 (one round, eight findings, all
-addressed; three owner decisions recorded)
+addressed; three owner decisions recorded); WS1 and WS3 implemented
 
 Created: 2026-11-09
 Last-updated: 2026-11-09
@@ -151,9 +151,12 @@ a silent absence of a row.
 the unperturbed gate refuses (`check-shell.mjs` exits 2 without `shellcheck`),
 so the row is UNREADABLE and the matrix exits 2. That is the right answer, and
 the report states which tools CI installs so a reviewer can tell an absent
-tool from a broken gate: `uv`, `gitleaks` and `shellcheck` are installed by CI
-steps, and `npm`/`npx` come with Node. The implementer confirms the list
-against `ci.yml` in WS1 and writes it in the ADR's text.
+tool from a broken gate: `uv` and `gitleaks` are installed by CI steps
+(`scripts/install-uv.sh`, `scripts/install-gitleaks.sh`), `npm`/`npx` come
+with Node, and `shellcheck` is installed by no step: `ci.yml` only runs
+`check:shell` on `ubuntu-latest`, whose image carries it. (This spec first
+listed `shellcheck` among the installed tools; WS1 read `ci.yml` and the
+list is written in the ADR's text as corrected.)
 
 **INDEPENDENT is not conformance for a tool.** A wrapper logs only on `exec`.
 A probe by `command -v shellcheck`, `which shellcheck`, or an absolute path
