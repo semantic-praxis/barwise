@@ -3020,6 +3020,221 @@ test("tool axis: a TOOL_EXCEPTIONS name no gate reaches is stale, and every entr
   }
 });
 
+// --- fault-matrix-axes WS2: the write axis ----------------------------------
+//
+// Every pass runs under scripts/lib/write-recorder.mjs, and a write into the
+// tree is a finding (WROTE TREE), recorded against the gate while the run
+// goes on. These cases drive the whole script, because the behaviour under
+// test is its exit path: a fixture checkout holds a copy of the matrix and
+// two or three fixture gates, so the verdict that matters is again one the
+// real gates cannot produce.
+
+test("classify: any write, from either signal, is a finding, and is judged even for an unreadable gate [adr:gate-refusal-contract#no-writes]", () => {
+  assert.equal(fm.classify({ kind: "clean", baseline: 0, touched: 0 }).verdict, "CLEAN");
+  const wrote = fm.classify({ kind: "clean", baseline: 0, touched: 1 });
+  assert.equal(wrote.verdict, "WROTE TREE");
+  assert.equal(wrote.ok, false);
+  assert.equal(wrote.refused, false, "a write is a finding (exit 1), not a refusal (exit 2)");
+  // A gate whose unperturbed run fails may still have written: the baseline
+  // does not gate this verdict.
+  assert.equal(fm.classify({ kind: "clean", baseline: 1, touched: 3 }).verdict, "WROTE TREE");
+  assert.equal(fm.classify({ kind: "clean", baseline: 1, touched: 0 }).verdict, "CLEAN");
+});
+
+/**
+ * A fixture checkout (`<tmp>/<name with a space>/barwise/scripts`) holding a
+ * copy of the matrix, its one library and the recorder, a git history, and
+ * the named gates. The matrix finds its root from its own location, so the
+ * fixture is its root.
+ */
+function matrixFixture(gates, { recorder } = {}) {
+  const parent = mkdtempSync(join(tmpdir(), "barwise-matrix-"));
+  const dir = join(parent, "the repo");
+  const scripts = join(dir, "barwise", "scripts");
+  mkdirSync(join(scripts, "lib"), { recursive: true });
+  mkdirSync(join(dir, "barwise", "packages", "core"), { recursive: true });
+  mkdirSync(join(dir, ".github", "workflows"), { recursive: true });
+  for (const f of ["fault-matrix.mjs", "lib/ci-gates.mjs", "lib/write-recorder.mjs"]) {
+    writeFileSync(join(scripts, f), readFileSync(join(SCRIPTS, f)));
+  }
+  if (recorder !== undefined) writeFileSync(join(scripts, "lib", "write-recorder.mjs"), recorder);
+  const names = Object.keys(gates);
+  writeFileSync(
+    join(dir, ".github", "workflows", "ci.yml"),
+    ["jobs:", "  ci:", "    steps:", ...names.map((n) => `      - run: npm run ${n}`), ""].join(
+      "\n",
+    ),
+  );
+  writeFileSync(
+    join(dir, "barwise", "package.json"),
+    JSON.stringify({
+      name: "fixture",
+      private: true,
+      scripts: Object.fromEntries(names.map((n) => [n, `node scripts/${n}.mjs`])),
+    }),
+  );
+  for (const [n, source] of Object.entries(gates)) writeFileSync(join(scripts, `${n}.mjs`), source);
+  const git = (...a) => execFileSync("git", ["-C", dir, ...a], { stdio: "pipe" });
+  git("init", "-q");
+  git("config", "user.email", "matrix@test");
+  git("config", "user.name", "matrix");
+  git("add", "-A");
+  git("commit", "-qm", "fixture");
+  return {
+    dir,
+    run: (...args) =>
+      spawnSync(process.execPath, [join(scripts, "fault-matrix.mjs"), ...args], {
+        cwd: join(dir, "barwise"),
+        encoding: "utf8",
+        env: process.env,
+      }),
+    cleanup: () => rmSync(parent, { recursive: true, force: true }),
+  };
+}
+
+/** A fixture gate that writes `file` under the checkout root, and removes it if `undo`. */
+const writesRoot = (file, { undo }) =>
+  `import { rmSync, writeFileSync } from "node:fs";\n`
+  + `import { join } from "node:path";\n`
+  + `const p = join(import.meta.dirname, "..", "..", ${JSON.stringify(file)});\n`
+  + `writeFileSync(p, "x");\n${undo ? "rmSync(p);\n" : ""}`;
+
+const CLEAN_GATE = "process.exit(0);\n";
+
+test("a gate that writes and removes a probe is a finding only the recorder can see [adr:gate-refusal-contract#no-writes]", () => {
+  // `git status --porcelain` is clean after this gate (barwise-w43's shape),
+  // so on the old exit path it passed. Only the log has the write.
+  const fx = matrixFixture({
+    "gate-undone": writesRoot("probe.tmp", { undo: true }),
+    "gate-clean": CLEAN_GATE,
+  });
+  try {
+    const r = fx.run("--only", "gate-");
+    const all = `${r.stdout}${r.stderr}`;
+    assert.equal(r.status, 1, `a write is a finding, exit 1:\n${all}`);
+    assert.match(all, /FINDING\s+scripts\/gate-undone\.mjs under writes: WROTE TREE/);
+    assert.match(all, /writeFileSync [^;]*probe\.tmp/);
+    assert.doesNotMatch(all, /git status --porcelain (changed|before)/, "the tree was clean");
+    assert.match(all, /scripts\/gate-clean\.mjs .*writes=CLEAN/);
+    assert.doesNotMatch(all, /FINDING\s+scripts\/gate-clean/);
+  } finally {
+    fx.cleanup();
+  }
+});
+
+test("a persisted write is charged to the gate that made it, the run goes on to read the next gate, and the exit is 1 not 2 [adr:gate-refusal-contract#no-writes]", () => {
+  // It was a refusal that stopped the run at the first dirty tree (exit 2),
+  // so every gate after it went unread. The root's path holds a space, which
+  // an unquoted path in NODE_OPTIONS would split.
+  const fx = matrixFixture({
+    "gate-persists": writesRoot("persisted.txt", { undo: false }),
+    "gate-after": CLEAN_GATE,
+  });
+  try {
+    const r = fx.run("--only", "gate-");
+    const all = `${r.stdout}${r.stderr}`;
+    assert.equal(r.status, 1, all);
+    assert.match(all, /FINDING\s+scripts\/gate-persists\.mjs under writes: WROTE TREE/);
+    assert.match(all, /git status --porcelain changed/);
+    assert.match(all, /\?\? persisted\.txt/, "the before and after sets are printed");
+    // The later gate ran, read clean, and was not charged with the earlier
+    // gate's file: its own start is the earlier gate's end.
+    assert.match(all, /scripts\/gate-after\.mjs .*writes=CLEAN/);
+    assert.doesNotMatch(all, /FINDING\s+scripts\/gate-after/);
+    assert.match(all, /1 findings/);
+  } finally {
+    fx.cleanup();
+  }
+});
+
+test("a finding outranks an unreadable gate, as every finding does, and both are named [adr:gate-refusal-contract#no-writes]", () => {
+  // The spec's sentence says "2 wins, as today", but today a finding wins
+  // (the file header says why: it is the more actionable of the two), and
+  // the same sentence says the matrix "exits 1 if any finding exists".
+  const fx = matrixFixture({
+    "gate-persists": writesRoot("persisted.txt", { undo: false }),
+    "gate-broken": "process.exit(1);\n",
+  });
+  try {
+    const r = fx.run("--only", "gate-");
+    const all = `${r.stdout}${r.stderr}`;
+    assert.equal(r.status, 1, all);
+    assert.match(all, /FINDING\s+scripts\/gate-persists\.mjs under writes: WROTE TREE/);
+    assert.match(all, /UNREADABLE scripts\/gate-broken\.mjs/);
+  } finally {
+    fx.cleanup();
+  }
+});
+
+test("a gate that is unreadable and also writes is still charged with the write [adr:gate-refusal-contract#no-writes]", () => {
+  const fx = matrixFixture({
+    "gate-broken": writesRoot("persisted.txt", { undo: false }) + "process.exit(1);\n",
+  });
+  try {
+    const r = fx.run("--only", "gate-");
+    const all = `${r.stdout}${r.stderr}`;
+    assert.equal(r.status, 1, all);
+    assert.match(all, /FINDING\s+scripts\/gate-broken\.mjs under writes: WROTE TREE/);
+  } finally {
+    fx.cleanup();
+  }
+});
+
+test("a gate that writes nothing leaves the matrix clean, and only temp writes outside the root do not count [adr:gate-refusal-contract#no-writes]", () => {
+  const fx = matrixFixture({
+    "gate-temp": `import { mkdtempSync, rmSync } from "node:fs";\n`
+      + `import { tmpdir } from "node:os";\nimport { join } from "node:path";\n`
+      + `rmSync(mkdtempSync(join(tmpdir(), "gate-temp-")), { recursive: true });\n`,
+  });
+  try {
+    const r = fx.run("--only", "gate-");
+    const all = `${r.stdout}${r.stderr}`;
+    assert.equal(r.status, 0, all);
+    assert.match(all, /writes=CLEAN/);
+  } finally {
+    fx.cleanup();
+  }
+});
+
+test("a recorder that logs nothing refuses the run instead of reading every gate as clean [adr:gate-refusal-contract#no-writes]", () => {
+  const fx = matrixFixture({ "gate-clean": CLEAN_GATE }, {
+    recorder: "// loads, records nothing\n",
+  });
+  try {
+    const r = fx.run("--only", "gate-");
+    const all = `${r.stdout}${r.stderr}`;
+    assert.equal(r.status, 2, all);
+    assert.match(all, /instrument is blind/);
+    assert.doesNotMatch(all, /writes=CLEAN/);
+  } finally {
+    fx.cleanup();
+  }
+});
+
+test("ci-local shows a matrix exit 1 as FAIL and keeps REFUSED for exit 2 [adr:gate-refusal-contract#no-writes]", () => {
+  const repo = tempCiRepo();
+  try {
+    const ci = join(repo.dir, ".github", "workflows", "ci.yml");
+    writeFileSync(ci, readFileSync(ci, "utf8").replace("npm run boom", "npm run fault-matrix"));
+    const pkg = join(repo.root, "package.json");
+    const json = JSON.parse(readFileSync(pkg, "utf8"));
+    delete json.scripts.boom;
+    json.scripts["fault-matrix"] = "node scripts/boom.mjs";
+    writeFileSync(pkg, JSON.stringify(json));
+    writeFileSync(
+      join(repo.root, "scripts", "boom.mjs"),
+      'console.log("FINDING scripts/x.mjs under writes: WROTE TREE");\nprocess.exitCode = 1;\n',
+    );
+    const r = runCiLocal(repo);
+    assert.equal(r.status, 1, r.all);
+    assert.match(r.all, /fault-matrix\s+FAIL/);
+    assert.doesNotMatch(r.all, /REFUSED/);
+    assert.doesNotMatch(r.all, /COULD NOT ANSWER/);
+  } finally {
+    rmSync(repo.dir, { recursive: true, force: true });
+  }
+});
+
 // --- barwise-984: an id names one issue, and created_at says which ---------
 //
 // Five collisions across three sessions. `beads-crud` mints ids from the

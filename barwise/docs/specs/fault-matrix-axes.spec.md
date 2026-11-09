@@ -1,7 +1,7 @@
 # The fault matrix's missing axes: tool, writes, and what to do about manifests
 
 Status: Planned; plan reviewed 2026-11-09 (one round, eight findings, all
-addressed; three owner decisions recorded); WS1 and WS3 implemented
+addressed; three owner decisions recorded); WS1, WS2 and WS3 implemented
 
 Created: 2026-11-09
 Last-updated: 2026-11-09
