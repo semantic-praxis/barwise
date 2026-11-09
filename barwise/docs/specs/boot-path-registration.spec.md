@@ -1,6 +1,6 @@
 # Format registration held at what each surface boots
 
-Status: Planned; plan reviewed 2026-11-08 (one round, eight findings, all addressed; three owner decisions recorded). No workstream implemented. Grounds workstream 2 of `purity-and-model-boundary.spec.md` and replaces its provisional sketch.
+Status: Planned; plan reviewed 2026-11-08 (one round, eight findings, all addressed; three owner decisions recorded). Workstreams 1 and 2 implemented 2026-11-09. Grounds workstream 2 of `purity-and-model-boundary.spec.md` and replaces its provisional sketch.
 Created: 2026-11-08
 Last-updated: 2026-11-09
 Plan-reviewed: f85380ee (code-review, pr-review)

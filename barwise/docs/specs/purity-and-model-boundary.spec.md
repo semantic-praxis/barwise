@@ -1,6 +1,6 @@
 # Core purity widened, and the model SDK boundary held
 
-Status: WS1 and WS3 implemented 2026-11-06 (purity parses with TypeScript and walks the syntax tree -- code review showed a token scanner misreads a regex after `)` and hides the rest of the file, and cannot tell type from value position -- with the new rules, a refusal on no source, and arch-triage taking its rules; the four sorts use compareCodeUnits with a two-locale test; modelSdkBoundary.test.ts holds one-layer-out); WS2 provisional
+Status: WS1 and WS3 implemented 2026-11-06 (purity parses with TypeScript and walks the syntax tree -- code review showed a token scanner misreads a regex after `)` and hides the rest of the file, and cannot tell type from value position -- with the new rules, a refusal on no source, and arch-triage taking its rules; the four sorts use compareCodeUnits with a two-locale test; modelSdkBoundary.test.ts holds one-layer-out); WS2 grounded in `boot-path-registration.spec.md`
 Created: 2026-11-06
 Last-updated: 2026-11-06
 Plan-reviewed: fc79ebb8 (code-review, pr-review)
@@ -100,7 +100,8 @@ Out of scope, and stated as remaining gaps in the ADRs:
 (barwise-dko, a known violation of `pure-ops`; `lxl` stays open,
 narrowed to it); `explicit-registration` (barwise-ym8.2n3), whose
 per-surface boot-path tests are a design of their own given the CLI's
-lazy per-command registration (WS2, provisional); `format-in-its-
+lazy per-command registration (WS2, grounded in
+`boot-path-registration.spec.md`); `format-in-its-
 connector`'s second half (barwise-ym8.x9w).
 
 ## Alternatives considered
@@ -127,7 +128,9 @@ beside green cases for the forms that stay allowed (a type-position
 `import("x").T`, `typeof import("x")`, a string mentioning `fetch`). The
 pure-ops and connector-owns-io probes still CAUGHT.
 
-### 2. Registration through each surface's boot path (provisional)
+### 2. Registration through each surface's boot path
+
+Grounded and moved to `boot-path-registration.spec.md`: no surface registers at boot, the CLI registers per command, and the check holds the registry after a fresh-process boot.
 
 ### 3. The model SDK boundary
 

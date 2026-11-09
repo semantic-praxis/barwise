@@ -253,10 +253,11 @@ When a format is added, it shall be registered by name through a
 `FormatDescriptor`, and the registry shall not auto-discover formats
 from the filesystem.
 
-Guard: review (with a fitness-function backstop). That registration is
-_named_ is verified by the absence of filesystem globbing in the
-registry; that a new descriptor is wired in explicitly is a review
-check. The connector packages (`registerStandardFormats()`,
+Guard: tests (boot-registration tests in `cli` and `mcp`), with a
+fitness-function backstop. That registration is _named_ is verified by
+the absence of filesystem globbing in the registry; that each surface
+holds the formats it can be asked for is verified by booting it in a
+fresh process (`boot-path-registration.spec.md`). The connector packages (`registerStandardFormats()`,
 `registerDbtFormats()`, `registerCodeFormats()`) are the reference.
 
 ## DRY (secondary)

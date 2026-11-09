@@ -1,5 +1,13 @@
 [
   {
+    "decision": "connector-packages#explicit-registration",
+    "files": [
+      "barwise/packages/cli/tests/bootRegistration.test.ts",
+      "barwise/packages/mcp/tests/bootRegistration.test.ts"
+    ],
+    "why": "The CLI registers per command and MCP once at import; each test boots its own surface in a fresh process, and one passing test proves only its own surface."
+  },
+  {
     "decision": "surface-capability-parity#pinned-tool-lists",
     "files": [
       "barwise/packages/mcp/tests/serverSpawn.test.ts",

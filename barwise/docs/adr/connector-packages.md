@@ -9,8 +9,7 @@ docs/specs/archive/code-analysis.spec.md, docs/specs/norma-export.spec.md,
 docs/specs/format-renderers-to-connectors.spec.md
 Enforced-by: npm run purity (connector-owns-io),
 tests (core-no-interop, format-in-its-connector, explicit-registration),
-none (barwise-ym8.iyw: connector-owns-io), none (barwise-ym8.x9w: format-in-its-connector),
-none (barwise-ym8.2n3: explicit-registration)
+none (barwise-ym8.iyw: connector-owns-io), none (barwise-ym8.x9w: format-in-its-connector)
 
 ## Context
 
@@ -97,12 +96,23 @@ format lives and how it reaches the surfaces.
   parser cascade is formats', and dbt composes it through
   `parseSqlPatterns`. Nothing checks that a format's code sits in its own
   connector rather than another one (barwise-ym8.x9w).
-- That each surface registers what it needs is review-only (S-EXPL-5).
-  A missing registration fails loudly ("not registered", "Unknown
-  format") when a test or a user asks for that format. One copy is
-  checked: `vscode/tests/unit/formatEnums.test.ts` holds the VS Code
-  tool enums to the registry, but it registers the formats itself, so it
-  cannot see the extension forgetting one. Open: the VS Code pickers
+- That each surface registers what it needs is held by boot tests, which
+  read the registry a fresh process holds after it starts
+  (`docs/specs/boot-path-registration.spec.md`). The CLI registers per
+  command, lazily, so `cli/tests/bootRegistration.test.ts` boots each
+  command in a child process and derives what that command can be asked
+  for from the command itself; `mcp/tests/bootRegistration.test.ts`
+  spawns the server and holds the `import_model` and `export_model`
+  format lists to the full set. The MCP check is weak by construction:
+  several modules register the same connector, so removing one call
+  changes nothing observable. VS Code inherits the MCP set through
+  `@barwise/mcp` and has no boot test of its own: a test would stub
+  `vscode` and two more modules, and could not go red for deleting the
+  extension's own register calls, because `@barwise/mcp` registers the
+  same set when the extension loads it. If the extension stops depending
+  on `@barwise/mcp`, add one. `vscode/tests/unit/formatEnums.test.ts`
+  holds the VS Code tool enums to the registry but registers the formats
+  itself. Open: the VS Code pickers
   offer a subset of the registered formats (barwise-i22), MCP
   `generate_diagram` points at an unregistered `svg` exporter
   (barwise-0wa.ymj), and `docs/IMPORT_EXPORT.md` is wrong about which
