@@ -3,6 +3,7 @@
 Status: Planned; plan reviewed 2026-11-08 (one round, eight findings, all addressed; three owner decisions recorded). No workstream implemented. Grounds workstream 2 of `purity-and-model-boundary.spec.md` and replaces its provisional sketch.
 Created: 2026-11-08
 Last-updated: 2026-11-09
+Plan-reviewed: f85380ee (code-review, pr-review)
 Tracking: barwise-ym8.2n3 (gap: `connector-packages#explicit-registration` has no enforcer)
 Touches: +barwise/packages/cli/tests/bootRegistration.test.ts,
 +barwise/packages/mcp/tests/bootRegistration.test.ts, barwise/docs/adr/connector-packages.md,
