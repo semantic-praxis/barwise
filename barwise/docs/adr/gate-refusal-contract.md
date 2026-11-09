@@ -5,11 +5,10 @@ Date: 2026-09-17
 Tracking: barwise-ubc, barwise-987, barwise-989, barwise-1012,
 barwise-1019, barwise-ydl, barwise-shq, barwise-vt2, barwise-w43,
 docs/specs/gate-refusal-contract.spec.md
-Enforced-by: npm run fault-matrix (three-results, refuse-not-find, cwd-invariant),
-tests (three-results, refuse-not-find, cwd-invariant, readers-keep-third),
+Enforced-by: npm run fault-matrix (three-results, refuse-not-find, cwd-invariant, no-writes),
+tests (three-results, refuse-not-find, cwd-invariant, readers-keep-third, no-writes),
 none (barwise-ym8.j31: three-results),
-none (barwise-ym8.aep: readers-keep-third),
-none (barwise-ym8.if3: no-writes)
+none (barwise-ym8.aep: readers-keep-third)
 
 ## Context
 
@@ -67,17 +66,20 @@ corrections made during grounding are in the spec above.
   segment, also inside an `&&` chain, under `git` empty, `git`
   absent, a shallow answer, each tool its own process execs gone from
   PATH (`node` and the shell are not perturbed; `git` has its own
-  axes), and three working directories, in under three minutes. A gate that
+  axes), and three working directories, with every pass under a write
+  recorder, in under three minutes. A gate that
   exits 0 having called a broken `git` or a missing tool (FALSE GREEN),
   exits 1 on it (CRASHED), or answers differently by directory
   (READING MOVED) is a finding; a gate whose unperturbed run is not 0 is
-  a refusal. It also refuses when a gate changes
-  `git status --porcelain` and when a script chains two node gates. It
-  reads exit codes only: it does not check a refusal's message, has no
-  manifest or lockfile axis, and does not see a write undone before the
-  gate exits (`fault-matrix-axes.spec.md`, WS2). Its verdicts are pinned
-  against `classify` in `gates.test.mjs`, and a probe per decision
-  plants a gate that breaks it.
+  a refusal. It reports a finding (`WROTE TREE`) when a gate
+  writes into the repository tree, seen by a write recorder and by `git
+  status --porcelain`, and refuses when a script chains two node gates.
+  The finding is recorded against the gate that made the write, the run
+  goes on to read the remaining gates, and the exit is 1 at the end; a
+  persisted write charges only the gate that made it. It reads exit codes
+  only: it does not check a refusal's message and has no manifest or
+  lockfile axis. Its verdicts are pinned against `classify` in
+  `gates.test.mjs`, and a probe per decision plants a gate that breaks it.
 - The tool axis (`fault-matrix-axes.spec.md`, WS1) puts one logging wrapper
   per executable on the real PATH in a directory, runs each gate once on
   that PATH alone (the record pass, which is also its baseline), and
@@ -97,6 +99,24 @@ corrections made during grounding are in the spec above.
   because the `ubuntu-latest` runner image carries it. A tool absent on a
   runner makes the unperturbed gate refuse and the row UNREADABLE, which
   is the right answer.
+- The write axis (`fault-matrix-axes.spec.md`, WS2) appends an inline
+  recorder (`scripts/lib/write-recorder.mjs`, a `data:` module, because a
+  path with a space splits NODE_OPTIONS) to every gate's NODE_OPTIONS, so
+  it reaches the gate, its workers and every node process it starts. It
+  logs each write call of `fs` and `fs/promises` as it is made, under the
+  real path of the repository root and not under "not the temp directory",
+  so a write undone before the gate exits is still in the log (the
+  `git status --porcelain` signal misses it, barwise-w43). A canary refuses
+  the run when a write two processes down is not logged, and a drift test
+  fails when Node exports an `fs` function nobody has classified. Not
+  seen: writes by non-Node programs (`git`'s index, `dprint`, a shell
+  redirect) and by a node child started with a scrubbed environment.
+  `git status --porcelain` covers those for paths git tracks or lists and
+  ignores gitignored ones (`dist`, `.turbo`, `node_modules`), so a
+  non-Node write into a gitignored path is seen by neither signal, and a
+  green matrix is not "no gate writes anywhere" (owner, 2026-11-09); the
+  report's "Not run" footer says so on every run. `strace -f
+  --seccomp-bpf` is the follow-up if native writes ever matter.
 - The matrix never runs itself, and leaves out the node gates named in
   `MATRIX_EXCEPTIONS` (`scripts/lib/ci-gates.mjs`), each with its
   reason; `fault-matrix -- --all` runs them on demand. A test fails on a
@@ -128,9 +148,8 @@ corrections made during grounding are in the spec above.
 - `check-depcruise-gate` wrote its probe file into `packages/core/src`
   and deleted it in a `finally`, so a killed run left it in the tree; it
   now probes a temporary mirror of the cruise root, and a test polls the
-  tree while the gate runs (barwise-w43). Decision 5 stays a gap: nothing
-  in CI watches every gate for such a write (`fault-matrix-axes.spec.md`,
-  WS2).
+  tree while the gate runs (barwise-w43). The write axis now watches
+  every node gate for such a write.
 - Other open gaps: the trial gate reports PASS over results older than
   its inputs (barwise-e0q); `ci:local` passes on a Node `.nvmrc` does
   not pin (barwise-1045); nothing reports unwired git hooks

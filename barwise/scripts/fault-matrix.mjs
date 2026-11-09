@@ -34,7 +34,8 @@
  * non-zero cannot be read: every fault reading is then about whatever
  * is already wrong (shellcheck absent from a container, say), not about
  * the fault. Those rows report UNREADABLE and the harness exits 2 --
- * the contract applied to itself. A harness that scored them as
+ * the contract applied to itself -- unless a finding was also seen, which
+ * outranks a refusal (exit 1). A harness that scored them as
  * conforming would be the exact defect it audits.
  *
  * Usage:
@@ -50,12 +51,15 @@
  *
  * Exit codes:
  *   0  every readable gate conformed on every axis run
- *   1  a finding: a false green, or a reading that changed with cwd
+ *   1  a finding: a false green, a reading that changed with cwd, or a
+ *      gate that wrote into the repository tree (WROTE TREE)
  *   2  refused: a gate could not be read, or an axis could not be set up
  *
  * A finding outranks a refusal because it is the more actionable of the
  * two, and the report names both regardless of which the exit code
- * carries.
+ * carries. A write is a finding, not a refusal (fault-matrix-axes.spec.md,
+ * owner 2026-11-09): it is recorded against the gate that made it and the
+ * run goes on.
  */
 import { spawnSync } from "node:child_process";
 import {
@@ -66,6 +70,7 @@ import {
   mkdtempSync,
   readdirSync,
   readFileSync,
+  realpathSync,
   rmSync,
   statSync,
   writeFileSync,
@@ -189,10 +194,19 @@ const finding = (verdict) => ({ verdict, ok: false, refused: false });
  *                 not get to answer. Same answer is fine too. A
  *                 DIFFERENT answer is the finding.
  *
- * `touched` is how many times the gate reached for the broken resource,
- * and is read only for `instrumented`.
+ *   clean         no fault at all: the question is whether the gate changed
+ *                 the tree it read. `touched` is the number of in-scope
+ *                 write operations the recorder logged, plus one when
+ *                 `git status --porcelain` moved. Any is a finding. Judged
+ *                 BEFORE the baseline: a gate that cannot be read otherwise
+ *                 may still have written, and a write needs no baseline to
+ *                 be a write.
+ *
+ * `touched` is how many times the gate reached for the broken resource
+ * (or, for `clean`, wrote), and is read only for those two.
  */
 export function classify({ kind, baseline, exit, touched }) {
+  if (kind === "clean") return touched === 0 ? ok("CLEAN") : finding("WROTE TREE");
   if (baseline !== 0) return { verdict: "UNREADABLE", ok: false, refused: true };
   const same = exit === baseline;
   switch (kind) {
@@ -248,10 +262,126 @@ export function run(gate, { cwd = NPM_ROOT, env = process.env, node = process.ex
   const file = gate.file ?? join(SCRIPTS, gate.script.replace(/^scripts\//, ""));
   return spawnSync(node, [file, ...gate.args], {
     cwd,
-    env,
+    // The recorder is this Node's fs surface; another major is the
+    // wrong-Node-major axis, whose question is the answer, not the writes,
+    // and which a preload it rejects would answer for the wrong reason.
+    env: recorder !== null && node === process.execPath ? recorderEnv(env, recorder) : env,
     encoding: "utf8",
     timeout: 300_000,
   });
+}
+
+// --- the write axis ---------------------------------------------------
+//
+// docs/specs/fault-matrix-axes.spec.md, WS2. A gate reads and reports; it
+// must not write to the tree it read. `git status --porcelain` cannot see a
+// probe written and removed inside one gate (barwise-w43), so every pass
+// also runs under scripts/lib/write-recorder.mjs, which logs each write call
+// as it is made. The recorder is inline (a `data:` module appended to
+// NODE_OPTIONS), so it reaches the gate, its workers and every node process
+// it starts, and carries no path that a space in the checkout could split.
+
+/** The recorder as a NODE_OPTIONS token. Same shape as exit-recorder's. */
+export function recorderOption() {
+  const source = readFileSync(join(SCRIPTS, "lib", "write-recorder.mjs"), "utf8");
+  // The charset parameter keeps this token out of the exit recorder's
+  // IMPORT_PREFIX, which strips every token that starts with it; without
+  // it, any subtree that re-adds the exit recorder would drop this one.
+  return `--import=data:text/javascript;charset=utf-8;base64,${
+    Buffer.from(source, "utf8").toString("base64")
+  }`;
+}
+
+/**
+ * `env` with the recorder appended to NODE_OPTIONS, never assigned to it: an
+ * agent session already carries the exit recorder there.
+ */
+export function recorderEnv(env, rec) {
+  return {
+    ...env,
+    NODE_OPTIONS: [env.NODE_OPTIONS, rec.option].filter(Boolean).join(" "),
+    BARWISE_WRITE_LOG: rec.log,
+    BARWISE_WRITE_ROOT: rec.root,
+  };
+}
+
+/**
+ * The active recorder, or null. Module state because `run` sits under four
+ * axes and the git shim; threading it through each would change every call.
+ * `startRecorder` sets it, `stopRecorder` clears it and removes the log.
+ */
+let recorder = null;
+
+/** Start recording every gate run from here on: `{ dir, log, root, option }`. */
+export function startRecorder({ root = GIT_ROOT } = {}) {
+  const dir = mkdtempSync(join(tmpdir(), "barwise-writes-"));
+  const log = join(dir, "writes.jsonl");
+  writeFileSync(log, "");
+  recorder = { dir, log, root: realpathSync(root), option: recorderOption(), seen: 0 };
+  return recorder;
+}
+
+export function stopRecorder() {
+  if (recorder === null) return;
+  rmSync(recorder.dir, { recursive: true, force: true });
+  recorder = null;
+}
+
+/** Every logged write, as `[{ pid, op, path }]`. */
+export function readWrites(rec) {
+  return readFileSync(rec.log, "utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l));
+}
+
+/** The writes logged since the last call: one gate's, between two calls. */
+export function takeWrites(rec) {
+  const all = readWrites(rec);
+  const mine = all.slice(rec.seen);
+  rec.seen = all.length;
+  return mine;
+}
+
+/**
+ * The instrument must be able to say it is blind (the same rule as
+ * `farmCanary`). A node child starts a grandchild, which writes a file
+ * under the root and removes it before exiting; both processes must have
+ * inherited the recorder, and the undone write must be in the log. A
+ * recorder that did not load, did not reach a descendant, or watched the
+ * tree rather than the call would read every gate as clean.
+ */
+export function writeCanary(rec) {
+  const name = `.barwise-write-canary-${process.pid}`;
+  const probe = join(rec.root, name);
+  const inner = `const fs = require("node:fs"); const p = ${JSON.stringify(probe)}; `
+    + `fs.writeFileSync(p, "x"); fs.rmSync(p);`;
+  const outer = `const r = require("node:child_process").spawnSync(process.execPath, `
+    + `["-e", ${JSON.stringify(inner)}], { stdio: "inherit" }); process.exit(r.status ?? 1);`;
+  const before = readWrites(rec).length;
+  let r;
+  try {
+    r = spawnSync(process.execPath, ["-e", outer], {
+      env: recorderEnv(process.env, rec),
+      encoding: "utf8",
+    });
+  } finally {
+    rmSync(probe, { force: true });
+  }
+  if (r.error || r.status !== 0) {
+    refuse(
+      `the write axis cannot run its canary under the recorder: ${
+        // The last lines only: a module that fails to parse echoes its own
+        // base64 source ahead of the error.
+        r.error?.message
+          ?? `exit ${r.status}: ${r.stderr.trim().split("\n").slice(-6).join("\n")}`}`,
+    );
+  }
+  const logged = readWrites(rec).slice(before);
+  if (!logged.some((e) => e.path.endsWith(`/${name}`) && e.op === "writeFileSync")) {
+    refuse(
+      "the write axis' recorder did not log a write made two processes down, so it would\n"
+        + "  read every gate as writing nothing. The instrument is blind.",
+    );
+  }
+  rec.seen = readWrites(rec).length;
 }
 
 /**
@@ -481,6 +611,17 @@ export function toolAxis(gate, farm, { cwd } = {}) {
   return { record, raw, counted, readings };
 }
 
+/** One line for a WROTE TREE finding: the distinct operations, then the porcelain signal. */
+export function describeWrites(row) {
+  const distinct = [...new Set(row.ops.map((o) => `${o.op} ${o.path}`))];
+  const shown = distinct.slice(0, 5).join("; ");
+  const more = distinct.length > 5 ? `; and ${distinct.length - 5} more` : "";
+  const porcelain = row.treeBefore === row.treeAfter ? "" : "; git status --porcelain changed";
+  return `${row.ops.length} write operation(s) logged${
+    row.ops.length > 0 ? `: ${shown}${more}` : ""
+  }${porcelain}`;
+}
+
 /**
  * The gates' tool reach that the wrapper cannot see: a probe that never
  * execs (`command -v`, `which`) and a tool named by absolute path. Over the
@@ -574,15 +715,20 @@ function main() {
 
   console.log(
     `fault-matrix: ${gates.length} node gates from ci.yml, `
-      + `${altNode === undefined ? 5 : 6} axes, on ${process.version}.\n`,
+      + `${altNode === undefined ? 6 : 7} axes, on ${process.version}.\n`,
   );
 
-  const treeBefore = dirtySet();
+  let treeBefore = dirtySet();
 
   // The farm is built and its canary passed before any gate runs: a blind
   // instrument refuses the run rather than reading every gate as independent.
   const farm = buildFarm();
-  const removeFarm = () => rmSync(farm.dir, { recursive: true, force: true });
+  // The recorder's log directory goes the same way as the farm's.
+  const rec = startRecorder();
+  const removeFarm = () => {
+    rmSync(farm.dir, { recursive: true, force: true });
+    stopRecorder();
+  };
   process.on("exit", removeFarm);
   // A CI cancel or Ctrl-C skips "exit" handlers; remove the farm there too.
   for (const sig of ["SIGINT", "SIGTERM"]) {
@@ -592,6 +738,7 @@ function main() {
     });
   }
   farmCanary(farm);
+  writeCanary(rec);
   const reachedByGate = [];
   const unseen = [];
 
@@ -609,6 +756,23 @@ function main() {
       line.push(`${axis}=${c.verdict}`);
     };
 
+    // The write verdict, from both signals, once the gate's last pass is done.
+    // The tree is compared against what THIS gate started from (the previous
+    // gate's end), so a write that persisted charges only the gate that made
+    // it. Judged for an UNREADABLE gate too: a write needs no baseline.
+    const recordWrites = () => {
+      const ops = takeWrites(rec);
+      const treeAfter = dirtySet();
+      const moved = treeAfter !== treeBefore;
+      const touched = ops.length + (moved ? 1 : 0);
+      const c = classify({ kind: "clean", baseline, touched });
+      const row = { gate: gate.script, axis: "writes", kind: "clean", baseline, touched, ...c };
+      if (touched > 0) Object.assign(row, { ops, treeBefore, treeAfter });
+      rows.push(row);
+      line.push(`writes=${c.verdict}`);
+      treeBefore = treeAfter;
+    };
+
     // Counted before the readable check: a TOOL_EXCEPTIONS name reached only
     // by a gate that is UNREADABLE today is not stale.
     reachedByGate.push(tools.raw);
@@ -616,7 +780,8 @@ function main() {
       // One row, not five: every axis reading would be about whatever is
       // already failing. Saying so once is the honest report.
       record("baseline", "invariant", baseline, undefined);
-      console.log(`${line[0]}  UNREADABLE (unperturbed exit ${baseline})`);
+      recordWrites();
+      console.log(`${line[0]}  UNREADABLE (unperturbed exit ${baseline})  ${line.at(-1)}`);
       continue;
     }
 
@@ -642,16 +807,7 @@ function main() {
       record("node-major", "refusable", run(gate, { node: altNode }).status, undefined);
     }
 
-    const treeAfter = dirtySet();
-    if (treeAfter !== treeBefore) {
-      refuse(
-        `${gate.script} WROTE to the working tree.\n`
-          + `  A gate reports a reading; it must not change what it read.\n`
-          + `  Before:\n${treeBefore || "    (clean)\n"}  After:\n${treeAfter}`
-          + `  Restore with \`git checkout -- <path>\` before trusting any reading above.`,
-      );
-    }
-
+    recordWrites();
     console.log(line.join("  "));
   }
 
@@ -706,6 +862,17 @@ function main() {
     `\n${rows.length} readings, ${findings.length} findings, ${unreadable.length} unreadable.`,
   );
   for (const f of findings) {
+    if (f.axis === "writes") {
+      console.log(`  FINDING   ${f.gate} under writes: WROTE TREE (${describeWrites(f)})`);
+      if (f.treeBefore !== f.treeAfter) {
+        console.log(
+          `    git status --porcelain before:\n${f.treeBefore || "      (clean)\n"}`
+            + `    after:\n${f.treeAfter}`
+            + "    Restore with `git checkout -- <path>` and remove any new file before trusting a later reading.",
+        );
+      }
+      continue;
+    }
     const detail = f.cwdExits === undefined
       ? `exit ${f.exit}, ${f.axis.startsWith("tool-") ? "tool" : "git"} calls ${f.touched ?? "n/a"}`
       : Object.entries(f.cwdExits).map(([where, e]) => `${where}=${e}`).join(", ");
@@ -727,7 +894,12 @@ function main() {
       + "  perturbed here (gate-refusal-contract, decision 2).\n"
       + "  Tools unseen by the tool axis: one reached by absolute path (dprint under\n"
       + "  fmt:check), one probed without an exec (command -v, which), and one a\n"
-      + "  shell starts beneath the gate. A reading of INDEPENDENT does not cover them.",
+      + "  shell starts beneath the gate. A reading of INDEPENDENT does not cover them.\n"
+      + "  Writes unseen by the writes axis: a native program's (git's index, dprint, sh -c\n"
+      + "  'echo > x') and a node child started with a scrubbed environment. git status\n"
+      + "  --porcelain covers them for tracked or untracked paths, and ignores gitignored\n"
+      + "  ones (dist, .turbo, node_modules): a native write there is seen by neither\n"
+      + "  signal, so a green matrix is not 'no gate writes anywhere' (owner, 2026-11-09).",
   );
   if (unseen.length > 0) {
     console.log("  Gates whose source probes or names a tool the wrappers cannot see:");

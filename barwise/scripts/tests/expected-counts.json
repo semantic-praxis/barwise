@@ -19,7 +19,7 @@
     "check-source-sites.test.mjs": 28,
     "ci-conditions.test.mjs": 21,
     "credential-handling.test.mjs": 7,
-    "gates.test.mjs": 363,
+    "gates.test.mjs": 371,
     "generated-marks.test.mjs": 4,
     "install-uv.test.mjs": 6,
     "masked-exit.test.mjs": 28,
@@ -35,6 +35,7 @@
     "spec-form.test.mjs": 25,
     "spec-reader.test.mjs": 17,
     "tracker-conflicts.test.mjs": 20,
-    "vitest-tmp.test.mjs": 1
+    "vitest-tmp.test.mjs": 1,
+    "write-recorder.test.mjs": 14
   }
 }

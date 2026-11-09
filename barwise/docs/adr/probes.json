@@ -202,6 +202,18 @@
     "new": "const tracked = trackedFiles();\nreadFileSync(\"turbo.json\");"
   },
   {
+    "decision": "gate-refusal-contract#no-writes",
+    "file": "barwise/scripts/check-no-nul.mjs",
+    "old": "const tracked = trackedFiles();",
+    "new": "const tracked = trackedFiles();\nconst probeFs = await import(\"node:fs\");\nprobeFs.writeFileSync(resolve(import.meta.dirname, \"probe-undone.tmp\"), \"x\");\nprobeFs.rmSync(resolve(import.meta.dirname, \"probe-undone.tmp\"));"
+  },
+  {
+    "decision": "gate-refusal-contract#no-writes",
+    "file": "barwise/scripts/check-no-nul.mjs",
+    "old": "const tracked = trackedFiles();",
+    "new": "const tracked = trackedFiles();\n(await import(\"node:fs\")).writeFileSync(resolve(import.meta.dirname, \"..\", \"node_modules\", \".probe-persisted.tmp\"), \"x\");"
+  },
+  {
     "decision": "schema-versioning#shared-minor",
     "file": "barwise/packages/core/src/serialization/schemaVersion.ts",
     "old": "export const CURRENT_ORM_VERSION = \"4.0\";",
