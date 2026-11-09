@@ -5,6 +5,7 @@ addressed; three owner decisions recorded)
 
 Created: 2026-11-09
 Last-updated: 2026-11-09
+Plan-reviewed: 798109a4 (code-review, pr-review)
 Tracking: barwise-ym8.rl7 (refuse-not-find: tool, manifest), barwise-ym8.j31
 (three-results: tool, manifest), barwise-ym8.if3 (no-writes); WS3 of
 `gate-contract-enforced.spec.md`
