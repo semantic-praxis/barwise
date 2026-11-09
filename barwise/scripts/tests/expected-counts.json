@@ -36,6 +36,6 @@
     "spec-reader.test.mjs": 17,
     "tracker-conflicts.test.mjs": 20,
     "vitest-tmp.test.mjs": 1,
-    "write-recorder.test.mjs": 13
+    "write-recorder.test.mjs": 14
   }
 }

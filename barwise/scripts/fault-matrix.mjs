@@ -34,7 +34,8 @@
  * non-zero cannot be read: every fault reading is then about whatever
  * is already wrong (shellcheck absent from a container, say), not about
  * the fault. Those rows report UNREADABLE and the harness exits 2 --
- * the contract applied to itself. A harness that scored them as
+ * the contract applied to itself -- unless a finding was also seen, which
+ * outranks a refusal (exit 1). A harness that scored them as
  * conforming would be the exact defect it audits.
  *
  * Usage:
@@ -283,7 +284,12 @@ export function run(gate, { cwd = NPM_ROOT, env = process.env, node = process.ex
 /** The recorder as a NODE_OPTIONS token. Same shape as exit-recorder's. */
 export function recorderOption() {
   const source = readFileSync(join(SCRIPTS, "lib", "write-recorder.mjs"), "utf8");
-  return `--import=data:text/javascript;base64,${Buffer.from(source, "utf8").toString("base64")}`;
+  // The charset parameter keeps this token out of the exit recorder's
+  // IMPORT_PREFIX, which strips every token that starts with it; without
+  // it, any subtree that re-adds the exit recorder would drop this one.
+  return `--import=data:text/javascript;charset=utf-8;base64,${
+    Buffer.from(source, "utf8").toString("base64")
+  }`;
 }
 
 /**

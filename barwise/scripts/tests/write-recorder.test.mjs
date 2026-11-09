@@ -642,3 +642,15 @@ test("drift: a stub export added to the export list fails the classification", (
     ["writeAll"],
   );
 });
+
+test("the write recorder's token survives the exit recorder's strip", async () => {
+  const fm = await import("../fault-matrix.mjs");
+  const { IMPORT_PREFIX } = await import("../lib/exit-log.mjs");
+  const option = fm.recorderOption();
+  // The exit recorder removes every NODE_OPTIONS token starting with its
+  // prefix (hooks/exit-recorder.mjs); the write recorder must not be one.
+  assert.ok(!option.startsWith(IMPORT_PREFIX), option.slice(0, 60));
+  const both = `${IMPORT_PREFIX}AAAA ${option}`;
+  const kept = both.split(" ").filter((t) => !t.startsWith(IMPORT_PREFIX)).join(" ");
+  assert.equal(kept, option);
+});
