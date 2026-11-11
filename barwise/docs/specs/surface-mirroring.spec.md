@@ -1,8 +1,9 @@
 # Mirror the CLI's toolset on MCP and VS Code, and make a gap fail CI
 
-Status: Draft -- workstream 4 in part: every shipped bundle finds the gym
-catalog (barwise-fbi); the npm script for its regenerator is barwise-q03.
-No other workstream implemented
+Status: In progress -- workstream 4 in part: every shipped bundle finds the
+gym catalog (barwise-fbi); the npm script for its regenerator is
+barwise-q03. The other workstreams and the rest of workstream 4 are not
+started
 
 Created: 2026-10-13
 Last-updated: 2026-11-11
