@@ -29,6 +29,7 @@ import { spawn } from "node:child_process";
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { scriptTestEnv } from "./lib/script-test-env.mjs";
 import { SCRIPT_REPORTS_DIR, scriptReport } from "./lib/test-reports.mjs";
 import { REPO_ROOT } from "./lib/tracked.mjs";
 
@@ -84,32 +85,7 @@ function testFiles() {
  */
 function runFile(file) {
   return new Promise((resolveRun) => {
-    // Two pieces of inherited state are wrong for a child that IS a fresh
-    // top-level run, and both were found by a run going red rather than by
-    // reading the docs.
-    //
-    // `NODE_TEST_CONTEXT` is how `node --test` recognises it is already inside
-    // a test run; with it set a child prints "run() is being called
-    // recursively ... skipping running files" and no summary at all -- which
-    // this script would then correctly refuse, for a suite that is fine.
-    //
-    // A reporter inherited through `NODE_OPTIONS` changes the output format
-    // out from under the parser below. That is not hypothetical: the summary
-    // this script reads is TAP's `# tests N`, and CI printed the spec
-    // reporter's `i tests N` instead, because CI runs the Node that `.nvmrc`
-    // pins and the default reporter is not the same across versions. Forcing
-    // the format makes the count independent of which Node is running, which
-    // is the same portability argument `.nvmrc` itself exists for.
-    const { NODE_TEST_CONTEXT: _nested, ...env } = process.env;
-    if (typeof env.NODE_OPTIONS === "string") {
-      // Stripped rather than overridden: `--test-reporter` ACCUMULATES between
-      // NODE_OPTIONS and argv, and node then refuses the run outright with
-      // "must match the number of specified --test-reporter-destination".
-      env.NODE_OPTIONS = env.NODE_OPTIONS
-        .split(/\s+/)
-        .filter((tok) => !tok.startsWith("--test-reporter"))
-        .join(" ");
-    }
+    const env = scriptTestEnv();
     // A second reporter writes what ran, test by test, for check:adr-tests
     // (docs/specs/executable-adrs.spec.md, WS2). Each reporter is paired
     // with its own destination, as node requires, and tap stays on stdout
