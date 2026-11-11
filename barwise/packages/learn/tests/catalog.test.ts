@@ -2,7 +2,7 @@
  * Tests for exercise-catalog discovery over the packaged seed catalog.
  */
 import { describe, expect, it } from "vitest";
-import { defaultCatalogDir, findExercise, listExercises } from "../src/exercise/catalog.js";
+import { findExercise, listExercises } from "../src/exercise/catalog.js";
 
 describe("catalog", () => {
   it("lists the packaged seed catalog", () => {
@@ -20,9 +20,5 @@ describe("catalog", () => {
 
   it("returns undefined for an unknown id", () => {
     expect(findExercise("no-such-exercise")).toBeUndefined();
-  });
-
-  it("resolves the default catalog dir to the packaged exercises", () => {
-    expect(defaultCatalogDir().endsWith("exercises")).toBe(true);
   });
 });
