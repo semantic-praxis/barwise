@@ -1,9 +1,11 @@
 # Mirror the CLI's toolset on MCP and VS Code, and make a gap fail CI
 
-Status: Draft -- no workstream implemented
+Status: Draft -- workstream 4 in part: every shipped bundle finds the gym
+catalog (barwise-fbi); the npm script for its regenerator is barwise-q03.
+No other workstream implemented
 
 Created: 2026-10-13
-Last-updated: 2026-11-05
+Last-updated: 2026-11-11
 Tracking: barwise-0wa. Sources: `docs/cli-surface-audit-2026-10-12.md`
 (option by option) and `docs/surface-parity-audit-2026-10-12.md`
 (runtime behaviour, a separate same-day audit whose issues are mapped
