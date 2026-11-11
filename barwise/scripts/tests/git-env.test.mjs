@@ -118,7 +118,12 @@ test("this run's own git reads no system or global config", () => {
   const listed = git(dir, process.env, "config", "--list", "--show-scope");
   assert.equal(listed.status, 0, listed.stderr);
   const outside = listed.stdout.split("\n").filter((l) => /^(global|system)\t/.test(l));
-  assert.deepEqual(outside, [], "git config from outside the repository reached this run");
+  assert.deepEqual(
+    outside,
+    [],
+    "git config from outside the repository reached this run; run the file through"
+      + " `npm run test:scripts`, which isolates it (lib/script-test-env.mjs)",
+  );
   const excludes = git(dir, process.env, "config", "--get", "core.excludesFile");
   assert.equal(excludes.status, 0, "core.excludesFile is unset, so git reads ~/.config/git/ignore");
   assert.equal(excludes.stdout.trim(), "");
