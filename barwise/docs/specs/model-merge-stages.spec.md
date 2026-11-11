@@ -96,6 +96,44 @@ not reach.
 So the first workstream is the instrument, and it is worth landing
 whether or not the rest follows.
 
+## What does IRI identity change here? (open: it shrinks what the translation is for)
+
+**Since format 4.0 the two id spaces mostly coincide, which is why M1
+is reached by no test.** `iri-identity.spec.md` (WS6, implemented
+2026-11-04) makes an object type's or fact type's id the local name its
+name gives, and replays an older file into those ids on load. Two models
+that both name `Customer` therefore hold one id for it, pair by id, and
+need no translation. The first draft of this spec called "two id spaces"
+essential without asking how often they still differ; the owner's
+question prompted the check.
+
+They differ in three cases:
+
+- **A pair found through the ids two older files stated** (`priorIds`,
+  `fromBasePrior`, `:180-184`). A rename between two revisions of a 3.x
+  file pairs by the old id and leaves the two sides with different 4.0
+  ids. M1 is this case. `refuseCoincidentIds` (`:1179-1240`) guards it
+  with two heuristics its own comment says misread some inputs
+  (barwise-wcg.3qv).
+- **An id a person stated that its name does not give**
+  (`structural/id-not-from-name`, a warning).
+- **A suffixed id**, where two names give one local name.
+
+Role ids are a different matter and stay essential: a role's id is its
+fact type's id and the role's name, so an accepted fact-type change can
+move or drop one, and populations and constraints must follow.
+
+Two consequences for this plan. Workstream 1's re-id'd models are the
+second case, which is legitimate input, and it should also draw the
+first: a pair of models carrying prior ids, since that is the path the
+translation now mostly exists for. And the size of `idSpace` depends on
+a question this spec does not own, listed under Open decisions: whether
+a merge should pair through prior ids at all.
+
+Not verified here: that an LLM draft's ids are name-given under 4.0, so
+that a transcript import pairs by id. `identity.ts:16-18` still says a
+draft's ids are fresh, which was true before 4.0.
+
 ## Should this be one rewrite? (resolved: no -- steps against a frozen oracle)
 
 **Each step keeps behaviour, and the current implementation is the
@@ -337,6 +375,13 @@ incoming model while accepting nothing returns the base, by hash.
   with its reason: equivalent on generated input, or a generator gap
   filed as an issue.
 
+- When a pair carrying prior ids can be drawn, the laws shall run it
+  too (provisional: how a generated model comes to hold `priorIds`
+  short of writing and replaying a 3.x file is not grounded; if it
+  cannot be done cheaply, the pull request says so and the case stays
+  with the fixtures in `replayedFragment.test.ts` and
+  `mergeCoincidentIds.test.ts`).
+
 M3 may well stay UNCAUGHT by the laws: a generated role's id is its
 fact type's id and a position, so a rebased incoming role lands on the
 existing role's id and the remap has nothing to record unless the arity
@@ -423,6 +468,19 @@ requirement in Scope is read here.
   and serve either design; then one bounded spike of B against the
   oracle, kept in the test tree, before choosing. The default if the
   owner wants no spike is workstreams 3 to 5 as written.
+- **Should a merge pair through prior ids at all?** It is what most of
+  the object-type and fact-type translation now serves, and it carries
+  the one refusal built on heuristics. Without it, two revisions of an
+  older file that renamed an element would merge as a removal and an
+  addition, which is what two 4.0 files already do, since 4.0 makes a
+  rename an operation (`barwise rename`). `refuseCoincidentIds`, the
+  prior-id seeding and most of `idSpace`'s object-type and fact-type
+  half would go: about 60 code lines and barwise-wcg.3qv with them.
+  Against it: a person merging two revisions of a 3.x file today gets
+  the rename, and would lose it. This is a behaviour change and the
+  `iri-identity` owner's call, not this spec's. Recommend deciding it
+  before workstream 3, because it sets how much `idSpace` has to hold;
+  the default is to keep prior-id pairing and build `idSpace` for it.
 - **Oracle in the test tree, or no oracle?** It adds 1,600 frozen lines
   under `tests/` for the life of workstreams 2 to 4. Recommend the
   oracle, for the reason given in Alternatives; the default if the
