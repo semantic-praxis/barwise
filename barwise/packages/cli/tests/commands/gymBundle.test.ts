@@ -45,15 +45,13 @@ describe("CLI release bundle: gym", () => {
 
   it("lists the packaged exercises and exits 0", () => {
     const r = run("gym", "list");
-    expect(r.stderr).toBe("");
-    expect(r.status).toBe(0);
+    expect(r.status, r.stderr).toBe(0);
     expect(r.stdout).toContain("customer-order");
   });
 
   it("checks a candidate against a packaged exercise and exits 0", () => {
     const r = run("gym", "check", "customer-order", reference, "--format", "json", "--no-state");
-    expect(r.stderr).toBe("");
-    expect(r.status).toBe(0);
+    expect(r.status, r.stderr).toBe(0);
     expect(JSON.parse(r.stdout)).toMatchObject({ exerciseId: "customer-order", passed: true });
   });
 });

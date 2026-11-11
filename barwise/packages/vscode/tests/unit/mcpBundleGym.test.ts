@@ -32,7 +32,7 @@ describe("VS Code-embedded MCP server: gym tools", () => {
 
   it("gym_list lists the packaged exercises", async () => {
     const r = await client.callTool({ name: "gym_list", arguments: {} });
-    const text = (r.content as { type: string; text: string; }[])[0]!.text;
+    const text = (r.content as { type: string; text: string; }[])[0]?.text ?? JSON.stringify(r);
     expect(r.isError, text).toBeFalsy();
     expect(JSON.parse(text).map((e: { id: string; }) => e.id)).toContain("customer-order");
   });
