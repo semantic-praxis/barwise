@@ -11,6 +11,9 @@ Touches: barwise/packages/core/src/diff/ModelMerge.ts,
 +barwise/packages/core/src/diff/mergeRefusals.ts,
 barwise/packages/core/tests/laws/merge.law.test.ts,
 barwise/packages/core/tests/arbitraries/model.ts,
+barwise/packages/core/tests/diff/ModelMerge.test.ts,
++barwise/packages/core/tests/diff/mergeDecisions.test.ts,
++barwise/packages/core/tests/diff/mergeIdSpace.test.ts,
 +barwise/packages/core/tests/laws/mergeOracle.law.test.ts,
 +barwise/packages/core/tests/diff/oracle/ModelMergeOracle.ts,
 barwise/packages/core/CLAUDE.md
@@ -107,14 +110,19 @@ need no translation. The first draft of this spec called "two id spaces"
 essential without asking how often they still differ; the owner's
 question prompted the check.
 
-They differ in three cases:
+They differ in four cases:
 
-- **A pair found through the ids two older files stated** (`priorIds`,
-  `fromBasePrior`, `:180-184`). A rename between two revisions of a 3.x
-  file pairs by the old id and leaves the two sides with different 4.0
-  ids. M1 is this case. `refuseCoincidentIds` (`:1179-1240`) guards it
-  with two heuristics its own comment says misread some inputs
+- **A pair the diff found through the ids two older files stated**
+  (`priorIds`). A rename between two revisions of a 3.x file pairs by
+  the old id and leaves the two sides with different 4.0 ids. M1 is this
+  case. `refuseCoincidentIds` (`:1179-1240`) guards it with two
+  heuristics its own comment says misread some inputs
   (barwise-wcg.3qv).
+- **A replayed fragment's reference to a base element it does not
+  restate**, which it names by the base's older id. `fromBasePrior`
+  seeds the translation with these (`:180-184`, barwise-957). This is
+  reference resolution, not pairing, and it stays whatever is decided
+  about the first case.
 - **An id a person stated that its name does not give**
   (`structural/id-not-from-name`, a warning).
 - **A suffixed id**, where two names give one local name.
@@ -124,9 +132,9 @@ fact type's id and the role's name, so an accepted fact-type change can
 move or drop one, and populations and constraints must follow.
 
 Two consequences for this plan. Workstream 1's re-id'd models are the
-second case, which is legitimate input, and it should also draw the
-first: a pair of models carrying prior ids, since that is the path the
-translation now mostly exists for. And the size of `idSpace` depends on
+third case, which is legitimate input, and it should also draw the
+first two: a pair of models carrying prior ids, since those are the
+paths the translation now mostly exists for. And the size of `idSpace` depends on
 a question this spec does not own, listed under Open decisions: whether
 a merge should pair through prior ids at all.
 
@@ -155,32 +163,49 @@ The oracle's reach is the generator's. `arbOrmModel` draws valid models
 only, so the branches a lenient load reaches -- a dangling player or
 fact type carried for the validator to report (`:507-513`, `:586-598`,
 `:650-664`), a repeated subtype pair (`:521-524`) -- are judged by the
-fixtures as they are today. Workstream 2 measures which lines of the
-frozen copy the oracle law executes and records the rest, so the
-boundary is a list and not a belief.
+fixtures as they are today. It also draws no prior ids, no imports and
+no namespace (`tests/arbitraries/model.ts` names none of them), so the
+prior-id seeding, `refuseCoincidentIds`, `refuseImportClashes`, the
+header's import branches and the alias carry of phase 9 are judged by
+fixtures alone -- the kind of protection M1 slipped through. Workstream
+2 measures which lines of the frozen copy the oracle law executes and
+records the rest, so the boundary is a list and not a belief, and
+workstream 3 does not start until each of those lines is shown red by a
+planted fault against the fixtures that are supposed to cover it.
+
+**The oracle is frozen against restructuring, not against fixes.** The
+copy is taken when workstream 2 lands, and "today's behaviour" in this
+spec means that copy's. `ModelMerge.ts` changes most days and three
+behaviour issues are open against it, so a fix that lands while the
+oracle exists changes the live file and the copy in one commit, and says
+so. Workstreams 2 to 5 run back to back to keep that window short.
 
 ## Scope
 
 In scope:
 
 - When a merge law draws a model pair, the suite shall run it a second
-  time with every id in the incoming model replaced by one the base does
-  not hold.
+  time with every id the incoming model holds replaced by one the base
+  does not hold, each keeping the shape a file gives it (a role under
+  its fact type, a population under its fact type, an instance under
+  its population).
 - When `mergeModels` is called, it shall return a model whose
-  serialized document is byte-identical to the one the implementation
-  at this spec's base commit returns for the same arguments, and when
-  that implementation throws, it shall throw an error with the same
-  message.
+  serialized document is byte-identical to the one the frozen copy of
+  workstream 2 returns for the same arguments, and when that copy
+  throws, it shall throw an error with the same message.
 - When `mergeModels` runs, it shall compute which side of each delta is
   kept, and the translation of every object-type, fact-type and role
   id, before it adds any element to the merged model.
 - When a constraint's references are rewritten, the merge shall go
-  through `mapConstraintReferences` for every kind of reference.
-- When the last workstream lands, `ModelMerge.ts` and the three new
-  modules shall together hold no more code lines than `ModelMerge.ts`
-  holds at the base commit (946, comments and blanks excluded), and the
-  pull request shall report both counts. The number is the base's own:
-  the requirement is that a restructure does not end as an addition.
+  through `mapConstraintReferences` for every kind of reference, and
+  when a constraint needs no rewriting it shall be passed through
+  untouched, as it is today.
+- When each of workstreams 3 to 5 lands, its pull request shall report
+  the code lines of `src/diff/` as a whole, before and after (comments
+  and blanks excluded; `ModelMerge.ts` alone holds 946 at `3de1d063`).
+  The whole directory, so that moving code to a neighbour does not read
+  as removing it. This is a reading for a person, not a gate: see Open
+  decisions.
 
 Out of scope, each with where it goes:
 
@@ -210,7 +235,7 @@ Out of scope, each with where it goes:
 | `ModelMerge.ts:1360-1407` id resolution | three functions reading maps and the merged model        | becomes `mergeIdSpace.ts`                           |
 | `ModelMerge.ts:1418-1490` join remap    | a second traversal of a constraint's references          | deleted; `mapConstraintReferences` covers it        |
 | `ModelMerge.ts:1540-1594` validation    | `getStructuralErrors`, `mergeAndValidate`                | stays                                               |
-| `tests/laws/merge.law.test.ts`          | four laws; pairs share ids                               | each two-draw law runs both id forms                |
+| `tests/laws/merge.law.test.ts`          | three laws in six tests, three of them two-draw          | each two-draw test runs both id forms               |
 | `tests/arbitraries/model.ts`            | ids by position                                          | gains a re-id helper; the arbitrary itself is kept  |
 | `tests/diff/*.test.ts`                  | 14 of 19 files call the merge, 4,466 lines               | untouched; one case added for M1                    |
 | `rename/remapIds.ts`                    | rebuilds a model with ids changed                        | untouched; workstream 1 uses it to re-id a model    |
@@ -255,7 +280,11 @@ declare function decide(
 interface IdSpace {
   objectType(id: string, from: Side): string;
   factType(id: string, from: Side): string;
-  /** null: the role did not survive an accepted change of arity. */
+  /**
+   * null: the merged model holds no role for it. On the existing side,
+   * an accepted change dropped it; on the incoming side, a rejected
+   * change kept a fact type with fewer roles.
+   */
   role(id: string, from: Side): string | null;
 }
 
@@ -358,14 +387,17 @@ model-level field; this spec does not fix that. Alternative B does.
 ### 1. Model pairs whose ids differ
 
 Tests only. A helper beside the arbitrary re-ids a model through
-`remapIds`, giving every object type, fact type, role, subtype fact and
-constraint an id with a fixed prefix, so a re-id'd model pairs with its
-partner by name and no longer by id. Each two-draw law in
-`merge.law.test.ts` runs both forms. One law is added: merging any
-incoming model while accepting nothing returns the base, by hash.
+`remapIds`, moving every id the model holds under a fixed prefix and
+keeping each id's shape: a role stays under its fact type's new id, a
+population under its fact type's, an instance under its population's.
+A re-id'd model then pairs with its partner by name and no longer by
+id, and looks like a file a person could have written. Each two-draw
+test in `merge.law.test.ts` runs both forms. One law is added: merging
+any incoming model while accepting nothing returns the base, by hash.
 
 - When the re-id'd pairs are drawn, the file's `coverage:` block shall
-  assert that some pair holds an object type and a fact type that pair
+  assert that some pair holds an object type, a fact type and a
+  population named for its fact type that pair
   by name under different ids, so the laws cannot go vacuous the way
   they are now (`tests/laws/lawPremises.test.ts` already requires the
   block).
@@ -390,9 +422,9 @@ so.
 
 ### 2. The oracle
 
-Mechanical. Copy `ModelMerge.ts` at the base commit to
-`tests/diff/oracle/ModelMergeOracle.ts`, imports repointed, nothing
-else changed. `mergeOracle.law.test.ts` draws two models, both id
+Mechanical. Copy `ModelMerge.ts` as it stands when this workstream
+lands to `tests/diff/oracle/ModelMergeOracle.ts`, imports repointed,
+nothing else changed; the pull request names the commit copied. `mergeOracle.law.test.ts` draws two models, both id
 forms, and a random accepted set, and asserts the live and frozen
 merges agree on the serialized document or on the thrown message.
 
@@ -435,11 +467,20 @@ replaced by one `mapConstraintReferences` call handling role and
 object-type references, and the three copies of "can it be added; else
 is the reference dangling in its source; else drop" become one helper.
 
+The constraint change is the risky one here. `mapConstraintReferences`
+returns a constraint in file shape, so a rewritten constraint goes back
+through `constraintRecord` and `modelConstraint`, as `mapRoleIds`
+already does (`:1464-1466`). Today a constraint that needs no rewriting
+is returned as the same object, and that must stay: sending every
+constraint through the round trip, a leniently loaded or unnamed one
+included, could change the document. The oracle law judges it, and the
+45 lines counted for this deletion are a prediction until it has.
+
 ### 5. Delete the oracle
 
 Delete `tests/diff/oracle/` and `mergeOracle.law.test.ts`, correct
-`packages/core/CLAUDE.md:43`, set this spec's Status. The line-count
-requirement in Scope is read here.
+`packages/core/CLAUDE.md:43`, set this spec's Status. The last
+`src/diff/` line reading is reported here.
 
 ## API and migration impact
 
@@ -473,9 +514,12 @@ requirement in Scope is read here.
   the one refusal built on heuristics. Without it, two revisions of an
   older file that renamed an element would merge as a removal and an
   addition, which is what two 4.0 files already do, since 4.0 makes a
-  rename an operation (`barwise rename`). `refuseCoincidentIds`, the
-  prior-id seeding and most of `idSpace`'s object-type and fact-type
-  half would go: about 60 code lines and barwise-wcg.3qv with them.
+  rename an operation (`barwise rename`). The pairing itself is the
+  diff's; what the merge would lose is `refuseCoincidentIds` (59 code
+  lines) and barwise-wcg.3qv with it, and `idSpace` would no longer
+  need to translate an id-paired rename. The `fromBasePrior` seeding
+  stays either way: it resolves a fragment's references and pairs
+  nothing.
   Against it: a person merging two revisions of a 3.x file today gets
   the rename, and would lose it. This is a behaviour change and the
   `iri-identity` owner's call, not this spec's. Recommend deciding it
@@ -491,12 +535,14 @@ requirement in Scope is read here.
   carries the others. Recommend no: this spec's claim is that nothing
   changes, and a behaviour change inside it would make the oracle law
   fail on purpose. File it against the stage once workstream 4 lands.
-- **Where the line count is read.** Scope makes "no more code lines
-  than 946" a requirement of the last workstream because the owner
-  asked that a restructure not end as an addition; the repository
-  treats line count as a shadow elsewhere. Recommend keeping it as a requirement here and
-  only here: it is read once, by a person, on one pull request, and
-  nothing ratchets on it.
+- **Should the line count be a requirement?** The owner asked that a
+  restructure not end as an addition, and the repository's rule is to
+  look at a line count and not gate on it. Scope therefore asks each
+  pull request to report `src/diff/`'s code lines before and after, and
+  requires nothing of the number. Recommend leaving it there: a person
+  reads it, and the tripwire below asks for a stop if it rises. The
+  alternative is a hard requirement of no growth, which a restructure
+  can meet by moving code out of the directory.
 
 ## Risks and testing
 
@@ -523,8 +569,12 @@ Tripwires:
 - If the oracle law finds a counterexample that is the live code being
   right and the frozen code wrong, stop: that is a behaviour change,
   and it belongs in an issue, not in this spec's diff.
-- If workstream 4 ends with more code lines than it started with, say
-  so in the pull request and ask before workstream 5.
+- If `src/diff/` ends workstream 4 with more code lines than it held
+  before workstream 3, say so in the pull request and ask before
+  workstream 5.
+- If a fix to merge behaviour is needed while the oracle exists and
+  cannot be made in both copies in one commit, finish or abandon the
+  restructure first; do not edit the oracle alone.
 
 ## Non-goals
 
