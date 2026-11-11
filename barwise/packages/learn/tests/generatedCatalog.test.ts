@@ -2,7 +2,7 @@
  * The compiled-in gym catalog must equal packages/learn/exercises/
  * (barwise-fbi; surface-mirroring spec, workstream 4).
  *
- * `exercises.generated.ts` is committed, so nothing else forces it to
+ * `exercises.generated.json` is committed, so nothing else forces it to
  * stay in step with the files it came from -- the same guard llm's
  * builtins test keeps over `builtins.generated.ts`. Regenerate with
  * `node scripts/regen-gym-exercises.mjs` from barwise/ and review the diff.
@@ -13,7 +13,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { listExercises } from "../src/exercise/catalog.js";
-import { packagedExerciseFiles } from "../src/exercise/exercises.generated.js";
+import packagedExerciseFiles from "../src/exercise/exercises.generated.json" with { type: "json" };
 
 const exercisesDir = resolve(dirname(fileURLToPath(import.meta.url)), "../exercises");
 const onDisk = Object.fromEntries(

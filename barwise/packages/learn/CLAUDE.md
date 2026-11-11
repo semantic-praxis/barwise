@@ -37,10 +37,10 @@ src/
 
 schemas/          gym-exercise.schema.json (editor autocomplete for .gym.yaml)
 exercises/        Seed catalog: *.gym.yaml plus reference *.orm.yaml. Compiled
-                  into src/exercise/exercises.generated.ts, which the packaged
+                  into src/exercise/exercises.generated.json, which the packaged
                   catalog loads (the release bundles have no exercises/ beside
                   them, barwise-fbi); after an edit, run
-                  `node scripts/regen-gym-exercises.mjs` from barwise/
+                  `node barwise/scripts/regen-gym-exercises.mjs`
 tutorials/        Tutorial sources: *.tutorial.yaml plus per-step model
                   snapshots; rendered to docs/tutorial/ by regen:tutorial
 tests/            Vitest; tests/helpers/ModelBuilder.ts (copied from @barwise/core)

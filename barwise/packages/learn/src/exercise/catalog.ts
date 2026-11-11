@@ -1,13 +1,14 @@
 /**
  * Exercise catalog discovery: list and load the `.gym.yaml` exercises
  * in a catalog. The packaged seed catalog is the default and is compiled
- * in (`exercises.generated.ts`, from `packages/learn/exercises/`);
+ * in (`exercises.generated.json`, written from `packages/learn/exercises/`
+ * by `barwise/scripts/regen-gym-exercises.mjs`);
  * surfaces may point at an external catalog directory instead, which is
  * read from disk at the package edge, like `loadExercise`.
  */
 import { readdirSync } from "node:fs";
 import { posix, resolve } from "node:path";
-import { packagedExerciseFiles } from "./exercises.generated.js";
+import packagedCatalog from "./exercises.generated.json" with { type: "json" };
 import { type LoadedExercise, loadExercise, loadExerciseFrom } from "./loadExercise.js";
 
 /** An exercise available in a catalog. */
@@ -20,6 +21,9 @@ export interface CatalogEntry {
   readonly filePath?: string;
   readonly loaded: LoadedExercise;
 }
+
+/** Every file in the packaged catalog, by file name. */
+const packagedExerciseFiles: Readonly<Record<string, string>> = packagedCatalog;
 
 const isExercise = (name: string): boolean => name.endsWith(".gym.yaml");
 
