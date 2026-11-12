@@ -114,19 +114,6 @@
         "6ad692fa"
       ],
       "note": "Genuinely unimplemented, and the header is right. 6ad692fa (#720, model-invariants WS1, squash-merged from 88c8d466, which this row first named) adds OrmModel.constraintsSharingAnId, and 1c9e6351 (#730, model-invariants WS3) makes the store refuse an id it already holds; both touch core/src/model/OrmModel.ts, which this spec names because its own workstream 1 adds subject-area declarations there. None is built. Remove this row when WS1 ships and the Status says so. Re-read 2026-10-24: 31ec97ad (join-ring-constraint WS1) touched orm-model.schema.json, ModelMerge.ts and referenceDiagnostics.ts for a new constraint kind; no subject-area declaration exists, so the verdict holds."
-    },
-    "surface-mirroring.spec.md": {
-      "status": "Draft -- no workstream implemented",
-      "commits": [
-        "ac3a6aae",
-        "94c02e78",
-        "0c567c7a",
-        "285ef258",
-        "86d5f71a",
-        "0ed47d51",
-        "c9d83477"
-      ],
-      "note": "The header is right: none of its workstreams (mirroring CLI options on MCP and VS Code, and the parity gate) has started. 285ef258, 86d5f71a, 0ed47d51 and c9d83477 are PR #914 (barwise-wcg.4kp, barwise-xv1), which touched packages/core/src/diff/ModelMerge.ts to refuse a 3.x merge whose prior-id pairing looks coincidental, a merge correctness fix the spec does not plan. ac3a6aae is iri-identity 7a (#916), which pointed cli and core tests at the migrated example models; 94c02e78 and 0c567c7a are 7c (#925), which gave test files under mcp/tests/tools/ 4.0 ids. Neither is a mirroring workstream."
     }
   }
 }

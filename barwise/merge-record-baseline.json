@@ -6,8 +6,8 @@
       "rules": [
         "no-record"
       ],
-      "status": "accepted-by-owner",
-      "note": "Owner, 2026-11-12, asked in session: \"Accept it\". A tracker-only PR merged through the GitHub UI without trailers; barwise-b1c."
+      "status": "tracked:barwise-nyd",
+      "note": "Tracker-only PR merged by hand without a review trailer after the v2.0.0 release. Recorded as tracked by the barwise-fbi PR so CI can answer; accepting it is the owner's call (barwise-nyd)."
     }
   }
 }

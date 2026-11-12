@@ -1,34 +1,56 @@
 /**
  * Exercise catalog discovery: list and load the `.gym.yaml` exercises
- * in a directory. The packaged seed catalog under
- * `packages/learn/exercises/` is the default; surfaces may point at an
- * external catalog directory instead. Filesystem access lives here at
- * the package edge, like `loadExercise`.
+ * in a catalog. The packaged seed catalog is the default and is compiled
+ * in (`exercises.generated.json`, written from `packages/learn/exercises/`
+ * by `barwise/scripts/regen-gym-exercises.mjs`);
+ * surfaces may point at an external catalog directory instead, which is
+ * read from disk at the package edge, like `loadExercise`.
  */
 import { readdirSync } from "node:fs";
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
-import { type LoadedExercise, loadExercise } from "./loadExercise.js";
+import { posix, resolve } from "node:path";
+import packagedCatalog from "./exercises.generated.json" with { type: "json" };
+import { type LoadedExercise, loadExercise, loadExerciseFrom } from "./loadExercise.js";
 
-/**
- * The packaged seed catalog. Resolves relative to this module, whose
- * directory sits two levels below the package root in both `src/`
- * (tests) and `dist/` (builds).
- */
-export function defaultCatalogDir(): string {
-  return resolve(dirname(fileURLToPath(import.meta.url)), "../../exercises");
-}
-
-/** An exercise available in a catalog directory. */
+/** An exercise available in a catalog. */
 export interface CatalogEntry {
-  readonly filePath: string;
+  /**
+   * The exercise file on disk. Absent for the packaged catalog, which is
+   * compiled in: the release bundles are single files with no catalog
+   * directory beside them (barwise-fbi).
+   */
+  readonly filePath?: string;
   readonly loaded: LoadedExercise;
 }
 
-/** Load every `.gym.yaml` in the directory, sorted by file name. */
-export function listExercises(dir: string = defaultCatalogDir()): CatalogEntry[] {
+/** Every file in the packaged catalog, by file name. */
+const packagedExerciseFiles: Readonly<Record<string, string>> = packagedCatalog;
+
+const isExercise = (name: string): boolean => name.endsWith(".gym.yaml");
+
+/** A packaged catalog file by its path relative to the catalog root. */
+function packagedFile(relPath: string): string {
+  const text = packagedExerciseFiles[posix.normalize(relPath)];
+  if (text === undefined) {
+    throw new Error(`The packaged exercise catalog has no file "${relPath}".`);
+  }
+  return text;
+}
+
+function listPackaged(): CatalogEntry[] {
+  return Object.keys(packagedExerciseFiles)
+    .filter(isExercise)
+    .sort()
+    .map((name) => ({ loaded: loadExerciseFrom(packagedFile(name), packagedFile) }));
+}
+
+/**
+ * Load every `.gym.yaml` in the directory, sorted by file name; with no
+ * directory, the packaged catalog.
+ */
+export function listExercises(dir?: string): CatalogEntry[] {
+  if (dir === undefined) return listPackaged();
   return readdirSync(dir)
-    .filter((f) => f.endsWith(".gym.yaml"))
+    .filter(isExercise)
     .sort()
     .map((f) => {
       const filePath = resolve(dir, f);

@@ -1,7 +1,8 @@
 /**
- * Load a `.gym.yaml` exercise from disk, resolving its reference and
- * starter model paths (relative to the exercise file) into `OrmModel`s.
- * This is the one module in the package that touches the filesystem; the
+ * Load a `.gym.yaml` exercise, resolving its reference and starter model
+ * paths (relative to the exercise file) into `OrmModel`s. `loadExercise`
+ * reads from disk; `loadExerciseFrom` takes the text and a reader for the
+ * files beside it, which is how the compiled-in catalog loads. The
  * evaluator itself is pure and takes already-loaded models.
  */
 import { type OrmModel, OrmYamlSerializer } from "@barwise/core";
@@ -21,19 +22,29 @@ export interface LoadedExercise {
 
 const serializer = new OrmYamlSerializer();
 
-function loadModel(baseDir: string, relPath: string): OrmModel {
-  const full = resolve(baseDir, relPath);
-  return serializer.deserialize(readFileSync(full, "utf-8"));
-}
-
-export function loadExercise(filePath: string): LoadedExercise {
-  const raw = readFileSync(filePath, "utf-8");
+/**
+ * Load an exercise from its text. `readSibling` returns the text of a
+ * file named relative to the exercise, as its `reference` and `starter`
+ * fields name them.
+ */
+export function loadExerciseFrom(
+  raw: string,
+  readSibling: (relPath: string) => string,
+): LoadedExercise {
   const exercise = parseExercise(parseYaml(raw));
-  const baseDir = dirname(filePath);
+  const model = (relPath: string): OrmModel => serializer.deserialize(readSibling(relPath));
 
   return {
     exercise,
-    reference: exercise.reference ? loadModel(baseDir, exercise.reference) : undefined,
-    starter: exercise.starter ? loadModel(baseDir, exercise.starter) : undefined,
+    reference: exercise.reference ? model(exercise.reference) : undefined,
+    starter: exercise.starter ? model(exercise.starter) : undefined,
   };
+}
+
+export function loadExercise(filePath: string): LoadedExercise {
+  const baseDir = dirname(filePath);
+  return loadExerciseFrom(
+    readFileSync(filePath, "utf-8"),
+    (relPath) => readFileSync(resolve(baseDir, relPath), "utf-8"),
+  );
 }

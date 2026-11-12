@@ -9,6 +9,7 @@
       "entry": [
         "scripts/at-root.mjs",
         "scripts/beads-merge-driver.mjs",
+        "scripts/regen-gym-exercises.mjs",
         "scripts/hooks/*.mjs",
         "scripts/lib/module-count-hook.mjs",
         "scripts/lib/write-recorder.mjs",

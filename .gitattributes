@@ -14,6 +14,7 @@
 
 # Regenerated output: review the generator, not this.
 barwise/packages/llm/src/prompt/artifacts/builtins.generated.ts linguist-generated=true
+barwise/packages/learn/src/exercise/exercises.generated.json linguist-generated=true
 barwise/examples/output/** linguist-generated=true
 barwise/docs/tutorial/** linguist-generated=true
 barwise/packages/cli/tests/characterization/golden/** linguist-generated=true
