@@ -9,7 +9,7 @@ Tracking: barwise-6mf
 Plan-reviewed: 45f824a9 (code-review, pr-review)
 Touches: barwise/scripts/pr-risk.mjs, barwise/scripts/lib/review-tiers.mjs,
 barwise/review-tiers.json, barwise/scripts/check-review-tiers.mjs,
-barwise/scripts/tests/gates.test.mjs, .github/workflows/ci.yml,
+barwise/scripts/tests/, .github/workflows/ci.yml,
 .claude/skills/pr-review/SKILL.md, .claude/skills/pr-creation/SKILL.md
 
 In one sentence: `pr-risk` already computes which `pr-review` checklist

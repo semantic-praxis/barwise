@@ -468,7 +468,7 @@ jobs:
       #
       # After the build, not before: the audit-rubric writer and stale-row
       # tests score through packages/promptlab/dist, and while this step
-      # ran first they skipped in every CI run (barwise-ym8.fi5). gates.test.mjs
+      # ran first they skipped in every CI run (barwise-ym8.fi5). gates-baselines.serial.test.mjs
       # holds the order and refuses, rather than skips, when CI is set and
       # the dist is missing.
       - run: npm run test:scripts

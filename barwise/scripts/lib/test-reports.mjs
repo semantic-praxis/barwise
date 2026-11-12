@@ -19,7 +19,7 @@ export const TRIAL_REPORT = join("barwise", "test-results", "trial.jsonl");
 export const vitestReport = (pkgDir) =>
   join("barwise", "packages", pkgDir, "test-results", "vitest.json");
 
-/** The report for one script-test file, e.g. `gates.test.mjs`. */
+/** The report for one script-test file, e.g. `gates-contract.test.mjs`. */
 export const scriptReport = (file) => join(SCRIPT_REPORTS_DIR, file.replace(/\.mjs$/, ".jsonl"));
 
 /**

@@ -6,7 +6,7 @@ Created: 2026-10-24
 Last-updated: 2026-10-24
 Tracking: barwise-1046
 Plan-reviewed: 26090320 (code-review, pr-review)
-Touches: barwise/scripts/lib/review-tiers.mjs, barwise/scripts/check-review-tiers.mjs, barwise/review-tiers.json, barwise/scripts/tests/gates.test.mjs
+Touches: barwise/scripts/lib/review-tiers.mjs, barwise/scripts/check-review-tiers.mjs, barwise/review-tiers.json, barwise/scripts/tests/
 
 ## Principle
 

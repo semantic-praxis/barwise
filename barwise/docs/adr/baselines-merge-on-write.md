@@ -99,7 +99,7 @@ note, was decided when barwise-qs8 closed.
 - The trial writer, decision 2's exception, keeps rows no longer
   detected and never refreshes derived fields (decision 1). That
   exception is held by this prose and by the `WRITERS` reason text in
-  `gates.test.mjs`, which fails if the writer comes to import the
+  `gates-baselines.serial.test.mjs`, which fails if the writer comes to import the
   helper; nothing fails if it starts regenerating rows. What a test
   does pin is its summary line, its sort and that it keeps a row no
   longer open (`trial/tests/gate-write.test.mjs`).
@@ -120,4 +120,4 @@ note, was decided when barwise-qs8 closed.
     and sort comment, and the `baseline-merge.test.mjs` header;
   - the comments in the three writers where they call the helper,
     plus `audit-spec-status`'s survey and reopen comments;
-  - the comments on the `gates.test.mjs` writer tests.
+  - the comments on the `gates-baselines.serial.test.mjs` writer tests.

@@ -71,7 +71,7 @@ import {
 /**
  * `--at <commit>` runs the same audit against a historical tree. It is
  * how this gate proves it would have caught the defect it was written
- * for -- see scripts/tests/gates.test.mjs, which asserts it fires at
+ * for -- see scripts/tests/gates-contract.test.mjs, which asserts it fires at
  * 7fbbba7. Mutating a Status on today's tree does NOT reproduce that
  * condition: the comparison is against the commit that last touched the
  * spec, and every spec here has been edited since its implementation

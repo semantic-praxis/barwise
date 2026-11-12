@@ -229,7 +229,7 @@ function main() {
 }
 
 // Only run the check when invoked as a command. The helpers above are
-// pure and importable, which is what scripts/tests/gates.test.mjs needs
+// pure and importable, which is what scripts/tests/gates-contract.test.mjs needs
 // to show this gate red on a planted defect: `root` is script-relative
 // by design (barwise-905), so a fixture repo cannot reach the loop.
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

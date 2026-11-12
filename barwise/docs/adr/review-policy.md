@@ -94,7 +94,7 @@ condition, is a separate decision (`steward` section 4b).
   routing.
 - `review-policy.md#copilot-requested`'s mechanism is
   `.github/workflows/copilot-review.yml`,
-  whose shell runs against a stubbed `gh` in `gates.test.mjs` (the
+  whose shell runs against a stubbed `gh` in `gates-review.test.mjs` (the
   `test:scripts` step, `if: docs_only != 'true'`). Since 2026-10-19 the
   request job runs only on a manual dispatch, so neither
   `review-policy.md#copilot-requested` nor
