@@ -1,6 +1,6 @@
 {
   "name": "@barwise/promptlab",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "private": true,
   "description": "Deterministic prompt evaluation for the barwise LLM surfaces",
   "type": "module",
@@ -25,9 +25,9 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@barwise/core": "2.0.0",
-    "@barwise/learn": "2.0.0",
-    "@barwise/llm": "2.0.0",
+    "@barwise/core": "2.0.1",
+    "@barwise/learn": "2.0.1",
+    "@barwise/llm": "2.0.1",
     "yaml": "^2.9.1"
   },
   "devDependencies": {
