@@ -404,29 +404,11 @@
               "items": {
                 "type": "object",
                 "properties": {
-                  "kind": {
-                    "type": "string",
-                    "enum": [
-                      "objectType",
-                      "factType"
-                    ]
-                  },
-                  "from": {
-                    "type": "string",
-                    "minLength": 1,
-                    "description": "Its name in the base model"
-                  },
-                  "to": {
-                    "type": "string",
-                    "minLength": 1,
-                    "description": "Its name in the incoming model"
-                  }
+                  "kind": { "type": "string", "enum": ["objectType", "factType"] },
+                  "from": { "type": "string", "minLength": 1, "description": "Its name in the base model" },
+                  "to": { "type": "string", "minLength": 1, "description": "Its name in the incoming model" }
                 },
-                "required": [
-                  "kind",
-                  "from",
-                  "to"
-                ]
+                "required": ["kind", "from", "to"]
               }
             }
           },
