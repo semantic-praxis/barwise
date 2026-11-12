@@ -109,13 +109,6 @@
       "note": "merge exits 1 with 'Merge produced 1 structural error(s)' on a fact-type rename and does not say which error (barwise-nqd)."
     },
     {
-      "id": "bundle-gym-catalog",
-      "issue": "barwise-fbi",
-      "severity": "S3",
-      "step": "^release-bundle:gym-list$",
-      "note": "The release CLI bundle cannot resolve the packaged gym catalog (import.meta.url is empty under cjs) and fails with a Node path error (barwise-fbi)."
-    },
-    {
       "id": "acceptance-key-through-entity",
       "issue": "barwise-3pc",
       "severity": "S5",
