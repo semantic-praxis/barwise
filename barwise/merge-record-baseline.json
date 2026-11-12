@@ -1,4 +1,13 @@
 {
   "$comment": "Merges the owner has answered for, from scripts/check-merge-record.mjs (npm run check:merge-record; CI runs it). A merge cannot be amended, so a finding on history stays until acknowledged here: status is `accepted-by-owner` or `tracked:<issue>`, and note says why a reader can follow. `--write` adds a placeholder row for a new finding; check:findings refuses a placeholder and an open row whose issue is closed. docs/adr/merge-delegation.md.",
-  "merges": {}
+  "merges": {
+    "5d3f661e8b772523ba0888c67311e9156846bcad": {
+      "subject": "Merge pull request #1020 from semantic-praxis/claude/dreamy-cerf-7t4wq9",
+      "rules": [
+        "no-record"
+      ],
+      "status": "accepted-by-owner",
+      "note": "Owner, 2026-11-12, asked in session: \"Accept it\". A tracker-only PR merged through the GitHub UI without trailers; barwise-b1c."
+    }
+  }
 }
