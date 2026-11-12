@@ -21,6 +21,7 @@
     "credential-handling.test.mjs": 7,
     "gates.test.mjs": 371,
     "generated-marks.test.mjs": 4,
+    "git-env.test.mjs": 7,
     "install-uv.test.mjs": 6,
     "masked-exit.test.mjs": 28,
     "measure-comparison.test.mjs": 42,
