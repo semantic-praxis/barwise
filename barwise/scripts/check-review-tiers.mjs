@@ -40,7 +40,7 @@
  * barwise-1046). A stale acknowledgement fails as well.
  *
  * `--checklist`, `--table`, `--review` and `--tracked` override the inputs. They exist for this
- * gate's own tests in scripts/tests/gates.test.mjs, which have to watch
+ * gate's own tests in scripts/tests/gates-review.test.mjs, which have to watch
  * each exit code on a planted defect and must not perturb the real
  * checklist to do it. Nothing else passes them.
  *

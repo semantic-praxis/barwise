@@ -76,7 +76,7 @@ name: Copilot review
 # verify the request path, or to backfill a PR opened before this existed.
 #
 # The shell in both `run:` steps is executed by
-# barwise/scripts/tests/gates.test.mjs against a stubbed `gh`, one case per
+# barwise/scripts/tests/gates-review.test.mjs against a stubbed `gh`, one case per
 # branch, so an edit here is tested as written.
 
 on:

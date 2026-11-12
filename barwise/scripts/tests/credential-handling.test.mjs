@@ -3,7 +3,7 @@
  * (docs/specs/credential-handling-held.spec.md). Each property is literal
  * text in a tracked file or the wrapper's behaviour against a stand-in,
  * so these run, and never skip, whether or not gitleaks is installed.
- * The staged-probe tests in gates.test.mjs, which need the real scanner,
+ * The staged-probe tests in gates-contract.test.mjs, which need the real scanner,
  * stay where they are.
  */
 import assert from "node:assert/strict";

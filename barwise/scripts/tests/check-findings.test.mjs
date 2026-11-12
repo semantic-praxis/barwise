@@ -27,7 +27,7 @@ const TRACKER = ".beads/issues.jsonl";
 
 /**
  * A tree holding only what the gate reads, as committed at HEAD. Not the
- * working tree: gates.test.mjs rewrites these baselines (and restores them)
+ * working tree: gates-baselines.serial.test.mjs rewrites these baselines (and restores them)
  * while this file runs beside it, so a copy taken mid-rewrite would be a
  * reversed or half-written file.
  */

@@ -5,7 +5,7 @@
  * the same answer from the repository root, from `barwise/`, and from a
  * package directory. That is the whole reason the wrapper exists
  * (barwise-907: a satisfied `cd barwise` failed and silently skipped a
- * format step), so the test runs from all three, as gates.test.mjs does
+ * format step), so the test runs from all three, as gates-contract.test.mjs does
  * for the enumerating gates.
  *
  * Red is established first: an unknown script and a missing script

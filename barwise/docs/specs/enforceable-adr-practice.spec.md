@@ -8,7 +8,7 @@ Tracking: barwise-ym8.gxp (barwise-ym8.krj, barwise-ym8.kva, barwise-ym8.gc9; fo
 Touches: barwise/scripts/check-adr-tests.mjs, barwise/scripts/check-architecture.mjs, barwise/scripts/lib/adr-enforcement.mjs,
 barwise/scripts/lib/adr-judge.mjs,
 barwise/scripts/mutate.mjs, barwise/scripts/tests/check-adr-tests.test.mjs,
-barwise/scripts/tests/gates.test.mjs, barwise/scripts/tests/expected-counts.json,
+barwise/scripts/tests/, barwise/scripts/tests/expected-counts.json,
 barwise/docs/adr/credential-handling.md, barwise/docs/ARCHITECTURE.md,
 barwise/docs/specs/executable-adrs.spec.md, .beads/issues.jsonl,
 +barwise/scripts/adr-probes.mjs, +barwise/scripts/tests/adr-probes.test.mjs,

@@ -249,7 +249,7 @@ export const SOURCE_KEYS = Object.fromEntries(SOURCES.map((s) => [s.source, s.ke
  * The ratchets, one per baseline (findings-close-by-mechanism
  * decisions 2 and 4): the script that runs it, and the ci.yml `run:` line
  * that wires it into CI, or why it is not wired (`noCi`). A test in
- * gates.test.mjs requires this list to cover every baseline above, each
+ * gates-baselines.serial.test.mjs requires this list to cover every baseline above, each
  * `ci` line to be a step that can fail CI, and each script to be the one
  * its npm script runs; the stale-row cases that test each ratchet live
  * with the tests, not here.
