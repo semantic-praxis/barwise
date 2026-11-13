@@ -31,7 +31,6 @@ const MODELS = [
   "examples/auction-project/domains/catalog.orm.yaml",
   "examples/models/diagram-layout.orm.yaml",
   "examples/transcripts/clinic-appointments.orm.yaml",
-  "examples/transcripts/rb-global-account-taxonomy.orm.yaml",
   "test-plan/fixtures/external-uniqueness-violation.orm.yaml",
   "test-plan/fixtures/external-uniqueness.orm.yaml",
   "trial/customers/C01-hospital/kernel.orm.yaml",
