@@ -4,7 +4,7 @@ Status: Implemented (WS1: the identification-cycle rule and the shared
 identification graph; WS2: the two phases, the barwise-965 fix and the
 mapper-law clause WS5 deferred).
 Created: 2026-09-08
-Last-updated: 2026-09-08
+Last-updated: 2026-11-13
 Tracking: barwise-966 (this spec); barwise-963 (a foreign key keeps a
 key a later step replaced); barwise-965 (a subtype fact truncates a
 composite subtype key); barwise-962 (an entity may objectify a fact type
@@ -151,21 +151,21 @@ schema and are unchanged.
 
 ## Inventory
 
-| Module                                                     | Current state                                                            | Verdict                                           |
-| ---------------------------------------------------------- | ------------------------------------------------------------------------ | ------------------------------------------------- |
-| `core/src/model/identification.ts`                         | does not exist                                                           | new: the one identification-graph builder (WS1)   |
-| `core/src/validation/ruleId.ts`                            | 76 rule ids, `subtypeCycle` among them                                   | adds `identificationCycle` (WS1)                  |
-| `core/src/validation/rules/structural.ts`                  | `checkSubtypeCycles` walks subtype edges only                            | adds the identification-cycle rule (WS1)          |
-| `core/tests/arbitraries/model.ts`                          | builds a cycle in 57 of 250 sampled models, 55 of them self-objectifying | stops generating cycles (WS1)                     |
-| `examples/transcripts/rb-global-account-taxonomy.orm.yaml` | two objectifications naming a type that plays a role in the fact type    | the two entries deleted (WS1)                     |
-| `core/src/mapping/RelationalMapper.ts` (`map`)             | four ordered steps, keys mutated in 2b and 3                             | two phases; keys settled first (WS2)              |
-| `core/src/mapping/RelationalMapper.ts` (barwise-962 skip)  | defensive `continue` added in PR #456                                    | removed; the rule replaces it (WS1)               |
-| `core/src/mapping/RelationalSchema.ts` (`MutableTable`)    | `primaryKey` assignable throughout mapping                               | assignable only in phase 1 (WS2)                  |
-| `core/src/mapping/RelationalMapper.ts` (`mapSubtypeFact`)  | shared key is `[ownPk[0], ...restSupertypePk]`                           | extends the whole own key (WS2, barwise-965)      |
-| `core/tests/laws/mapper.law.test.ts`                       | four structural clauses; the key-equality clause deferred                | the deferred clause returns (WS2)                 |
-| `core/tests/mapping/RelationalMapper.test.ts`              | fixtures for barwise-961, -962, and the -963 ratchet                     | -962 and the ratchet go; -965 becomes positive    |
-| `cli/tests/characterization/golden/*`                      | eighteen goldens: three models, six formats                              | unchanged; none of the three carries either shape |
-| `core/src/mapping/renderers/*`, `formats/*`                | consume `RelationalSchema`                                               | untouched; the schema type does not change        |
+| Module                                                    | Current state                                                            | Verdict                                           |
+| --------------------------------------------------------- | ------------------------------------------------------------------------ | ------------------------------------------------- |
+| `core/src/model/identification.ts`                        | does not exist                                                           | new: the one identification-graph builder (WS1)   |
+| `core/src/validation/ruleId.ts`                           | 76 rule ids, `subtypeCycle` among them                                   | adds `identificationCycle` (WS1)                  |
+| `core/src/validation/rules/structural.ts`                 | `checkSubtypeCycles` walks subtype edges only                            | adds the identification-cycle rule (WS1)          |
+| `core/tests/arbitraries/model.ts`                         | builds a cycle in 57 of 250 sampled models, 55 of them self-objectifying | stops generating cycles (WS1)                     |
+| a shipped transcript example (since removed)              | two objectifications naming a type that plays a role in the fact type    | the two entries deleted (WS1)                     |
+| `core/src/mapping/RelationalMapper.ts` (`map`)            | four ordered steps, keys mutated in 2b and 3                             | two phases; keys settled first (WS2)              |
+| `core/src/mapping/RelationalMapper.ts` (barwise-962 skip) | defensive `continue` added in PR #456                                    | removed; the rule replaces it (WS1)               |
+| `core/src/mapping/RelationalSchema.ts` (`MutableTable`)   | `primaryKey` assignable throughout mapping                               | assignable only in phase 1 (WS2)                  |
+| `core/src/mapping/RelationalMapper.ts` (`mapSubtypeFact`) | shared key is `[ownPk[0], ...restSupertypePk]`                           | extends the whole own key (WS2, barwise-965)      |
+| `core/tests/laws/mapper.law.test.ts`                      | four structural clauses; the key-equality clause deferred                | the deferred clause returns (WS2)                 |
+| `core/tests/mapping/RelationalMapper.test.ts`             | fixtures for barwise-961, -962, and the -963 ratchet                     | -962 and the ratchet go; -965 becomes positive    |
+| `cli/tests/characterization/golden/*`                     | eighteen goldens: three models, six formats                              | unchanged; none of the three carries either shape |
+| `core/src/mapping/renderers/*`, `formats/*`               | consume `RelationalSchema`                                               | untouched; the schema type does not change        |
 
 `RelationalMapper.map`'s signature does not change, so the eleven call
 sites across `cli`, `mcp`, `vscode`, `dbt`, `formats` and `core`'s own
@@ -242,12 +242,11 @@ it: phase 1 may assume a DAG only once something rejects the models that
 are not.
 
 **One shipped example is malformed, and the rule is what finds it.**
-`examples/transcripts/rb-global-account-taxonomy.orm.yaml` declares
-`UserAccountMembership` as the objectification of
-`UserAccountMembership involves User`, a binary it plays the first role
-of -- and does the same for `AccountOrganizationLink`. Both types are
-already independently identified, by reference modes `MembershipId` and
-`LinkId`, so the objectifications contradict the model's own
+One model under `examples/transcripts/` (since removed from the
+repository) declares an entity type as the objectification of a binary
+it plays the first role of -- and does the same for a second entity
+type. Both types are already independently identified, each by its own
+reference mode, so the objectifications contradict the model's own
 identification and are an extraction artifact rather than a modelling
 choice. WS1 deletes the two entries: both types keep their reference
 modes, both fact types stay, and nothing else moves. Re-extracting the
@@ -319,7 +318,7 @@ shall go red.
   already sits at that severity for the narrower case. The cost is
   accepted and is most of WS1: `structural/*` is `error` severity, so
   the arbitrary must stop generating cycles (57 of 250 sampled models)
-  and `rb-global-account-taxonomy` must be fixed in the same PR or
+  and the malformed example must be fixed in the same PR or
   `validate:examples` goes red. `constraint/*` would have been cheaper
   and would have left the mapper facing cycles forever, with phase 1
   unable to assume a DAG.
@@ -349,7 +348,7 @@ That change is barwise-967 and is out of scope here.
   signal to stop and explain rather than to regenerate.
   `npm run validate:examples` does reach the eight, so it is the
   end-to-end guard for WS1's new diagnostic -- and one of the eight,
-  `rb-global-account-taxonomy`, currently carries a cycle, so WS1 turns
+  a transcript example since removed, carried a cycle, so WS1 turns
   that gate red until it also lands the deletion. Neither gate is real
   cover for WS2, which is why the law over generated models is its
   acceptance test.
