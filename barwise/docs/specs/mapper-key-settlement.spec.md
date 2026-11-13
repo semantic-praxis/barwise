@@ -348,7 +348,7 @@ That change is barwise-967 and is out of scope here.
   signal to stop and explain rather than to regenerate.
   `npm run validate:examples` does reach the eight, so it is the
   end-to-end guard for WS1's new diagnostic -- and one of the eight,
-  a transcript example since removed, carried a cycle, so WS1 turns
+  since removed from the repository, carries a cycle, so WS1 turns
   that gate red until it also lands the deletion. Neither gate is real
   cover for WS2, which is why the law over generated models is its
   acceptance test.

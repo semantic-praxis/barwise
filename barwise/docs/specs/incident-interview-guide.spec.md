@@ -7,11 +7,14 @@ Tracking: barwise-mef
 Touches: +barwise/packages/core/src/interview/,
 barwise/packages/core/src/counterexample/,
 barwise/packages/core/package.json,
+barwise/packages/core/tests/public/exports.json,
 +barwise/packages/core/tests/laws/interview.law.test.ts,
 barwise/packages/cli/src/commands/verbalize.ts,
 barwise/packages/mcp/src/tools/verbalize.ts,
 barwise/packages/mcp/src/prompts/guidance/guidance.ts,
-barwise/packages/vscode/src/mcp/ToolRegistration.ts
+barwise/packages/mcp/src/prompts/analyzeDomain.ts,
+barwise/packages/vscode/src/mcp/ToolRegistration.ts,
+barwise/packages/vscode/package.json
 
 ## Principle
 
@@ -42,9 +45,15 @@ instrument.
 The method this borrows is Gary Klein's Critical Decision Method (Klein,
 Calderwood and MacGregor, 1989). Its premise is that experts cannot
 recite what they know as rules but can retell a case, and the knowledge
-shows in the retelling. Every transcript barwise ships is the opposite: a
-facilitator asks for rules and an expert recites them
-(`eval-transcript-realism.spec.md` measured this from the scoring side).
+shows in the retelling. Seven of the ten eval transcripts barwise ships
+are the opposite: a facilitator asks for rules and one expert recites
+them. One of the other three shows the premise at work. In
+`packages/promptlab/evals/vendor-onboarding.transcript.md` an expert
+says each vendor has one primary contact, takes it back, and a
+colleague's account of one supplier is what explains why the rule is one
+contact per vendor and region. No question was aimed at that account:
+the colleague raised it and the facilitator let it run. The guide is a
+way to ask for it.
 The sensemaking work already frames a counterexample as an expectancy to
 confirm (`implicit-sensemaking.spec.md`); this spec gives that expectancy
 a form an expert can answer.
@@ -73,13 +82,15 @@ In scope:
 - When a model carries a constraint for which `generateCounterexamples`
   returns a counterexample, the guide shall contain exactly one question
   citing that constraint, on the forbids side.
-- When a model carries a constraint for which no counterexample exists
-  (today `value_comparison`, `cardinality` and the four join kinds), the
-  guide shall name that constraint under a "not asked" heading with the
-  reason.
+- When a model carries a constraint for which `generateCounterexamples`
+  returns none, the guide shall name that constraint under a "not asked"
+  heading with one of two reasons: its kind has no generator (today
+  `value_comparison`, `cardinality` and the four join kinds), or the
+  generator found no population that violates it.
 - When a constraint in the candidate family (Open decision 2) is absent
   from a model and not implied by one that is present, the guide shall
-  contain exactly one question for it, on the permits side.
+  contain exactly one question for it, on the permits side, or name it
+  under "not asked" when the generator returns no population for it.
 - When a question is rendered, it shall state the model's claim as its
   existing verbalization and the case as fact sentences built from the
   fact type's reading, never as a tuple.
@@ -100,18 +111,28 @@ Out of scope:
 
 ## Inventory
 
-| Module                                               | Current state                                                              | Verdict                                              |
-| ---------------------------------------------------- | -------------------------------------------------------------------------- | ---------------------------------------------------- |
-| `core/src/counterexample/CounterexampleGenerator.ts` | 11 of 17 constraint kinds have a generator; six return `undefined` by name | reused unchanged; the six feed "not asked" (WS2)     |
-| `core/src/interview/`                                | does not exist                                                             | new: guide type, generator, fact sentences (WS2)     |
-| `core/src/verbalization/`                            | verbalizes fact types and constraints; no sentence for a fact instance     | untouched; the sentence helper lives in WS2's module |
-| `core/package.json`                                  | `./counterexample` subpath export                                          | adds `./interview` (WS2)                             |
-| `cli/src/commands/verbalize.ts`                      | `--counterexamples`                                                        | adds `--questions` (WS3)                             |
-| `mcp/src/tools/verbalize.ts`                         | `counterexamples` parameter                                                | adds `questions` (WS3)                               |
-| `vscode/src/mcp/ToolRegistration.ts`                 | verbalize tool carries `counterexamples`                                   | adds `questions` (WS3)                               |
-| `mcp/src/prompts/guidance/guidance.ts`               | workflow, sensemaking, context-hygiene blocks                              | adds `ELICITATION_GUIDANCE` (WS1)                    |
-| `core/tests/laws/`                                   | `counterexample.law.test.ts` round-trips each counterexample               | adds `interview.law.test.ts` (WS2 and WS4)           |
-| `core/src/model/` (open questions)                   | no such element; planned by `model-open-questions.spec.md`                 | read by the guide once it exists (WS5)               |
+| Module                                                      | Current state                                                                                            | Verdict                                                           |
+| ----------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| `core/src/counterexample/CounterexampleGenerator.ts`        | 11 of 17 kinds have a generator; a covered kind still returns `undefined` when no population violates it | output unchanged; exports the kinds with no generator (WS2)       |
+| `core/src/interview/`                                       | does not exist                                                                                           | new: guide type, generator, fact sentences, text renderer (WS2)   |
+| `core/src/verbalization/`                                   | verbalizes fact types and constraints; no sentence for a fact instance                                   | untouched; the sentence helper lives in WS2's module              |
+| `core/package.json`                                         | `./counterexample` subpath export                                                                        | adds `./interview` (WS2)                                          |
+| `cli/src/commands/verbalize.ts`                             | `--counterexamples`                                                                                      | adds `--questions` (WS3)                                          |
+| `mcp/src/tools/verbalize.ts`                                | `counterexamples` parameter                                                                              | adds `questions` (WS3)                                            |
+| `vscode/src/mcp/ToolRegistration.ts`, `vscode/package.json` | verbalize tool carries `counterexamples`                                                                 | adds `questions` (WS3)                                            |
+| `mcp/src/prompts/guidance/guidance.ts`, `analyzeDomain.ts`  | workflow, sensemaking, context-hygiene blocks                                                            | adds `ELICITATION_GUIDANCE`, composed into `analyze-domain` (WS1) |
+| `core/tests/laws/`                                          | `counterexample.law.test.ts` round-trips each counterexample                                             | adds `interview.law.test.ts` (WS2 and WS4)                        |
+| `core/src/model/` (open questions)                          | no such element; planned by `model-open-questions.spec.md`                                               | read by the guide once it exists (WS5)                            |
+
+The second "not asked" reason is the common one. In the 18 models under
+`examples/` and `trial/customers/` at `7e7a9412`, 29 of 1,684
+constraints get no counterexample, and 27 of those are of kinds that
+have a generator: 14 mandatory, 6 exclusion, 6 exclusive-or and 1
+external uniqueness. The generator returns `undefined` for both cases
+and says which only in a comment, so the guide cannot tell them apart
+today. WS2 has the counterexample module export the kinds it has no
+generator for, which makes the reason derived instead of a second list
+of six kinds that must agree with the generator's switch.
 
 The capability matrix in the root `CLAUDE.md` gains no row if Open
 decision 1 resolves as recommended: `--counterexamples` is carried by the
@@ -147,11 +168,12 @@ interface InterviewQuestion {
 interface InterviewGuide {
   /** Grouped by fact type in model order; identification questions last. */
   readonly questions: readonly InterviewQuestion[];
-  /** Constraints present in the model that no question covers, and why. */
+  /** Claims no question covers, and why. */
   readonly notAsked: readonly {
+    side: "forbids" | "permits";
     constraintId?: string;
-    constraintType: string;
-    reason: string;
+    constraintType: Constraint["type"];
+    reason: "no-generator" | "no-violating-population";
   }[];
 }
 
@@ -225,7 +247,9 @@ claim is unverified.
 
 New `core/src/interview/` module with the types above, built over
 `generateCounterexamples`. It adds the one piece core lacks: a sentence
-for a fact instance, rendered through the fact type's reading. Law, in
+for a fact instance, rendered through the fact type's reading. The
+counterexample module gains one export, the constraint kinds it has no
+generator for, and changes nothing it returns. Law, in
 `interview.law.test.ts` over `arbOrmModel`: the forbids-side questions
 and the counterexamples are in one-to-one correspondence with equal
 populations, and every constraint in the model is either cited by a
@@ -235,9 +259,11 @@ question or named in `notAsked`.
 
 `--questions` on `barwise verbalize`, `questions` on `verbalize_model`
 and on the VS Code verbalize tool; text and JSON output. Opt-in and
-default off, as `--counterexamples` is. The renderer is one function
-shared by the surfaces, following `constraintReport.ts`, so wording
-cannot drift between them.
+default off, as `--counterexamples` is. The text renderer is one function
+in `core/src/interview/` that all three surfaces call, so wording cannot
+drift between them. That is the arrangement `constraintReport.ts` has in
+`@barwise/formats`, and not the one counterexamples have, where the CLI
+and the MCP tool each render their own.
 
 ### 4. Permits-side questions (provisional: not yet grounded)
 
@@ -283,8 +309,10 @@ does not start before that spec's first workstream ships.
    is the better fit and three small wirings.
 2. **The permits-side candidate family.** Recommended: a mandatory
    constraint on each optional role an entity type plays, and a
-   single-role uniqueness on each role of a binary whose only uniqueness
-   spans both roles. Excluded by default: tightening a many-to-one binary
+   single-role uniqueness on each role of a binary that has no
+   single-role uniqueness, whether its only uniqueness spans both roles
+   or it declares none (a legal state: `fact-type-without-uniqueness` is
+   a warning). Excluded by default: tightening a many-to-one binary
    to one-to-one, because "have two doctors ever shared a specialty" is
    true of almost every such fact type and would bury the questions that
    matter. Excluding it puts one case outside the WS4 law (deleting one
