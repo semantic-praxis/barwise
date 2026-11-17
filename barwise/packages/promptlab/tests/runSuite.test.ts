@@ -8,10 +8,10 @@ import { readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { defaultSuitePath, loadSuite, runSuite } from "../src/index.js";
+import { loadPackagedSuite, runSuite } from "../src/index.js";
 
 const fixturesDir = resolve(dirname(fileURLToPath(import.meta.url)), "fixtures/responses");
-const suite = loadSuite(defaultSuitePath());
+const suite = loadPackagedSuite();
 
 /**
  * Recorded payloads exist only for the train cases -- the three dev

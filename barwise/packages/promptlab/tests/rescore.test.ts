@@ -12,10 +12,10 @@ import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { defaultSuitePath, loadSuite } from "../src/evalcase/loadSuite.js";
+import { loadPackagedSuite } from "../src/evalcase/loadSuite.js";
 import { diffRescores, rescoreDirectory, type RescoreResult } from "../src/record/rescore.js";
 
-const suite = loadSuite(defaultSuitePath());
+const suite = loadPackagedSuite();
 const answerKey = (caseId: string) =>
   join(import.meta.dirname, "fixtures/responses", `${caseId}.json`);
 

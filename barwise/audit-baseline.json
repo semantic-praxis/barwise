@@ -1,6 +1,11 @@
 {
   "$comment": "Classification baseline for scripts/audit-duplication.mjs --check (barwise-871). Every detected candidate carries a verdict: accepted-benign (repetition that is not one decision, or a checked/guarded copy) or tracked:<issue> (an open, detectable finding). --check fails on a candidate missing here AND on an entry no longer detected, so the tracked entries always enumerate exactly the open detectable findings, and resolving one forces removing its row and closing its issue. Rubric and method: .claude/skills/duplication-audit/.",
   "candidates": {
+    "generated:9b6822829607": {
+      "status": "accepted-benign",
+      "note": "generated artifact with a drift test (generatedSuite.test.ts): the eval suite compiled in for the CLI release bundle (barwise-fke)",
+      "detail": "packages/promptlab/src/evalcase/suite.generated.json (guard test mentioning it: yes)"
+    },
     "generated:faa3e9440386": {
       "status": "accepted-benign",
       "note": "generated artifact with a drift test (generatedCatalog.test.ts): the gym catalog compiled in for the release bundles (barwise-fbi)",

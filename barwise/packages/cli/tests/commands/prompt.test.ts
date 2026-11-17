@@ -370,6 +370,29 @@ describe("barwise prompt artifact", () => {
 });
 
 describe("barwise prompt history", () => {
+  // The packaged suite is compiled into the CLI and has no manifest on
+  // disk, so it has no history to read; the refusal names --suite rather
+  // than reading an empty list or a path that does not exist (barwise-fke).
+  it("refuses with no --suite, and names the flag", async () => {
+    const result = await runCli(["prompt", "history"]);
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr).toContain("has no history file. Pass --suite <manifest>");
+  });
+
+  it("eval refuses --force-history with no --suite, before any provider call", async () => {
+    // No provider is configured here: a refusal that came after the run
+    // started would fail on the missing provider instead.
+    const result = await runCli(["prompt", "eval", "--force-history"]);
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr).toContain("--force-history needs a suite on disk.");
+  });
+
+  it("compare refuses with no --suite the same way", async () => {
+    const result = await runCli(["prompt", "compare", "--a", "1", "--b", "2"]);
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr).toContain("has no history file. Pass --suite <manifest>");
+  });
+
   it("reports an empty history for a fresh suite", async () => {
     const dir = mkdtempSync(join(tmpdir(), "barwise-prompt-"));
     writeFileSync(join(dir, "t.md"), "Facilitator: hi.\n");

@@ -8,11 +8,11 @@ import { readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { defaultSuitePath, loadSuite, scoreExtraction } from "../src/index.js";
+import { loadPackagedSuite, scoreExtraction } from "../src/index.js";
 import type { LoadedEvalCase, PromptCheck } from "../src/index.js";
 
 const fixturesDir = resolve(dirname(fileURLToPath(import.meta.url)), "fixtures/responses");
-const suite = loadSuite(defaultSuitePath());
+const suite = loadPackagedSuite();
 
 function payloadFor(caseId: string): string {
   return readFileSync(join(fixturesDir, `${caseId}.json`), "utf8");

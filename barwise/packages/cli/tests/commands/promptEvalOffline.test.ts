@@ -122,6 +122,35 @@ const historyPath = (): string => join(tmp, "history.jsonl");
 warmPromptCommand();
 
 describe("barwise prompt eval, against a loopback provider", () => {
+  it("scores the packaged suite with no --suite, and records nothing", async () => {
+    // With no --suite the CLI reads the suite compiled into promptlab,
+    // which has no history file: the run is scored and printed, and the
+    // repository's own history.jsonl is left alone (barwise-fke).
+    await serve(fixtureAnswerer(EVALS, FIXTURES, TRAIN));
+    const repoHistory = join(EVALS, "history.jsonl");
+    const before = readFileSync(repoHistory, "utf8");
+
+    const { stdout, stderr, exitCode } = await runCli([
+      "prompt",
+      "eval",
+      "--provider",
+      "ollama",
+      "--base-url",
+      fake!.url,
+      "--model",
+      "fake-local",
+      "--split",
+      "train",
+      "--format",
+      "json",
+    ]);
+
+    expect(exitCode, stderr).toBe(0);
+    expect((JSON.parse(stdout) as { mean: number; }).mean).toBe(ANSWER_KEY_MEAN);
+    expect(stderr).toContain("NOTE: not recorded. The packaged eval suite is built into the CLI");
+    expect(readFileSync(repoHistory, "utf8")).toBe(before);
+  });
+
   it("runs the train split end to end and reports the recorded scores", async () => {
     // The whole path in one assertion: real client, real budget, real
     // streaming reader, real conformance, real scoring. If any of them
