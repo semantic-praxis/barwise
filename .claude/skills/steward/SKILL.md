@@ -230,9 +230,22 @@ Three symptoms, one cause, and none of them says "stale ref":
   again) is the one that cannot work.
 
 So prune when a PR merges, before reading any of those three as
-evidence about the remote. Nothing checks this; barwise-1033 carries
-the question of whether a check is worth it and where one could
-usefully run.
+evidence about the remote. A session that keeps working on the same
+branch name after its PR merged -- the remote-session case, where the
+branch is assigned -- also restarts the branch on `main` and tracks it,
+so the hook compares against `main` and the next push is a plain
+`[new branch]`:
+
+```bash
+git fetch origin main
+git checkout -B <branch> origin/main
+git update-ref -d refs/remotes/origin/<branch>
+git branch --set-upstream-to=origin/main
+```
+
+`update-ref -d` removes the one stale ref without the network; it is
+what both occurrences in the 2.0.1 release session needed (owner,
+2026-11-17, barwise-1033 option A). Nothing checks this.
 
 ## 7. A Copilot refusal is not a review, and nothing waits on it
 
