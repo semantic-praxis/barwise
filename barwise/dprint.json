@@ -24,6 +24,7 @@
     "**/*.orm.yaml",
     "docs/tutorial/**",
     "packages/learn/src/exercise/exercises.generated.json",
+    "packages/promptlab/src/evalcase/suite.generated.json",
     "**/*.map.yaml",
     "**/*.orm-project.yaml",
     "**/package-lock.json",

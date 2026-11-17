@@ -2,9 +2,9 @@ import { OrmYamlSerializer } from "@barwise/core";
 import type { GymCheck } from "@barwise/learn";
 import { parseVocabulary } from "@barwise/learn";
 import { readFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { dirname, posix, resolve } from "node:path";
 import { parse } from "yaml";
+import packagedSuiteFiles from "./suite.generated.json" with { type: "json" };
 import type {
   EvalCase,
   EvalSuite,
@@ -34,13 +34,38 @@ const PROMPT_CHECK_KINDS = ["requires_ambiguity"] as const;
 
 const CHECK_KINDS = [...GYM_CHECK_KINDS, ...PROMPT_CHECK_KINDS] as const;
 
-/** The packaged seed suite's manifest path. */
-export function defaultSuitePath(): string {
-  return resolve(
-    dirname(fileURLToPath(import.meta.url)),
-    "../../evals/suite.yaml",
-  );
+/**
+ * Where a suite's files come from. A path is what error messages name;
+ * `at` resolves a path the manifest or a case names relative to the
+ * file that names it.
+ */
+interface SuiteFiles {
+  read(path: string): string;
+  at(from: string, relPath: string): string;
 }
+
+const DISK: SuiteFiles = {
+  read: (path) => readFileSync(path, "utf8"),
+  at: (from, relPath) => resolve(dirname(from), relPath),
+};
+
+/**
+ * The packaged seed suite, compiled in (`suite.generated.json`, written
+ * from `packages/promptlab/evals/` by
+ * `barwise/scripts/regen-eval-suite.mjs`). Resolving the directory from
+ * import.meta.url failed in the CJS CLI bundle, where it is empty, and a
+ * single-file download has no evals/ beside it (barwise-fke).
+ */
+const PACKAGED: SuiteFiles = {
+  read: (path) => {
+    const text = (packagedSuiteFiles as Readonly<Record<string, string>>)[path];
+    if (text === undefined) {
+      throw new Error(`The packaged eval suite has no file "${path}".`);
+    }
+    return text;
+  },
+  at: (from, relPath) => posix.normalize(posix.join(posix.dirname(from), relPath)),
+};
 
 /**
  * Load a suite manifest and every case it declares. Cases are loaded in
@@ -48,7 +73,20 @@ export function defaultSuitePath(): string {
  */
 export function loadSuite(manifestPath: string): EvalSuite {
   const absManifest = resolve(manifestPath);
-  const doc = parseMapping(readFileSync(absManifest, "utf8"), absManifest);
+  return { ...loadSuiteFrom(absManifest, DISK), manifestPath: absManifest };
+}
+
+/**
+ * The packaged seed suite, from the compiled-in copy. It has no
+ * `manifestPath`, so it has no history file: a history lives beside a
+ * manifest on disk, and the packaged one is the repository's record.
+ */
+export function loadPackagedSuite(): EvalSuite {
+  return loadSuiteFrom("suite.yaml", PACKAGED);
+}
+
+function loadSuiteFrom(absManifest: string, files: SuiteFiles): EvalSuite {
+  const doc = parseMapping(files.read(absManifest), absManifest);
 
   const version = doc["version"];
   if (typeof version !== "string" || version.length === 0) {
@@ -63,12 +101,11 @@ export function loadSuite(manifestPath: string): EvalSuite {
     throw new Error(`${absManifest}: "cases" must be a non-empty list of file paths.`);
   }
 
-  const suiteDir = dirname(absManifest);
   const cases = casePaths.map((entry) => {
     if (typeof entry !== "string") {
       throw new Error(`${absManifest}: every entry in "cases" must be a path string.`);
     }
-    return loadEvalCase(resolve(suiteDir, entry));
+    return loadEvalCaseFrom(files.at(absManifest, entry), files);
   });
 
   const ids = new Set<string>();
@@ -89,14 +126,16 @@ export function loadSuite(manifestPath: string): EvalSuite {
     weights,
     ...(collapseFloor !== undefined ? { collapseFloor } : {}),
     cases: withSplits,
-    manifestPath: absManifest,
   };
 }
 
 /** Load and validate a single `.eval.yaml` case with its transcript and reference. */
 export function loadEvalCase(filePath: string): LoadedEvalCase {
-  const absPath = resolve(filePath);
-  const doc = parseMapping(readFileSync(absPath, "utf8"), absPath);
+  return loadEvalCaseFrom(resolve(filePath), DISK);
+}
+
+function loadEvalCaseFrom(absPath: string, files: SuiteFiles): LoadedEvalCase {
+  const doc = parseMapping(files.read(absPath), absPath);
 
   const id = doc["id"];
   if (typeof id !== "string" || id.length === 0) {
@@ -131,13 +170,12 @@ export function loadEvalCase(filePath: string): LoadedEvalCase {
   // must-agree copy waiting to drift.
   const vocabulary = parseVocabulary(doc["vocabulary"], absPath);
 
-  const caseDir = dirname(absPath);
-  const transcript = readFileSync(resolve(caseDir, transcriptPath), "utf8");
+  const transcript = files.read(files.at(absPath, transcriptPath));
 
   let reference;
   if (referencePath !== undefined) {
     reference = new OrmYamlSerializer().deserialize(
-      readFileSync(resolve(caseDir, referencePath), "utf8"),
+      files.read(files.at(absPath, referencePath)),
     );
   }
 

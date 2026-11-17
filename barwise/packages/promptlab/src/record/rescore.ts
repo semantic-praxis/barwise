@@ -74,7 +74,9 @@ export function rescoreDirectory(dir: string, suite: EvalSuite): RescoreResult {
     if (!loaded) {
       throw new Error(
         `${join(dir, file)}: case "${parsed.caseId}" is not declared in `
-          + `${suite.manifestPath}. Rescoring it would report a count smaller `
+          + `${
+            suite.manifestPath ?? "the packaged suite"
+          }. Rescoring it would report a count smaller `
           + `than the round it claims to cover.`,
       );
     }

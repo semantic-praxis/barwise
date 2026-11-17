@@ -14,10 +14,10 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import type { RunProgress } from "../src/index.js";
-import { defaultSuitePath, loadSuite, runSuite, withRetry } from "../src/index.js";
+import { loadPackagedSuite, runSuite, withRetry } from "../src/index.js";
 
 const fixturesDir = resolve(dirname(fileURLToPath(import.meta.url)), "fixtures/responses");
-const suite = loadSuite(defaultSuitePath());
+const suite = loadPackagedSuite();
 const TRAIN = { split: "train" } as const;
 
 function fixtureClient() {

@@ -18,10 +18,10 @@ import { readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { defaultSuitePath, loadSuite, runSuite, toHistoryEntry } from "../src/index.js";
+import { loadPackagedSuite, runSuite, toHistoryEntry } from "../src/index.js";
 
 const fixturesDir = resolve(dirname(fileURLToPath(import.meta.url)), "fixtures/responses");
-const suite = loadSuite(defaultSuitePath());
+const suite = loadPackagedSuite();
 const TRAIN = { split: "train" } as const;
 
 /** A client that answers every case from its recorded payload. */

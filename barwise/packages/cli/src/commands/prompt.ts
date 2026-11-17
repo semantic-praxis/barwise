@@ -29,12 +29,9 @@ import type { CaseSummary, RunProgress, SuiteReport } from "@barwise/promptlab";
 import {
   appendRunHistory,
   compareRows,
-  defaultSuitePath,
   diffRescores,
   hashPrompt,
-  historyPathFor,
   IncompleteRunError,
-  loadSuite,
   marginOfError,
   payloadFileName,
   readHistory,
@@ -50,6 +47,7 @@ import { basename, extname, join, resolve } from "node:path";
 import { callLogSink } from "../workspace/callLogSink.js";
 import { loadModel, readFile } from "../workspace/io.js";
 import { artifactByVersion, artifactCandidates } from "../workspace/promptArtifacts.js";
+import { historyPathOf, NO_HISTORY, resolveSuite } from "../workspace/promptSuite.js";
 import { describeProvenance, resolveProvenance } from "../workspace/provenance.js";
 import { API_KEY_FLAG, API_KEY_FLAG_DESCRIPTION } from "./apiKeyFlag.js";
 import { renderReview } from "./review.js";
@@ -75,16 +73,15 @@ export function registerPromptCommand(program: Command, version = "0.0.0-dev"): 
   registerCompare(promptCmd);
 }
 
-function suitePath(opts: { suite?: string; }): string {
-  return opts.suite ? resolve(opts.suite) : defaultSuitePath();
-}
-
 /** `barwise prompt eval` */
 function registerEval(promptCmd: Command, version: string): void {
   promptCmd
     .command("eval")
     .description("Run the eval suite against a provider and record the scores")
-    .option("--suite <manifest>", "Suite manifest (defaults to the packaged suite)")
+    .option(
+      "--suite <manifest>",
+      "Suite manifest (defaults to the packaged suite, which records no history)",
+    )
     .option(
       "--provider <provider>",
       `LLM provider (${PROVIDER_NAMES.join(", ")}). Auto-detects from env vars if omitted.`,
@@ -162,7 +159,7 @@ function registerEval(promptCmd: Command, version: string): void {
         },
       ) => {
         try {
-          const suite = loadSuite(suitePath(opts));
+          const suite = resolveSuite(opts);
 
           if (opts.split !== undefined && opts.split !== "train" && opts.split !== "dev") {
             throw new Error(`Unknown split "${opts.split}". Use "train" or "dev".`);
@@ -341,7 +338,9 @@ function registerEval(promptCmd: Command, version: string): void {
             );
           }
 
-          if (opts.history) {
+          if (opts.history && suite.manifestPath === undefined) {
+            process.stderr.write(`NOTE: not recorded. ${NO_HISTORY}\n`);
+          } else if (opts.history) {
             // A row that will be compared against later should say what
             // it cannot support. A one-off exploratory run is not
             // nagged -- this fires only when the run is being recorded.
@@ -371,7 +370,7 @@ function registerEval(promptCmd: Command, version: string): void {
               );
             }
             try {
-              appendRunHistory(historyPathFor(suite.manifestPath), report, entry, {
+              appendRunHistory(historyPathOf(suite), report, entry, {
                 ...(opts.forceHistory === true ? { force: true } : {}),
               });
             } catch (err) {
@@ -415,7 +414,7 @@ function registerScore(promptCmd: Command): void {
     .option("--suite <manifest>", "Suite manifest (defaults to the packaged suite)")
     .action((opts: { case: string; extraction: string; suite?: string; }) => {
       try {
-        const suite = loadSuite(suitePath(opts));
+        const suite = resolveSuite(opts);
         const loadedCase = suite.cases.find((c) => c.evalCase.id === opts.case);
         if (!loadedCase) {
           const ids = suite.cases.map((c) => c.evalCase.id).join(", ");
@@ -620,12 +619,15 @@ function registerHistory(promptCmd: Command): void {
   promptCmd
     .command("history")
     .description("Show the suite's recorded eval scores")
-    .option("--suite <manifest>", "Suite manifest (defaults to the packaged suite)")
+    .option(
+      "--suite <manifest>",
+      "Suite manifest whose history to show (required: the packaged suite has none)",
+    )
     .option("--format <format>", "Output format (text or json)", "text")
     .action((opts: { suite?: string; format: string; }) => {
       try {
-        const suite = loadSuite(suitePath(opts));
-        const entries = readHistory(historyPathFor(suite.manifestPath));
+        const suite = resolveSuite(opts);
+        const entries = readHistory(historyPathOf(suite));
         if (opts.format === "json") {
           process.stdout.write(JSON.stringify(entries, null, 2) + "\n");
           return;
@@ -1057,7 +1059,7 @@ function registerRescore(promptCmd: Command): void {
     .option("--format <format>", "Output format (text or json)", "text")
     .action((opts: { payloads: string; baseline?: string; suite?: string; format: string; }) => {
       try {
-        const suite = loadSuite(suitePath(opts));
+        const suite = resolveSuite(opts);
         const result = rescoreDirectory(resolve(opts.payloads), suite);
 
         if (opts.baseline === undefined) {
@@ -1158,12 +1160,15 @@ function registerCompare(promptCmd: Command): void {
     .description("Compare two recorded history rows, with resolvability verdicts")
     .requiredOption("--a <index>", "Row index from `prompt history` (1-based)")
     .requiredOption("--b <index>", "Row index from `prompt history` (1-based)")
-    .option("--suite <manifest>", "Suite manifest (defaults to the packaged suite)")
+    .option(
+      "--suite <manifest>",
+      "Suite manifest whose history to compare (required: the packaged suite has none)",
+    )
     .option("--format <format>", "Output format (text or json)", "text")
     .action((opts: { a: string; b: string; suite?: string; format: string; }) => {
       try {
-        const suite = loadSuite(suitePath(opts));
-        const entries = readHistory(historyPathFor(suite.manifestPath));
+        const suite = resolveSuite(opts);
+        const entries = readHistory(historyPathOf(suite));
         const pick = (raw: string, which: string) => {
           const n = Number(raw);
           if (!Number.isInteger(n) || n < 1 || n > entries.length) {
