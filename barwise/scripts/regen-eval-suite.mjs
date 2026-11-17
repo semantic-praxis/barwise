@@ -20,7 +20,7 @@
  * .ts module because the map is data; as TypeScript, its embedded models
  * read as code to check:source-sites.
  *
- * Usage: node barwise/scripts/regen-eval-suite.mjs
+ * Usage: npm run regen:eval-suite
  */
 import { readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
