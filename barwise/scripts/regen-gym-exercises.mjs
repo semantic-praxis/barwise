@@ -25,7 +25,7 @@
  * compares the map with the directory byte for byte. JSON carries no
  * comment, so the provenance note lives here and in catalog.ts.
  *
- * Usage: node scripts/regen-gym-exercises.mjs   (from barwise/)
+ * Usage: npm run regen:gym-exercises
  */
 import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";

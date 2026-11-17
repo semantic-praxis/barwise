@@ -5,7 +5,7 @@
  * `exercises.generated.json` is committed, so nothing else forces it to
  * stay in step with the files it came from -- the same guard llm's
  * builtins test keeps over `builtins.generated.ts`. Regenerate with
- * `node scripts/regen-gym-exercises.mjs` from barwise/ and review the diff.
+ * `npm run regen:gym-exercises` and review the diff.
  */
 import { OrmYamlSerializer } from "@barwise/core";
 import { readdirSync, readFileSync } from "node:fs";

@@ -55,7 +55,7 @@ evals/         The packaged seed suite: suite.yaml (weights + declared
                src/evalcase/suite.generated.json, which
                loadPackagedSuite() reads: the CLI release bundle is one
                file with no evals/ beside it (barwise-fke). After an
-               edit, run `node barwise/scripts/regen-eval-suite.mjs`;
+               edit, run `npm run regen:eval-suite`;
                generatedSuite.test.ts fails until it is run. The
                compiled-in copy has no manifest path, so no history: a
                history is always for a suite named on disk

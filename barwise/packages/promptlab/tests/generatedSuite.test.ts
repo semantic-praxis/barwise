@@ -4,7 +4,7 @@
  *
  * `suite.generated.json` is committed, so nothing else forces it to stay
  * in step with the files it came from. Regenerate with
- * `node barwise/scripts/regen-eval-suite.mjs` and review the diff.
+ * `npm run regen:eval-suite` and review the diff.
  */
 import { OrmYamlSerializer } from "@barwise/core";
 import { readdirSync, readFileSync, statSync } from "node:fs";
