@@ -1,9 +1,10 @@
 /**
  * Regenerate the compiled-in eval suite (barwise-fke).
  *
- * Reads the suite's files in packages/promptlab/evals/ (every .yaml and
- * .md; not history.jsonl, which is the repository's run record, not part
- * of the suite) and emits packages/promptlab/src/evalcase/suite.generated.json,
+ * Reads every file under packages/promptlab/evals/, subdirectories
+ * included, except history.jsonl, which is the repository's run record,
+ * not part of the suite. No extension filter: a case may name any file,
+ * and a filter would be a second rule the drift test must restate and emits packages/promptlab/src/evalcase/suite.generated.json,
  * a map from file name to file text that loadSuite.ts imports, so the
  * packaged suite loads without touching the filesystem.
  *
@@ -21,7 +22,7 @@
  *
  * Usage: node barwise/scripts/regen-eval-suite.mjs
  */
-import { readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -29,7 +30,17 @@ const here = dirname(fileURLToPath(import.meta.url));
 const promptlabRoot = resolve(here, "../packages/promptlab");
 const evalsDir = resolve(promptlabRoot, "evals");
 
-const names = readdirSync(evalsDir).filter((f) => /\.(yaml|md)$/.test(f)).sort();
+/** Every file under `dir`, as posix paths relative to evals/, sorted. */
+function filesUnder(dir, prefix = "") {
+  return readdirSync(dir).sort().flatMap((entry) => {
+    const rel = prefix === "" ? entry : `${prefix}/${entry}`;
+    return statSync(resolve(dir, entry)).isDirectory()
+      ? filesUnder(resolve(dir, entry), rel)
+      : [rel];
+  });
+}
+
+const names = filesUnder(evalsDir).filter((f) => f !== "history.jsonl");
 const suite = Object.fromEntries(
   names.map((name) => [name, readFileSync(resolve(evalsDir, name), "utf8")]),
 );

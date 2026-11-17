@@ -21,6 +21,8 @@ import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from .dataset import default_suite_path
+
 
 class BarwiseCliError(RuntimeError):
     """The CLI could not answer. Carries stderr, which names the cause."""
@@ -198,7 +200,21 @@ def score_extraction(case_id: str, extraction_json: str) -> CaseScore:
         handle.write(extraction_json)
         path = handle.name
     try:
-        out = _run(["prompt", "score", "--case", case_id, "--extraction", path])
+        # The suite on disk, the one dataset.py reads the cases from:
+        # without --suite the CLI scores against its compiled-in copy,
+        # which lags an uncommitted edit to evals/ (barwise-fke).
+        out = _run(
+            [
+                "prompt",
+                "score",
+                "--case",
+                case_id,
+                "--extraction",
+                path,
+                "--suite",
+                str(default_suite_path()),
+            ]
+        )
     finally:
         os.unlink(path)
     return CaseScore.from_json(json.loads(out))

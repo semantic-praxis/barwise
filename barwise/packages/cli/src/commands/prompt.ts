@@ -160,6 +160,11 @@ function registerEval(promptCmd: Command, version: string): void {
       ) => {
         try {
           const suite = resolveSuite(opts);
+          // --force-history asks for a write the packaged suite cannot
+          // take; refused before the first paid call, not dropped after.
+          if (opts.forceHistory === true && suite.manifestPath === undefined) {
+            throw new Error(`--force-history needs a suite on disk. ${NO_HISTORY}`);
+          }
 
           if (opts.split !== undefined && opts.split !== "train" && opts.split !== "dev") {
             throw new Error(`Unknown split "${opts.split}". Use "train" or "dev".`);

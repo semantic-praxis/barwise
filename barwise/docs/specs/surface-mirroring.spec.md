@@ -235,7 +235,7 @@ Out of scope:
 - New options on deprecated tools (`generate_schema`, `generate_diagram`). barwise-0wa.ymj decides their future, and their option gaps take baseline rows naming it.
 - The audit's section 5, capabilities MCP or VS Code has and the CLI lacks. The owner's direction is one-way.
 - VS Code palette parity. The VS Code column counts a language-model tool as reach (`docs/adr/surface-capability-parity.md`, decision 3), so the palette is a separate question, lineage for its Export... commands included (barwise-ace). The palette changes here are the per-delta review for the dbt and code imports and the transcript picker's default.
-- Who may write `prompt eval`'s history. In an installed CLI, `prompt eval` appends beside the packaged suite (`appendRunHistory` at `historyPathFor(suitePath(...))`, which defaults to `defaultSuitePath()`). No tool this spec adds reads or writes that history.
+- Who may write `prompt eval`'s history. Only a suite named with `--suite` has one, beside its manifest; the packaged suite is compiled in and has none (barwise-fke). No tool this spec adds reads or writes that history.
 
 ## Inventory
 

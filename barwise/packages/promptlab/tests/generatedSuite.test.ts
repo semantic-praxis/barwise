@@ -7,7 +7,7 @@
  * `node barwise/scripts/regen-eval-suite.mjs` and review the diff.
  */
 import { OrmYamlSerializer } from "@barwise/core";
-import { readdirSync, readFileSync } from "node:fs";
+import { readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
@@ -15,10 +15,19 @@ import packagedSuiteFiles from "../src/evalcase/suite.generated.json" with { typ
 import { loadPackagedSuite, loadSuite } from "../src/index.js";
 
 const evalsDir = resolve(dirname(fileURLToPath(import.meta.url)), "../evals");
+// Every file under evals/ but the run record: the same rule as the
+// generator, which has no filter for this to drift from.
+function filesUnder(dir: string, prefix = ""): string[] {
+  return readdirSync(dir).sort().flatMap((entry) => {
+    const rel = prefix === "" ? entry : `${prefix}/${entry}`;
+    return statSync(resolve(dir, entry)).isDirectory()
+      ? filesUnder(resolve(dir, entry), rel)
+      : [rel];
+  });
+}
 const onDisk = Object.fromEntries(
-  readdirSync(evalsDir)
-    .filter((f) => /\.(yaml|md)$/.test(f))
-    .sort()
+  filesUnder(evalsDir)
+    .filter((f) => f !== "history.jsonl")
     .map((f) => [f, readFileSync(resolve(evalsDir, f), "utf8")]),
 );
 

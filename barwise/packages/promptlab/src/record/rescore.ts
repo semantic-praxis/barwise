@@ -72,11 +72,13 @@ export function rescoreDirectory(dir: string, suite: EvalSuite): RescoreResult {
     if (!parsed) continue; // not a payload; a log or a note beside them
     const loaded = byId.get(parsed.caseId);
     if (!loaded) {
+      // The packaged suite is the compiled-in copy, which lags a case
+      // just added to evals/ until it is regenerated; --suite reads disk.
+      const where = suite.manifestPath
+        ?? "the compiled-in packaged suite (pass --suite to read a suite on disk)";
       throw new Error(
         `${join(dir, file)}: case "${parsed.caseId}" is not declared in `
-          + `${
-            suite.manifestPath ?? "the packaged suite"
-          }. Rescoring it would report a count smaller `
+          + `${where}. Rescoring it would report a count smaller `
           + `than the round it claims to cover.`,
       );
     }
