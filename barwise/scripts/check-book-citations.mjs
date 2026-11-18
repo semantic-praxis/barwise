@@ -65,7 +65,7 @@ const ALLOWLIST = [
 
 const SELF = new Set([
   "barwise/scripts/check-book-citations.mjs",
-  "barwise/scripts/tests/gates.test.mjs",
+  "barwise/scripts/tests/gates-contract.test.mjs",
 ]);
 
 /** Which tracked files are read. Historical specs cite whatever edition they cited. */

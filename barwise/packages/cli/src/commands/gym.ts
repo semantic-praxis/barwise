@@ -114,7 +114,11 @@ function registerShow(gymCmd: Command): void {
           lines.push("", `Reading (optional pre-session skim): ${ex.reading}`);
         }
         if (ex.starter) {
-          lines.push("", `Starter model: ${resolve(entry.filePath, "..", ex.starter)}`);
+          // A packaged exercise is compiled in and has no file to point at.
+          const starter = entry.filePath
+            ? resolve(entry.filePath, "..", ex.starter)
+            : `${ex.starter} (packaged catalog)`;
+          lines.push("", `Starter model: ${starter}`);
         }
         lines.push(
           "",

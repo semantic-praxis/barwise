@@ -1,6 +1,6 @@
 {
   "name": "@barwise/dbt",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "private": true,
   "description": "dbt connector for ORM models (project import, SQL compile, schema YAML export)",
   "type": "module",
@@ -24,8 +24,8 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@barwise/core": "2.0.0",
-    "@barwise/formats": "2.0.0",
+    "@barwise/core": "2.0.1",
+    "@barwise/formats": "2.0.1",
     "yaml": "^2.9.1"
   },
   "devDependencies": {

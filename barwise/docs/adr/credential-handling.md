@@ -72,7 +72,7 @@ and the exit contract `credential-handling.md#wrapper-contract` applies is
   (`credential-handling-held.spec.md`) holds all four from tracked text
   and stand-ins, so it never skips for a missing gitleaks:
   - 1: it reads `.gitleaks.toml` as `[extend] useDefault = true` plus
-    exactly one rule, `anthropic-api-key`. The `gates.test.mjs` probes,
+    exactly one rule, `anthropic-api-key`. The `gates-contract.test.mjs` probes,
     where gitleaks is installed, also show `useDefault` and the Anthropic
     rule detecting. barwise-1028 (open) tracks sending the rule upstream.
   - 2: it requires the one CI step running `check:secrets` to carry no
@@ -87,7 +87,7 @@ and the exit contract `credential-handling.md#wrapper-contract` applies is
     `pre-merge-commit`, which validates only the tracker; neither scan
     inspects unreachable objects (spec, Out of scope, for untracked files
     and unreachable objects).
-  - 3: `scripts/tests/gates.test.mjs` shows the gate red on staged probes,
+  - 3: `scripts/tests/gates-contract.test.mjs` shows the gate red on staged probes,
     asserts redaction on the secret itself, and covers gitleaks absent, an
     odd gitleaks status, a missing config and a shallow clone; it runs in
     CI under `npm run test:scripts` (`if:
@@ -124,5 +124,5 @@ and the exit contract `credential-handling.md#wrapper-contract` applies is
   headers of `check-secrets.mjs`, `.gitleaks.toml` and
   `install-gitleaks.sh`, the comments on the `ci.yml` secret-scan steps,
   the pre-commit hook, `.claude/hooks/session-start.sh`, and the
-  check-secrets section of `scripts/tests/gates.test.mjs` also state this
+  check-secrets section of `scripts/tests/gates-contract.test.mjs` also state this
   rule.

@@ -15,10 +15,10 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import type { LoadedEvalCase } from "../src/index.js";
-import { defaultSuitePath, loadSuite, scoreExtraction } from "../src/index.js";
+import { loadPackagedSuite, scoreExtraction } from "../src/index.js";
 
 const fixturesDir = resolve(dirname(fileURLToPath(import.meta.url)), "fixtures/responses");
-const suite = loadSuite(defaultSuitePath());
+const suite = loadPackagedSuite();
 
 const loadedCase = suite.cases.find((c) => c.evalCase.id === "university-enrollment")!;
 

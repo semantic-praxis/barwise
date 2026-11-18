@@ -37,14 +37,14 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { defaultSuitePath, loadSuite } from "../src/evalcase/loadSuite.js";
+import { loadPackagedSuite } from "../src/evalcase/loadSuite.js";
 import { renderReference } from "../src/evalcase/renderReference.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const EVALS = resolve(__dirname, "../evals");
 const PAYLOADS = resolve(__dirname, "fixtures/responses");
 
-const suite = loadSuite(defaultSuitePath());
+const suite = loadPackagedSuite();
 const withReference = suite.cases.filter((c) => c.evalCase.reference !== undefined);
 
 describe("committed reference models", () => {

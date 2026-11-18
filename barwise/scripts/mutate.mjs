@@ -273,7 +273,7 @@ for (const signal of ["SIGINT", "SIGTERM"]) {
 // The command must fail BECAUSE of the mutation, and CAUGHT is decided from
 // its exit status alone -- so a command that already fails unmutated reports
 // CAUGHT for every mutation, including ones nothing catches. Not hypothetical:
-// `gates.test.mjs` exited 1 in any container without shellcheck or gitleaks,
+// `gates-contract.test.mjs` exited 1 in any container without shellcheck or gitleaks,
 // and five readings in PR #505 were recorded as CAUGHT on a suite that was
 // already red. `mutate ... && echo verified` printed verified each time.
 // barwise-906's class again, in the tool built to close it (barwise-1019).

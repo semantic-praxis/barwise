@@ -1,6 +1,6 @@
 {
   "name": "@barwise/llm",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "private": true,
   "description": "LLM-powered transcript extraction for ORM models",
   "type": "module",
@@ -25,12 +25,12 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.128.0",
-    "@barwise/core": "2.0.0",
+    "@barwise/core": "2.0.1",
     "openai": "^7.17.0",
     "yaml": "^2.9.1"
   },
   "devDependencies": {
-    "@barwise/diagram": "2.0.0",
+    "@barwise/diagram": "2.0.1",
     "@types/node": "^26.6.2",
     "@vitest/coverage-v8": "^5.0.5",
     "vitest": "^5.0.5"

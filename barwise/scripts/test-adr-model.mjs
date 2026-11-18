@@ -17,6 +17,7 @@
 import { spawnSync } from "node:child_process";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { scriptTestEnv } from "./lib/script-test-env.mjs";
 // The cases build sandbox repositories and run check-adr-model over them,
 // so a git that fails or answers emptily everywhere fails cases, which
 // this runner would report as a finding (the fault matrix's git-empty and
@@ -43,7 +44,7 @@ try {
 const run = spawnSync(
   process.execPath,
   ["--test", "--test-reporter=tap", join(here, "tests", "adr-model.test.mjs")],
-  { encoding: "utf8" },
+  { encoding: "utf8", env: scriptTestEnv() },
 );
 // A child that never started has no output to print: refuse first.
 if (run.error || run.signal) refuse(`the run did not finish (${run.error?.message ?? run.signal})`);

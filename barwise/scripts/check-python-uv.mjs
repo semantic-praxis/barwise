@@ -94,7 +94,7 @@ const SELF = new Set([
   "barwise/scripts/check-python-uv.mjs",
   "barwise/scripts/lib/python-uv-rules.mjs",
   "barwise/scripts/hooks/python-uv-guard.mjs",
-  "barwise/scripts/tests/gates.test.mjs",
+  "barwise/scripts/tests/gates-contract.test.mjs",
   "barwise/scripts/tests/install-uv.test.mjs",
   "barwise/scripts/tests/python-uv-guard.test.mjs",
 ]);

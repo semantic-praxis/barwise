@@ -464,7 +464,8 @@ def render_delta_report(
     # an instruction. `--artifact-version` is what makes the choice
     # explicit rather than a race between matching artifacts.
     lines.append(
-        f"barwise prompt eval --artifacts {artifact_path.parent} "
+        f"barwise prompt eval --suite packages/promptlab/evals/suite.yaml "
+        f"--artifacts {artifact_path.parent} "
         f"--artifact-version {candidate_version} \\"
     )
     lines.append(

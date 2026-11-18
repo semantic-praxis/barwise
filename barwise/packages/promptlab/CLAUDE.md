@@ -51,6 +51,14 @@ evals/         The packaged seed suite: suite.yaml (weights + declared
                (docs/prompt-baseline-2.5.0-2026-08-28.md). Tests that
                copy evals/ carry those rows, so history assertions are
                deltas against the baseline, never absolute counts
+               The suite files (not history.jsonl) are compiled into
+               src/evalcase/suite.generated.json, which
+               loadPackagedSuite() reads: the CLI release bundle is one
+               file with no evals/ beside it (barwise-fke). After an
+               edit, run `npm run regen:eval-suite`;
+               generatedSuite.test.ts fails until it is run. The
+               compiled-in copy has no manifest path, so no history: a
+               history is always for a suite named on disk
 tests/         Vitest; fixtures/responses/ holds the recorded payloads
                that double as the suite's answer keys
 ```

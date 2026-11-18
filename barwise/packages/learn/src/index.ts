@@ -1,10 +1,5 @@
 // Exercise format
-export {
-  type CatalogEntry,
-  defaultCatalogDir,
-  findExercise,
-  listExercises,
-} from "./exercise/catalog.js";
+export { type CatalogEntry, findExercise, listExercises } from "./exercise/catalog.js";
 export { type LoadedExercise, loadExercise } from "./exercise/loadExercise.js";
 export { ExerciseParseError, parseExercise, parseVocabulary } from "./exercise/parseExercise.js";
 export {

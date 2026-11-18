@@ -50,7 +50,7 @@ corrections made during grounding are in the spec above.
   listing. Every other `git` call a gate makes (merge-base, show, diff,
   log) is that gate's own to guard, as barwise-ydl shows. Tools,
   manifests and shallow clones are handled gate by gate.
-- `gates.test.mjs` pins the git-failure refusal for a hand-kept list
+- `gates-contract.test.mjs` pins the git-failure refusal for a hand-kept list
   of about ten gates, though more than twenty scripts import
   `tracked.mjs` (barwise-1006, item 6, which counted an older list);
   cwd invariance for three scripts; and the `ci-local` and `mutate`
@@ -79,7 +79,7 @@ corrections made during grounding are in the spec above.
   persisted write charges only the gate that made it. It reads exit codes
   only: it does not check a refusal's message and has no manifest or
   lockfile axis. Its verdicts are pinned against `classify` in
-  `gates.test.mjs`, and a probe per decision plants a gate that breaks it.
+  `gates-ci-local.test.mjs`, and a probe per decision plants a gate that breaks it.
 - The tool axis (`fault-matrix-axes.spec.md`, WS1) puts one logging wrapper
   per executable on the real PATH in a directory, runs each gate once on
   that PATH alone (the record pass, which is also its baseline), and

@@ -17,14 +17,14 @@ import { readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { defaultSuitePath, loadSuite, scoreExtraction } from "../src/index.js";
+import { loadPackagedSuite, scoreExtraction } from "../src/index.js";
 
 const payloadsDir = resolve(
   dirname(fileURLToPath(import.meta.url)),
   "../../..",
   "eval-payloads/20260828-0936",
 );
-const suite = loadSuite(defaultSuitePath());
+const suite = loadPackagedSuite();
 
 function caseFor(caseId: string) {
   const loaded = suite.cases.find((c) => c.evalCase.id === caseId);

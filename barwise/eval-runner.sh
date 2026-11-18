@@ -134,7 +134,10 @@ run_arm() {
   local concurrency
   concurrency="$(concurrency_for "${split}")"
   echo "== ${name} (${split} split)"
-  npx barwise prompt eval --provider anthropic \
+  # --suite names the manifest on disk, which is what records each arm
+  # to evals/history.jsonl; without it the run scores the compiled-in
+  # copy and records nothing (barwise-fke).
+  npx barwise prompt eval --suite packages/promptlab/evals/suite.yaml --provider anthropic \
     --split "${split}" --repeat 5 --concurrency "${concurrency}" --verbose \
     --save-payloads "${ROUND}/${name}" "$@" 2>&1 | tee "${ROUND}/${name}.log"
   touch "${ROUND}/${name}.done"

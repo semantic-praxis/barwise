@@ -70,13 +70,6 @@
       "issue": "barwise-j82",
       "class": "verbalize-parity"
     },
-    "C01/small/6/release-bundle:gym-list": {
-      "severity": "S3",
-      "class": "bundle-gym-catalog",
-      "issue": "barwise-fbi",
-      "note": "The release CLI bundle cannot resolve the packaged gym catalog (import.meta.url is empty under cjs) and fails with a Node path error (barwise-fbi).",
-      "detail": "exit 1: Error: The \"path\" argument must be of type string or an instance of URL. Received undefined"
-    },
     "C02/small/1/model-roundtrip:dbt": {
       "severity": "S1",
       "class": "dbt-roundtrip",
@@ -125,13 +118,6 @@
       "note": "The CLI indents a fact type's constraint readings by two spaces under its readings and MCP verbalize_model joins every reading flat (barwise-j82). The lane saw it only once parity stopped skipping spilled results; the capability matrix still says verbalize has no divergence.",
       "issue": "barwise-j82",
       "class": "verbalize-parity"
-    },
-    "C02/small/6/release-bundle:gym-list": {
-      "severity": "S3",
-      "class": "bundle-gym-catalog",
-      "issue": "barwise-fbi",
-      "note": "The release CLI bundle cannot resolve the packaged gym catalog (import.meta.url is empty under cjs) and fails with a Node path error (barwise-fbi).",
-      "detail": "exit 1: Error: The \"path\" argument must be of type string or an instance of URL. Received undefined"
     },
     "C03/small/1/model-roundtrip:dbt": {
       "severity": "S1",
@@ -209,13 +195,6 @@
       "note": "The CLI indents a fact type's constraint readings by two spaces under its readings and MCP verbalize_model joins every reading flat (barwise-j82). The lane saw it only once parity stopped skipping spilled results; the capability matrix still says verbalize has no divergence.",
       "issue": "barwise-j82",
       "class": "verbalize-parity"
-    },
-    "C03/small/6/release-bundle:gym-list": {
-      "severity": "S3",
-      "class": "bundle-gym-catalog",
-      "issue": "barwise-fbi",
-      "note": "The release CLI bundle cannot resolve the packaged gym catalog (import.meta.url is empty under cjs) and fails with a Node path error (barwise-fbi).",
-      "detail": "exit 1: Error: The \"path\" argument must be of type string or an instance of URL. Received undefined"
     },
     "C04/small/1/model-roundtrip-validate:norma": {
       "severity": "S1",
@@ -308,13 +287,6 @@
       "issue": "barwise-j82",
       "class": "verbalize-parity"
     },
-    "C04/small/6/release-bundle:gym-list": {
-      "severity": "S3",
-      "class": "bundle-gym-catalog",
-      "issue": "barwise-fbi",
-      "note": "The release CLI bundle cannot resolve the packaged gym catalog (import.meta.url is empty under cjs) and fails with a Node path error (barwise-fbi).",
-      "detail": "exit 1: Error: The \"path\" argument must be of type string or an instance of URL. Received undefined"
-    },
     "C05/small/1/import:scheduling-kotlin": {
       "severity": "S1",
       "class": "kotlin-importer-empty",
@@ -392,13 +364,6 @@
       "issue": "barwise-j82",
       "class": "verbalize-parity"
     },
-    "C05/small/6/release-bundle:gym-list": {
-      "severity": "S3",
-      "class": "bundle-gym-catalog",
-      "issue": "barwise-fbi",
-      "note": "The release CLI bundle cannot resolve the packaged gym catalog (import.meta.url is empty under cjs) and fails with a Node path error (barwise-fbi).",
-      "detail": "exit 1: Error: The \"path\" argument must be of type string or an instance of URL. Received undefined"
-    },
     "C06/small/1/import:platform-typescript": {
       "severity": "S1",
       "class": "code-import-utility-name-skip",
@@ -468,13 +433,6 @@
       "note": "The CLI indents a fact type's constraint readings by two spaces under its readings and MCP verbalize_model joins every reading flat (barwise-j82). The lane saw it only once parity stopped skipping spilled results; the capability matrix still says verbalize has no divergence.",
       "issue": "barwise-j82",
       "class": "verbalize-parity"
-    },
-    "C06/small/6/release-bundle:gym-list": {
-      "severity": "S3",
-      "class": "bundle-gym-catalog",
-      "issue": "barwise-fbi",
-      "note": "The release CLI bundle cannot resolve the packaged gym catalog (import.meta.url is empty under cjs) and fails with a Node path error (barwise-fbi).",
-      "detail": "exit 1: Error: The \"path\" argument must be of type string or an instance of URL. Received undefined"
     },
     "C07/small/1/model-roundtrip:dbt": {
       "severity": "S1",
@@ -546,13 +504,6 @@
       "issue": "barwise-j82",
       "class": "verbalize-parity"
     },
-    "C07/small/6/release-bundle:gym-list": {
-      "severity": "S3",
-      "class": "bundle-gym-catalog",
-      "issue": "barwise-fbi",
-      "note": "The release CLI bundle cannot resolve the packaged gym catalog (import.meta.url is empty under cjs) and fails with a Node path error (barwise-fbi).",
-      "detail": "exit 1: Error: The \"path\" argument must be of type string or an instance of URL. Received undefined"
-    },
     "C08/small/1/model-roundtrip:dbt": {
       "severity": "S1",
       "class": "dbt-roundtrip",
@@ -615,13 +566,6 @@
       "note": "The CLI indents a fact type's constraint readings by two spaces under its readings and MCP verbalize_model joins every reading flat (barwise-j82). The lane saw it only once parity stopped skipping spilled results; the capability matrix still says verbalize has no divergence.",
       "issue": "barwise-j82",
       "class": "verbalize-parity"
-    },
-    "C08/small/6/release-bundle:gym-list": {
-      "severity": "S3",
-      "class": "bundle-gym-catalog",
-      "issue": "barwise-fbi",
-      "note": "The release CLI bundle cannot resolve the packaged gym catalog (import.meta.url is empty under cjs) and fails with a Node path error (barwise-fbi).",
-      "detail": "exit 1: Error: The \"path\" argument must be of type string or an instance of URL. Received undefined"
     },
     "C09/small/1/model-roundtrip:dbt": {
       "severity": "S1",
@@ -700,13 +644,6 @@
       "issue": "barwise-j82",
       "class": "verbalize-parity"
     },
-    "C09/small/6/release-bundle:gym-list": {
-      "severity": "S3",
-      "class": "bundle-gym-catalog",
-      "issue": "barwise-fbi",
-      "note": "The release CLI bundle cannot resolve the packaged gym catalog (import.meta.url is empty under cjs) and fails with a Node path error (barwise-fbi).",
-      "detail": "exit 1: Error: The \"path\" argument must be of type string or an instance of URL. Received undefined"
-    },
     "C10/small/1/model-roundtrip:dbt": {
       "severity": "S1",
       "class": "dbt-roundtrip",
@@ -762,13 +699,6 @@
       "note": "The CLI indents a fact type's constraint readings by two spaces under its readings and MCP verbalize_model joins every reading flat (barwise-j82). The lane saw it only once parity stopped skipping spilled results; the capability matrix still says verbalize has no divergence.",
       "issue": "barwise-j82",
       "class": "verbalize-parity"
-    },
-    "C10/small/6/release-bundle:gym-list": {
-      "severity": "S3",
-      "class": "bundle-gym-catalog",
-      "issue": "barwise-fbi",
-      "note": "The release CLI bundle cannot resolve the packaged gym catalog (import.meta.url is empty under cjs) and fails with a Node path error (barwise-fbi).",
-      "detail": "exit 1: Error: The \"path\" argument must be of type string or an instance of URL. Received undefined"
     },
     "C11/small/1/import:backend-kotlin": {
       "severity": "S1",
@@ -861,13 +791,6 @@
       "issue": "barwise-j82",
       "class": "verbalize-parity"
     },
-    "C11/small/6/release-bundle:gym-list": {
-      "severity": "S3",
-      "class": "bundle-gym-catalog",
-      "issue": "barwise-fbi",
-      "note": "The release CLI bundle cannot resolve the packaged gym catalog (import.meta.url is empty under cjs) and fails with a Node path error (barwise-fbi).",
-      "detail": "exit 1: Error: The \"path\" argument must be of type string or an instance of URL. Received undefined"
-    },
     "C12/small/1/model-roundtrip:dbt": {
       "severity": "S1",
       "class": "dbt-roundtrip",
@@ -923,13 +846,6 @@
       "note": "The CLI indents a fact type's constraint readings by two spaces under its readings and MCP verbalize_model joins every reading flat (barwise-j82). The lane saw it only once parity stopped skipping spilled results; the capability matrix still says verbalize has no divergence.",
       "issue": "barwise-j82",
       "class": "verbalize-parity"
-    },
-    "C12/small/6/release-bundle:gym-list": {
-      "severity": "S3",
-      "class": "bundle-gym-catalog",
-      "issue": "barwise-fbi",
-      "note": "The release CLI bundle cannot resolve the packaged gym catalog (import.meta.url is empty under cjs) and fails with a Node path error (barwise-fbi).",
-      "detail": "exit 1: Error: The \"path\" argument must be of type string or an instance of URL. Received undefined"
     }
   }
 }

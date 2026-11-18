@@ -25,7 +25,7 @@ export const WORKFLOW = resolve(SCRIPTS, "../../.github/workflows/ci.yml");
  * The npm steps ci.yml runs that `fault-matrix` does not, each with why
  * (docs/specs/gate-contract-enforced.spec.md, WS2). The one list of
  * exceptions: the matrix also never runs itself, which fault-matrix.mjs
- * holds by script path. `gates.test.mjs` fails on a name here that is not
+ * holds by script path. `gates-ci-local.test.mjs` fails on a name here that is not
  * a node gate ci.yml runs, and on a step running `node scripts/...` that
  * the matrix cannot resolve and so would drop unseen.
  */
@@ -42,7 +42,7 @@ export const MATRIX_EXCEPTIONS = Object.freeze({
  * name a gate's own process execs; a name here is one that gets through
  * its parent-pid rule although the gate is not what depends on it (a
  * transitive call that npm or npx makes on the gate's behalf). Empty
- * because none has been needed; `gates.test.mjs` fails on a name here that
+ * because none has been needed; `gates-ci-local.test.mjs` fails on a name here that
  * no gate reaches, so an entry cannot outlive its reason, and the matrix
  * reports one the same way on a full run.
  */

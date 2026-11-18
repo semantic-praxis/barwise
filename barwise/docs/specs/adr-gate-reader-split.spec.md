@@ -7,7 +7,7 @@ Last-updated: 2026-11-04
 Tracking: barwise-ym8.pw0 (before docs/specs/adr-conformance-model.spec.md)
 Touches: barwise/scripts/check-architecture.mjs, barwise/scripts/check-adr-tests.mjs,
 +barwise/scripts/lib/adr-facts.mjs, +barwise/scripts/lib/adr-judge.mjs,
-+barwise/scripts/tests/adr-facts.test.mjs, barwise/scripts/tests/expected-counts.json, barwise/scripts/tests/gates.test.mjs,
++barwise/scripts/tests/adr-facts.test.mjs, barwise/scripts/tests/expected-counts.json, barwise/scripts/tests/,
 barwise/scripts/tests/check-adr-tests.test.mjs
 Plan-reviewed: c6c17aa1 (code-review, pr-review)
 

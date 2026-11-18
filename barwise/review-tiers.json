@@ -78,6 +78,8 @@
       "globs": [
         "barwise/examples/output/",
         "barwise/packages/llm/src/prompt/artifacts/builtins.generated.ts",
+        "barwise/packages/learn/src/exercise/exercises.generated.json",
+        "barwise/packages/promptlab/src/evalcase/suite.generated.json",
         "barwise/docs/tutorial/",
         "barwise/packages/cli/tests/characterization/golden/",
         "barwise/packages/diagram-ui/tests/golden/goldens/"

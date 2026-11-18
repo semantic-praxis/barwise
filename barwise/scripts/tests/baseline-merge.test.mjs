@@ -1,7 +1,7 @@
 /**
  * Unit tests for the baseline merge rule.
  *
- * `gates.test.mjs` drives the three writers end to end, which is what proves
+ * `gates-baselines.serial.test.mjs` drives the three writers end to end, which is what proves
  * the repository's own 90 verdicts survive a rewrite. These tests cover the
  * helper's contract directly, because two parts of it are not reachable
  * through any current caller and would otherwise be guards with no test:

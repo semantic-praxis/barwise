@@ -97,7 +97,7 @@ test("isWiring covers the shared files and directories, nothing else", () => {
       "package.json",
       "barwise/package.json",
       "CLAUDE.md",
-      "barwise/scripts/tests/gates.test.mjs",
+      "barwise/scripts/tests/gates-contract.test.mjs",
       "barwise/docs/specs/x.spec.md",
       ".beads/issues.jsonl",
     ]

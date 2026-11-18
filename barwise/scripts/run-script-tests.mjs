@@ -22,13 +22,25 @@
  *
  * PER FILE, not in total. A total is a shadow that diverges exactly where it
  * matters: one file truncating by four while another gains four leaves the
- * total correct and the run incomplete. Measured, per-file costs nothing --
- * 39.6s parallel against 42.6s combined, since one file dominates either way.
+ * total correct and the run incomplete. Per-file counting costs nothing: the
+ * files run in parallel either way.
+ *
+ * Files run in parallel, and the tests within a file serially, so the slowest
+ * FILE sets the wall time. One file, gates.test.mjs, grew to 371 tests and
+ * 277 of the suite's 283 seconds before anything reported it (barwise-bbt);
+ * it is now six gates-*.test.mjs files, and the summary names the slowest
+ * file so the next such growth is visible. Look at it; it is not a gate.
+ *
+ * A file named `*.serial.test.mjs` runs alone, after the parallel files
+ * finish: its tests rewrite the repository's live files (the ratchet
+ * baselines) and restore them, so a test in another file reading those files
+ * at the same moment would see the planted rows.
  */
 import { spawn } from "node:child_process";
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { scriptTestEnv } from "./lib/script-test-env.mjs";
 import { SCRIPT_REPORTS_DIR, scriptReport } from "./lib/test-reports.mjs";
 import { REPO_ROOT } from "./lib/tracked.mjs";
 
@@ -84,32 +96,8 @@ function testFiles() {
  */
 function runFile(file) {
   return new Promise((resolveRun) => {
-    // Two pieces of inherited state are wrong for a child that IS a fresh
-    // top-level run, and both were found by a run going red rather than by
-    // reading the docs.
-    //
-    // `NODE_TEST_CONTEXT` is how `node --test` recognises it is already inside
-    // a test run; with it set a child prints "run() is being called
-    // recursively ... skipping running files" and no summary at all -- which
-    // this script would then correctly refuse, for a suite that is fine.
-    //
-    // A reporter inherited through `NODE_OPTIONS` changes the output format
-    // out from under the parser below. That is not hypothetical: the summary
-    // this script reads is TAP's `# tests N`, and CI printed the spec
-    // reporter's `i tests N` instead, because CI runs the Node that `.nvmrc`
-    // pins and the default reporter is not the same across versions. Forcing
-    // the format makes the count independent of which Node is running, which
-    // is the same portability argument `.nvmrc` itself exists for.
-    const { NODE_TEST_CONTEXT: _nested, ...env } = process.env;
-    if (typeof env.NODE_OPTIONS === "string") {
-      // Stripped rather than overridden: `--test-reporter` ACCUMULATES between
-      // NODE_OPTIONS and argv, and node then refuses the run outright with
-      // "must match the number of specified --test-reporter-destination".
-      env.NODE_OPTIONS = env.NODE_OPTIONS
-        .split(/\s+/)
-        .filter((tok) => !tok.startsWith("--test-reporter"))
-        .join(" ");
-    }
+    const env = scriptTestEnv();
+    const started = Date.now();
     // A second reporter writes what ran, test by test, for check:adr-tests
     // (docs/specs/executable-adrs.spec.md, WS2). Each reporter is paired
     // with its own destination, as node requires, and tap stays on stdout
@@ -134,7 +122,7 @@ function runFile(file) {
     child.stdout.on("data", (d) => (out += d));
     child.stderr.on("data", (d) => (out += d));
     child.on("close", (code) => {
-      resolveRun({ file, out, code, ...summarise(out) });
+      resolveRun({ file, out, code, ms: Date.now() - started, ...summarise(out) });
     });
   });
 }
@@ -189,7 +177,11 @@ if (files.length === 0) {
   ]);
 }
 
-const results = await Promise.all(files.map(runFile));
+const SERIAL = /\.serial\.test\.mjs$/;
+const parallel = await Promise.all(files.filter((f) => !SERIAL.test(f)).map(runFile));
+const alone = [];
+for (const f of files.filter((f) => SERIAL.test(f))) alone.push(await runFile(f));
+const results = [...parallel, ...alone].sort((a, b) => (a.file < b.file ? -1 : 1));
 for (const r of results) process.stdout.write(r.out);
 
 if (WRITE) {
@@ -265,7 +257,9 @@ if (failed > 0) {
   console.error(`\nrun-script-tests: ${failed} failing of ${total}, all counts verified.`);
   process.exit(FAILED);
 }
+const slowest = results.reduce((a, b) => (b.ms > a.ms ? b : a));
 console.log(
   `\nrun-script-tests: ${total} test(s) across ${files.length} file(s), `
-    + `every count matching the manifest.`,
+    + `every count matching the manifest. Slowest file: ${slowest.file}, `
+    + `${(slowest.ms / 1000).toFixed(1)}s.`,
 );

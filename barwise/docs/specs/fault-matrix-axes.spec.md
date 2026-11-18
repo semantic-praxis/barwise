@@ -11,7 +11,7 @@ Tracking: barwise-ym8.rl7 (refuse-not-find: tool, manifest), barwise-ym8.j31
 `gate-contract-enforced.spec.md`
 Touches: barwise/scripts/fault-matrix.mjs, +barwise/scripts/lib/write-recorder.mjs,
 barwise/scripts/lib/ci-gates.mjs, barwise/scripts/lib/adr-enforcement.mjs,
-barwise/scripts/tests/gates.test.mjs, +barwise/scripts/tests/write-recorder.test.mjs,
+barwise/scripts/tests/, +barwise/scripts/tests/write-recorder.test.mjs,
 barwise/docs/adr/gate-refusal-contract.md, barwise/docs/adr/probes.json,
 barwise/docs/specs/gate-contract-enforced.spec.md, barwise/docs/ARCHITECTURE.md
 
