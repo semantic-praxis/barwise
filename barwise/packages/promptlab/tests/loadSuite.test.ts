@@ -7,7 +7,7 @@ import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { defaultSuitePath, loadEvalCase, loadSuite } from "../src/index.js";
+import { loadEvalCase, loadPackagedSuite, loadSuite } from "../src/index.js";
 
 const MINIMAL_TRANSCRIPT = "Facilitator: hello.\n";
 
@@ -22,7 +22,7 @@ describe("loadSuite on the packaged seed suite", () => {
   // and an order of magnitude slower under coverage instrumentation on a
   // shared CI runner, so the package sets a 30s testTimeout.
   it("loads the manifest with weights and ten cases in declared order", () => {
-    const suite = loadSuite(defaultSuitePath());
+    const suite = loadPackagedSuite();
     expect(suite.version).toBe("2.13.0");
     // Re-fitted for suite 2.0.0, where a weight is the cost of a model
     // in which every element carries that kind of defect rather than
@@ -55,7 +55,7 @@ describe("loadSuite on the packaged seed suite", () => {
   });
 
   it("splits seven train cases from three held-out dev cases", () => {
-    const suite = loadSuite(defaultSuitePath());
+    const suite = loadPackagedSuite();
     const dev = suite.cases.filter((c) => c.split === "dev").map((c) => c.evalCase.id);
     const train = suite.cases.filter((c) => c.split === "train");
     expect(dev).toEqual(["vendor-onboarding", "subscription-billing", "incident-response"]);
@@ -69,7 +69,7 @@ describe("loadSuite on the packaged seed suite", () => {
     // (barwise-845): every case now carries a generated reference and
     // population checks. Pinned so a case added later without one is a
     // decision, not an oversight.
-    const suite = loadSuite(defaultSuitePath());
+    const suite = loadPackagedSuite();
     for (const c of suite.cases) {
       expect(c.reference, c.evalCase.id).toBeDefined();
     }

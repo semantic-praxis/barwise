@@ -872,15 +872,22 @@ subcommands: `eval`, `score`, `schema`, `artifact`, `run`, `history`,
 `rescore`, `compare`.
 
 ```sh
-barwise prompt eval --split dev --repeat 3
+barwise prompt eval --suite packages/promptlab/evals/suite.yaml --split dev --repeat 3
 barwise prompt score --case enrollment-1 --extraction payload.json
 barwise prompt schema --surface review
 barwise prompt artifact --provider anthropic --model claude-haiku-4-5
 barwise prompt run notes.md --artifacts ./candidates
-barwise prompt history --format json
+barwise prompt history --suite packages/promptlab/evals/suite.yaml --format json
 barwise prompt rescore --payloads eval-payloads/20260828-1647 --baseline before.json
-barwise prompt compare --a 13 --b 9
+barwise prompt compare --suite packages/promptlab/evals/suite.yaml --a 13 --b 9
 ```
+
+With no `--suite`, every subcommand reads the packaged suite, which is
+compiled into the CLI, so a downloaded CLI needs nothing beside it. That
+copy has no history file: `eval` scores and prints but records nothing,
+and `history` and `compare` refuse. A suite named with `--suite` keeps
+its history in `history.jsonl` beside the manifest; in a barwise
+checkout that is `packages/promptlab/evals/suite.yaml` (barwise-fke).
 
 - `eval` -- run the eval suite against a live provider and record the
   scores. Options: `--suite <manifest>`, `--provider`, `--model`,
@@ -914,7 +921,8 @@ barwise prompt compare --a 13 --b 9
   `--artifacts <dir>`, `--provider`, `--model`, `--base-url`. Takes a transcript file for extraction or a
   `.orm.yaml` for review.
 - `history` -- show the suite's recorded eval scores. Options:
-  `--suite <manifest>`, `--format <text|json>`.
+  `--suite <manifest>` (required in effect: the packaged suite has no
+  history), `--format <text|json>`.
 - `rescore` -- score a recorded round's saved payloads under the current
   build, which is how a scorer change is judged. Options:
   `--payloads <dir>` (required, searched recursively),

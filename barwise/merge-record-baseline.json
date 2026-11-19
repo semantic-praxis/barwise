@@ -6,8 +6,8 @@
       "rules": [
         "no-record"
       ],
-      "status": "tracked:barwise-nyd",
-      "note": "Tracker-only PR merged by hand without a review trailer after the v2.0.0 release. Recorded as tracked by the barwise-fbi PR so CI can answer; accepting it is the owner's call (barwise-nyd)."
+      "status": "accepted-by-owner",
+      "note": "Tracker-only PR (filing barwise-j9q and barwise-2ed) merged by hand without a review trailer after the v2.0.0 release. The owner accepted it on 2026-11-17 (barwise-nyd): no code changed, so nothing to revert."
     }
   }
 }

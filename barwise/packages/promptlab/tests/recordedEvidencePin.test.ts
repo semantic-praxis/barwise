@@ -24,11 +24,11 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { defaultSuitePath, loadSuite } from "../src/evalcase/loadSuite.js";
+import { loadPackagedSuite } from "../src/evalcase/loadSuite.js";
 import { rescoreDirectory } from "../src/record/rescore.js";
 
 const ROUND = join(import.meta.dirname, "../../../eval-payloads/20260828-1647");
-const suite = loadSuite(defaultSuitePath());
+const suite = loadPackagedSuite();
 
 // Per arm: payload count and mean, under suite 2.13.0.
 //

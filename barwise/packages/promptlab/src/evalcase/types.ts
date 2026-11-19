@@ -132,5 +132,10 @@ export interface EvalSuite {
    */
   readonly collapseFloor?: number;
   readonly cases: readonly LoadedEvalCase[];
-  readonly manifestPath: string;
+  /**
+   * The manifest on disk, which also places the suite's history file.
+   * Absent for the packaged suite loaded from its compiled-in copy, which
+   * has no history of its own to write (barwise-fke).
+   */
+  readonly manifestPath?: string;
 }

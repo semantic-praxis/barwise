@@ -79,6 +79,8 @@
     "arch:triage": "npm --prefix barwise run arch:triage --",
     "regen:tutorial": "npm --prefix barwise run regen:tutorial --",
     "regen:builtins": "npm --prefix barwise run regen:builtins --",
+    "regen:gym-exercises": "npm --prefix barwise run regen:gym-exercises --",
+    "regen:eval-suite": "npm --prefix barwise run regen:eval-suite --",
     "regen:references": "npm --prefix barwise run regen:references --",
     "regen:architecture": "npm --prefix barwise run regen:architecture --",
     "trial:generate": "npm --prefix barwise run trial:generate --",

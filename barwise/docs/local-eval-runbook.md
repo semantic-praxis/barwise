@@ -26,7 +26,11 @@ inferred.
 `packages/promptlab/evals/history.jsonl` carries its first committed
 rows: the 2026-08-28 eight-arm re-baseline
 (docs/prompt-baseline-2.5.0-2026-08-28.md). Recorded runs append to
-it; `barwise prompt history` reads it back. Where the workstreams
+it; `barwise prompt history --suite packages/promptlab/evals/suite.yaml`
+reads it back. Every history command names the suite with `--suite`:
+without it the CLI reads the copy compiled into promptlab, which has
+no history file, so `prompt eval` records nothing and `prompt history`
+and `prompt compare` refuse (barwise-fke). Where the workstreams
 stand:
 
 - **barwise-845 -- CLOSED at suite 2.5.0.** The three dev cases carry
@@ -176,7 +180,7 @@ scorer change, `barwise prompt rescore --payloads eval-payloads/<stamp>
 build; pass an earlier result as `--baseline` to see what moved. It
 crosses suite versions on purpose -- that is the question it answers --
 and refuses a diff whose two sides cover different payloads. Comparing
-two recorded rows is `barwise prompt compare --a <i> --b <j>`, which
+two recorded rows is `barwise prompt compare --suite <manifest> --a <i> --b <j>`, which
 prints the resolvability verdicts that used to be done by hand
 (docs/specs/recorded-evidence-commands.spec.md).
 
@@ -202,37 +206,40 @@ directories itself.
 ```sh
 STAMP=$(date +%Y%m%d-%H%M)
 mkdir -p "eval-payloads/$STAMP"
+# Named so each run records to evals/history.jsonl; without --suite a
+# run is scored against the compiled-in copy and recorded nowhere.
+SUITE=packages/promptlab/evals/suite.yaml
 
 # The two shipped variants
-npx barwise prompt eval --provider anthropic --model claude-haiku-4-5 \
+npx barwise prompt eval --suite "$SUITE" --provider anthropic --model claude-haiku-4-5 \
   --split dev   --repeat 5 --concurrency 3 --verbose \
   --save-payloads "eval-payloads/$STAMP/haiku45-2-dev"   2>&1 | tee "eval-payloads/$STAMP/haiku45-2-dev.log"
-npx barwise prompt eval --provider anthropic --model claude-haiku-4-5 \
+npx barwise prompt eval --suite "$SUITE" --provider anthropic --model claude-haiku-4-5 \
   --split train --repeat 5 --concurrency 7 --verbose \
   --save-payloads "eval-payloads/$STAMP/haiku45-2-train" 2>&1 | tee "eval-payloads/$STAMP/haiku45-2-train.log"
 
-npx barwise prompt eval --provider anthropic --model claude-sonnet-5 \
+npx barwise prompt eval --suite "$SUITE" --provider anthropic --model claude-sonnet-5 \
   --split dev   --repeat 5 --concurrency 3 --verbose \
   --save-payloads "eval-payloads/$STAMP/sonnet5-3-dev"   2>&1 | tee "eval-payloads/$STAMP/sonnet5-3-dev.log"
-npx barwise prompt eval --provider anthropic --model claude-sonnet-5 \
+npx barwise prompt eval --suite "$SUITE" --provider anthropic --model claude-sonnet-5 \
   --split train --repeat 5 --concurrency 7 --verbose \
   --save-payloads "eval-payloads/$STAMP/sonnet5-3-train" 2>&1 | tee "eval-payloads/$STAMP/sonnet5-3-train.log"
 
 # The default artifact, one control per model
-npx barwise prompt eval --artifact-version default \
+npx barwise prompt eval --suite "$SUITE" --artifact-version default \
   --provider anthropic --model claude-haiku-4-5 \
   --split dev   --repeat 5 --concurrency 3 --verbose \
   --save-payloads "eval-payloads/$STAMP/default-haiku-dev"    2>&1 | tee "eval-payloads/$STAMP/default-haiku-dev.log"
-npx barwise prompt eval --artifact-version default \
+npx barwise prompt eval --suite "$SUITE" --artifact-version default \
   --provider anthropic --model claude-haiku-4-5 \
   --split train --repeat 5 --concurrency 7 --verbose \
   --save-payloads "eval-payloads/$STAMP/default-haiku-train"  2>&1 | tee "eval-payloads/$STAMP/default-haiku-train.log"
 
-npx barwise prompt eval --artifact-version default \
+npx barwise prompt eval --suite "$SUITE" --artifact-version default \
   --provider anthropic --model claude-sonnet-5 \
   --split dev   --repeat 5 --concurrency 3 --verbose \
   --save-payloads "eval-payloads/$STAMP/default-sonnet-dev"   2>&1 | tee "eval-payloads/$STAMP/default-sonnet-dev.log"
-npx barwise prompt eval --artifact-version default \
+npx barwise prompt eval --suite "$SUITE" --artifact-version default \
   --provider anthropic --model claude-sonnet-5 \
   --split train --repeat 5 --concurrency 7 --verbose \
   --save-payloads "eval-payloads/$STAMP/default-sonnet-train" 2>&1 | tee "eval-payloads/$STAMP/default-sonnet-train.log"
@@ -337,9 +344,10 @@ suite version -- is `ARMS=thinking ./eval-runner.sh`.
 
 ## Record or not
 
-Recording is the default: the blocks above append to
-`evals/history.jsonl`, which carries the committed 2026-08-28 rows,
-and `barwise prompt history` reads it back. A row's `suiteVersion` is
+Recording is the default for a suite named with `--suite`: the blocks
+above append to `evals/history.jsonl`, which carries the committed
+2026-08-28 rows, and `barwise prompt history --suite "$SUITE"` reads it
+back. A row's `suiteVersion` is
 what keeps rows either side of a bump from being compared, so
 recording at a new suite version needs no ceremony beyond a clean
 tree.

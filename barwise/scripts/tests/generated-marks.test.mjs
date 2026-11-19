@@ -34,6 +34,8 @@ const REGEN = {
   "regen:examples": ["barwise/examples/output/"],
   "regen:tutorial": ["barwise/docs/tutorial/"],
   "regen:builtins": ["barwise/packages/llm/src/prompt/artifacts/builtins.generated.ts"],
+  "regen:gym-exercises": ["barwise/packages/learn/src/exercise/exercises.generated.json"],
+  "regen:eval-suite": ["barwise/packages/promptlab/src/evalcase/suite.generated.json"],
   "regen:references": ["barwise/packages/promptlab/evals/*.reference.orm.yaml"],
 };
 const SECTION_WRITERS = {

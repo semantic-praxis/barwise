@@ -40,7 +40,7 @@ exercises/        Seed catalog: *.gym.yaml plus reference *.orm.yaml. Compiled
                   into src/exercise/exercises.generated.json, which the packaged
                   catalog loads (the release bundles have no exercises/ beside
                   them, barwise-fbi); after an edit, run
-                  `node barwise/scripts/regen-gym-exercises.mjs`
+                  `npm run regen:gym-exercises`
 tutorials/        Tutorial sources: *.tutorial.yaml plus per-step model
                   snapshots; rendered to docs/tutorial/ by regen:tutorial
 tests/            Vitest; tests/helpers/ModelBuilder.ts (copied from @barwise/core)

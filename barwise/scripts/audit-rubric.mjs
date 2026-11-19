@@ -58,7 +58,7 @@ try {
   );
   process.exit(2);
 }
-const { defaultSuitePath, loadSuite, scoreExtraction } = promptlab;
+const { loadSuite, scoreExtraction } = promptlab;
 const KEYS = resolve(ROOT, "packages/promptlab/tests/fixtures/responses");
 const BASELINE = resolve(ROOT, "rubric-baseline.json");
 
@@ -135,7 +135,7 @@ function mutationsFor(kind, check, key) {
 }
 
 function audit() {
-  const suite = loadSuite(defaultSuitePath());
+  const suite = loadSuite(resolve(ROOT, "packages/promptlab/evals/suite.yaml"));
   const rows = [];
   for (const loaded of suite.cases) {
     const caseId = loaded.evalCase.id;
