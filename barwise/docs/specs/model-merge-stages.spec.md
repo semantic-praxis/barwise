@@ -4,6 +4,7 @@ Status: Draft -- no workstream implemented
 
 Created: 2026-11-11
 Last-updated: 2026-11-11
+Plan-reviewed: 76ab3a77 (code-review, pr-review)
 Tracking: barwise-sic
 Touches: barwise/packages/core/src/diff/ModelMerge.ts,
 +barwise/packages/core/src/diff/mergeDecisions.ts,
