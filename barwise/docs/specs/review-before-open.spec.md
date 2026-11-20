@@ -17,7 +17,7 @@ CLAUDE.md
 
 In one sentence: in a session that loads the project hooks, a call that
 opens a pull request is refused unless that session's own record shows
-`/code-review` was invoked and `pr-review/checklist.md` was read whole
+`/code-review` returned and `pr-review/checklist.md` was read whole
 while HEAD was the commit the pull request proposes; the owner's
 instruction to open without review travels as an `Opened-without-review:`
 line in the body and is logged.
@@ -51,35 +51,37 @@ acceptance criteria say a restatement in prose does not close it. The
 merge end already has its mechanism: `merge-guard.mjs` refuses a merge
 call with no verdict on the pinned head. The opening end has none. This
 spec builds that counterpart, on the same footing: a `PreToolUse` hook
-that refuses the call, reading a record that something other than the
-author's say-so wrote.
+that refuses the call, reading a record that a hook wrote when the step
+happened.
 
 "Explicit over implicit" decides the record's shape. Every earlier
 occurrence had a body or a reply that said, or implied, the review was
-done. So the record is written by a hook when the review step happens,
-keyed to the commit it happened on, and the guard believes nothing else.
+done. So the record is written by a hook, keyed to the commit the step
+happened on, and the guard reads nothing the author wrote about the
+review.
 
-## What counts as "the review ran"? (resolved: a `/code-review` invocation and a whole-file read of the checklist, each on the proposed commit)
+## What counts as "the review ran"? (resolved: `/code-review` returned and the checklist was read whole, each on the proposed commit)
 
 Two observations, both made by a `PostToolUse` hook, both stamped with
-`git rev-parse HEAD` at the moment they happen.
+`git rev-parse HEAD` at the moment they happen. Each was measured in
+this session (Claude Code 2.1.329, 2026-11-20) with a probe: a temporary
+hook that wrote every input it received to a file.
 
-**`/code-review`: the `Skill` tool was called with skill `code-review`.**
-Measured in this session (Claude Code 2.1.329, 2026-11-20) with a
-probe, a temporary hook that wrote each input it received to a file: a
-`Skill` call for `spec-writer` fired `PostToolUse` with
-`tool_name: "Skill"`, `tool_input: {"skill": "spec-writer"}` and
-`tool_response: {"success": true, "commandName": "spec-writer"}`.
-(Provisional: measured for a project skill, not yet for the built-in
-`code-review`. This spec's plan review invokes it with the probe in
-place; if its `tool_input.skill` is some other name, the recorder
-matches the measured name and this paragraph is corrected before
-implementation.)
+**`/code-review`: the `Skill` tool returned for skill `code-review`.**
+The probe's capture of this spec's own plan review:
+`tool_name: "Skill"`,
+`tool_input: {"skill": "code-review", "args": "medium <path>"}`, and
+`tool_response: {"success": true, "commandName": "code-review",
+"status": "forked", "agentId": "...", "result": "<the findings>"}`.
+The skill runs forked, so `PostToolUse` fires when the review comes
+back, not when it starts. (A skill that loads into the turn instead,
+such as `spec-writer`, fires at once with only `success` and
+`commandName`.) The recorder matches `tool_input.skill` and does not
+read the response.
 
 **The checklist: the `Read` tool returned all of
 `.claude/skills/pr-review/checklist.md` to the main conversation.**
-Measured the same way: a `Read` fires `PostToolUse` with
-`tool_input.file_path` and
+A `Read` fires `PostToolUse` with `tool_input.file_path` and
 `tool_response.file.{startLine, numLines, totalLines}`. A read with
 `limit: 5` reported `numLines: 5` of `totalLines: 428`; a read with no
 limit reported `startLine: 1` and `numLines` equal to `totalLines`. A
@@ -106,17 +108,17 @@ conversation (no `agent_id` in the hook input) because a subagent's tool
 calls carry the parent's `session_id` (measured: an `Explore` subagent's
 `Read` arrived with this session's id plus `agent_id` and `agent_type`),
 and an exploring subagent that happens to read the file is not this
-session running the checklist. A `/code-review` invocation is recorded
+session running the checklist. A `/code-review` return is recorded
 wherever it fires: nothing invokes it by accident, and refusing a
 delegated review would cost a second full review.
 
 **What the record cannot see.** It is a shadow of the property, in root
-`CLAUDE.md`'s sense, and it diverges where the step is started and not
-done:
+`CLAUDE.md`'s sense, and it diverges where a step happens and is not
+acted on:
 
-- That a review was started on this commit is recorded; that it
-  finished, what it found, and whether the findings were fixed are not.
-  The `Skill` call returns when the skill loads, before any reviewing.
+- That `/code-review` returned on this commit is recorded; what it
+  found, and whether the findings were fixed, are not. A fix is a new
+  commit and voids the entry; an ignored finding does not.
 - `/code-review`'s effort level and target are not read. A review of
   another path, at `low`, on this commit counts.
 - A read is not an application. Which checklist groups were run, and
@@ -127,33 +129,60 @@ done:
 - A `/code-review` the user types is expanded without the `Skill` tool
   (documented: `PreToolUse` on `Skill` "fires only when Claude calls the
   tool"), so it is not recorded. Open decision 1.
+- The session can write the record itself: the file is in a directory
+  its own user owns, and a line that parses is believed. That is forgery
+  and not omission, and nothing here stops it, as nothing stops a
+  session adding the override line unasked.
 
 All four recorded occurrences are the kind the shadow sees exactly: a
-step that was never started on the commit. The spec claims that much and
-no more. The merge end still requires a posted verdict on the merged
-head, so a review started and abandoned here is caught there or not at
-all.
+step that never happened on the commit. The spec claims that much and no
+more. The merge end still requires a posted verdict on the merged head,
+so a review that ran here and was ignored is caught there or not at all.
 
 ## Which commit? (resolved: the tip of the head branch on the remote, asked at the moment of the call)
 
 A pull request proposes whatever the head branch points at on GitHub.
 The guard asks for exactly that: `git ls-remote origin
 refs/heads/<head>`, where `<head>` is the call's `head` argument (or,
-for `gh pr create` without `--head`, the current branch). Measured here:
-`git ls-remote origin refs/heads/main` answers through the session's
-proxy in under a second.
+for `gh pr create` without `--head`, the current branch in the hook
+input's `cwd`). Measured here: `git ls-remote origin refs/heads/main`
+answers through the session's proxy in under a second.
 
 The local `HEAD` is not used at the guard. It can be ahead of the push,
 or on another branch. The remote-tracking ref is not used either: it is
-this clone's memory of the remote, and `steward` section 6 records three
-ways it goes stale. The recorder does use local `HEAD`, because that is
+this clone's memory of the remote, and `steward` section 6 records it
+pointing at a commit the remote no longer has. The recorder does use local `HEAD`, because that is
 what the review read; the two meet as shas, and equality is the whole
 test. A commit made after the review has a different sha, so "a run on
 an earlier commit does not count" needs no clock and no ancestry rule.
 
-A branch the remote does not have is a refusal ("push first"), and so is
-a head in another repository (`fork:branch`, or a call whose
-`owner/repo` is not `origin`'s): the guard cannot resolve either.
+**In Bash, the opening call must be the whole command.** `PreToolUse`
+fires once, before any of the command runs. In `git push origin feat &&
+gh pr create --head feat` the guard would ask the remote before the
+push, find the reviewed commit, and allow a pull request that opens on
+the unreviewed one; `git checkout other && gh pr create` and `cd
+<worktree> && gh pr create` move the branch the same way. No list of
+commands that move a tip is complete, so the guard refuses any Bash
+command in which a pull-request-opening `gh` call is not the only
+command: more than one segment, a call inside `bash -c`, or a `$( )` or
+backtick substitution anywhere. The remedy is in the message: run it as
+a command of its own. Leading `VAR=value` words and `env` are allowed,
+since they run nothing. The MCP tool has no such case: its call is one
+action.
+
+Three more refusals, each because the guard cannot resolve the head:
+
+- a branch the remote does not have ("push first");
+- a head in another repository: `otherowner:branch`, or a call whose
+  `owner/repo` is not `origin`'s. The comparison ignores case, as GitHub
+  does, and `<origin's owner>:branch` is the same repository;
+- `git ls-remote` failing, or not answering within 15 seconds. The
+  guard sets that limit on its own `git` call and exits 2 when it trips.
+  What this harness does when a `PreToolUse` hook outlives the harness's
+  own timeout was not measured, so the guard does not depend on it.
+  Fifteen seconds is an order of magnitude over the measured second, and
+  short enough that a stalled proxy costs a quarter of a minute and not
+  a hung turn.
 
 ## How does the owner open one without review? (resolved: an `Opened-without-review:` line in the body)
 
@@ -168,9 +197,24 @@ The guard allows a call whose body carries that line with text after the
 colon, and logs it in two places: the body itself, which every reader of
 the pull request sees and GitHub's search finds
 (`"Opened-without-review:" in:body`), and an `override` entry in the
-session record. A line with no text is refused: an empty override
-records no instruction, as `check:merge-record` already rules for an
-empty `Owner-directed:` trailer.
+session record carrying the head branch's name and the line's text. A
+line with no text is refused: an empty override records no instruction,
+as `check:merge-record` already rules for an empty `Owner-directed:`
+trailer.
+
+The override is read before the head is resolved, so it needs no pushed
+branch and no answer from the remote, and its record entry carries no
+sha. It does need a usable `session_id` and a writable record: an
+override the guard cannot log is refused.
+
+**Where the guard reads the body.** `body` on the MCP call; `--body` or
+`-b` on `gh pr create`; the file named by `--body-file` or `-F`,
+resolved against the hook input's `cwd`; a `body=` field on `gh api`.
+It does not read standard input (`--body-file -`), `--fill`, `--web`,
+or a JSON `--input` file: with those the guard sees no override and
+applies the ordinary rule. A body built with `"$(cat <<'EOF' ...)"` is a
+substitution, which the rule above already refuses; `pr-creation`
+section 4 asks for a body file for its own reasons.
 
 The key is not `Owner-directed:` because that one already means "merge
 without the review trailers" in a merge commit message
@@ -203,32 +247,41 @@ In scope, as requirements:
    and blocks nothing. For any other event it exits 0 and prints nothing.
 4. When a tool call opens a pull request, the guard shall exit 2 unless
    the session's record holds a `code-review` entry and a `checklist`
-   entry whose sha is the proposed commit. The calls are:
-   `mcp__github__create_pull_request`; in Bash, `gh pr create` (not with
-   `--help`, `-h` or `--dry-run`) and a `gh api` write to
-   `repos/<owner>/<repo>/pulls`.
-5. When the guard refuses under 4, the message shall name the proposed
+   entry whose sha is the proposed commit. The calls are
+   `mcp__github__create_pull_request` and, in Bash, a `gh` call whose
+   subcommand is `pr create` or `pr new` (gh's alias for it) or a
+   `gh api` write to `repos/<owner>/<repo>/pulls`, with or without a
+   leading slash and with gh's `{owner}` and `{repo}` placeholders. A
+   `gh pr create` carrying `--help` or `-h` as a flag, not as another
+   flag's value, opens nothing and is passed. `--dry-run` and `--web`
+   get no exemption.
+5. When a Bash command contains a pull-request-opening `gh` call that is
+   not the command's only segment, the guard shall exit 2 and say to run
+   it as a command of its own.
+6. When the guard refuses under 4, the message shall name the proposed
    sha, which of the two entries is missing, the sha each was last
    recorded on if any, the two actions that create them, and the
    override.
-6. When the guard cannot answer -- the tool call cannot be parsed, the
-   input has no usable `session_id`, the base directory or the record
-   cannot be read, the head branch cannot be named or resolved -- it
-   shall exit 2 and name what it could not see. It never exits 0 or 1 in
-   that state (`docs/adr/gate-refusal-contract.md`; exit 2 is also what
-   blocks a `PreToolUse` call).
-7. When the record holds lines the guard cannot parse and the entries it
+7. When the guard cannot answer -- the input has no usable `session_id`,
+   the base directory or the record cannot be read, the head branch
+   cannot be named or resolved, `git` fails or times out -- it shall
+   exit 2 and name what it could not see. It never exits 0 or 1 in that
+   state (`docs/adr/gate-refusal-contract.md`; exit 2 is also what
+   blocks a `PreToolUse` call). A tool call the guard cannot parse at
+   all is the same state and gets the same exit, pending Open decision 2.
+8. When the record holds lines the guard cannot parse and the entries it
    needs are not among the lines it can, the refusal shall say how many
    lines were unreadable. A line that parses is believed; an unreadable
    line can hide an entry and cannot invent one.
-8. When the body of a pull-request-opening call carries a line
+9. When the body of a pull-request-opening call carries a line
    `Opened-without-review:` followed by text, the guard shall append an
-   `override` entry to the record and exit 0. When it cannot append the
-   entry, or the line has no text, it shall exit 2.
-9. When a Bash command runs `gh api graphql` with a `createPullRequest`
-   mutation, the guard shall exit 2: it cannot read a head out of a
-   query string. This is `merge-guard`'s rule for `mergePullRequest`.
-10. A draft is a pull request: `draft: true` and `--draft` change
+   `override` entry to the record and exit 0, without resolving the
+   head. When it cannot append the entry, or the line has no text, it
+   shall exit 2. Requirement 5 still applies.
+10. When a Bash command runs `gh api graphql` with a `createPullRequest`
+    mutation, the guard shall exit 2: it cannot read a head out of a
+    query string. This is `merge-guard`'s rule for `mergePullRequest`.
+11. A draft is a pull request: `draft: true` and `--draft` change
     nothing. `pr-creation` section 5 already says a branch that is not
     ready does not get one.
 
@@ -251,8 +304,8 @@ Out of scope:
 
 | File                                               | Current state                                                   | Verdict                                                                   |
 | -------------------------------------------------- | --------------------------------------------------------------- | ------------------------------------------------------------------------- |
-| `barwise/scripts/hooks/merge-guard.mjs`            | parses `gh` commands in six module-private functions            | imports them from `lib/gh-command.mjs`; behaviour unchanged               |
-| `barwise/scripts/lib/gh-command.mjs`               | does not exist                                                  | new: the moved parser, plus `repoFromRemote`                              |
+| `barwise/scripts/hooks/merge-guard.mjs`            | owns the `gh` command parser, module-private                    | imports it from `lib/gh-command.mjs`; behaviour unchanged                 |
+| `barwise/scripts/lib/gh-command.mjs`               | does not exist                                                  | new: the moved parser (the list is in Workstream 1)                       |
 | `barwise/scripts/lib/exit-log.mjs`                 | owns `exitBase`, `checkBase`, `SESSION_ID`                      | untouched; imported                                                       |
 | `barwise/scripts/lib/review-record.mjs`            | does not exist                                                  | new: the record's path, append and read                                   |
 | `barwise/scripts/hooks/review-recorder.mjs`        | does not exist                                                  | new: the `PostToolUse` writer                                             |
@@ -261,6 +314,7 @@ Out of scope:
 | `barwise/scripts/tests/merge-guard.test.mjs`       | drives the hook as a process, every refusal planted             | untouched; the regression net for the move                                |
 | `barwise/scripts/tests/pr-open-guard.test.mjs`     | does not exist                                                  | new: every refusal planted, the override, the recorder, the wiring        |
 | `barwise/docs/adr/review-policy.md`                | says nothing records that `/code-review` ran                    | gains decision `review-before-open` and loses that sentence               |
+| `barwise/docs/adr/tested-in.json`                  | names `merge-guard.test.mjs` for `pinned-merge`                 | gains the same kind of row for `review-before-open`                       |
 | `.claude/skills/pr-creation/SKILL.md`, `CLAUDE.md` | state the author-side review as practice                        | point at the ADR decision instead of restating it                         |
 | `.claude/skills/pr-review/checklist.md`            | no item on an overridden opening                                | one item under "Every PR"                                                 |
 
@@ -285,9 +339,10 @@ table points to.
   reviews.jsonl    one JSON object per line, append-only:
                      {"t": 1795180000000, "kind": "code-review", "sha": "<40 hex>"}
                      {"t": 1795180100000, "kind": "checklist",   "sha": "<40 hex>"}
-                     {"t": 1795180200000, "kind": "override",    "sha": "<40 hex>", "text": "..."}
+                     {"t": 1795180200000, "kind": "override",    "head": "<branch>", "text": "..."}
 
-scripts/lib/gh-command.mjs      ghCalls, subcommand, flagValue, apiFields, repoFromRemote
+scripts/lib/gh-command.mjs      withoutHeredocBodies, segments, ghCalls, subcommand,
+                                flagValue, apiFields, repoFromRemote
                                 (moved from merge-guard.mjs; both hooks import them)
 scripts/lib/review-record.mjs   reviewLogPath(base, session)
                                 appendReview(base, session, entry)
@@ -295,9 +350,10 @@ scripts/lib/review-record.mjs   reviewLogPath(base, session)
 
 review-recorder.mjs (PostToolUse)        pr-open-guard.mjs (PreToolUse)
   not a matching event -> exit 0           not a PR-opening call -> exit 0
-  sha = git rev-parse HEAD (cwd)           override line in the body -> log, exit 0
-  appendReview(...)                        sha = git ls-remote origin refs/heads/<head>
-  cannot record -> exit 2, says why        both kinds on sha -> exit 0
+  sha = git rev-parse HEAD (cwd)           Bash: not the only command -> exit 2
+  appendReview(...)                        override line in the body -> log, exit 0
+  cannot record -> exit 2, says why        sha = git ls-remote origin refs/heads/<head>
+                                           both kinds on sha -> exit 0
                                            otherwise -> exit 2, says why
 ```
 
@@ -333,8 +389,8 @@ one node start per `Read` (about 30 ms here, `time node -e 0`).
 - **A record the agent writes itself**, with a command such as
   `node scripts/review-record.mjs --ran code-review`. No `PostToolUse`
   wiring and no dependence on tool payload shapes. It lost for the same
-  reason as the body gate: it records a claim, and the claim is what
-  failed.
+  reason as the body gate: it makes writing the claim the supported
+  path, and the claim is what failed.
 - **No record: read the session transcript at the guard.** The hook
   input carries `transcript_path`, and the transcript holds every tool
   call, so the guard could look for the `Skill` call and the `Read`
@@ -352,6 +408,12 @@ one node start per `Read` (about 30 ms here, `time node -e 0`).
   would end the re-review after a one-line fix. It lost because the
   owner's rule is that a run on an earlier commit does not count, and
   any "little" is a threshold with no stated relation to an outcome.
+- **In Bash, compare the local branch tip with the remote's instead of
+  requiring the call to stand alone.** It catches `git push && gh pr
+  create` and lets ordinary chains through. It lost because it answers
+  one way of moving the tip (a push of the current branch) and not the
+  others (a checkout, a `cd` to another worktree, a push of another
+  ref), which is the enumerated list the guard cannot complete.
 
 ## Workstreams (each independently shippable)
 
@@ -359,16 +421,20 @@ one node start per `Read` (about 30 ms here, `time node -e 0`).
 
 One pull request, read by commit:
 
-1. Move `withoutHeredocBodies`, `segments`, `ghCalls`, `VALUED`,
-   `subcommand`, `flagValue`, `apiFields` and `repoFromRemote` from
-   `merge-guard.mjs` to `lib/gh-command.mjs`, byte for byte, and import
-   them back. `merge-guard.test.mjs` passes unchanged.
+1. Move `withoutHeredocBodies`, `segments`, `ghCalls`, `subcommand` (with its
+   `VALUED` set), `flagValue` and `apiFields` from
+   `merge-guard.mjs` to `lib/gh-command.mjs` unchanged, and import them
+   back. `repoFromRemote` moves too, with one change: it makes its own
+   `git remote get-url origin` call there, because the `run` helper it
+   uses today stays in `merge-guard.mjs` for that hook's `gh` reads.
+   `merge-guard.test.mjs` passes unchanged.
 2. Add `lib/review-record.mjs`, `hooks/review-recorder.mjs` and
    `hooks/pr-open-guard.mjs`, wire them in `.claude/settings.json`, and
    add `tests/pr-open-guard.test.mjs`. The tests drive both hooks as
    processes with JSON on stdin, against a temporary clone with a bare
    repository as `origin` and `TMPDIR` pointed at a temporary directory,
-   so `git ls-remote` and the record are real and nothing is stubbed.
+   so `git ls-remote` and the record are real and nothing is stubbed
+   (the timeout test alone puts a `git` that sleeps first on `PATH`).
    Each requirement in Scope has a test that plants its violation; the
    refusal tests assert the message, not only the exit code (root
    `REVIEW.md`, failure mode 3). One test reads `.claude/settings.json`
@@ -386,8 +452,8 @@ is watched refusing a real `mcp__github__create_pull_request` call for
 that pull request, and then allowing the same call once both steps have
 run on that head. barwise-953's acceptance criteria require the first
 half. The hooks are live in the building session as soon as
-`.claude/settings.json` is edited (measured: a probe hook added
-mid-session fired on the next tool call).
+`.claude/settings.json` is edited (measured: the probe was added
+mid-session and fired on the next tool call).
 
 barwise-953 closes in a tracker-only pull request after this one merges.
 
@@ -400,6 +466,9 @@ barwise-953 closes in a tracker-only pull request after this one merges.
   caller").
 - Every session that loads `.claude/settings.json` gains one node start
   per `Read` and per `Skill` call, and one more per Bash call.
+- A session that opened pull requests with `git push && gh pr create`,
+  or with a heredoc body, has to run the push first and pass a body
+  file. Remote sessions open through the MCP tool and are not affected.
 
 ## Open decisions (for review)
 
@@ -421,10 +490,11 @@ barwise-953 closes in a tracker-only pull request after this one merges.
    every Bash call while the harness sends input the guard cannot parse;
    (b) exit 1, as `merge-guard` and `python-uv-guard` do, which lets the
    call through with a note only a verbose transcript shows.
-   Recommended: (a). `gate-refusal-contract.md` asks for it, the state
-   has not been observed, and a session blocked loudly is found sooner
-   than a guard that has silently stopped guarding. `merge-guard`'s
-   exit 1 is left alone here; changing it belongs with barwise-7k4.
+   Recommended: (a), and requirement 7 is written that way.
+   `gate-refusal-contract.md` asks for it, the state has not been
+   observed, and a session blocked loudly is found sooner than a guard
+   that has silently stopped guarding. `merge-guard`'s exit 1 is left
+   alone here; changing it belongs with barwise-7k4.
 3. **No detective half.** A session that loads no project hooks, or a
    person, opens a pull request unguarded and nothing reports it
    afterwards. Options: (a) accept and state it in the ADR, as
@@ -447,10 +517,10 @@ barwise-953 closes in a tracker-only pull request after this one merges.
 - **The guard adds pressure to the thing it observes.** Before it,
   nothing was gained by invoking a skill and ignoring it. Tripwire: one
   pull request whose record was complete and whose review visibly did
-  not happen (opened in the same turn as the `Skill` call, or with
-  `/code-review`'s findings untouched) reopens "What counts", and the
-  next observation to consider is what the review produced, not that it
-  started.
+  not count (`/code-review`'s findings untouched, or a record the
+  session wrote by hand) reopens "What counts", and the next observation
+  to consider is what the review returned, which the `Skill` response
+  carries.
 - **The record is lost with the container.** It lives under
   `os.tmpdir()`, and a resumed session in a fresh container starts with
   none. The guard refuses and the steps run again; nothing is opened on
@@ -460,9 +530,11 @@ barwise-953 closes in a tracker-only pull request after this one merges.
   opening is refused. The tests cannot see that: they hold the hooks to
   the shapes measured on 2026-11-20. The refusal message says what the
   recorder looks for, which is where a session would start.
-- **`git ls-remote` fails.** The guard refuses. Opening the pull
-  request needs the same remote, so the refusal loses nothing
-  (`merge-guard` makes the same argument for its API read).
+- **`git ls-remote` fails or hangs.** The guard refuses, on its own
+  15-second limit if need be. Opening the pull request needs the same
+  remote, so the refusal loses nothing (`merge-guard` makes the same
+  argument for its API read; its `gh` calls carry no timeout, which is
+  filed as barwise-me4 and not changed here).
 - Testing: `npm run test:scripts` runs the new file, and its count goes
   in `expected-counts.json`. Each refusal test is watched failing with
   its guard removed, through `barwise/scripts/mutate.mjs`. The moved
@@ -470,9 +542,10 @@ barwise-953 closes in a tracker-only pull request after this one merges.
 
 ## Non-goals
 
-- Judging the review. The guard holds that it was started on the right
-  commit, and says so in those words.
+- Judging the review. The guard holds that both steps happened on the
+  right commit, and says so in those words.
 - Guarding sessions that load no project hooks, the GitHub web
-  interface, `curl`, or `gh` reached through `xargs`, `eval` or a
-  variable (`merge-guard`'s known limits, inherited with its parser).
+  interface, `curl`, a user-defined `gh` alias, or `gh` reached through
+  `xargs`, `eval` or a variable (`merge-guard`'s known limits, inherited
+  with its parser).
 - Any change to when a pull request may merge.
