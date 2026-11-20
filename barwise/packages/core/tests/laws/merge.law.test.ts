@@ -25,7 +25,7 @@ import type { ConstraintDelta, FactTypeDelta, ModelDelta } from "../../src/diff/
 import { diffModels } from "../../src/diff/ModelDiff.js";
 import { MERGE_DIFF_OPTIONS, mergeAndValidate, mergeModels } from "../../src/diff/ModelMerge.js";
 import { hashModel } from "../../src/lineage/manifest.js";
-import type { Constraint } from "../../src/model/Constraint.js";
+import type { Constraint, ExternalConstraint } from "../../src/model/Constraint.js";
 import { graphOf } from "../../src/model/graph.js";
 import { populationIdBase } from "../../src/model/idRules.js";
 import type { OrmModel } from "../../src/model/OrmModel.js";
@@ -65,9 +65,11 @@ import {
  *
  * In both, every reference the merge takes from the incoming side has to
  * be translated to arrive. All three run, and none replaces another: only
- * the shared-id form makes two drawn subtype facts, objectifications and
- * populations collide on an id, which is what the determinism law below
- * was written for.
+ * the shared-id form makes two drawn subtype facts and objectifications
+ * collide on an id, which is what the determinism law below was written
+ * for. Populations collide there too, and through prior ids, where a
+ * replayed population is named for its fact type and a sample and a
+ * significant one on the same fact type are two populations.
  *
  * A form takes plans and not models because a name can only be changed
  * before a model is built. `arbOrmModel` is `arbModelPlan` built, so the
@@ -219,7 +221,7 @@ describe("law: merging nothing changes nothing", () => {
  * marked, so it equals no resolved one. Keys are sorted, because a
  * constraint the merge rebuilt lists its fields in another order.
  */
-function withPathsByName(model: OrmModel, constraint: Constraint | undefined): unknown {
+function withPathsByName(model: OrmModel, constraint: Constraint): unknown {
   const role = (id: string): string => {
     const factType = model.factTypes.find((ft) => ft.getRoleById(id) !== undefined);
     return factType === undefined
@@ -245,9 +247,11 @@ function isUnpairedJoin(delta: ModelDelta): delta is ConstraintDelta {
 }
 
 /** A join constraint the diff reports as modified, which barwise-bni may explain. */
-function isModifiedJoin(delta: ModelDelta): delta is ConstraintDelta {
+function isModifiedJoin(
+  delta: ModelDelta,
+): delta is ConstraintDelta & { existing: ExternalConstraint; incoming: ExternalConstraint; } {
   return delta.elementType === "constraint" && delta.kind === "modified"
-    && delta.incoming?.type.startsWith("join_") === true;
+    && delta.existing !== undefined && delta.incoming?.type.startsWith("join_") === true;
 }
 
 describe("law: accepting every delta yields the incoming model, aliases aside", () => {
@@ -854,14 +858,60 @@ describe("law: whatever is accepted, a population is keyed by its fact type's ro
 });
 
 /**
+ * A partial acceptance can ask for a merge that cannot be built, and the
+ * merge refuses: a fact type is kept or taken whose player the reviewer
+ * left out, by declining the object type's addition or accepting its
+ * removal. That is the only refusal two valid models draw, and it is the
+ * reviewer's doing.
+ *
+ * It is also what a fault in the id translation looks like from outside.
+ * A player the merge did keep, under the base's id, and failed to
+ * translate the incoming id of, dangles the same way and is refused in
+ * the same words. The population law above passes on a refusal, so
+ * without this law a fault that turned merges into refusals read as a
+ * reviewer declining things (found by the review of #1036, with the
+ * mapping a declined object-type change records deleted: 97 merges lost
+ * under different ids, and no law failed).
+ */
+describe("law: a merge is refused only for a player the acceptance left out", () => {
+  it.each(ID_FORMS)("every refusal names an object type the reviewer left out, $name", {
+    timeout: LAW_TIMEOUT_MS,
+  }, ({ pairOf }) => {
+    fc.assert(
+      fc.property(arbModelPlan(), arbModelPlan(), fc.infiniteStream(fc.boolean()), (x, y, coin) => {
+        const [existing, incoming] = pairOf(x, y);
+        const { deltas, accepted, refusal } = mergeSome(existing, incoming, coin);
+        if (refusal === null) return;
+        const leftOut = deltas.flatMap((delta, at) =>
+          delta.elementType !== "object_type"
+            ? []
+            : delta.kind === "added" && !accepted.has(at)
+            ? [delta.incoming!.id]
+            : delta.kind === "removed" && accepted.has(at)
+            ? [delta.existing!.id]
+            : []
+        );
+        const player = /references object type id "([^"]+)" which does not exist/.exec(refusal)
+          ?.[1];
+        expect(player, refusal).toBeDefined();
+        expect(leftOut, refusal).toContain(player);
+      }),
+      { seed: SEED, numRuns: RUNS },
+    );
+  });
+});
+
+/**
  * The premises of the law over a partial acceptance.
  *
- * The law has something to read only where a merge was returned and a
- * population and its fact type came from different sides. Drawn from the
- * arbitraries the law draws from, at its seed.
+ * The population law has something to read only where a merge was
+ * returned and a population and its fact type came from different sides,
+ * and the refusal law only where one was refused. Drawn from the
+ * arbitraries the laws draw from, at their seed.
  *
  * Measured over 250 draws, sharing ids, under different ids and through
- * prior ids: a merge is returned in 205 each; among those the base's
+ * prior ids: a merge is returned in 205 each and refused in 45; among
+ * the returned the base's
  * population is carried past an accepted fact-type change that dropped a
  * role in 17, 19 and 18, and an incoming population is taken onto a fact
  * type the merge kept from the base in 39, 38 and 40.
@@ -871,12 +921,13 @@ describe("law: whatever is accepted, a population is keyed by its fact type's ro
  * arity on the incoming side, and two coin tosses landing opposite ways.
  */
 describe.each(ID_FORMS)(
-  "coverage: the partial acceptances split a population from its fact type, $name",
+  "coverage: the partial acceptances refuse some merges and split a population from its fact type, $name",
   ({ pairOf }) => {
-    const merges = fc.sample(
+    const attempts = fc.sample(
       fc.tuple(arbModelPlan(), arbModelPlan(), fc.infiniteStream(fc.boolean())),
       { seed: SEED, numRuns: RUNS },
-    ).map(([x, y, coin]) => mergeSome(...pairOf(x, y), coin)).filter(({ model }) => model !== null);
+    ).map(([x, y, coin]) => mergeSome(...pairOf(x, y), coin));
+    const merges = attempts.filter(({ model }) => model !== null);
 
     /** The paired fact types whose delta `chosen` accepts, by the id `side` gives them. */
     const factTypesWhere = (
@@ -894,6 +945,11 @@ describe.each(ID_FORMS)(
 
     it("returns a merge to read", () => {
       expectAtLeast("merges returned", merges.length, 100);
+    });
+
+    it("refuses a merge to read", () => {
+      // The refusal law asserts only where a merge was refused.
+      expectAtLeast("merges refused", attempts.length - merges.length, 22);
     });
 
     it("carries a base population past a dropped role", () => {
@@ -949,16 +1005,19 @@ function acceptedBy(deltas: readonly ModelDelta[], coin: Iterator<boolean>): Set
   return new Set(deltas.flatMap((_, i) => (coin.next().value ? [i] : [])));
 }
 
-/** Merge with each delta accepted on a coin toss; `model` is null where the merge refused. */
+/**
+ * Merge with each delta accepted on a coin toss. `model` is null where
+ * the merge refused, and `refusal` is then what it said.
+ */
 function mergeSome(existing: OrmModel, incoming: OrmModel, coin: Iterator<boolean>) {
   const { deltas } = diffModels(existing, incoming, MERGE_DIFF_OPTIONS);
   const accepted = acceptedBy(deltas, coin);
-  const { model } = mergeAndValidate(existing, incoming, {
+  const { model, diagnostics } = mergeAndValidate(existing, incoming, {
     deltas,
     matching: "id-first",
     recognizeRenames: false,
   }, accepted);
-  return { deltas, accepted, model };
+  return { deltas, accepted, model, refusal: model === null ? diagnostics[0]!.message : null };
 }
 
 /** Merge with every non-unchanged delta accepted. */
