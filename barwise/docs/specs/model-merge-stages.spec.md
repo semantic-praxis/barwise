@@ -1,9 +1,10 @@
 # Model merge: decide once, translate ids once, then build
 
-Status: Draft -- no workstream implemented
+Status: WS1 shipped 2026-11-20 (the merge laws run each drawn pair sharing ids, under different ids and through prior ids; all six probes CAUGHT by the laws alone); WS2 to WS5 not started, the owner's to decide after WS1's fault report
 
 Created: 2026-11-11
-Last-updated: 2026-11-11
+Last-updated: 2026-11-20
+Plan-reviewed: 76ab3a77 (code-review, pr-review)
 Tracking: barwise-sic
 Touches: barwise/packages/core/src/diff/ModelMerge.ts,
 +barwise/packages/core/src/diff/mergeDecisions.ts,

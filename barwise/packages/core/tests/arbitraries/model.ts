@@ -60,6 +60,7 @@ import type {
   RoleConfig,
 } from "../../src/model/FactType.js";
 import { storePreferredFlags } from "../../src/model/identification.js";
+import { populationIdBase, suffixed } from "../../src/model/idRules.js";
 import type { ObjectifiedFactTypeConfig } from "../../src/model/ObjectifiedFactType.js";
 import type {
   CardinalityRange,
@@ -72,6 +73,7 @@ import type {
 import { OrmModel, type OrmModelConfig } from "../../src/model/OrmModel.js";
 import type { FactInstanceConfig, PopulationConfig } from "../../src/model/Population.js";
 import type { SubtypeFactConfig } from "../../src/model/SubtypeFact.js";
+import { remapIds } from "../../src/rename/remapIds.js";
 import {
   type FlaggedSubtypeFact,
   subtypeConstraintsFromFlags,
@@ -1136,4 +1138,73 @@ export function arbModelPlan(): fc.Arbitrary<ModelPlan> {
 /** A structurally valid `OrmModel`: the two halves composed. */
 export function arbOrmModel(): fc.Arbitrary<OrmModel> {
   return arbModelPlan().map(buildModel);
+}
+
+// ---------------------------------------------------------------------------
+// The same model under other ids
+// ---------------------------------------------------------------------------
+
+/**
+ * The prefix `reIdModel` moves ids under. No generated id starts with it
+ * (`ot0`, `ft0`, `c0`, `sf0`, `oft0`, `pop.0`, `pref0`), so a re-id'd
+ * model shares no id with any drawn one.
+ */
+export const RE_ID_PREFIX = "x_";
+
+/**
+ * The same model with every id it holds replaced, for a law that needs
+ * two models whose ids differ.
+ *
+ * Ids here come from positions, so two drawn models hold the same ones:
+ * `ot0` is `T0` in both, every element a diff pairs is paired by id, and
+ * a merge of the two translates every id to itself. Six faults planted in
+ * the merge's id translation passed every merge law for that reason
+ * (docs/specs/model-merge-stages.spec.md, "Can the suite protect a
+ * restructure?"). A re-id'd model pairs with its partner by name and
+ * content instead, which is the input the translation exists for.
+ *
+ * Each id keeps the shape a file gives it, so the result reads as a file
+ * a person could have written and not as a model no reader produces: a
+ * role stays under its fact type's new id (`ft0.r1` to `x_ft0.r1`), a
+ * population is named for its fact type (`x_ft0.population`, the second
+ * on one fact type `x_ft0.population_2`, as the model's own suffix rule
+ * gives), and an instance stays under its population. The merge reads
+ * those shapes (`rebaseRoles`, `withPopulationId`), so a flat prefix on
+ * every id would leave them unexercised.
+ *
+ * Through `remapIds`, so every reference follows its id by the one
+ * traversal a rename uses; nothing here knows where a model keeps a
+ * reference.
+ */
+export function reIdModel(model: OrmModel): OrmModel {
+  const ids = new Map<string, string>();
+  const move = (id: string | undefined): void => {
+    if (id !== undefined) ids.set(id, `${RE_ID_PREFIX}${id}`);
+  };
+  /** `id` under its owner's new id where it sits under the old one. */
+  const under = (id: string, owner: string, newOwner: string): string =>
+    id.startsWith(`${owner}.`)
+      ? `${newOwner}${id.slice(owner.length)}`
+      : `${RE_ID_PREFIX}${id}`;
+
+  for (const ot of model.objectTypes) move(ot.id);
+  for (const ft of model.factTypes) {
+    move(ft.id);
+    for (const role of ft.roles) ids.set(role.id, under(role.id, ft.id, ids.get(ft.id)!));
+  }
+  for (const [constraint] of model.everyConstraint()) move(constraint.id);
+  for (const sf of model.subtypeFacts) move(sf.id);
+  for (const oft of model.objectifiedFactTypes) move(oft.id);
+
+  const taken = new Set<string>();
+  for (const population of model.populations) {
+    const factTypeId = ids.get(population.factTypeId) ?? population.factTypeId;
+    const id = suffixed(populationIdBase(factTypeId), (candidate) => !taken.has(candidate));
+    taken.add(id);
+    ids.set(population.id, id);
+    for (const instance of population.instances) {
+      ids.set(instance.id, under(instance.id, population.id, id));
+    }
+  }
+  return remapIds(model, ids);
 }
