@@ -1126,11 +1126,13 @@ describe("mergeAndValidate", () => {
  * definition-only one that touches no role.
  *
  * Fresh role ids matter to these fixtures: a re-extraction mints new
- * ones, and that is the whole defect. The generated models in
- * `tests/laws/merge.law.test.ts` cannot cover this -- the arbitrary
- * assigns role ids positionally (`ft0r0`), so two generated models share
- * them and the remap is a no-op. A law there would pass vacuously,
- * which is why this is a fixture test.
+ * ones, and that is the whole defect. They pin the case by name. When
+ * they were written the generated models in
+ * `tests/laws/merge.law.test.ts` could not cover it: the arbitrary gives
+ * role ids by position (`ft0.r0`), so two generated models share them,
+ * and no law read a partial acceptance. Since model-merge-stages WS1 the
+ * laws there run pairs whose ids differ, and one law reads this case
+ * over generated input (a population is keyed by its fact type's roles).
  */
 describe("mergeModels: a KEPT population follows its fact type's roles", () => {
   function model(
