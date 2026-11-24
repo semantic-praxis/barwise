@@ -5,6 +5,9 @@ Status: Draft -- no workstream implemented
 Created: 2026-11-20
 Last-updated: 2026-11-24
 Tracking: barwise-953
+Plan-reviewed: 404c9d2f (code-review and pr-review read 4b278196; 404c9d2f
+adds the three text changes that review asked for and was merged on the
+owner's direction without a further round)
 Touches: +barwise/scripts/hooks/pr-open-guard.mjs,
 +barwise/scripts/hooks/review-recorder.mjs,
 +barwise/scripts/lib/gh-command.mjs, +barwise/scripts/lib/review-record.mjs,
