@@ -3,19 +3,19 @@
   "records": {
     "adr-batch10-enforcers::347550b98b44": {
       "spec": "adr-batch10-enforcers.spec.md",
-      "excerpt": "the plan's enforcers (adr-refactor.spec.md, batch 10) were checked against the code and the live record before",
+      "excerpt": "the plan's enforcers (adr-refactor.spec.md, batch 10) were checked against the code and the live record before being adopted. eleven could not fail on the viola",
       "caught_by": "execution",
       "note": "Grounding: the plan's enforcers were measured against the code and the merge record before being adopted; several were replaced."
     },
     "adr-batch10-enforcers::b77ddf37fcc1": {
       "spec": "adr-batch10-enforcers.spec.md",
-      "excerpt": "ask-owner (row 20, kept as a decision). now: nothing. enforcer: the api half's count (above), and it is the we",
+      "excerpt": "ask-owner (row 20, kept as a decision). now: nothing. enforcer: the api half's count (above), and it is the weakest of the four, for the reasons in \"where the p",
       "caught_by": "not-a-correction",
       "note": "A decision's classification line (row 20 kept as a decision), not a correction."
     },
     "adr-batch9-enforcers::a7ca09d36a00": {
       "spec": "adr-batch9-enforcers.spec.md",
-      "excerpt": "the first draft's \"two places, plus a type in verifyossie.ts\" was wrong: a key-and-template scan misses the as",
+      "excerpt": "the first draft's \"two places, plus a type in verifyossie.ts\" was wrong: a key-and-template scan misses the assignment form. mcp/src/workspace/resolve.ts:198 me",
       "caught_by": "reasoning",
       "note": "Plan review (code-review on the draft): verifyOssie.ts:169 assigns doc.orm_version in document30(), so the writer census was redone with a full parse."
     },
@@ -99,7 +99,7 @@
     },
     "capability-matrix-check::8fc3dcde55b8": {
       "spec": "capability-matrix-check.spec.md",
-      "excerpt": "- where a decision names its files: docs/adr/tested-in.json, a list of { decision, files, why } rows beside pr",
+      "excerpt": "- where a decision names its files: docs/adr/tested-in.json, a list of { decision, files, why } rows beside probes.json, files as repository paths. reading path",
       "caught_by": "reasoning",
       "note": "WS2 design: reading test paths from Consequences prose and a header grammar change were weighed and set aside before any code, as alternatives considered."
     },
@@ -498,6 +498,12 @@
       "excerpt": "orm lets an objectified fact type carry a simple reference scheme: \"review has reviewid\" on a review that objectifies \"reviewer reviews paper\" is ordinary, not ",
       "caught_by": "execution",
       "note": "Rescoring the committed 20260828-1647 round moved 13 of 115 payloads, all one legitimate ORM shape."
+    },
+    "incident-interview-guide::38d02c876f5b": {
+      "spec": "incident-interview-guide.spec.md",
+      "excerpt": "barwise generates, from a draft model alone, a list of concrete cases to put to a domain expert -- one for each thing the model says cannot happen, and one for ",
+      "caught_by": "not-a-correction",
+      "note": "The spec's opening resolution sentence. Its contrast is with the interview the guide replaces (asking an expert for the rules a second time), not with an earlier draft of the spec."
     },
     "instruction-reference-check::dafdec52cc5a": {
       "spec": "instruction-reference-check.spec.md",
