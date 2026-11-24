@@ -49,6 +49,11 @@ output specification for the PR body (spec:
   model name belongs. Authority: root `CLAUDE.md` conventions; the
   harness rule on model identity.
 - The branch is on current `main` and carries no merge markers.
+- A body line starting `Opened-without-review:` quotes an instruction
+  the owner gave. The opening guard takes the line on trust, because
+  nothing can tell a session's words from the owner's (barwise-4q0), and
+  a pull request opened that way has had no review before this one.
+  Authority: `docs/adr/review-policy.md#review-before-open`.
 - **A change to a shared function names each caller, and why the change
   is right for that caller.** A function two writers share changes for
   both of them. Removing `source_context` from the object type writer

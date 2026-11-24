@@ -397,7 +397,10 @@ skill (`.claude/skills/release/`).
 - Opening a PR follows the `pr-creation` skill, reviewing one follows
   `pr-review`, and merging one follows the `steward` skill's section 4b:
   the review has recommended `merge` on the head being merged
-  (`docs/adr/merge-delegation.md`). Which review runs when is the root
+  (`docs/adr/merge-delegation.md`). The call that opens one is refused
+  until the session ran `/code-review` and read the `pr-review`
+  checklist on the commit it proposes
+  (`docs/adr/review-policy.md#review-before-open`). Which review runs when is the root
   `REVIEW.md` (`docs/adr/review-policy.md`); the invariants CI cannot
   check live in `pr-review/checklist.md`.
 - TypeScript strict mode. Base config in `barwise/tsconfig.base.json`

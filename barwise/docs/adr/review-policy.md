@@ -1,12 +1,12 @@
 # Review policy
 
 Scope: process
-Date: 2026-10-24
+Date: 2026-11-24
 Tracking: barwise-ilb, barwise-1040, barwise-1050, barwise-953,
-barwise-nm8, barwise-16u, barwise-m9q, barwise-gin,
+barwise-nm8, barwise-16u, barwise-m9q, barwise-gin, barwise-slv,
 docs/specs/tiered-pr-review.spec.md, docs/specs/review-md.spec.md,
-docs/specs/review-routing.spec.md
-Enforced-by: tests (copilot-requested, tier-informs, review-md-owns-lanes),
+docs/specs/review-routing.spec.md, docs/specs/review-before-open.spec.md
+Enforced-by: tests (copilot-requested, tier-informs, review-md-owns-lanes, review-before-open),
 npm run check:review-workflows (review-md-owns-lanes, copilot-requested, copilot-never-blocks, tier-informs),
 none (barwise-ym8.8ya: copilot-never-blocks)
 
@@ -23,8 +23,11 @@ chose to review every non-trivial change and block nothing on Copilot
 root `REVIEW.md` then mapped the review lanes and the failure modes
 reviews keep finding (`review-md.spec.md`), and on 2026-10-24
 `review-routing.spec.md` made the `pr-review` and `pr-creation` skills
-start from the tier classifier's routing. Who may merge, and on what
-condition, is a separate decision (`steward` section 4b).
+start from the tier classifier's routing. The author's own review before
+opening stayed a practice, and was skipped on four recorded pull
+requests (barwise-953), so on 2026-11-20 the owner chose to refuse the
+opening call instead (`review-before-open.spec.md`). Who may merge, and
+on what condition, is a separate decision (`steward` section 4b).
 
 ## Decision
 
@@ -47,6 +50,11 @@ condition, is a separate decision (`steward` section 4b).
    reviewer run every group it lists, every group no path can detect,
    and every failure mode, and the reviewer says which ran. Nothing
    fails on the tier or the routing.
+5. **A session opens a pull request only after `/code-review` returned
+   and the `pr-review` checklist was read whole, in that session, on the
+   commit the pull request proposes.**{#review-before-open} The owner's
+   instruction to open without that is quoted in the body on a line
+   starting `Opened-without-review:`.
 
 ## Consequences
 
@@ -114,18 +122,46 @@ condition, is a separate decision (`steward` section 4b).
   design when a request does not land, so "cannot fail a run" is not the
   rule.
 - `review-policy.md#review-md-owns-lanes` is held for the table and the CI
-  row's trigger; that anyone runs a lane is not. `pr-creation` and
-  `pr-review` hold the practice, and nothing records that `/code-review`
-  or `/security-review` ran (barwise-953). A stacked pull request gets no
+  row's trigger; that anyone runs a lane is not, with one exception:
+  `review-policy.md#review-before-open` holds the author's `/code-review`
+  before opening. Nothing records that `/security-review` ran
+  (barwise-slv). A stacked pull request gets no
   CI until `main` is merged into it after its parent merges (`steward`
   section 4a). `pr-risk` does not route the `/security-review` triggers
   (barwise-16u).
 - `review-policy.md#tier-informs` holds that nothing else keys on the
   tier. It does not hold the rest: nothing records that `pr-risk` ran on
-  the reviewed head or
-  that its groups were run (barwise-953). Printing the routing in CI was
+  the reviewed head or that its groups were run. The opening guard
+  records that the checklist was read on the proposed commit, which is
+  less, and says so (`review-before-open.spec.md`, "What the record
+  cannot see"). Printing the routing in CI was
   deferred by the owner on 2026-10-24 until reviewers are shown to use
   it (`review-routing.spec.md`, WS3; barwise-6mf).
+- `review-policy.md#review-before-open` is held by two Claude Code
+  hooks, in a session that loads `.claude/settings.json`
+  (`review-before-open.spec.md` has the design and the measurements).
+  `scripts/hooks/review-recorder.mjs` appends to the session's record
+  when the `Skill` tool returns for `code-review` and when the `Read`
+  tool returns the whole checklist to the main conversation, each with
+  the commit `HEAD` names. `scripts/hooks/pr-open-guard.mjs` refuses
+  `mcp__github__create_pull_request`, and one literal form of
+  `gh pr create` in Bash, unless both entries are on the tip of the head
+  branch as `git ls-remote` reports it; a fix after a review is a new
+  commit and needs both again. A state it cannot read refuses with
+  exit 2 (`gate-refusal-contract.md`). `pr-open-guard.test.mjs` plants
+  each refusal (the `test:scripts` step).
+- What that hook does not hold, each stated in the spec: that the review
+  was acted on or the checklist applied; a session that loads no project
+  hooks, or a person; the `gh` forms its parser does not see, which the
+  test file pins as a list; a session that writes the record itself or
+  adds the override line unasked (barwise-4q0); and
+  `mcp__github__create_pull_request_with_copilot`, where no commit of
+  the session exists to review. Nothing reads opened pull requests
+  afterwards: the record lives in a session's temporary directory, and
+  the body is text the author writes. An overridden opening still meets
+  `merge-delegation.md#review-before-merge` before it merges, and the
+  `pr-review` checklist asks the reviewer there whose instruction the
+  line quotes.
 - What reviews keep finding is prevented upstream: Copilot's findings
   are classified by failure mode and the most common one gets a mechanism
   in front of review; REVIEW.md's "Always check" list, drawn from a month
@@ -155,4 +191,6 @@ condition, is a separate decision (`steward` section 4b).
   `tiered-pr-review.spec.md`, `REVIEW.md`, the `copilot-review.yml` header, `review-tiers.json`, the
   `steward` (section 7), `pr-review` (section 3 and `checklist.md`) and
   `pr-creation` skills, `review-md.spec.md` and
-  `review-routing.spec.md` also state this rule.
+  `review-routing.spec.md` also state this rule. Decision 5 is stated
+  here and designed in its spec; `pr-creation` and the root `CLAUDE.md`
+  point to it.
