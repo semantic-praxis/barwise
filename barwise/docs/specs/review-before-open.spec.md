@@ -80,7 +80,8 @@ The skill runs forked, so `PostToolUse` fires when the review comes
 back, not when it starts. (A skill that loads into the turn instead,
 such as `spec-writer`, fires at once with only `success` and
 `commandName`.) The recorder matches `tool_input.skill` and requires
-`success: true`; it does not read the findings.
+`success: true` and a `result`, which a skill that only loaded does not
+carry; it does not read the findings.
 
 **The checklist: the `Read` tool returned all of
 `.claude/skills/pr-review/checklist.md` to the main conversation.**
@@ -272,8 +273,11 @@ Opened-without-review: "open it now, I will review it myself" (owner, 2026-11-20
 
 The guard allows a call whose body carries that line: the key at the
 start of a line, with text after the colon, outside a fenced code block
-(``` or `~~~`; an unclosed fence runs to the end) and outside an HTML
-comment, where it would be accepted and not rendered. A body that quotes
+and outside an HTML comment, where it would be accepted and not
+rendered. Fences are read as CommonMark reads them: three or more
+backticks or tildes, closed only by a line of at least as many, so a
+longer fence can show a shorter one, and an unclosed fence runs to the
+end. A comment opener inside an inline code span is text. A body that quotes
 the key inline or shows it in a code block, as this spec and its
 implementing pull request do, is not an override. The guard logs an
 override in two places: the body itself, which every reader of the pull
@@ -310,8 +314,8 @@ one item so the reviewer at the merge end asks.
 In scope, as requirements:
 
 1. When a `PostToolUse` event reports the `Skill` tool with
-   `tool_input.skill` equal to `code-review` and
-   `tool_response.success` equal to `true`, the recorder shall append an
+   `tool_input.skill` equal to `code-review`, `tool_response.success`
+   equal to `true` and a `tool_response.result`, the recorder shall append an
    entry of kind `code-review` carrying `git rev-parse HEAD` (run in the
    event's `cwd`) to the session's review record.
 2. When a `PostToolUse` event with no `agent_id` reports a `Read` whose
@@ -675,6 +679,19 @@ barwise-953 closes in a tracker-only pull request after this one merges.
 - **An overridden opening is not compared with `origin`.** The override
   is read before anything is resolved, as specified, so it is logged
   with the head the call names, whatever repository that is in.
+- **What the first review of the code found** (2026-11-24, nine
+  findings, each now a test). Two let an opening through: `gh api` with
+  its fields spelled `--field=k=v` or `-fk=v`, an attached `-XPOST`, or
+  a full URL, none of which the first reading of "a `gh api` write"
+  covered; and a four-backtick fence, which an inner three-backtick line
+  closed, so a body that only showed the override line could be taken
+  for one. The rest: a tool call with no `tool_name` passed where
+  requirement 7 says it refuses; a comment closed and reopened on one
+  line hid an override; a `code-review` that had only loaded was
+  recorded, so requirement 1 now asks for the `result`; `-XGET` read as
+  a write; `--help` after an unknown flag was refused on the literal
+  path only; a comment opener in an inline code span swallowed a real
+  override; and nothing held the checklist's path to the file.
 - **Open decisions.** Built as recommended: a typed `/code-review` is
   not recorded (filed as barwise-flv), a tool call the guard cannot
   parse exits 2, and there is no detective half.

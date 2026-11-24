@@ -34,7 +34,7 @@ import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { isAbsolute } from "node:path";
 import { checkBase, exitBase, SESSION_ID } from "../lib/exit-log.mjs";
-import { apiFields, flagValue, ghCalls, repoFromRemote, subcommand } from "../lib/gh-command.mjs";
+import { flagValue, ghCalls, repoFromRemote, subcommand } from "../lib/gh-command.mjs";
 import {
   appendReview,
   CHECKLIST,
@@ -112,8 +112,7 @@ const VALUE_FLAGS = new Map([
 const SWITCHES = new Map([["--draft", "draft"], ["-d", "draft"]]);
 
 /**
- * The flags of a literal `gh pr create`, as `{ help }`, `{ fault }` or
- * `{ flags }`. Strict on purpose: a flag outside the form, a repeat, or a
+ * The flags of a literal `gh pr create`, as `{ fault }` or `{ flags }`. Strict on purpose: a flag outside the form, a repeat, or a
  * stray word is a fault, because gh would read a repeat as its last value
  * and this reads it as the first.
  */
@@ -126,7 +125,6 @@ function literalFlags(rest) {
   };
   for (let i = 0; i < rest.length; i++) {
     const w = rest[i];
-    if (w === "--help" || w === "-h") return { help: true };
     let fault;
     const eq = w.startsWith("--") ? w.indexOf("=") : -1;
     if (SWITCHES.has(w)) fault = set(SWITCHES.get(w), true, w);
@@ -186,12 +184,17 @@ function parserSeesOpening(command) {
     } else if (words[0] === "api" && words[1] === "graphql") {
       if (args.some((a) => /createPullRequest/.test(a))) return true;
     } else if (words[0] === "api") {
-      if (!words.slice(1).some((w) => /^\/?repos\/[^/]+\/[^/]+\/pulls\/?$/.test(w))) continue;
-      // gh sends POST once a field is given; a bare path, or -X GET, lists.
-      const method = flagValue(args, ["--method", "-X"]);
-      const fields = Object.keys(apiFields(args)).length > 0
-        || args.some((a) => /^--input(=|$)/.test(a));
-      if (method ? /^post$/i.test(method) : fields) return true;
+      // The endpoint, with or without a leading slash, a host before it or a
+      // query after it.
+      const pulls = /(?:^|\/)repos\/[^/]+\/[^/]+\/pulls\/?(?:\?.*)?$/;
+      if (!words.slice(1).some((w) => pulls.test(w))) continue;
+      // gh sends POST once a field or an input is given; a bare path, or
+      // an explicit GET, lists. Every spelling counts: `-f k=v`, `-fk=v`,
+      // `--field=k=v`, `-XPOST`.
+      const method = flagValue(args, ["--method", "-X"])
+        ?? args.find((a) => /^-X./.test(a))?.slice(2);
+      const sends = args.some((a) => /^(-[fF]|--field|--raw-field|--input)/.test(a));
+      if (method ? !/^get$/i.test(method) : sends) return true;
     }
   }
   return false;
@@ -223,42 +226,61 @@ function opening(input) {
       "`gh api` has no accepted form. Run the push, or anything else, as a command of its own first.",
     );
   }
+  // Asked first, as on the other path: a call for help opens nothing,
+  // whatever else it carries.
+  if (asksForHelp(words.slice(3))) return null;
   const parsed = literalFlags(words.slice(3));
-  if (parsed.help) return null;
   if (parsed.fault) refuse(`${parsed.fault}. The form the guard reads:\n${LITERAL_FORM}`);
   const { repo, head, body, bodyFile } = parsed.flags;
   return { slug: repo, head, body, bodyFile };
 }
 
 /**
- * The text of an override line in a pull request body, or undefined when
- * there is none: the key at the start of a line, outside a fenced code
- * block (an unclosed fence runs to the end) and outside an HTML comment,
- * where it would be accepted and never rendered. A body that documents
- * the key inline or in a code block is not an override.
+ * The override in a pull request body: `{ text }` for a line that counts,
+ * `{ hidden: true }` when the key starts a line only where it does not
+ * count, else `{}`. A line counts when it starts with the key outside a
+ * fenced code block and outside an HTML comment, where it would be
+ * accepted and never rendered. A body that documents the key inline or in
+ * a code block is not an override.
+ *
+ * Fences follow CommonMark: opened by three or more backticks or tildes,
+ * closed only by a line of at least as many of the same character and
+ * nothing else, so a longer fence can show a shorter one; unclosed, it
+ * runs to the end. A comment opener inside an inline code span is text.
  */
-function overrideText(body) {
+function overrideIn(body) {
   let fence = null;
   let comment = false;
+  let hidden = false;
   for (const line of body.split(/\r?\n/)) {
     if (fence) {
-      if (line.trimStart().startsWith(fence)) fence = null;
+      const closes = line.match(/^ {0,3}(`{3,}|~{3,})\s*$/);
+      if (closes && closes[1][0] === fence[0] && closes[1].length >= fence.length) fence = null;
+      else if (line.startsWith(OVERRIDE)) hidden = true;
       continue;
     }
-    if (comment) {
-      if (line.includes("-->")) comment = false;
-      continue;
+    const startsInComment = comment;
+    if (!comment) {
+      const opens = line.match(/^ {0,3}(`{3,}|~{3,})/);
+      if (opens) {
+        fence = opens[1];
+        continue;
+      }
     }
-    const opens = line.match(/^ {0,3}(```|~~~)/);
-    if (opens) {
-      fence = opens[1];
-      continue;
+    // Walk the line's comment markers, so one that closes a comment and
+    // opens the next leaves the state open.
+    const text = line.replace(/`[^`]*`/g, "");
+    for (let at = 0;;) {
+      const next = text.indexOf(comment ? "-->" : "<!--", at);
+      if (next < 0) break;
+      at = next + (comment ? 3 : 4);
+      comment = !comment;
     }
-    if (line.startsWith(OVERRIDE)) return line.slice(OVERRIDE.length).trim();
-    const at = line.lastIndexOf("<!--");
-    if (at >= 0 && !line.includes("-->", at)) comment = true;
+    if (!line.startsWith(OVERRIDE)) continue;
+    if (startsInComment) hidden = true;
+    else return { text: line.slice(OVERRIDE.length).trim() };
   }
-  return undefined;
+  return hidden ? { hidden: true } : {};
 }
 
 /** The commit `head` points at on origin, asked now. Refuses when it cannot tell. */
@@ -307,6 +329,12 @@ try {
   );
 }
 
+if (input === null || typeof input !== "object" || typeof input.tool_name !== "string") {
+  refuse(
+    "the tool call on stdin names no tool, so it cannot be told from one that opens a pull request",
+  );
+}
+
 const call = opening(input);
 if (call === null) process.exit(0);
 
@@ -344,7 +372,7 @@ if (call.bodyFile !== undefined) {
 }
 if (typeof body !== "string") refuse("the call's body is not text");
 
-const override = overrideText(body);
+const { text: override, hidden: overrideHidden } = overrideIn(body);
 if (override !== undefined) {
   if (override === "") {
     refuse(
@@ -418,6 +446,11 @@ refuse(
   ...(record.unreadable > 0
     ? [
       `${record.unreadable} unreadable line(s) in the review record; a step may have been recorded there`,
+    ]
+    : []),
+  ...(overrideHidden
+    ? [
+      `the body has a line starting \`${OVERRIDE}\` inside a code block or an HTML comment, where it is not rendered and does not count`,
     ]
     : []),
   `when the owner has said to open it without review, quote the instruction in the body on a line starting \`${OVERRIDE}\`. The pr-creation skill has the rest of the readiness gate`,

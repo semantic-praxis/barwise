@@ -6,8 +6,9 @@
  *
  * Two events are recorded, each with `git rev-parse HEAD` in the event's
  * cwd:
- *   - the Skill tool returned for `code-review` with success. That skill
- *     runs forked, so the event fires when the review comes back;
+ *   - the Skill tool returned for `code-review` with success and a result.
+ *     That skill runs forked, so the event fires when the review comes
+ *     back, and the result is what tells a return from a load;
  *   - the Read tool returned all of .claude/skills/pr-review/checklist.md
  *     to the main conversation. A partial read cannot be told from reading
  *     the headings, and a subagent's read (it carries the parent's session
@@ -48,9 +49,11 @@ function kindOf(input) {
   if (input?.hook_event_name !== "PostToolUse") return null;
   const ti = input.tool_input ?? {};
   if (input.tool_name === "Skill") {
-    return ti.skill === "code-review" && input.tool_response?.success === true
-      ? "code-review"
-      : null;
+    // A skill that loads into the turn returns at once with success and no
+    // result; a review that came back carries its findings. Only that counts.
+    const back = input.tool_response?.success === true
+      && typeof input.tool_response.result === "string";
+    return ti.skill === "code-review" && back ? "code-review" : null;
   }
   if (input.tool_name !== "Read" || typeof ti.file_path !== "string") return null;
   // The cheap test first: this runs on every Read, and git is asked only

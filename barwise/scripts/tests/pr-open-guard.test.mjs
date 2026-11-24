@@ -31,6 +31,7 @@ import { dirname, join } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { envWithoutRepoLocation, envWithoutUserGitConfig } from "../lib/git-env.mjs";
+import { CHECKLIST as CHECKLIST_REL } from "../lib/review-record.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const GUARD = join(HERE, "..", "hooks", "pr-open-guard.mjs");
@@ -43,7 +44,7 @@ const TMP = join(T, "tmp");
 const ORIGIN = join(T, "o", "r.git");
 const WORK = join(T, "work");
 const OTHER = join(T, "other");
-const CHECKLIST = join(WORK, ".claude", "skills", "pr-review", "checklist.md");
+const CHECKLIST = join(WORK, CHECKLIST_REL);
 const ENV = { ...envWithoutRepoLocation(envWithoutUserGitConfig()), TMPDIR: TMP };
 const BASE = join(TMP, `barwise-exit-${process.getuid?.() ?? "user"}`);
 
@@ -183,8 +184,10 @@ test("the recorder ignores another skill, and a code-review that did not succeed
   for (
     const over of [
       { tool_input: { skill: "pr-review" } },
-      { tool_response: { success: false, commandName: "code-review" } },
-      { tool_response: { commandName: "code-review" } },
+      { tool_response: { success: false, commandName: "code-review", result: "[]" } },
+      { tool_response: { commandName: "code-review", result: "[]" } },
+      // A skill that only loaded into the turn: success, and no result yet.
+      { tool_response: { success: true, commandName: "code-review" } },
       { hook_event_name: "PreToolUse" },
     ]
   ) {
@@ -205,7 +208,7 @@ test(`the recorder writes a checklist entry for a whole-file read in the main co
 test("the recorder ignores a partial read, a subagent's read, another file and another checkout's checklist", () => {
   branch("rec4");
   const sid = session();
-  const elsewhere = join(OTHER, ".claude", "skills", "pr-review", "checklist.md");
+  const elsewhere = join(OTHER, CHECKLIST_REL);
   for (
     const event of [
       readEvent(sid, {}, { numLines: 2 }),
@@ -249,6 +252,13 @@ test("the recorder says why, with exit 2, when a matching event cannot be record
   assert.equal(r.status, 2, r.stderr);
   assert.match(r.stderr, /open to other users/);
   assert.deepEqual(recorded(sid, base), []);
+});
+
+test("the checklist is where the hooks look for it", () => {
+  // The clone above carries a stand-in at the same relative path, so the
+  // suite would stay green if the real file moved and every opening were
+  // then refused for a read nobody can make.
+  assert.ok(existsSync(join(ROOT, CHECKLIST_REL)), `${CHECKLIST_REL} is not in this repository`);
 });
 
 // ------------------------------------------------------- guard, MCP call
@@ -403,6 +413,11 @@ test(`a record it cannot read refuses and says why ${TAG}`, () => {
 test(`a tool call it cannot parse refuses: exit 2, never 0 or 1 ${TAG}`, () => {
   refused("not json", /could not be parsed, so it cannot be told from one that opens/);
   refused({ tool_name: "Bash", tool_input: {} }, /carries no command to read/);
+  refused("null", /names no tool, so it cannot be told from one that opens/);
+  refused(
+    { tool_input: { command: "gh pr create --repo o/r --head feat" } },
+    /names no tool, so it cannot be told from one that opens/,
+  );
 });
 
 test("a call that opens nothing passes whatever the session state is", () => {
@@ -417,6 +432,11 @@ test("a call that opens nothing passes whatever the session state is", () => {
       bash(undefined, "gh pr create --repo o/r --help | head -40"),
       bash(undefined, "gh api repos/o/r/pulls"),
       bash(undefined, "gh api -X GET repos/o/r/pulls -f state=open"),
+      bash(undefined, "gh api -XGET repos/o/r/pulls -f state=open"),
+      bash(undefined, "gh api 'repos/o/r/pulls?state=open&per_page=5'"),
+      bash(undefined, "gh api --method=get repos/o/r/pulls --field=state=open"),
+      bash(undefined, "gh pr create --fill --help"),
+      bash(undefined, "gh pr create --repo o/r --head feat --label x -h"),
       bash(undefined, "gh api graphql -f query='{ viewer { login } }'"),
       bash(undefined, "git commit -m 'explain gh pr create --head x'"),
       bash(undefined, "cat <<'EOF' > notes.md\ngh pr create --head feat\nEOF"),
@@ -458,12 +478,30 @@ test(`a body that only shows the key is not an override ${TAG}`, () => {
     "```text\nOpened-without-review: in an unclosed fence",
     "<!--\nOpened-without-review: in a comment, so never rendered\n-->",
     "<!-- a comment that opens\nOpened-without-review: and is still open\n",
+    // A longer fence shows a shorter one: the inner fence does not close it.
+    '````md\n```\nOpened-without-review: "quote the owner here"\n```\n````',
+    "~~~~\n~~~\nOpened-without-review: in a tilde fence of four\n~~~\n~~~~",
+    // A fence closes only on a line that is nothing but the fence.
+    "```\n```js is not a closing line\nOpened-without-review: still fenced\n",
+    // The line that closes one comment opens the next.
+    "<!-- a --> x <!--\nhidden\n--> y <!--\nOpened-without-review: go\n-->",
   ];
   for (const body of bodies) {
     const sid = session();
-    refused(mcp(sid, { body }), /has not reviewed that commit/);
+    const r = refused(mcp(sid, { body }), /has not reviewed that commit/);
     assert.deepEqual(recorded(sid), [], body);
+    // Said when the key starts a line that does not count, and only then.
+    const atLineStart = /^Opened-without-review:/m.test(body);
+    assert.equal(/inside a code block or an HTML comment/.test(r.stderr), atLineStart, body);
   }
+  // A comment opener in an inline code span is text, not a comment.
+  const spans = session();
+  allowed(
+    mcp(spans, {
+      body: "It counts outside an HTML comment (`<!--`).\n\nOpened-without-review: owner said go\n",
+    }),
+  );
+  assert.equal(recorded(spans)[0].text, "owner said go");
   // After the fence or the comment closes, the line counts again.
   const sid = session();
   allowed(mcp(sid, { body: "```\ncode\n```\n<!-- note -->\nOpened-without-review: yes, go\n" }));
@@ -558,6 +596,14 @@ test(`every other gh opening the shared parser sees is refused, reviewed or not 
       "gh api /repos/o/r/pulls -f head=feat -f base=main -f title=t",
       "gh api repos/{owner}/{repo}/pulls -X POST --input pr.json",
       "gh api -X POST repos/o/r/pulls",
+      "gh api -XPOST repos/o/r/pulls",
+      "gh api -X POST 'repos/o/r/pulls?per_page=1' --input pr.json",
+      "gh api repos/o/r/pulls --field=title=T --field=head=feat --field=base=main",
+      "gh api repos/o/r/pulls --raw-field=title=T --raw-field=head=feat",
+      "gh api repos/o/r/pulls -ftitle=T -fhead=feat -fbase=main",
+      "gh api repos/o/r/pulls -Fdraft=true -fhead=feat",
+      "gh api repos/o/r/pulls --input=pr.json",
+      "gh api https://api.github.com/repos/o/r/pulls -f title=T -f head=feat -f base=main",
       "gh api graphql -f query='mutation { createPullRequest(input: {}) { clientMutationId } }'",
     ]
   ) {
