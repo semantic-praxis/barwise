@@ -1,6 +1,6 @@
 # A pull request opens only after this session reviewed the commit it proposes
 
-Status: Draft -- no workstream implemented
+Status: Implemented 2026-11-24 -- workstream 1 (the parser move, the recorder, the guard, their wiring and the ADR decision). The three Open decisions were built as recommended; the owner has not answered them.
 
 Created: 2026-11-20
 Last-updated: 2026-11-24
@@ -633,11 +633,10 @@ barwise-953 closes in a tracker-only pull request after this one merges.
   opening is refused. The tests cannot see that: they hold the hooks to
   the shapes measured on 2026-11-20. The refusal message says what the
   recorder looks for, which is where a session would start.
-- **The hook input's `cwd` may not be the shell's.** Whether a `cd` in
-  an earlier Bash call moves the `cwd` a later hook receives was not
-  measured. The design does not depend on the answer: `--repo` is
-  explicit and compared with `origin`, and `--body-file` is absolute.
-  Workstream 1 measures it and records the result here.
+- **The hook input's `cwd` and the shell's.** Unmeasured when this was
+  drafted, so the design does not depend on it: `--repo` is explicit
+  and compared with `origin`, and `--body-file` is absolute. Measured
+  in Workstream 1; see Implementation notes.
 - **`git ls-remote` fails or hangs.** The guard refuses, on its own
   15-second limit if need be. Opening the pull request needs the same
   remote, so the refusal loses nothing (`merge-guard` makes the same
@@ -647,6 +646,38 @@ barwise-953 closes in a tracker-only pull request after this one merges.
   in `expected-counts.json`. Each refusal test is watched failing with
   its guard removed, through `barwise/scripts/mutate.mjs`. The moved
   parser is covered by `merge-guard.test.mjs`, unchanged.
+
+## Implementation notes (Workstream 1, 2026-11-24)
+
+- **The hook input's `cwd` follows the shell.** Measured with a probe on
+  `PreToolUse`: after `cd barwise/scripts` in one Bash call, the next
+  call's hook input carried that directory as `cwd`, and the hook
+  process started in it. The absolute `--body-file` rule was written
+  without that and is kept: it costs a session nothing and leaves one
+  thing fewer resting on the harness.
+- **The header's `Plan-reviewed:` line names 404c9d2f and says what the
+  reviews read.** `check:plan-review` requires the named commit to carry
+  the plan as implementation began, and 404c9d2f changed the body after
+  4b278196, the last commit both reviews read. The owner directed its
+  merge, so no review names it; the line says so instead of naming a
+  commit with another body.
+- **`withoutHeredocBodies` and `segments` moved and are not exported.**
+  Only `ghCalls` uses them. The Target architecture lists them as the
+  module's contents, which they are.
+- **`lib/review-record.mjs` also holds the local git reading.** Both
+  hooks ask git for one line in the hook input's `cwd` (`HEAD`, the
+  repository root), so `gitLine` and `checklistPath` live beside the
+  record, with a 10-second limit: a local reading takes milliseconds, so
+  ten seconds means git is not answering, and the hook says so.
+- **The literal form is read from the trimmed command.** Leading and
+  trailing whitespace, a final newline included, means nothing to the
+  shell.
+- **An overridden opening is not compared with `origin`.** The override
+  is read before anything is resolved, as specified, so it is logged
+  with the head the call names, whatever repository that is in.
+- **Open decisions.** Built as recommended: a typed `/code-review` is
+  not recorded (filed as barwise-flv), a tool call the guard cannot
+  parse exits 2, and there is no detective half.
 
 ## Non-goals
 
