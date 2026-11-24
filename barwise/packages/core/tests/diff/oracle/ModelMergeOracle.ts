@@ -5,13 +5,13 @@
  * reorder the import statements and rewrap the lines that hold one;
  * nothing else differs, and everything below this comment is that file.
  *
- * FROZEN IS THIS FILE, NOT WHAT IT IMPORTS. The pairing it reads
- * (`elementDiff.ts`, `identity.ts`, `deltas.ts`), the id rules and
- * `mapConstraintReferences` are the live modules, as they are for the
- * live merge. A change to one of those changes both merges alike and the
- * law cannot see it. The spec leaves them untouched by the restructure
- * for that reason; a step that needs to change one is outside what this
- * oracle judges, and says so.
+ * FROZEN IS THIS FILE, NOT WHAT IT IMPORTS. Every module it imports from
+ * `src/` is the live one, as it is for the live merge: the pairing
+ * (`elementDiff.ts`, `identity.ts`), the model and its id rules, the
+ * constraint decoders, validation. A change to any of them changes both
+ * merges alike and the law cannot see it. A step of the restructure that
+ * needs to change one is outside what this oracle judges, and says so
+ * (the spec's tripwires).
  *
  * It is the judge of the restructure in
  * docs/specs/model-merge-stages.spec.md: `tests/laws/mergeOracle.law.test.ts`

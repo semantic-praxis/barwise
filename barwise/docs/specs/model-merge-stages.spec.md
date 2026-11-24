@@ -474,11 +474,16 @@ above and six of barwise-ocn's seven are CAUGHT; dropping the
 it. The pull request has the plants.
 
 **What the law cannot judge: a module both merges import.** The copy
-freezes `ModelMerge.ts`. The pairing it reads (`elementDiff.ts`,
-`identity.ts`, `deltas.ts`), the id rules and `mapConstraintReferences`
-are the live modules, so a change to one moves both merges alike. The
-Inventory leaves them untouched; a step that needs to change one is a
-tripwire, below.
+freezes `ModelMerge.ts` and nothing else. Every module it imports from
+`src/` is the live one: the pairing (`elementDiff.ts`, `identity.ts`),
+the model and its id rules, validation, and `decode/constraint.ts`,
+which workstream 4 plans to send every rewritten constraint through. A
+change to any of them moves both merges alike. A step that needs to
+change one is a tripwire, below.
+
+**The inputs are read too.** The law serializes both models before the
+two merges and after, so a stage that wrote to the base in place fails
+it although the document it returned agrees.
 
 **What the law does not execute.** v8 coverage of
 `tests/diff/oracle/ModelMergeOracle.ts` under
@@ -500,7 +505,29 @@ by the frozen file's own line numbers:
 | 1385                                    | `keptConstraintIds`                                       | an existing constraint id the incoming model gives another element                          |
 | 1528                                    | `remapJoinOperand`                                        | a join root neither model translates                                                        |
 
-Branch arms never taken on lines that did run are on 39 further lines.
+Branch arms never taken, on 39 lines that did run. Most are the other
+side of a `??` or an `if` whose rows are above; the rest are a shape the
+generator does not draw, such as a role id that is not under its fact
+type's (1356) or an instance id not under its population's (957). The
+precondition covers these lines as it covers the rows above.
+
+| In                                        | Lines                                                                                        |
+| ----------------------------------------- | -------------------------------------------------------------------------------------------- |
+| `mergeModels`                             | 167, 234, 251, 270, 296, 312, 415-417, 476, 543, 557, 574, 575, 587, 624, 687, 740, 741, 768 |
+| `sameUniquenessIn`                        | 822, 825                                                                                     |
+| `withPopulationId`                        | 957                                                                                          |
+| `refuseUnmergeablePairing`                | 1044                                                                                         |
+| `acceptedHeader`                          | 1071                                                                                         |
+| `refuseImportClashes`                     | 1089                                                                                         |
+| `refuseNameClashes`                       | 1137, 1152                                                                                   |
+| `refuseOwnerChanges`                      | 1175, 1178                                                                                   |
+| `refuseCoincidentIds`                     | 1245, 1263                                                                                   |
+| `addFactTypeToMerged`                     | 1319                                                                                         |
+| `rebaseRoles`                             | 1356                                                                                         |
+| `remapJoinOperand`                        | 1525                                                                                         |
+| `unionAliases`                            | 1539, 1540                                                                                   |
+| `getStructuralErrors`, `mergeAndValidate` | 1590, 1617                                                                                   |
+
 Both readings come from `packages/core`:
 
 ```sh
@@ -654,10 +681,10 @@ Tripwires:
 - If `src/diff/` ends workstream 4 with more code lines than it held
   before workstream 3, say so in the pull request and ask before
   workstream 5.
-- If a step needs to change a module the frozen copy imports
-  (`elementDiff.ts`, `identity.ts`, `deltas.ts`, `model/idRules.ts`,
-  `model/mint.ts`), stop: the oracle law cannot judge that change, so it
-  is made and reviewed on its own, before or after the restructure.
+- If a step needs to change any module the frozen copy imports from
+  `src/` (`decode/constraint.ts` is the likely one, in workstream 4),
+  stop: the oracle law cannot judge that change, so it is made and
+  reviewed on its own, before or after the restructure.
 - If a fix to merge behaviour is needed while the oracle exists and
   cannot be made in both copies in one commit, finish or abandon the
   restructure first; do not edit the oracle alone.

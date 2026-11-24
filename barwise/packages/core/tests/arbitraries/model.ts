@@ -53,12 +53,7 @@ import {
 } from "../../src/model/Constraint.js";
 import type { Definition } from "../../src/model/Definition.js";
 import type { DiagramLayout } from "../../src/model/DiagramLayout.js";
-import type {
-  DerivationKind,
-  DerivationRule,
-  FactTypeConfig,
-  RoleConfig,
-} from "../../src/model/FactType.js";
+import type { DerivationKind, DerivationRule, FactTypeConfig } from "../../src/model/FactType.js";
 import { storePreferredFlags } from "../../src/model/identification.js";
 import { populationIdBase, suffixed } from "../../src/model/idRules.js";
 import type { ObjectifiedFactTypeConfig } from "../../src/model/ObjectifiedFactType.js";
@@ -72,6 +67,7 @@ import type {
 } from "../../src/model/ObjectType.js";
 import { OrmModel, type OrmModelConfig } from "../../src/model/OrmModel.js";
 import type { FactInstanceConfig, PopulationConfig } from "../../src/model/Population.js";
+import type { RoleConfig } from "../../src/model/Role.js";
 import type { SubtypeFactConfig } from "../../src/model/SubtypeFact.js";
 import { remapIds } from "../../src/rename/remapIds.js";
 import { replayInto40 } from "../../src/serialization/replay.js";

@@ -94,6 +94,17 @@ function outcome(
 }
 
 /**
+ * The two models a merge was given, as documents. A merge returns a new
+ * model and leaves both of these as it found them (the merge's own
+ * header says so); the laws read them before and after, because a stage
+ * that sorted or appended to a base collection in place would still
+ * return the document the frozen merge returns.
+ */
+function documents(pair: readonly [OrmModel, OrmModel]): string[] {
+  return pair.map((model) => yaml.serialize(model));
+}
+
+/**
  * Both merges on one input, the frozen one first: it reads the pair
  * before the live merge has touched it, so a live merge that changed its
  * inputs could not hand the judge a pair that already agrees with it.
@@ -159,8 +170,11 @@ describe("law: the merge returns what the frozen merge returns", () => {
   }, ({ pairOf }) => {
     fc.assert(
       fc.property(arbModelPlan(), arbModelPlan(), arbAcceptance, (x, y, acceptance) => {
-        const { frozen, live } = bothOutcomes(...pairOf(x, y), MERGE_DIFF_OPTIONS, acceptance);
+        const pair = pairOf(x, y);
+        const before = documents(pair);
+        const { frozen, live } = bothOutcomes(...pair, MERGE_DIFF_OPTIONS, acceptance);
         expect(live).toEqual(frozen);
+        expect(documents(pair)).toEqual(before);
       }),
       { seed: SEED, numRuns: RUNS },
     );
@@ -172,8 +186,10 @@ describe("law: the merge returns what the frozen merge returns", () => {
     fc.assert(
       fc.property(arbModelPlan(), arbAcceptance, (x, acceptance) => {
         const pair = pairOf(x, withSomeEdited(x));
+        const before = documents(pair);
         const { frozen, live } = bothOutcomes(...pair, MERGE_DIFF_OPTIONS, acceptance);
         expect(live).toEqual(frozen);
+        expect(documents(pair)).toEqual(before);
       }),
       { seed: SEED, numRuns: RUNS },
     );
@@ -297,7 +313,9 @@ describe.each(ID_FORMS)("coverage: the edited copies leave elements unchanged, $
       .toBeGreaterThanOrEqual(floor);
   }
 
-  it("compares merges that were returned, and built from both sides", () => {
+  it("compares merges that were returned, and built from both sides", {
+    timeout: LAW_TIMEOUT_MS,
+  }, () => {
     // The diffs above say what was on offer; these say a merge was built
     // from it. An edited copy that came to be refused in every draw would
     // leave the law comparing 250 identical refusals.
