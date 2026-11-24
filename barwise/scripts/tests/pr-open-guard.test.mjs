@@ -483,6 +483,8 @@ test(`a body that only shows the key is not an override ${TAG}`, () => {
     "~~~~\n~~~\nOpened-without-review: in a tilde fence of four\n~~~\n~~~~",
     // A fence closes only on a line that is nothing but the fence.
     "```\n```js is not a closing line\nOpened-without-review: still fenced\n",
+    // An escaped backtick is a character, so this comment opener is real.
+    "\\`<!--\\`\nOpened-without-review: owner said so\n-->",
     // The line that closes one comment opens the next.
     "<!-- a --> x <!--\nhidden\n--> y <!--\nOpened-without-review: go\n-->",
   ];
@@ -502,6 +504,13 @@ test(`a body that only shows the key is not an override ${TAG}`, () => {
     }),
   );
   assert.equal(recorded(spans)[0].text, "owner said go");
+  // So is one in a double-backtick span.
+  // A shorter run inside the span does not close it.
+  const doubled = session();
+  allowed(
+    mcp(doubled, { body: "A span: ``a ` <!-- b`` in prose.\n\nOpened-without-review: go\n" }),
+  );
+  assert.equal(recorded(doubled)[0].text, "go");
   // After the fence or the comment closes, the line counts again.
   const sid = session();
   allowed(mcp(sid, { body: "```\ncode\n```\n<!-- note -->\nOpened-without-review: yes, go\n" }));
@@ -614,6 +623,23 @@ test(`every other gh opening the shared parser sees is refused, reviewed or not 
   }
 });
 
+test("a GraphQL call whose query the guard cannot read is refused, not passed", () => {
+  for (
+    const command of [
+      "gh api graphql -F query=@q.graphql -F headRefName=feat",
+      "gh api graphql -fquery=@q.graphql",
+      "gh api graphql --input q.json",
+      "gh api graphql --input=-",
+    ]
+  ) {
+    const r = refused(bash(session(), command), [
+      /takes its query from a file or from stdin, which the guard cannot read/,
+      /Put the query in the command/,
+    ]);
+    assert.doesNotMatch(r.stderr, /the guard reads one form only/);
+  }
+});
+
 test("the forms the shared parser does not see pass unguarded: the stated limits", () => {
   // Pinned so that the limits lib/gh-command.mjs and the spec list are the
   // real ones. A parser change that closes one fails here, and the list
@@ -633,6 +659,10 @@ test("the forms the shared parser does not see pass unguarded: the stated limits
       `xargs ${open}`,
       `eval "${open}"`,
       "$GH pr create --repo o/r --head feat",
+      // A substitution inside double quotes, and one inside an argument
+      // (barwise-hig): the parser's own defect, shared with merge-guard.
+      `PR_URL="$(${open})"`,
+      'gh api "repos/$(git config --get x.slug)/pulls" -f title=t -f head=feat -f base=main',
     ]
   ) allowed(bash(session(), command));
 });

@@ -25,8 +25,9 @@ while HEAD was the commit the pull request proposes; the owner's
 instruction to open without review travels as an `Opened-without-review:`
 line in the body and is logged.
 
-The owner chose refusal on 2026-11-20. This spec designs it; it does not
-reopen the choice. Its price is stated once here: every commit made
+The rule itself is `docs/adr/review-policy.md#review-before-open`; this
+spec is its design and its measurements. The owner chose refusal on
+2026-11-20, and the spec does not reopen the choice. Its price is stated once here: every commit made
 after a review needs both steps again before the pull request can open.
 
 ## Principle
@@ -247,16 +248,22 @@ the ordinary forms: a chain, a `VAR=value` or bare `env` prefix, `sh
 -c`, a substitution, a heredoc body, double quotes, a missing or
 repeated flag. `gh api` has no accepted form: a session that wants to
 open a pull request from Bash uses the literal `gh pr create`.
-`gh pr create --help` or `-h` opens nothing and is passed.
+`gh pr create --help` or `-h` opens nothing and is passed. A
+`gh api graphql` call whose query comes from a file or from stdin is
+refused as well: the guard sees the call and cannot read the mutation.
 
 **What is not seen.** The parser finds no `gh` call in `timeout 60 gh
 pr create`, `env -C <dir> gh pr create`, `if ...; then gh pr create;
 fi`, `{ gh pr create; }`, `( gh pr create )`, `! gh pr create`,
 `bash -lc '...'`, a command after a quoted `<<WORD` (its heredoc
 stripping is not quote-aware), or `gh` reached through `xargs`, `eval`,
-a variable, an alias or a shell function. Each form in the command's
-text was run against the parser on 2026-11-24 (an alias or a function is
-not in the text at all). They pass unguarded, as the same forms of
+a variable, an alias or a shell function. Nor does it find one inside a
+double-quoted substitution (`X="$(gh pr create ...)"`), and a
+substitution inside an argument cuts the call short (`gh api
+"repos/$(...)/pulls" -f head=...`); both are the parser's own defect,
+filed as barwise-hig. Each form in the command's text was run against
+the parser on 2026-11-24 (an alias or a function is not in the text at
+all), and `pr-open-guard.test.mjs` runs the list on every change. They pass unguarded, as the same forms of
 `gh pr merge` pass `merge-guard` today. The guard holds the paths a
 session takes by default; it is not a boundary against a command built
 to get around it, any more than the record is against a session that
@@ -692,6 +699,12 @@ barwise-953 closes in a tracker-only pull request after this one merges.
   a write; `--help` after an unknown flag was refused on the literal
   path only; a comment opener in an inline code span swallowed a real
   override; and nothing held the checklist's path to the file.
+- **What the second review of the code found** (2026-11-24). Two more
+  forms the shared parser does not see, added to the list above and to
+  the test that pins it. A GraphQL call with its query in a file, which
+  the guard saw and could not read: now a refusal. The override reader's
+  inline code spans, read too crudely in both directions: now matched by
+  backtick-run length, with an escaped backtick a character.
 - **Open decisions.** Built as recommended: a typed `/code-review` is
   not recorded (filed as barwise-flv), a tool call the guard cannot
   parse exits 2, and there is no detective half.

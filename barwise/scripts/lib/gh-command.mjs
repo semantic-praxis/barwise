@@ -2,16 +2,22 @@
  * Reading a `gh` command out of a Bash tool call, for the hooks that guard
  * one: merge-guard.mjs (a merge) and pr-open-guard.mjs (an opening).
  *
- * Moved here unchanged from merge-guard.mjs when the second hook arrived
+ * Moved here from merge-guard.mjs when the second hook arrived
  * (docs/specs/review-before-open.spec.md, Workstream 1), so the two read a
- * command the same way. A change here is a change to both.
+ * command the same way: a change here is a change to both. The parser is
+ * what it was. `repoFromRemote` is not: it makes its own git call and
+ * takes the directory whose `origin` is meant, which pr-open-guard passes
+ * (the hook input's cwd) and merge-guard does not (the process's own; the
+ * two were measured equal on 2026-11-24).
  *
- * What it does not see is part of its contract, because both hooks pass a
- * command in which it finds no `gh` call: `timeout 60 gh ...`, `env -C
- * <dir> gh ...`, a compound command (`if`, `{ }`, `( )`, `!`), `bash -lc`,
- * a command after a quoted `<<WORD`, and `gh` reached through `xargs`,
- * `eval`, a variable, an alias or a function. pr-open-guard.test.mjs pins
- * that list.
+ * What the parser does not see is part of its contract, because both
+ * hooks pass a command in which it finds no `gh` call: a wrapper it does
+ * not know (`timeout`, `env -C`), a compound command, a substitution
+ * inside double quotes or inside an argument, and `gh` reached through
+ * `eval`, `xargs`, a variable, an alias or a function. The list itself is
+ * owned by pr-open-guard.test.mjs ("the stated limits"), which runs each
+ * form; it is not restated here, so there is one copy to keep true
+ * (barwise-hig is the defect behind the substitution forms).
  */
 import { spawnSync } from "node:child_process";
 

@@ -175,14 +175,22 @@ function asksForHelp(rest) {
   return false;
 }
 
-/** Whether the shared parser finds a pull-request-opening gh call in the command. */
-function parserSeesOpening(command) {
+/**
+ * What the shared parser finds in the command: "opening" for a gh call
+ * that opens a pull request, "unreadable" for one the guard can see and
+ * cannot read (a GraphQL call whose query is not in the command), else
+ * null.
+ */
+function parserSees(command) {
   for (const args of ghCalls(command)) {
     const { words, at } = subcommand(args);
     if (words[0] === "pr" && (words[1] === "create" || words[1] === "new")) {
-      if (!asksForHelp(args.slice(at[1] + 1))) return true;
+      if (!asksForHelp(args.slice(at[1] + 1))) return "opening";
     } else if (words[0] === "api" && words[1] === "graphql") {
-      if (args.some((a) => /createPullRequest/.test(a))) return true;
+      if (args.some((a) => /createPullRequest/.test(a))) return "opening";
+      // The query from a file or stdin: the call is seen and the mutation
+      // is not, which is a state the guard cannot read, not one it passes.
+      if (args.some((a) => /query=@/.test(a) || /^--input(=|$)/.test(a))) return "unreadable";
     } else if (words[0] === "api") {
       // The endpoint, with or without a leading slash, a host before it or a
       // query after it.
@@ -194,10 +202,10 @@ function parserSeesOpening(command) {
       const method = flagValue(args, ["--method", "-X"])
         ?? args.find((a) => /^-X./.test(a))?.slice(2);
       const sends = args.some((a) => /^(-[fF]|--field|--raw-field|--input)/.test(a));
-      if (method ? !/^get$/i.test(method) : sends) return true;
+      if (method ? !/^get$/i.test(method) : sends) return "opening";
     }
   }
-  return false;
+  return null;
 }
 
 /**
@@ -219,7 +227,13 @@ function opening(input) {
   const literal = words?.[0] === "gh" && words[1] === "pr"
     && (words[2] === "create" || words[2] === "new");
   if (!literal) {
-    if (!parserSeesOpening(ti.command)) return null;
+    const seen = parserSees(ti.command);
+    if (seen === null) return null;
+    if (seen === "unreadable") {
+      refuse(
+        "this `gh api graphql` call takes its query from a file or from stdin, which the guard cannot read, so it cannot be told from a `createPullRequest` mutation. Put the query in the command",
+      );
+    }
     refuse(
       "this command opens a pull request with gh, and the guard reads one form only, because it runs before any of the command does and cannot tell what the rest of it will change:\n"
         + LITERAL_FORM,
@@ -249,6 +263,44 @@ function opening(input) {
  * runs to the end. A comment opener inside an inline code span is text.
  */
 function overrideIn(body) {
+  /**
+   * The line with its inline code spans removed, as Markdown reads them:
+   * a span opens on a run of backticks and closes on the next run of the
+   * same length, and a backslash-escaped backtick is a character. Cruder
+   * readings failed both ways: an escaped pair around a comment opener hid
+   * a real comment, and a double-backtick span was not seen as code.
+   */
+  const withoutCodeSpans = (line) => {
+    const s = line.replace(/\\`/g, " ");
+    let out = "";
+    for (let i = 0; i < s.length;) {
+      if (s[i] !== "`") {
+        out += s[i++];
+        continue;
+      }
+      let n = 0;
+      while (s[i + n] === "`") n++;
+      let close = -1;
+      for (let j = i + n; j < s.length;) {
+        if (s[j] !== "`") {
+          j++;
+          continue;
+        }
+        let m = 0;
+        while (s[j + m] === "`") m++;
+        if (m === n) {
+          close = j;
+          break;
+        }
+        j += m;
+      }
+      if (close < 0) {
+        out += s.slice(i, i + n);
+        i += n;
+      } else i = close + n;
+    }
+    return out;
+  };
   let fence = null;
   let comment = false;
   let hidden = false;
@@ -269,7 +321,7 @@ function overrideIn(body) {
     }
     // Walk the line's comment markers, so one that closes a comment and
     // opens the next leaves the state open.
-    const text = line.replace(/`[^`]*`/g, "");
+    const text = withoutCodeSpans(line);
     for (let at = 0;;) {
       const next = text.indexOf(comment ? "-->" : "<!--", at);
       if (next < 0) break;
@@ -290,6 +342,8 @@ function remoteTip(cwd, head) {
     cwd,
     encoding: "utf8",
     timeout: REMOTE_MS,
+    // So that git fails at once where it would otherwise stop to ask for
+    // credentials, and sit out the whole limit on a terminal nobody is at.
     env: { ...process.env, GIT_TERMINAL_PROMPT: "0" },
   });
   if (r.error?.code === "ETIMEDOUT" || r.signal) {
