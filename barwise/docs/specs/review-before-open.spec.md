@@ -1,10 +1,13 @@
 # A pull request opens only after this session reviewed the commit it proposes
 
-Status: Draft -- no workstream implemented
+Status: Implemented 2026-11-24 -- workstream 1 (the parser move, the recorder, the guard, their wiring and the ADR decision). The three Open decisions were built as recommended; the owner has not answered them.
 
 Created: 2026-11-20
 Last-updated: 2026-11-24
 Tracking: barwise-953
+Plan-reviewed: 404c9d2f (code-review and pr-review read 4b278196; 404c9d2f
+adds the three text changes that review asked for and was merged on the
+owner's direction without a further round)
 Touches: +barwise/scripts/hooks/pr-open-guard.mjs,
 +barwise/scripts/hooks/review-recorder.mjs,
 +barwise/scripts/lib/gh-command.mjs, +barwise/scripts/lib/review-record.mjs,
@@ -22,8 +25,9 @@ while HEAD was the commit the pull request proposes; the owner's
 instruction to open without review travels as an `Opened-without-review:`
 line in the body and is logged.
 
-The owner chose refusal on 2026-11-20. This spec designs it; it does not
-reopen the choice. Its price is stated once here: every commit made
+The rule itself is `docs/adr/review-policy.md#review-before-open`; this
+spec is its design and its measurements. The owner chose refusal on
+2026-11-20, and the spec does not reopen the choice. Its price is stated once here: every commit made
 after a review needs both steps again before the pull request can open.
 
 ## Principle
@@ -77,7 +81,8 @@ The skill runs forked, so `PostToolUse` fires when the review comes
 back, not when it starts. (A skill that loads into the turn instead,
 such as `spec-writer`, fires at once with only `success` and
 `commandName`.) The recorder matches `tool_input.skill` and requires
-`success: true`; it does not read the findings.
+`success: true` and a `result`, which a skill that only loaded does not
+carry; it does not read the findings.
 
 **The checklist: the `Read` tool returned all of
 `.claude/skills/pr-review/checklist.md` to the main conversation.**
@@ -243,16 +248,22 @@ the ordinary forms: a chain, a `VAR=value` or bare `env` prefix, `sh
 -c`, a substitution, a heredoc body, double quotes, a missing or
 repeated flag. `gh api` has no accepted form: a session that wants to
 open a pull request from Bash uses the literal `gh pr create`.
-`gh pr create --help` or `-h` opens nothing and is passed.
+`gh pr create --help` or `-h` opens nothing and is passed. A
+`gh api graphql` call whose query comes from a file or from stdin is
+refused as well: the guard sees the call and cannot read the mutation.
 
 **What is not seen.** The parser finds no `gh` call in `timeout 60 gh
 pr create`, `env -C <dir> gh pr create`, `if ...; then gh pr create;
 fi`, `{ gh pr create; }`, `( gh pr create )`, `! gh pr create`,
 `bash -lc '...'`, a command after a quoted `<<WORD` (its heredoc
 stripping is not quote-aware), or `gh` reached through `xargs`, `eval`,
-a variable, an alias or a shell function. Each form in the command's
-text was run against the parser on 2026-11-24 (an alias or a function is
-not in the text at all). They pass unguarded, as the same forms of
+a variable, an alias or a shell function. Nor does it find one inside a
+double-quoted substitution (`X="$(gh pr create ...)"`), and a
+substitution inside an argument cuts the call short (`gh api
+"repos/$(...)/pulls" -f head=...`); both are the parser's own defect,
+filed as barwise-hig. Each form in the command's text was run against
+the parser on 2026-11-24 (an alias or a function is not in the text at
+all), and `pr-open-guard.test.mjs` runs the list on every change. They pass unguarded, as the same forms of
 `gh pr merge` pass `merge-guard` today. The guard holds the paths a
 session takes by default; it is not a boundary against a command built
 to get around it, any more than the record is against a session that
@@ -269,8 +280,11 @@ Opened-without-review: "open it now, I will review it myself" (owner, 2026-11-20
 
 The guard allows a call whose body carries that line: the key at the
 start of a line, with text after the colon, outside a fenced code block
-(``` or `~~~`; an unclosed fence runs to the end) and outside an HTML
-comment, where it would be accepted and not rendered. A body that quotes
+and outside an HTML comment, where it would be accepted and not
+rendered. Fences are read as CommonMark reads them: three or more
+backticks or tildes, closed only by a line of at least as many, so a
+longer fence can show a shorter one, and an unclosed fence runs to the
+end. A comment opener inside an inline code span is text. A body that quotes
 the key inline or shows it in a code block, as this spec and its
 implementing pull request do, is not an override. The guard logs an
 override in two places: the body itself, which every reader of the pull
@@ -307,8 +321,8 @@ one item so the reviewer at the merge end asks.
 In scope, as requirements:
 
 1. When a `PostToolUse` event reports the `Skill` tool with
-   `tool_input.skill` equal to `code-review` and
-   `tool_response.success` equal to `true`, the recorder shall append an
+   `tool_input.skill` equal to `code-review`, `tool_response.success`
+   equal to `true` and a `tool_response.result`, the recorder shall append an
    entry of kind `code-review` carrying `git rev-parse HEAD` (run in the
    event's `cwd`) to the session's review record.
 2. When a `PostToolUse` event with no `agent_id` reports a `Read` whose
@@ -630,11 +644,10 @@ barwise-953 closes in a tracker-only pull request after this one merges.
   opening is refused. The tests cannot see that: they hold the hooks to
   the shapes measured on 2026-11-20. The refusal message says what the
   recorder looks for, which is where a session would start.
-- **The hook input's `cwd` may not be the shell's.** Whether a `cd` in
-  an earlier Bash call moves the `cwd` a later hook receives was not
-  measured. The design does not depend on the answer: `--repo` is
-  explicit and compared with `origin`, and `--body-file` is absolute.
-  Workstream 1 measures it and records the result here.
+- **The hook input's `cwd` and the shell's.** Unmeasured when this was
+  drafted, so the design does not depend on it: `--repo` is explicit
+  and compared with `origin`, and `--body-file` is absolute. Measured
+  in Workstream 1; see Implementation notes.
 - **`git ls-remote` fails or hangs.** The guard refuses, on its own
   15-second limit if need be. Opening the pull request needs the same
   remote, so the refusal loses nothing (`merge-guard` makes the same
@@ -644,6 +657,57 @@ barwise-953 closes in a tracker-only pull request after this one merges.
   in `expected-counts.json`. Each refusal test is watched failing with
   its guard removed, through `barwise/scripts/mutate.mjs`. The moved
   parser is covered by `merge-guard.test.mjs`, unchanged.
+
+## Implementation notes (Workstream 1, 2026-11-24)
+
+- **The hook input's `cwd` follows the shell.** Measured with a probe on
+  `PreToolUse`: after `cd barwise/scripts` in one Bash call, the next
+  call's hook input carried that directory as `cwd`, and the hook
+  process started in it. The absolute `--body-file` rule was written
+  without that and is kept: it costs a session nothing and leaves one
+  thing fewer resting on the harness.
+- **The header's `Plan-reviewed:` line names 404c9d2f and says what the
+  reviews read.** `check:plan-review` requires the named commit to carry
+  the plan as implementation began, and 404c9d2f changed the body after
+  4b278196, the last commit both reviews read. The owner directed its
+  merge, so no review names it; the line says so instead of naming a
+  commit with another body.
+- **`withoutHeredocBodies` and `segments` moved and are not exported.**
+  Only `ghCalls` uses them. The Target architecture lists them as the
+  module's contents, which they are.
+- **`lib/review-record.mjs` also holds the local git reading.** Both
+  hooks ask git for one line in the hook input's `cwd` (`HEAD`, the
+  repository root), so `gitLine` and `checklistPath` live beside the
+  record, with a 10-second limit: a local reading takes milliseconds, so
+  ten seconds means git is not answering, and the hook says so.
+- **The literal form is read from the trimmed command.** Leading and
+  trailing whitespace, a final newline included, means nothing to the
+  shell.
+- **An overridden opening is not compared with `origin`.** The override
+  is read before anything is resolved, as specified, so it is logged
+  with the head the call names, whatever repository that is in.
+- **What the first review of the code found** (2026-11-24, nine
+  findings, each now a test). Two let an opening through: `gh api` with
+  its fields spelled `--field=k=v` or `-fk=v`, an attached `-XPOST`, or
+  a full URL, none of which the first reading of "a `gh api` write"
+  covered; and a four-backtick fence, which an inner three-backtick line
+  closed, so a body that only showed the override line could be taken
+  for one. The rest: a tool call with no `tool_name` passed where
+  requirement 7 says it refuses; a comment closed and reopened on one
+  line hid an override; a `code-review` that had only loaded was
+  recorded, so requirement 1 now asks for the `result`; `-XGET` read as
+  a write; `--help` after an unknown flag was refused on the literal
+  path only; a comment opener in an inline code span swallowed a real
+  override; and nothing held the checklist's path to the file.
+- **What the second review of the code found** (2026-11-24). Two more
+  forms the shared parser does not see, added to the list above and to
+  the test that pins it. A GraphQL call with its query in a file, which
+  the guard saw and could not read: now a refusal. The override reader's
+  inline code spans, read too crudely in both directions: now matched by
+  backtick-run length, with an escaped backtick a character.
+- **Open decisions.** Built as recommended: a typed `/code-review` is
+  not recorded (filed as barwise-flv), a tool call the guard cannot
+  parse exits 2, and there is no detective half.
 
 ## Non-goals
 

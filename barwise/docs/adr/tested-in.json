@@ -38,5 +38,12 @@
       "barwise/scripts/tests/merge-guard.test.mjs"
     ],
     "why": "The refusal tests and the settings.json registration test live together; the registration test is the one that goes red if the hook is unwired, and it is the only test that does not run the hook."
+  },
+  {
+    "decision": "review-policy#review-before-open",
+    "files": [
+      "barwise/scripts/tests/pr-open-guard.test.mjs"
+    ],
+    "why": "The refusal tests and the settings.json wiring test live together; the wiring test is the one that goes red if either hook is unwired, and it is the only test that does not run the hooks."
   }
 ]
