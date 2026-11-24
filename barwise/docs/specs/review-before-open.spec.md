@@ -3,7 +3,7 @@
 Status: Draft -- no workstream implemented
 
 Created: 2026-11-20
-Last-updated: 2026-11-20
+Last-updated: 2026-11-24
 Tracking: barwise-953
 Touches: +barwise/scripts/hooks/pr-open-guard.mjs,
 +barwise/scripts/hooks/review-recorder.mjs,
@@ -76,8 +76,8 @@ The probe's capture of this spec's own plan review:
 The skill runs forked, so `PostToolUse` fires when the review comes
 back, not when it starts. (A skill that loads into the turn instead,
 such as `spec-writer`, fires at once with only `success` and
-`commandName`.) The recorder matches `tool_input.skill` and does not
-read the response.
+`commandName`.) The recorder matches `tool_input.skill` and requires
+`success: true`; it does not read the findings.
 
 **The checklist: the `Read` tool returned all of
 `.claude/skills/pr-review/checklist.md` to the main conversation.**
@@ -119,6 +119,10 @@ acted on:
 - That `/code-review` returned on this commit is recorded; what it
   found, and whether the findings were fixed, are not. A fix is a new
   commit and voids the entry; an ignored finding does not.
+- Whether `PostToolUse` fires at all for a forked review that is
+  interrupted was not measured. The recorder requires
+  `tool_response.success` to be `true`, which is what a review that
+  came back carries.
 - `/code-review`'s effort level and target are not read. A review of
   another path, at `low`, on this commit counts.
 - A read is not an application. Which checklist groups were run, and
@@ -144,9 +148,11 @@ so a review that ran here and was ignored is caught there or not at all.
 A pull request proposes whatever the head branch points at on GitHub.
 The guard asks for exactly that: `git ls-remote origin
 refs/heads/<head>`, where `<head>` is the branch the call names: the MCP
-tool's `head` argument, `--head` on `gh pr create`, the `head=` field
-on `gh api`. Measured here: `git ls-remote origin refs/heads/main`
-answers through the session's proxy in 0.6 seconds.
+tool's `head` argument, or `--head` in the Bash form the next section
+accepts. Every `git` call the guard makes runs in the hook input's
+`cwd`, so `origin` is that directory's. Measured here: `git ls-remote
+origin refs/heads/main` answers through the session's proxy in 0.6
+seconds.
 
 The local `HEAD` is not used at the guard. It can be ahead of the push,
 or on another branch. The remote-tracking ref is not used either: it is
@@ -157,37 +163,11 @@ shas, and equality is the whole test. A commit made after the review has
 a different sha, so "a run on an earlier commit does not count" needs no
 clock and no ancestry rule.
 
-**In Bash, the guard accepts one shape and refuses the rest.** The
-question it has to answer is which commit a command will propose, and
-the command's text does not settle it. `PreToolUse` fires once, before
-any of the command runs: in `git push origin feat && gh pr create --head
-feat` the guard would ask the remote before the push, find the reviewed
-commit, and allow a pull request that opens on the unreviewed one. `git
-checkout other && gh pr create`, `cd <worktree> && gh pr create`, `env
--C <worktree> gh pr create` and `GH_REPO=other/repo gh pr create` each
-move what the call means, and without `--head` gh proposes the current
-branch's upstream, whose name need not be the branch's. Two review
-rounds of this spec each found forms the previous list had missed, which
-is the sign of a list that cannot be finished. So the guard does not
-list what is unsafe. A pull-request-opening `gh` call in Bash is allowed
-to proceed to the record check only when all of these hold, and is
-refused with the accepted shape in the message otherwise:
-
-- the command is one segment (no `&&`, `;`, `|`, newline-separated
-  command, `$( )` or backtick substitution, and not inside `bash -c`);
-- its first word is `gh` or a path to it: no `VAR=value`, no `env`;
-- the head branch is named, with `--head` or `-H` (`head=` on `gh
-  api`);
-- `--repo` or `-R`, when given, names `origin`'s repository.
-
-The MCP tool needs none of this: its call is one action with the head
-and the repository as arguments.
-
-Three more refusals, each because the guard cannot resolve the head:
+Three refusals, each because the guard cannot resolve the head:
 
 - a branch the remote does not have ("push first");
 - a head in another repository: `otherowner:branch`, or a call whose
-  `owner/repo` is not `origin`'s. The comparison ignores case, as GitHub
+  repository is not `origin`'s. The comparison ignores case, as GitHub
   does, and `<origin's owner>:branch` is the same repository;
 - `git ls-remote` failing, or not answering within 15 seconds. The
   guard sets that limit on its own `git` call and exits 2 when it trips.
@@ -196,6 +176,73 @@ Three more refusals, each because the guard cannot resolve the head:
   Fifteen seconds is more than ten times the measured 0.6, and short
   enough that a stalled proxy costs a quarter of a minute and not a hung
   turn.
+
+## What does the guard promise for `gh` in Bash? (resolved by the owner, 2026-11-24: one literal form)
+
+The guard accepts one literal form of `gh pr create`, refuses every
+other pull-request-opening `gh` call that `merge-guard`'s parser can
+see, and does not claim to see the rest.
+
+The MCP tool needs none of this: its call is one action with the head
+and the repository as arguments. A Bash command is different, because
+what it will make `gh` do cannot be read off its text. `PreToolUse`
+fires once, before any of the command runs: in `git push origin feat &&
+gh pr create --head feat` the guard would ask the remote before the
+push, find the reviewed commit, and allow a pull request that opens on
+the unreviewed one. Three review rounds of this spec each found more
+such forms (`env -C <worktree>`, `GH_REPO=`, a branch whose upstream has
+another name, a repeated `--head`), and the third found that the parser
+this spec reuses does not detect some of them at all. The owner was
+asked and chose this resolution.
+
+**The literal form.** The command, as one string, is a sequence of
+words separated by spaces, where each word is built only from plain
+characters (letters, digits and `_ . / : = @ , + % -`) and
+single-quoted strings. Nothing else may appear outside single quotes: no
+double quote, `$`, backtick, backslash, `;`, `&`, `|`, `<`, `>`,
+parenthesis, brace, `*`, `?`, `~`, `#`, `!` or newline. In that
+sublanguage the shell expands nothing and starts exactly one program
+with exactly those words, so reading the command is splitting it. The
+words must then be:
+
+```
+gh pr create --repo <owner>/<repo> --head <branch> [--base <branch>]
+             [--title '<text>'] [--body '<text>' | --body-file <absolute path>]
+             [--draft]
+```
+
+`new` is accepted for `create`, the short flags (`-R -H -B -t -b -F
+-d`) and `--flag=value` for the long ones, in any order, each flag at
+most once. `--repo` and `--head` are required: without `--repo` gh
+chooses its base repository itself, and without `--head` it proposes
+the current branch's upstream. `--repo` must name `origin`'s
+repository. `--body-file` must be an absolute path, because whether the
+hook input's `cwd` is the directory the command will run in was not
+measured. Any other flag makes the command not the literal form; the
+refusal prints the form.
+
+**What is refused.** A Bash command that is not the literal form and in
+which the moved parser (`ghCalls`) finds a `gh` call with subcommand
+`pr create` or `pr new`, a `gh api` write to a `pulls` path, or a
+`gh api graphql` call with a `createPullRequest` mutation. That covers
+the ordinary forms: a chain, a `VAR=value` or bare `env` prefix, `sh
+-c`, a substitution, a heredoc body, double quotes, a missing or
+repeated flag. `gh api` has no accepted form: a session that wants to
+open a pull request from Bash uses the literal `gh pr create`.
+`gh pr create --help` or `-h` opens nothing and is passed.
+
+**What is not seen.** The parser finds no `gh` call in `timeout 60 gh
+pr create`, `env -C <dir> gh pr create`, `if ...; then gh pr create;
+fi`, `{ gh pr create; }`, `( gh pr create )`, `! gh pr create`,
+`bash -lc '...'`, a command after a quoted `<<WORD` (its heredoc
+stripping is not quote-aware), or `gh` reached through `xargs`, `eval`,
+a variable, an alias or a shell function. Each form in the command's
+text was run against the parser on 2026-11-24 (an alias or a function is
+not in the text at all). They pass unguarded, as the same forms of
+`gh pr merge` pass `merge-guard` today. The guard holds the paths a
+session takes by default; it is not a boundary against a command built
+to get around it, any more than the record is against a session that
+writes it by hand.
 
 ## How does the owner open one without review? (resolved: an `Opened-without-review:` line in the body)
 
@@ -207,11 +254,13 @@ Opened-without-review: "open it now, I will review it myself" (owner, 2026-11-20
 ```
 
 The guard allows a call whose body carries that line: the key at the
-start of a line, outside a fenced code block, with text after the colon.
-A body that quotes the key inline or shows it in a code block, as this
-spec and its implementing pull request do, is not an override. The guard
-logs an override in two places: the body itself, which every reader of
-the pull request sees and GitHub's search finds
+start of a line, with text after the colon, outside a fenced code block
+(``` or `~~~`; an unclosed fence runs to the end) and outside an HTML
+comment, where it would be accepted and not rendered. A body that quotes
+the key inline or shows it in a code block, as this spec and its
+implementing pull request do, is not an override. The guard logs an
+override in two places: the body itself, which every reader of the pull
+request sees and GitHub's search finds
 (`"Opened-without-review:" in:body`), and an `override` entry in the
 session record carrying the head branch's name and the line's text. A
 line with no text is refused: an empty override records no instruction,
@@ -223,14 +272,9 @@ branch and no answer from the remote, and its record entry carries no
 sha. It does need a usable `session_id` and a writable record: an
 override the guard cannot log is refused.
 
-**Where the guard reads the body.** `body` on the MCP call; `--body` or
-`-b` on `gh pr create`; the file named by `--body-file` or `-F`,
-resolved against the hook input's `cwd`; a `body=` field on `gh api`.
-It does not read standard input (`--body-file -`), `--fill`, `--web`,
-or a JSON `--input` file: with those the guard sees no override and
-applies the ordinary rule. A body built with `"$(cat <<'EOF' ...)"` is a
-substitution, which the Bash rule above already refuses; `pr-creation`
-section 4 asks for a body file for its own reasons.
+**Where the guard reads the body.** `body` on the MCP call; in the
+literal Bash form, the `--body` text or the file `--body-file` names. A
+file the guard cannot read is a refusal, not an absent override.
 
 The key is not `Owner-directed:` because that one already means "merge
 without the review trailers" in a merge commit message
@@ -249,13 +293,16 @@ one item so the reviewer at the merge end asks.
 In scope, as requirements:
 
 1. When a `PostToolUse` event reports the `Skill` tool with
-   `tool_input.skill` equal to `code-review`, the recorder shall append
-   an entry of kind `code-review` carrying `git rev-parse HEAD` (run in
-   the event's `cwd`) to the session's review record.
-2. When a `PostToolUse` event with no `agent_id` reports a `Read` of
-   `<repository root>/.claude/skills/pr-review/checklist.md` whose
-   response has `startLine` 1 and `numLines` equal to `totalLines`, the
-   recorder shall append an entry of kind `checklist` the same way.
+   `tool_input.skill` equal to `code-review` and
+   `tool_response.success` equal to `true`, the recorder shall append an
+   entry of kind `code-review` carrying `git rev-parse HEAD` (run in the
+   event's `cwd`) to the session's review record.
+2. When a `PostToolUse` event with no `agent_id` reports a `Read` whose
+   `file_path` resolves (symlinks included) to
+   `.claude/skills/pr-review/checklist.md` under `git rev-parse
+   --show-toplevel` of the event's `cwd`, and whose response has
+   `startLine` 1 and `numLines` equal to `totalLines`, the recorder
+   shall append an entry of kind `checklist` the same way.
 3. When the recorder has matched an event and cannot write its entry (no
    usable `session_id`, a base directory `checkBase` refuses, `git`
    cannot name `HEAD`, a failed write), it shall exit 2 with the reason
@@ -264,21 +311,20 @@ In scope, as requirements:
 4. When a tool call opens a pull request, the guard shall exit 2 unless
    the session's record holds a `code-review` entry and a `checklist`
    entry whose sha is the proposed commit. The calls are
-   `mcp__github__create_pull_request` and, in Bash, a `gh` call whose
-   subcommand is `pr create` or `pr new` (gh's alias for it) or a
-   `gh api` write to `repos/<owner>/<repo>/pulls`, with or without a
-   leading slash and with gh's `{owner}` and `{repo}` placeholders. A
-   `gh pr create` carrying `--help` or `-h` as a flag, not as another
-   flag's value, opens nothing and is passed. `--dry-run` and `--web`
+   `mcp__github__create_pull_request` and a Bash command in the literal
+   form ("What does the guard promise for `gh` in Bash?").
+5. When a Bash command is not in the literal form and the moved parser
+   finds in it a `gh` call with subcommand `pr create` or `pr new`, a
+   `gh api` write to a `pulls` path (with or without a leading slash,
+   with gh's `{owner}` and `{repo}` placeholders), or a `gh api graphql`
+   call carrying `createPullRequest`, the guard shall exit 2 and print
+   the literal form. A `gh pr create` carrying `--help` or `-h` as a
+   flag, not as another flag's value, is passed. `--dry-run` and `--web`
    get no exemption.
-5. When a Bash command contains a pull-request-opening `gh` call and is
-   not the accepted shape ("Which commit?": one segment, `gh` first, the
-   head named, the repository `origin`'s), the guard shall exit 2 and
-   print the accepted shape.
 6. When the guard refuses under 4, the message shall name the proposed
    sha, which of the two entries is missing, the sha each was last
-   recorded on if any, the two actions that create them, and the
-   override.
+   recorded on if any, the two actions that create them (with the
+   checklist's path as the recorder expects it), and the override.
 7. When the guard cannot answer -- the input has no usable `session_id`,
    the base directory or the record cannot be read, the head branch
    cannot be named or resolved, `git` fails or times out -- it shall
@@ -290,16 +336,13 @@ In scope, as requirements:
    needs are not among the lines it can, the refusal shall say how many
    lines were unreadable. A line that parses is believed; an unreadable
    line can hide an entry and cannot invent one.
-9. When the body of a pull-request-opening call has a line that starts
-   with `Opened-without-review:`, outside a fenced code block, followed
-   by text, the guard shall append an `override` entry to the record and
-   exit 0, without resolving the head. When it cannot append the entry,
-   or the line has no text, it shall exit 2. Requirement 5 still
-   applies.
-10. When a Bash command runs `gh api graphql` with a `createPullRequest`
-    mutation, the guard shall exit 2: it cannot read a head out of a
-    query string. This is `merge-guard`'s rule for `mergePullRequest`.
-11. A draft is a pull request: `draft: true` and `--draft` change
+9. When the body of a pull-request-opening call under 4 has a line that
+   starts with `Opened-without-review:`, outside a fenced code block
+   and outside an HTML comment, followed by text, the guard shall append
+   an `override` entry to the record and exit 0, without resolving the
+   head. When it cannot append the entry, cannot read a `--body-file`,
+   or the line has no text, it shall exit 2.
+10. A draft is a pull request: `draft: true` and `--draft` change
     nothing. `pr-creation` section 5 already says a branch that is not
     ready does not get one.
 
@@ -367,10 +410,12 @@ scripts/lib/review-record.mjs   reviewLogPath(base, session)
                                 readReviews(base, session) -> { entries, unreadable }
 
 review-recorder.mjs (PostToolUse)        pr-open-guard.mjs (PreToolUse)
-  not a matching event -> exit 0           not a PR-opening call -> exit 0
-  sha = git rev-parse HEAD (cwd)           Bash: not the accepted shape -> exit 2
-  appendReview(...)                        override line in the body -> log, exit 0
-  cannot record -> exit 2, says why        sha = git ls-remote origin refs/heads/<head>
+  not a matching event -> exit 0           MCP create call, or Bash in the literal form:
+  sha = git rev-parse HEAD (cwd)             continue
+  appendReview(...)                        Bash, parser sees a gh opening -> exit 2
+  cannot record -> exit 2, says why        anything else -> exit 0
+                                           override line in the body -> log, exit 0
+                                           sha = git ls-remote origin refs/heads/<head>
                                            both kinds on sha -> exit 0
                                            otherwise -> exit 2, says why
 ```
@@ -426,14 +471,26 @@ one node start per `Read` (about 30 ms here, `time node -e 0`).
   would end the re-review after a one-line fix. It lost because the
   owner's rule is that a run on an earlier commit does not count, and
   any "little" is a threshold with no stated relation to an outcome.
-- **In Bash, list what is unsafe instead of what is accepted.** Two
-  drafts did: first "compare the local branch tip with the remote's",
-  which answers a push of the current branch and not a checkout or a
-  `cd`; then "the call must be the only command, with `VAR=value` and
-  `env` allowed", which missed `env -C`, `GH_REPO=` and a branch whose
-  upstream has another name. Each list was right about what it named and
-  open at the end, so the design names the accepted shape and refuses
-  the complement.
+- **In Bash, list what is unsafe instead of what is accepted.** Three
+  drafts did: "compare the local branch tip with the remote's", which
+  answers a push of the current branch and not a checkout or a `cd`;
+  "the call must be the only command, with `VAR=value` and `env`
+  allowed", which missed `env -C`, `GH_REPO=` and a branch whose
+  upstream has another name; and "one segment, `gh` first, the head
+  named", which still read flags the way the shell does not (a repeated
+  `--head`, a substitution inside a quoted title). Each list was right
+  about what it named and open at the end.
+- **Refuse every `gh` opening the parser sees; open only through the MCP
+  tool.** The smallest build, with no form to get wrong. Put to the owner
+  on 2026-11-24 and not chosen: the repository configures no GitHub MCP
+  server (`.mcp.json` names only `barwise`), so a local session would
+  need the override for every pull request, and an override used every
+  time stops meaning anything.
+- **A real shell lexer, so detection is complete.** Quote-aware,
+  heredoc-aware, compound commands and all. Put to the owner on
+  2026-11-24 and not chosen: it is the largest build, it would be a
+  second parser beside the one `merge-guard` uses, and `eval`, variables
+  and aliases would still be outside it.
 
 ## Workstreams (each independently shippable)
 
@@ -455,6 +512,11 @@ One pull request, read by commit:
    repository as `origin` and `TMPDIR` pointed at a temporary directory,
    so `git ls-remote` and the record are real and nothing is stubbed
    (the timeout test alone puts a `git` that sleeps first on `PATH`).
+   The literal form's reader lives in the guard and is new; it does not
+   use `segments`. One test runs every form listed under "What is not
+   seen" and asserts the guard passes it, so the stated limits are
+   pinned and a parser change that closes one shows up as a failure to
+   update, not as a silent change.
    Each requirement in Scope has a test that plants its violation; the
    refusal tests assert the message, not only the exit code (root
    `REVIEW.md`, failure mode 3). One test reads `.claude/settings.json`
@@ -486,10 +548,10 @@ barwise-953 closes in a tracker-only pull request after this one merges.
   caller").
 - Every session that loads `.claude/settings.json` gains one node start
   per `Read` and per `Skill` call, and one more per Bash call.
-- A session that opened pull requests with `git push && gh pr create`,
-  with no `--head`, or with a heredoc body, has to run the push first,
-  name the head and pass a body file. Remote sessions open through the
-  MCP tool and are not affected.
+- A session that opens pull requests with `gh` has to use the literal
+  form: push first, name `--repo` and `--head`, single-quote the title,
+  and pass the body as an absolute `--body-file`. Remote sessions open
+  through the MCP tool and are not affected.
 
 ## Open decisions (for review)
 
@@ -551,6 +613,11 @@ barwise-953 closes in a tracker-only pull request after this one merges.
   opening is refused. The tests cannot see that: they hold the hooks to
   the shapes measured on 2026-11-20. The refusal message says what the
   recorder looks for, which is where a session would start.
+- **The hook input's `cwd` may not be the shell's.** Whether a `cd` in
+  an earlier Bash call moves the `cwd` a later hook receives was not
+  measured. The design does not depend on the answer: `--repo` is
+  explicit and compared with `origin`, and `--body-file` is absolute.
+  Workstream 1 measures it and records the result here.
 - **`git ls-remote` fails or hangs.** The guard refuses, on its own
   15-second limit if need be. Opening the pull request needs the same
   remote, so the refusal loses nothing (`merge-guard` makes the same
@@ -566,7 +633,5 @@ barwise-953 closes in a tracker-only pull request after this one merges.
 - Judging the review. The guard holds that both steps happened on the
   right commit, and says so in those words.
 - Guarding sessions that load no project hooks, the GitHub web
-  interface, `curl`, a user-defined `gh` alias, or `gh` reached through
-  `xargs`, `eval` or a variable (`merge-guard`'s known limits, inherited
-  with its parser).
+  interface, `curl`, or the Bash forms listed under "What is not seen".
 - Any change to when a pull request may merge.
