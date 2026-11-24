@@ -1,9 +1,9 @@
 # Model merge: decide once, translate ids once, then build
 
-Status: WS1 shipped 2026-11-20 (the merge laws run each drawn pair sharing ids, under different ids and through prior ids; all six probes CAUGHT by the laws alone); WS2 to WS5 not started, the owner's to decide after WS1's fault report
+Status: WS1 shipped 2026-11-20 (the merge laws run each drawn pair sharing ids, under different ids and through prior ids; all six probes CAUGHT by the laws alone); WS2 shipped 2026-11-24 (the merge frozen at 285ef258 in `tests/diff/oracle/`, and the oracle law over it; the lines it does not execute are listed under workstream 2); WS3 to WS5 not started
 
 Created: 2026-11-11
-Last-updated: 2026-11-20
+Last-updated: 2026-11-24
 Plan-reviewed: 76ab3a77 (code-review, pr-review)
 Tracking: barwise-sic
 Touches: barwise/packages/core/src/diff/ModelMerge.ts,
@@ -421,6 +421,16 @@ existing role's id and the remap has nothing to record unless the arity
 differs. That is a statement about the generator, and the report says
 so.
 
+#### Implementation notes (2026-11-20)
+
+Shipped in #1036. Three forms run, not two: prior ids are drawn, since
+`replayInto40` gives any generated model prior ids in one call. All six
+probes are CAUGHT by the laws alone, M3 included: the paragraph above
+expected otherwise, and its reason was wrong. The arity differs in 202
+of 250 pairs; what was missing was a law that reads a partial
+acceptance, and one was added. A review planted 17 more faults, and the
+laws still pass some of them (barwise-ocn).
+
 ### 2. The oracle
 
 Mechanical. Copy `ModelMerge.ts` as it stands when this workstream
@@ -438,6 +448,77 @@ The copy is a frozen snapshot, and the law is its check. If
 `audit:duplication` or `knip` reads it as a finding, it is classified
 there as a test oracle with this spec named; it is not a must-agree
 copy, since agreeing with it is the test.
+
+#### Implementation notes (2026-11-24)
+
+The copy is of `285ef258`, the last commit to change `ModelMerge.ts`
+before this workstream. It differs from that file in its import paths,
+their order and wrapping, and a header saying it is frozen.
+
+The law compares `mergeAndValidate`, so one comparison holds the
+document, the diagnostics and the refusal. It went beyond the sketch
+above in three ways, each because the sketch left code unread:
+
+- **Acceptance is drawn in five levels**, nothing to everything, where an
+  even coin almost never accepts all or none of a fact type's dependents.
+- **Each model is also merged with an edited copy of itself.** Two
+  independent draws share no unchanged element, so the "unchanged"
+  branches, and the translations they record, ran in no generated merge
+  (barwise-ocn's first class).
+- **A diff the merge cannot trust** (matched by content, or with rename
+  recognition on) is compared for its refusal.
+
+Thirteen faults planted in the live file, law alone: the six probes
+above and six of barwise-ocn's seven are CAUGHT; dropping the
+`fromBasePrior` seeding is not, and `replayedFragment.test.ts` catches
+it. The pull request has the plants.
+
+**What the law cannot judge: a module both merges import.** The copy
+freezes `ModelMerge.ts`. The pairing it reads (`elementDiff.ts`,
+`identity.ts`, `deltas.ts`), the id rules and `mapConstraintReferences`
+are the live modules, so a change to one moves both merges alike. The
+Inventory leaves them untouched; a step that needs to change one is a
+tripwire, below.
+
+**What the law does not execute.** v8 coverage of
+`tests/diff/oracle/ModelMergeOracle.ts` under
+`tests/laws/mergeOracle.law.test.ts` alone: 460 of 509 statements, 366 of
+442 branch arms, 96 of 110 functions. The 49 statements never executed,
+by the frozen file's own line numbers:
+
+| Lines                                   | In                                                        | Needs an input the generator does not draw                                                  |
+| --------------------------------------- | --------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| 178-179, 769-770, 1072-1074, 1086-1098  | header, phase 9, `acceptedHeader`, `refuseImportClashes`  | imports or a namespace                                                                      |
+| 369, 418-419, 547-548, 625-634, 688-698 | constraints, subtype facts, objectifications, populations | a dangling reference, as a lenient load carries                                             |
+| 558-559, 573, 581-589                   | subtype facts                                             | a repeated subtype pair                                                                     |
+| 815, 817                                | `sameUniquenessIn`                                        | a preferred identifier that is not a uniqueness, or one over a dropped role                 |
+| 1013                                    | `mergedId`                                                | a subtype fact or objectification its model left unnamed                                    |
+| 1045-1050                               | `refuseUnmergeablePairing`                                | a declared rename                                                                           |
+| 1138-1146, 1153-1160                    | `refuseNameClashes`                                       | two kept elements sharing a name (`renamedPair.law.test.ts` draws these for the live merge) |
+| 1179-1183                               | `refuseOwnerChanges`                                      | a diff built with owner changes on                                                          |
+| 1264-1269                               | `refuseCoincidentIds`                                     | two replayed files whose shared id names different elements                                 |
+| 1385                                    | `keptConstraintIds`                                       | an existing constraint id the incoming model gives another element                          |
+| 1528                                    | `remapJoinOperand`                                        | a join root neither model translates                                                        |
+
+Branch arms never taken on lines that did run are on 39 further lines.
+Both readings come from `packages/core`:
+
+```sh
+npx vitest run tests/laws/mergeOracle.law.test.ts --coverage \
+  --coverage.include='tests/diff/oracle/**' --coverage.exclude='' \
+  --coverage.reporter=json --coverage.reportsDirectory=<dir> \
+  --coverage.thresholds.lines=0 --coverage.thresholds.statements=0 \
+  --coverage.thresholds.branches=0 --coverage.thresholds.functions=0
+```
+
+and are the statements and branch arms counted 0 in
+`<dir>/coverage-final.json`. A line number here is the frozen file's as
+this workstream landed it; its header is part of the file, so an edit to
+the header moves them.
+
+Every row rests on the fixtures in `tests/diff`, and workstream 3's
+precondition (each shown red by a planted fault against those fixtures)
+is not done.
 
 ### 3. Decisions and the id space (provisional: not yet grounded)
 
@@ -573,6 +654,10 @@ Tripwires:
 - If `src/diff/` ends workstream 4 with more code lines than it held
   before workstream 3, say so in the pull request and ask before
   workstream 5.
+- If a step needs to change a module the frozen copy imports
+  (`elementDiff.ts`, `identity.ts`, `deltas.ts`, `model/idRules.ts`,
+  `model/mint.ts`), stop: the oracle law cannot judge that change, so it
+  is made and reviewed on its own, before or after the restructure.
 - If a fix to merge behaviour is needed while the oracle exists and
   cannot be made in both copies in one commit, finish or abandon the
   restructure first; do not edit the oracle alone.
