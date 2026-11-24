@@ -33,6 +33,7 @@
     "merge-guard.test.mjs": 35,
     "merge-record.test.mjs": 41,
     "plan-scope.test.mjs": 8,
+    "pr-open-guard.test.mjs": 25,
     "pushed-tree.test.mjs": 12,
     "python-uv-guard.test.mjs": 33,
     "review-workflows.test.mjs": 27,
