@@ -2,7 +2,7 @@
 
 Status: Draft -- no workstream implemented
 Created: 2026-11-13
-Last-updated: 2026-11-13
+Last-updated: 2026-11-24
 Tracking: barwise-mef
 Touches: +barwise/packages/core/src/interview/,
 barwise/packages/core/src/counterexample/,
@@ -87,7 +87,7 @@ In scope:
   heading with one of two reasons: its kind has no generator (today
   `value_comparison`, `cardinality` and the four join kinds), or the
   generator found no population that violates it.
-- When a constraint in the candidate family (Open decision 2) is absent
+- When a constraint in the candidate family (decision 2) is absent
   from a model and not implied by one that is present, the guide shall
   contain exactly one question for it, on the permits side, or name it
   under "not asked" when the generator returns no population for it.
@@ -101,7 +101,7 @@ Out of scope:
 
 - Recording answers. An answer changes the model through features that
   exist: the incident becomes a sample population, and a constraint
-  gains, loses or changes modality. Open decision 4.
+  gains, loses or changes modality. Decision 4.
 - Storing extraction ambiguities. That is `model-open-questions.spec.md`;
   WS5 only reads what it stores.
 - Running the interview. A live interviewer is barwise-8ud and
@@ -134,9 +134,9 @@ today. WS2 has the counterexample module export the kinds it has no
 generator for, which makes the reason derived instead of a second list
 of six kinds that must agree with the generator's switch.
 
-The capability matrix in the root `CLAUDE.md` gains no row if Open
-decision 1 resolves as recommended: `--counterexamples` is carried by the
-existing `verbalize` row, and `--questions` rides the same one.
+The capability matrix in the root `CLAUDE.md` gains no row, since
+decision 1 puts the guide on `verbalize`: `--counterexamples` is carried
+by the existing `verbalize` row, and `--questions` rides the same one.
 `@barwise/llm` is untouched throughout. The guidance module's header says
 the barwise-modeling skill and the Copilot chat participant inherit its
 blocks; a search finds only the MCP server and the two prompts importing
@@ -221,7 +221,7 @@ model as a population, `validate` reports the constraint it violates.
   someone carries into a meeting. Rejected as the default because
   `export` is the workflow's last step, for a model that is sound, and a
   guide is for a draft; and because `@barwise/formats` holds interop
-  formats, which this is not. It remains Open decision 1.
+  formats, which this is not. Decision 1 chose the flag.
 - **A new command, `barwise interview`.** The clearest name and a new
   row on the matrix for three surfaces. `implicit-sensemaking.spec.md`
   rejected `probe_model` on the same grounds: it repeats the
@@ -273,9 +273,10 @@ existing generator, and emit it as a permits-side question. No second
 generator is written. Law: for a model `M` and a constraint `c` in the
 family, the guide for `M` without `c` contains a permits-side question
 whose population equals the population of `c`'s forbids-side question in
-`M`. Not yet grounded: whether "not implied by a present constraint" can
-be decided with what core has, and how many questions the family yields
-on the shipped examples.
+`M`. The family is settled (decision 2), and its size on the shipped
+models is measured there as an upper bound. Not yet grounded: whether
+"not implied by a present constraint" can be decided with what core has,
+which is what would bring that bound down.
 
 ### 5. Open questions in the guide (provisional: blocked on barwise-vny)
 
@@ -301,46 +302,60 @@ does not start before that spec's first workstream ships.
 
 ## Open decisions (for review)
 
-1. **Where the guide is reached.** A flag on `verbalize` (recommended),
-   an export format, or a new command. The flag has precedent, needs no
-   matrix row and sits at the workflow step where the expert is in the
-   room. The export format costs no surface wiring and writes a file,
-   which suits a document. The trade-off is fit against effort: the flag
-   is the better fit and three small wirings.
-2. **The permits-side candidate family.** Recommended: a mandatory
-   constraint on each optional role an entity type plays, and a
-   single-role uniqueness on each role of a binary that has no
-   single-role uniqueness, whether its only uniqueness spans both roles
-   or it declares none (a legal state: `fact-type-without-uniqueness` is
-   a warning). Excluded by default: tightening a many-to-one binary
-   to one-to-one, because "have two doctors ever shared a specialty" is
-   true of almost every such fact type and would bury the questions that
-   matter. Excluding it puts one case outside the WS4 law (deleting one
-   of the two constraints on a one-to-one), which the law states as a
-   premise. The alternative is to include it behind an option.
-3. **Identification questions.** In the clinic example, 12 of the 26
-   forbids-side questions come from the four reference-mode fact types.
-   Recommended: keep them and group them last. "Has one patient ever had
-   two record numbers" has a real answer in most businesses (duplicate
-   records), and it is the textbook case of a constraint that is deontic
-   and not alethic. The alternative is to omit them unless asked.
-4. **A home for answers.** Recommended: none in this spec. The outcome
-   table maps every answer to an edit the model already supports. If
-   facilitators need to record "asked, no change" so a later guide does
-   not ask again, the place is an answered entry in `open_questions`
-   (`model-open-questions.spec.md` keeps answered questions for exactly
-   that reason), not a second file. The alternative, an answer file keyed
-   by question id, gives a decision two places to live.
-5. **The name.** Recommended: `interview` for the module and
-   `--questions` for the flag, which say what a facilitator does with the
-   output. The alternative, `probe`, is shorter and is taken: it is the
-   counterexample generator's internal word for what it builds, so using
-   it here would give one word two meanings in one package.
+All five were put to the owner on 2026-11-24, and each was resolved as
+recommended.
+
+1. **Where the guide is reached.** **Resolved (owner, 2026-11-24): a flag
+   on `verbalize`.** The flag has precedent, needs no matrix row and sits
+   at the workflow step where the expert is in the room. An export format
+   would have cost no surface wiring and written a file, which suits a
+   document, and fits worse: `export` is for a sound model. A new command
+   was the third option.
+2. **The permits-side candidate family.** **Resolved (owner, 2026-11-24):
+   two members.** A mandatory constraint on each optional role an entity
+   type plays, and a single-role uniqueness on each role of a binary that
+   has no single-role uniqueness, whether its only uniqueness spans both
+   roles or it declares none (a legal state: `fact-type-without-uniqueness`
+   is a warning). Left out: tightening a many-to-one binary to one-to-one,
+   because "have two doctors ever shared a specialty" is true of almost
+   every such fact type. Leaving it out puts one case outside the WS4 law
+   (deleting one of the two constraints on a one-to-one), which the law
+   states as a premise. Counted over the 18 models under `examples/` and
+   `trial/customers/` at `7194990a`, before any filtering for candidates
+   a present constraint implies: the forbids side yields 1,655 questions,
+   the mandatory member adds 470 and the uniqueness member 136, and the
+   member left out would have added 475. The two chosen add 37% to the
+   guide, and they matter most where a draft is thin: the PII-redaction
+   example has 24 fact types and 16 forbids-side questions, and gains 63.
+   Including the third behind an option, including all three, and
+   deferring the choice to WS4 were the alternatives.
+3. **Identification questions.** **Resolved (owner, 2026-11-24): keep
+   them, grouped last.** In the clinic example, 12 of the 26 forbids-side
+   questions come from the four reference-mode fact types. "Has one
+   patient ever had two record numbers" has a real answer in most
+   businesses (duplicate records), and it is the textbook case of a
+   constraint that is deontic and not alethic. Omitting them unless asked
+   was the alternative.
+4. **A home for answers.** **Resolved (owner, 2026-11-24): none in this
+   spec.** The outcome table maps every answer to an edit the model
+   already supports. If facilitators come to need a record of "asked, no
+   change" so a later guide does not ask again, the place is an answered
+   entry in `open_questions` (`model-open-questions.spec.md` keeps
+   answered questions for exactly that reason), not a second file; that
+   would be a new decision. An answer file keyed by question id was the
+   alternative, and gives a decision two places to live.
+5. **The name.** **Resolved (owner, 2026-11-24): `interview` for the
+   module and `--questions` for the flag**, which say what a facilitator
+   does with the output. `elicitation` is the wider word the trial uses
+   for this stage, and `probe` is taken: it is the counterexample
+   generator's internal word for what it builds.
 
 ## Risks and testing
 
 - **Volume.** The clinic example has 11 fact types and yields 26
-  forbids-side questions before the permits side adds more. The guide
+  forbids-side questions before the permits side adds more, and a trial
+  kernel of about 60 fact types yields about 120 with some 40 more from
+  the permits side (decision 2 has the counts). The guide
   groups by fact type so a facilitator can work the fact types an
   incident touched and skip the rest. No cap is proposed: a limit needs a
   ranking, and the Alternatives section says why there is none.
