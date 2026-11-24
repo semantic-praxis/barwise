@@ -50,12 +50,14 @@ describe("convention: every law file declares the premises its laws rest on", ()
     // Guard the guard. Every assertion below is a filter over this
     // list, so an empty list makes all of them pass -- and a check
     // that cannot fail reads exactly like a check that is satisfied
-    // (assertion-audit rule 1b; barwise-902 shipped that way). Five
-    // today; the floor moves up when a sixth law earns a file.
+    // (assertion-audit rule 1b; barwise-902 shipped that way). Six that
+    // stay, today, and a seventh, `mergeOracle`, that goes when
+    // model-merge-stages workstream 5 deletes its oracle; the floor moves
+    // up when another law earns a file.
     expect(
       lawFiles.length,
       `expected law files in ${here}, found ${lawFiles.length}`,
-    ).toBeGreaterThanOrEqual(5);
+    ).toBeGreaterThanOrEqual(6);
   });
 
   it("gives every law file a coverage block", () => {

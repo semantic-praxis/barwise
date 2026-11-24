@@ -53,12 +53,7 @@ import {
 } from "../../src/model/Constraint.js";
 import type { Definition } from "../../src/model/Definition.js";
 import type { DiagramLayout } from "../../src/model/DiagramLayout.js";
-import type {
-  DerivationKind,
-  DerivationRule,
-  FactTypeConfig,
-  RoleConfig,
-} from "../../src/model/FactType.js";
+import type { DerivationKind, DerivationRule, FactTypeConfig } from "../../src/model/FactType.js";
 import { storePreferredFlags } from "../../src/model/identification.js";
 import { populationIdBase, suffixed } from "../../src/model/idRules.js";
 import type { ObjectifiedFactTypeConfig } from "../../src/model/ObjectifiedFactType.js";
@@ -72,8 +67,10 @@ import type {
 } from "../../src/model/ObjectType.js";
 import { OrmModel, type OrmModelConfig } from "../../src/model/OrmModel.js";
 import type { FactInstanceConfig, PopulationConfig } from "../../src/model/Population.js";
+import type { RoleConfig } from "../../src/model/Role.js";
 import type { SubtypeFactConfig } from "../../src/model/SubtypeFact.js";
 import { remapIds } from "../../src/rename/remapIds.js";
+import { replayInto40 } from "../../src/serialization/replay.js";
 import {
   type FlaggedSubtypeFact,
   subtypeConstraintsFromFlags,
@@ -1207,4 +1204,90 @@ export function reIdModel(model: OrmModel): OrmModel {
     }
   }
   return remapIds(model, ids);
+}
+
+// ---------------------------------------------------------------------------
+// Pairs of models, in the forms a law over two draws runs in
+// ---------------------------------------------------------------------------
+
+/**
+ * The three forms every law over a drawn pair runs in.
+ *
+ * The arbitrary gives ids by position, so two drawn models hold the same
+ * ids: everything the diff pairs, it pairs by id, and the merge translates
+ * every incoming id to itself. Run in that form alone, the merge laws passed
+ * with any of six faults planted in the merge's id translation
+ * (docs/specs/model-merge-stages.spec.md, "Can the suite protect a
+ * restructure?"). The other two forms are the two ways a real pair comes
+ * to hold different ids for one element:
+ *
+ * - **Under different ids.** The incoming model is re-id'd, so the pair
+ *   shares no id and pairs by name and content: an id a person stated, or
+ *   a draft whose ids are its own.
+ * - **Through prior ids.** Both models are replayed as a 3.x file is on
+ *   load, so each takes format 4.0's name-given ids and keeps the ids it
+ *   was drawn with as `priorIds`, and some of the incoming model's names
+ *   are changed first. The diff pairs through the prior ids, so a renamed
+ *   element is one modification whose two sides hold different ids:
+ *   two revisions of one older file, the case most of the merge's
+ *   object-type and fact-type translation now exists for.
+ *
+ * In both, every reference the merge takes from the incoming side has to
+ * be translated to arrive. All three run, and none replaces another: only
+ * the shared-id form makes two drawn subtype facts and objectifications
+ * collide on an id, which is what the determinism law in
+ * `tests/laws/merge.law.test.ts` was written for. Populations collide there too, and through prior ids, where a
+ * replayed population is named for its fact type and a sample and a
+ * significant one on the same fact type are two populations.
+ *
+ * A form takes plans and not models because a name can only be changed
+ * before a model is built. `arbOrmModel` is `arbModelPlan` built, so the
+ * laws draw what they drew.
+ */
+export interface IdForm {
+  readonly name: string;
+  readonly pairOf: (existing: ModelPlan, incoming: ModelPlan) => readonly [OrmModel, OrmModel];
+  /** Whether the pair's ids differ, which is where the diff misreads a join path. */
+  readonly idsDiffer: boolean;
+}
+export const SHARING_IDS: IdForm = {
+  name: "sharing ids",
+  pairOf: (existing, incoming) => [buildModel(existing), buildModel(incoming)],
+  idsDiffer: false,
+};
+export const UNDER_DIFFERENT_IDS: IdForm = {
+  name: "under different ids",
+  pairOf: (existing, incoming) => [buildModel(existing), reIdModel(buildModel(incoming))],
+  idsDiffer: true,
+};
+export const THROUGH_PRIOR_IDS: IdForm = {
+  name: "through prior ids",
+  pairOf: (existing, incoming) => [
+    replayInto40(buildModel(existing)),
+    replayInto40(buildModel(withSomeRenamed(incoming))),
+  ],
+  idsDiffer: true,
+};
+export const ID_FORMS: readonly IdForm[] = [SHARING_IDS, UNDER_DIFFERENT_IDS, THROUGH_PRIOR_IDS];
+
+/** The suffix `withSomeRenamed` gives a name; no generated name carries it. */
+export const RENAMED = " renamed";
+
+/**
+ * The plan with every second object type and fact type renamed, ids kept.
+ *
+ * Every second one, from the second: the first of each kind keeps its
+ * name, and the merge needs that. Where no element keeps its name under
+ * the id two older files share, `refuseCoincidentIds` reads the files as
+ * unrelated and refuses every accepted rename, and the laws would be
+ * reading a refusal.
+ */
+function withSomeRenamed(plan: ModelPlan): ModelPlan {
+  const renamed = <T extends { readonly name: string; }>(element: T, at: number): T =>
+    at % 2 === 1 ? { ...element, name: `${element.name}${RENAMED}` } : element;
+  return {
+    ...plan,
+    objectTypes: plan.objectTypes.map(renamed),
+    factTypes: plan.factTypes.map(renamed),
+  };
 }
