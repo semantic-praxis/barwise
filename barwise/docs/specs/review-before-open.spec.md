@@ -102,6 +102,13 @@ is chosen for three reasons:
   (`pr-creation`, section 1) and the full `pr-review` skill (its section 3). One observation covers both, and the author's pass does not have
   to become a full `pr-review` run that the merge end then repeats.
 
+`pr-review` loads into the turn and is not forked: invoked in this
+session on 2026-11-20, it returned its text to the main conversation,
+where `code-review` returned "completed (forked execution)". So its
+checklist read is the main conversation's. Were a skill to run forked,
+its read would carry an `agent_id` and not count, and the refusal says
+the main conversation reads the file.
+
 The read must be whole because a partial read cannot be told from
 reading the headings, which is the #525 case. It must come from the main
 conversation (no `agent_id` in the hook input) because a subagent's tool
@@ -154,6 +161,12 @@ accepts. Every `git` call the guard makes runs in the hook input's
 origin refs/heads/main` answers through the session's proxy in 0.6
 seconds.
 
+`ls-remote` reads its argument as a glob matched against the tail of
+each ref name (measured: `refs/heads/mai*` returns `main`), so the
+answer is used only when it is exactly one line whose ref name is
+exactly `refs/heads/<head>`. A head containing `*`, `?`, `[` or a
+backslash is refused before the call, and so is any other answer.
+
 The local `HEAD` is not used at the guard. It can be ahead of the push,
 or on another branch. The remote-tracking ref is not used either: it is
 this clone's memory of the remote, and `steward` section 6 records it
@@ -165,7 +178,8 @@ clock and no ancestry rule.
 
 Three refusals, each because the guard cannot resolve the head:
 
-- a branch the remote does not have ("push first");
+- a branch the remote does not have ("push first"), or an answer that is
+  not the one exact line described above;
 - a head in another repository: `otherowner:branch`, or a call whose
   repository is not `origin`'s. The comparison ignores case, as GitHub
   does, and `<origin's owner>:branch` is the same repository;
@@ -330,8 +344,11 @@ In scope, as requirements:
    cannot be named or resolved, `git` fails or times out -- it shall
    exit 2 and name what it could not see. It never exits 0 or 1 in that
    state (`docs/adr/gate-refusal-contract.md`; exit 2 is also what
-   blocks a `PreToolUse` call). A tool call the guard cannot parse at
-   all is the same state and gets the same exit, pending Open decision 2.
+   blocks a `PreToolUse` call). The guard classifies the call first: one
+   that opens no pull request exits 0 whatever the state of the session
+   id or the record, which are read only on the opening path. A tool
+   call the guard cannot parse at all cannot be classified, and gets
+   exit 2 pending Open decision 2.
 8. When the record holds lines the guard cannot parse and the entries it
    needs are not among the lines it can, the refusal shall say how many
    lines were unreadable. A line that parses is believed; an unreadable
@@ -550,7 +567,7 @@ barwise-953 closes in a tracker-only pull request after this one merges.
   per `Read` and per `Skill` call, and one more per Bash call.
 - A session that opens pull requests with `gh` has to use the literal
   form: push first, name `--repo` and `--head`, single-quote the title,
-  and pass the body as an absolute `--body-file`. Remote sessions open
+  and pass the body single-quoted or as an absolute `--body-file`. Remote sessions open
   through the MCP tool and are not affected.
 
 ## Open decisions (for review)
