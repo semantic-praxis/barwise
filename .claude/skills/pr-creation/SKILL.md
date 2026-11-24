@@ -74,6 +74,12 @@ least once:
 - **The author-side review lanes have run**: `/code-review` on your own
   diff, and `/security-review` when the diff meets a trigger listed in the
   root `REVIEW.md`, which owns that list and which lane runs when.
+- **Both of the last two were run on the commit you pushed.** A session
+  that loads the project hooks cannot open the pull request otherwise:
+  the rule and what enforces it are
+  `docs/adr/review-policy.md#review-before-open`. A fix is a new commit,
+  so `/code-review` and the checklist read come last, after the final
+  push.
 - **Each fact is written once; everything else points to it.** A
   count, a status, a list of entries, or a claim about what the code
   does has one home: wherever it is produced or decided -- the spec's
@@ -240,7 +246,12 @@ shell ran them as commands and the tool reported success.
 
 - Base `main`, ready for review, never a draft: a PR that is not
   ready is a branch. Remote sessions use the GitHub MCP tools;
-  locally, `gh auth switch --user gabeschenz` first (`AGENTS.md`).
+  locally, `gh auth switch --user gabeschenz` first (`AGENTS.md`), as a
+  command of its own: the opening guard
+  (`docs/adr/review-policy.md#review-before-open`) reads one literal
+  form of `gh pr create` and prints it when it refuses another. When
+  the owner has said to open without the review, the body quotes the
+  instruction on the line that ADR names.
 - Subscribe to the PR's activity, then read the `steward` skill: from
   here the PR is being driven, and that file owns the mechanics
   (tracker conflicts, regenerators, the ratchet, the pre-push order)

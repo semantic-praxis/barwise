@@ -51,6 +51,10 @@
           {
             "type": "command",
             "command": "env -u BARWISE_EXIT_DIR node \"$CLAUDE_PROJECT_DIR/barwise/scripts/hooks/merge-guard.mjs\""
+          },
+          {
+            "type": "command",
+            "command": "env -u BARWISE_EXIT_DIR node \"$CLAUDE_PROJECT_DIR/barwise/scripts/hooks/pr-open-guard.mjs\""
           }
         ]
       },
@@ -62,6 +66,15 @@
             "command": "env -u BARWISE_EXIT_DIR node \"$CLAUDE_PROJECT_DIR/barwise/scripts/hooks/merge-guard.mjs\""
           }
         ]
+      },
+      {
+        "matcher": "mcp__github__create_pull_request",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "env -u BARWISE_EXIT_DIR node \"$CLAUDE_PROJECT_DIR/barwise/scripts/hooks/pr-open-guard.mjs\""
+          }
+        ]
       }
     ],
     "PostToolUse": [
@@ -71,6 +84,15 @@
           {
             "type": "command",
             "command": "env -u BARWISE_EXIT_DIR node \"$CLAUDE_PROJECT_DIR/barwise/scripts/hooks/masked-exit.mjs\" post"
+          }
+        ]
+      },
+      {
+        "matcher": "Skill|Read",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "env -u BARWISE_EXIT_DIR node \"$CLAUDE_PROJECT_DIR/barwise/scripts/hooks/review-recorder.mjs\""
           }
         ]
       }

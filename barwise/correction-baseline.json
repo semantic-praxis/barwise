@@ -619,6 +619,12 @@
       "caught_by": "execution",
       "note": "Grounded in the metamodel's actual behaviour -- addObjectType throws without a reference_mode. The softest row in this baseline: reading the code, so arguably reasoning."
     },
+    "model-merge-stages::4ce33dccd995": {
+      "spec": "model-merge-stages.spec.md",
+      "excerpt": "shipped in #1036. three forms run, not two: prior ids are drawn, since replayinto40 gives any generated model prior ids in one call. all six probes are caught b",
+      "caught_by": "execution",
+      "note": "The spec expected probe M3 to stay missed by the laws because a generated role's id is its fact type's id and a position. Running the six probes for WS1 showed the arity differs in 202 of 250 pairs and the fault was unread for another reason: no law read a partial acceptance. Found by planting the fault and adding the law, on #1036."
+    },
     "multi-sample-import::e2ab5045552b": {
       "spec": "multi-sample-import.spec.md",
       "excerpt": "all three workstreams landed in one pr rather than three -- the designated branch serializes prs, and each workstream had its own offline tests, so splitting bo",
